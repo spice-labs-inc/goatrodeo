@@ -32,8 +32,8 @@ import scala.util.Try
 import scala.util.Success
 import scala.util.Failure
 import ujson.Value
-import goatrodeo.util.Helpers
-import goatrodeo.omnibor.{Entry, EntryMetaData, Storage, GitOID}
+import goatrodeo.util.{Helpers, GitOID}
+import goatrodeo.omnibor.{Entry, EntryMetaData, Storage}
 import java.io.FileOutputStream
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter

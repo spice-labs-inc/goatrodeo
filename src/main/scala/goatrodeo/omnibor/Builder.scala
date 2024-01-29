@@ -26,44 +26,76 @@ import java.io.OutputStreamWriter
 import java.io.BufferedWriter
 import java.util.Base64
 
+/** Build the GitOIDs the container and all the sub-elements found in the
+  * container
+  */
 object Builder {
-    def buildDB(source: File, storage: Storage, threadCnt: Int): Unit = {
+
+  /** Build the OmniBOR GitOID Corpus from all the JAR files contained in the
+    * directory and its subdirectories. Put the results in Storage.
+    *
+    * @param source
+    *   where to search for JAR files
+    * @param storage
+    *   the storage destination of the corpus
+    * @param threadCnt
+    *   the number of threads to use when computings
+    */
+  def buildDB(source: File, storage: Storage, threadCnt: Int): Unit = {
     val re = "\\.jar\\.[0-9]+$".r
     val onlyName = Pattern.compile("^(.*)\\.[0-9]+$")
+
+    // get a channel to find all the JAR files
     val files =
       Helpers.findFiles(
         source,
         f =>
           f.isFile() &&
-            (f.getName().endsWith(".jar") || re
-              .findFirstIn(f.getName())
-              .isDefined)
-      )
+            (f.getName().endsWith(".jar") ||
+              re.findFirstIn(f.getName()).isDefined))
+
+    // The count of all the files found
     val cnt = new AtomicInteger(0)
+
+    // start time
     val start = System.currentTimeMillis()
+
+    // fork `threadCnt` threads to do the work
     val threads = for { threadNum <- 0 until threadCnt } yield {
       val t = new Thread(
         () =>
+          // pull the files from the channel
+          // if the channel is closed/empty, `None` will be
+          // returned, handle it gracefully
           for {
             fileOpt <- files
             fileUnfixed <- fileOpt
           } {
             try {
+
+              // Get the filename
               val m = onlyName.matcher(fileUnfixed.getCanonicalPath())
               val file: java.io.File = if (m.find()) {
                 new File(m.group(1))
               } else { fileUnfixed }
+
+              // build the package
               for { p <- Loader.buildPackage(fileUnfixed, file.getName()) } {
+
+                // compute the filename in Storage for the Root entry
                 val (path_1, path_2, fileName) = GitOID.urlToFileName(p.gitoid)
 
                 val targetFile = f"${path_1}/${path_2}/${fileName}.json"
 
                 // if we've already processed something with the same gitoid, don't do it again
                 if (!storage.exists(targetFile)) {
+                  // write the root Entry
                   storage.write(targetFile, write(p.toEntry(), indent = 2))
 
+                  // update the Package URL index
                   p.updateIndex(storage)
 
+                  // write or update all the dependents
                   p.fixDependents(storage)
 
                 } else {
@@ -84,14 +116,22 @@ object Builder {
       t.start()
       t
     }
+
+    // wait for the threads to complete
     for { t <- threads } t.join()
 
     storage match {
+      // if the attribute of the Storage includes the ability to
+      // list filenames, write sharded index
       case v: ListFileNames =>
         v.target() match {
           case Some(target) =>
             val start = System.currentTimeMillis()
+            // make sure the destination exists
             target.getAbsoluteFile().getParentFile().mkdirs()
+
+            // FIXME -- deal with proper sharding of the output
+            // based on 1 or 2 digits in the MD5 hash
             val baseFos = new FileOutputStream(target)
             val fos =
               if (target.getName().endsWith(".gz"))
@@ -99,8 +139,11 @@ object Builder {
               else baseFos
             val wr = new OutputStreamWriter(fos, "UTF-8")
             val br = new BufferedWriter(wr)
+
+            // how many records did we process
             var cnt = 0
 
+            // Get the sorted (by MD5 of the path name)
             for {
               (hash, name) <- v.pathsSortedWithMD5()
               item <- storage.read(name)
@@ -108,11 +151,14 @@ object Builder {
               cnt = cnt + 1
               if (cnt % 10000 == 0)
                 println(f"Count ${cnt} writing ${hash},${name}")
+
+              // write the item
               br.write(
                 f"${hash},${name}||,||${Base64.getEncoder().encodeToString(item)}\n"
               )
             }
 
+            // clean up
             br.close()
             wr.close()
             fos.close()

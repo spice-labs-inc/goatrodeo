@@ -16,8 +16,7 @@ limitations under the License. */
 
 import upickle.default.*
 import scala.collection.SortedSet
-
-type GitOID = String
+import goatrodeo.util.GitOID
 
 object Entry {
 

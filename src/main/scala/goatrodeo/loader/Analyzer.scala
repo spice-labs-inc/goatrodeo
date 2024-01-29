@@ -25,8 +25,8 @@ import java.net.URL
 import java.net.URLEncoder
 import java.net.HttpURLConnection
 import java.io.InputStream
-import goatrodeo.util.Helpers
-import goatrodeo.omnibor.{Entry, GitOID}
+import goatrodeo.util.{Helpers, GitOID}
+import goatrodeo.omnibor.{Entry}
 
 /** Do analysis of the file to see what the composition of a particular JAR file
   * is
