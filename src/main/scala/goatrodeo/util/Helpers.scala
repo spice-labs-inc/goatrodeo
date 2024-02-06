@@ -170,30 +170,40 @@ object Helpers {
     slurpInput(fis)
   }
 
-  /**
-    * Get data on a GitOID from a GitOID Corpus
+  /** Get data on a GitOID from a GitOID Corpus
     *
-    * @param gitoid the gitoid to look up
-    * @param base the base of the corpus (e.g., https or file)
-    * @param splitter the function that splits the filename for lookup
-    * @return a tuple containing an HTTP response code. If it's 200, then the second item contains the
-    * `Array[Byte]` returned from the request
+    * @param gitoid
+    *   the gitoid to look up
+    * @param base
+    *   the base of the corpus (e.g., https or file)
+    * @param splitter
+    *   the function that splits the filename for lookup
+    * @return
+    *   a tuple containing an HTTP response code. If it's 200, then the second
+    *   item contains the `Array[Byte]` returned from the request
     */
   def getData(
       gitoid: GitOID,
       base: URL,
-      splitter: String => Vector[String]
+      splitter: String => (Vector[String], Option[String])
   ): (Int, Array[Byte]) = {
-    
+
     // FIXME Support SQLLite DB as well
-    val split = splitter(gitoid)
-    val actual = split.foldLeft(base)((url, v) => {
+    val (split, suffix) = splitter(gitoid)
+    val actualPre = split.foldLeft(base)((url, v) => {
       val uri = url.toURI()
       uri
         .resolve(f"${uri.getPath()}/${v}")
         .toURL()
     })
 
+    val actual = suffix match {
+      case None => actualPre
+      case Some(suff) => {
+        val uri = actualPre.toURI()
+        uri.resolve(f"${uri.getPath()}.${suff}").toURL()
+      }
+    }
 
     try {
       val input = actual.openConnection() match {
@@ -209,7 +219,10 @@ object Helpers {
       }
       (200, Helpers.slurpInput(input))
     } catch {
-      case e: Exception => (404, e.toString().getBytes("UTF-8"))
+      case e: Exception => 
+        {
+          (404, e.toString().getBytes("UTF-8"))
+        }
     }
 
   }

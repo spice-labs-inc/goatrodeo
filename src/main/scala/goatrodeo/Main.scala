@@ -33,10 +33,12 @@ import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
+import java.net.URL
 
 /** The `main` class
   */
 object Howdy {
+
   /** Command Line Configuration
     *
     * @param analyze
@@ -60,7 +62,8 @@ object Howdy {
       dbOut: Option[File] = None,
       build: Option[File] = None,
       threads: Int = 4,
-      inMem: Boolean = false
+      inMem: Boolean = false,
+      fetchURL: URL = new URL("https://goatrodeo.org/omnibor")
   )
 
   lazy val builder = OParser.builder[Config]
@@ -77,6 +80,9 @@ object Howdy {
       opt[Unit]('m', "mem")
         .text("Compute value using in-memory data store")
         .action((x, c) => c.copy(inMem = true)),
+      opt[URL]('f', "fetch")
+        .text("Fetch OmniBOR ids from which URL")
+        .action((u, c) => c.copy(fetchURL = u)),
       opt[File]('b', "build")
         .text("Build gitoid database from jar files in a directory")
         .action((x, c) =>
@@ -89,13 +95,14 @@ object Howdy {
         .text("Output SQLite database for DB-based gitoid storage")
         .action((db, c) => c.copy(dbOut = Some(db))),
       opt[Int]('t', "threads")
-        .text("How many threads to run (default 4). Should be 2x-3x number of cores")
+        .text(
+          "How many threads to run (default 4). Should be 2x-3x number of cores"
+        )
         .action((t, c) => c.copy(threads = t))
     )
   }
 
-  /**
-    * Bail out... gracefully if we're running in SBT
+  /** Bail out... gracefully if we're running in SBT
     *
     * @return
     */
@@ -115,24 +122,31 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(Config(Some(_), _, _, Some(_), _, _)) =>
+      case Some(Config(Some(_), _, _, Some(_), _, _, _)) =>
         println("Cannot do both analysis and building...")
         println(OParser.usage(parser1))
         bailFail()
 
-      case Some(Config(None, _, _, None, _, _)) =>
+      case Some(Config(None, _, _, None, _, _, _)) =>
         println("You must either build or analyze...");
         println(OParser.usage(parser1))
         bailFail()
 
-      case Some(Config(Some(analyzeFile), _, _, _, _, _)) =>
-        Analyzer.analyze(analyzeFile)
+      case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch)) =>
+        Analyzer.analyze(analyzeFile, fetch)
 
-      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem)) if out.isDefined || dbOut.isDefined =>
-        Builder.buildDB(buildFrom, Storage.getStorage(inMem, dbOut, out), threads)
+      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _))
+          if out.isDefined || dbOut.isDefined =>
+        Builder.buildDB(
+          buildFrom,
+          Storage.getStorage(inMem, dbOut, out),
+          threads
+        )
 
-      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem))  =>
-        println("Either `out` or `db` must be defined... where does the build result go?")
+      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _)) =>
+        println(
+          "Either `out` or `db` must be defined... where does the build result go?"
+        )
         println(OParser.usage(parser1))
         bailFail()
 

@@ -38,25 +38,19 @@ object Analyzer {
     * @param what
     *   the file to analyze
     */
-  def analyze(what: File): Unit = {
+  def analyze(what: File, fetch: URL): Unit = {
     val (main, gitoids) = buildGitOIDs(what)
 
-    val fetched = fetchOmniBOR(main :: gitoids, new URL("https://goatrodeo.org/omnibor"))
+    val fetched =
+      fetchOmniBOR(main :: gitoids, fetch, if (fetch.getProtocol() == "file") fileSplitter else webSplitter)
 
-    fetched.get(main) match {
-      case Some(Some(yep)) =>
-        println(f"Package ${yep.metadata.purl}")
-        println(f"Vulns ${write(yep.metadata.vulnerabilities, 2)}")
-      case _ =>
-        println(
-          toplinePercent(fetched)
-            .filter(_._2 > 0.75)
-            .map((a, b) =>
-              f"${a.metadata.filename.getOrElse("N/A")} ${write(a.metadata.vulnerabilities, 2)}" -> b
-            )
-            .toVector
-            .mkString("\n")
-        )
+
+    for {(info, probabily) <- toplinePercent(fetched) if probabily > 0.75} {
+      println(f"${info.metadata.filename
+            .getOrElse("N/A")}, ${(probabily * 100).toInt} %%, ${info.metadata.vulnerabilities match {
+              case None => "No CVEs"
+              case Some(vulns) => write(vulns, 2)
+            }}")
     }
   }
 
@@ -95,12 +89,12 @@ object Analyzer {
 
   /** Split the filename for web lookup
     */
-  lazy val webSplitter: GitOID => Vector[String] = s => Vector(s)
+  lazy val webSplitter: GitOID => (Vector[String], Option[String]) = s => (Vector(s), None)
 
   /** Splut the filename for filesystem lookup
     */
-  lazy val fileSplitter: GitOID => Vector[String] = s => {
-    val (a, b, c) = GitOID.urlToFileName(s); Vector(a, b, c)
+  lazy val fileSplitter: GitOID => (Vector[String], Option[String]) = s => {
+    val (a, b, c) = GitOID.urlToFileName(s); (Vector(a, b, c), Some("json"))
   }
 
   /** For a set of gitoids, look up the entries (information about the GitOID)
@@ -118,7 +112,7 @@ object Analyzer {
   def fetchOmniBOR(
       items: Seq[GitOID],
       base: URL,
-      splitter: String => Vector[String] = webSplitter
+      splitter: String => (Vector[String], Option[String]) = webSplitter
   ): Map[String, Option[Entry]] = {
     // what have we fetched
     var fetched = Map.from(items.map(i => (i, false)))
@@ -138,7 +132,7 @@ object Analyzer {
         fetched = fetched + (k -> true)
 
         val top: Option[Entry] = if (code == 200) {
-         val tt =  Try {
+          val tt = Try {
             upickle.default.read[Entry](body)
           }
 
@@ -163,15 +157,14 @@ object Analyzer {
     ret
   }
 
-  /**
-    * Compute the percentage of items from the whole
-    * that are contained in `Entry`s that have Package
-    * URLs
+  /** Compute the percentage of items from the whole that are contained in
+    * `Entry`s that have Package URLs
     *
-    * @param in the map of GitOID to Entry
-    * @return the `Entry`s that have package URLs (e.g., containers for
-      which there may be CVEs) and the percentage of files that are part
-      of each Package 
+    * @param in
+    *   the map of GitOID to Entry
+    * @return
+    *   the `Entry`s that have package URLs (e.g., containers for which there
+    *   may be CVEs) and the percentage of files that are part of each Package
     */
   def toplinePercent(
       in: Map[String, Option[Entry]]
