@@ -24,6 +24,7 @@ import java.net.URL
 import java.net.URLEncoder
 import java.net.HttpURLConnection
 import java.security.MessageDigest
+import javax.net.ssl.HttpsURLConnection
 
 type GitOID = String
 
@@ -183,14 +184,16 @@ object Helpers {
       base: URL,
       splitter: String => Vector[String]
   ): (Int, Array[Byte]) = {
+    
     // FIXME Support SQLLite DB as well
     val split = splitter(gitoid)
     val actual = split.foldLeft(base)((url, v) => {
       val uri = url.toURI()
       uri
-        .resolve(f"${uri.getPath()}/${URLEncoder.encode(v, "UTF-8")}")
+        .resolve(f"${uri.getPath()}/${v}")
         .toURL()
     })
+
 
     try {
       val input = actual.openConnection() match {

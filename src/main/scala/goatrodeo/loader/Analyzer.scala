@@ -41,10 +41,11 @@ object Analyzer {
   def analyze(what: File): Unit = {
     val (main, gitoids) = buildGitOIDs(what)
 
-    val fetched = fetchOmniBOR(main :: gitoids, null)
+    val fetched = fetchOmniBOR(main :: gitoids, new URL("https://goatrodeo.org/omnibor"))
 
     fetched.get(main) match {
       case Some(Some(yep)) =>
+        println(f"Package ${yep.metadata.purl}")
         println(f"Vulns ${write(yep.metadata.vulnerabilities, 2)}")
       case _ =>
         println(
@@ -137,9 +138,11 @@ object Analyzer {
         fetched = fetched + (k -> true)
 
         val top: Option[Entry] = if (code == 200) {
-          Try {
+         val tt =  Try {
             upickle.default.read[Entry](body)
-          }.toOption
+          }
+
+          tt.toOption
         } else None
 
         // put it in the return
