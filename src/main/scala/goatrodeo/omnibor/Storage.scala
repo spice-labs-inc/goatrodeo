@@ -20,6 +20,8 @@ import scala.util.Try
 import java.util.concurrent.atomic.AtomicReference
 import java.sql.Blob
 import java.sql.PreparedStatement
+import java.net.URL
+import goatrodeo.loader.GitOID
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -69,6 +71,45 @@ trait Storage {
   def release(): Unit
 }
 
+trait StorageReader {
+  def read(path: String): Option[Array[Byte]]
+}
+
+class WebStorageReader(base: URL) extends StorageReader {
+  def read(path: String): Option[Array[Byte]] = {
+    val u2 = new URL(base, path)
+    Try {
+      Helpers.slurpInput(u2.openStream())
+    }.toOption
+  }
+}
+
+class FileStorageReader(base: String) extends StorageReader {
+  private val baseFile = new File(base)
+
+  def read(path: String): Option[Array[Byte]] = {
+    val stuff = GitOID.urlToFileName(path)
+    val theFile =
+      new File(baseFile, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
+    if (theFile.exists()) {
+
+      Try {
+        Helpers.slurpInput(theFile)
+      }.toOption
+    } else None
+  }
+}
+
+object StorageReader {
+  def from(url: URL): StorageReader = {
+    if (url.getProtocol() == "file") {
+      new FileStorageReader(url.getPath())
+    } else {
+      new WebStorageReader(url)
+    }
+  }
+}
+
 /** Can the filenames be listed?
   */
 trait ListFileNames {
@@ -105,13 +146,17 @@ trait ListFileNames {
 /** A helper/companion to Storage
   */
 object Storage {
-  /**
-    * Based on criteria, return the appropriate storage instance
+
+  /** Based on criteria, return the appropriate storage instance
     *
-    * @param inMem store in-memory
-    * @param dbLoc the location of the SQLite database
-    * @param fsLoc the filesystem location for file store and InMemory target
-    * @return an appropriate storage instance
+    * @param inMem
+    *   store in-memory
+    * @param dbLoc
+    *   the location of the SQLite database
+    * @param fsLoc
+    *   the filesystem location for file store and InMemory target
+    * @return
+    *   an appropriate storage instance
     */
   def getStorage(
       inMem: Boolean,
@@ -126,15 +171,16 @@ object Storage {
   }
 }
 
-/**
-  * Deal with in-memory storage
+/** Deal with in-memory storage
   */
 object MemStorage {
-  /**
-    * Get an InMem storage instance
+
+  /** Get an InMem storage instance
     *
-    * @param targetDir the optional target directory for post-processing output
-    * @return the storage directory
+    * @param targetDir
+    *   the optional target directory for post-processing output
+    * @return
+    *   the storage directory
     */
   def getStorage(targetDir: Option[File]): Storage = {
 
@@ -171,14 +217,20 @@ object MemStorage {
   }
 }
 
-/**
-  * Store the GitOID Corpus on the filesystem
+/** Store the GitOID Corpus on the filesystem
   */
 object FileSystemStorage {
   def getStorage(root: File): Storage = {
 
     def buildIt(path: String): File = {
-      new File(root, path)
+      if (path.startsWith("pkg:")) {
+        new File(root, f"purl/${path}.json")
+      } else {
+        val stuff = GitOID.urlToFileName(path)
+
+        new File(root, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
+      }
+
     }
 
     new Storage {
@@ -200,9 +252,8 @@ object FileSystemStorage {
   }
 }
 
-/**
-  * The GitOID Corpus in a SQLite database. Turns out this is
-  * not materially faster than using the filesystem
+/** The GitOID Corpus in a SQLite database. Turns out this is not materially
+  * faster than using the filesystem
   */
 object SqlLiteStorage {
   import java.sql.Connection;

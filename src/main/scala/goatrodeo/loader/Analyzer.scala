@@ -26,7 +26,7 @@ import java.net.URLEncoder
 import java.net.HttpURLConnection
 import java.io.InputStream
 import goatrodeo.util.{Helpers, GitOID}
-import goatrodeo.omnibor.{Entry}
+import goatrodeo.omnibor.{Entry, StorageReader}
 
 /** Do analysis of the file to see what the composition of a particular JAR file
   * is
@@ -37,20 +37,22 @@ object Analyzer {
     *
     * @param what
     *   the file to analyze
+    * @param fetch -- the URL to fetch things from
     */
   def analyze(what: File, fetch: URL): Unit = {
     val (main, gitoids) = buildGitOIDs(what)
 
+    val reader: StorageReader = StorageReader.from(fetch)
+
     val fetched =
-      fetchOmniBOR(main :: gitoids, fetch, if (fetch.getProtocol() == "file") fileSplitter else webSplitter)
+      fetchOmniBOR(main :: gitoids, reader)
 
-
-    for {(info, probabily) <- toplinePercent(fetched) if probabily > 0.75} {
+    for { (info, probabily) <- toplinePercent(fetched) if probabily > 0.75 } {
       println(f"${info.metadata.filename
-            .getOrElse("N/A")}, ${(probabily * 100).toInt} %%, ${info.metadata.vulnerabilities match {
-              case None => "No CVEs"
-              case Some(vulns) => write(vulns, 2)
-            }}")
+          .getOrElse("N/A")}, ${(probabily * 100).toInt} %%, ${info.metadata.vulnerabilities match {
+          case None        => "No CVEs"
+          case Some(vulns) => write(vulns, 2)
+        }}")
     }
   }
 
@@ -87,32 +89,28 @@ object Analyzer {
     (ret, extra.getOrElse(Nil))
   }
 
-  /** Split the filename for web lookup
-    */
-  lazy val webSplitter: GitOID => (Vector[String], Option[String]) = s => (Vector(s), None)
+  // /** Split the filename for web lookup
+  //   */
+  // lazy val webSplitter: GitOID => (Vector[String], Option[String]) = s => (Vector(s), None)
 
-  /** Splut the filename for filesystem lookup
-    */
-  lazy val fileSplitter: GitOID => (Vector[String], Option[String]) = s => {
-    val (a, b, c) = GitOID.urlToFileName(s); (Vector(a, b, c), Some("json"))
-  }
+  // /** Splut the filename for filesystem lookup
+  //   */
+  // lazy val fileSplitter: GitOID => (Vector[String], Option[String]) = s => {
+  //   val (a, b, c) = GitOID.urlToFileName(s); (Vector(a, b, c), Some("json"))
+  // }
 
   /** For a set of gitoids, look up the entries (information about the GitOID)
     *
     * @param items
     *   the set of GitOIDs
-    * @param base
-    *   the URL of where to look up. Could be `https://` could be `file:`
-    * @param splitter
-    *   How to split the `gitoid` into something that can be looked up
-    *   (different between web and filesystem)
+    * @param reader read the GitOID from a web or filesystem
+    *   
     * @return
     *   a `Map` of `gitoid` -> `Entry`
     */
   def fetchOmniBOR(
       items: Seq[GitOID],
-      base: URL,
-      splitter: String => (Vector[String], Option[String]) = webSplitter
+      reader: StorageReader
   ): Map[String, Option[Entry]] = {
     // what have we fetched
     var fetched = Map.from(items.map(i => (i, false)))
@@ -126,18 +124,19 @@ object Analyzer {
       // for each GitOID we haven't fetched
       for { (k, got) <- fetched if !got } {
         // fetch the item
-        val (code, body) = Helpers.getData(k, base, splitter)
+        val body = reader.read(k)
 
         // mark it as fetched
         fetched = fetched + (k -> true)
 
-        val top: Option[Entry] = if (code == 200) {
-          val tt = Try {
-            upickle.default.read[Entry](body)
-          }
+        val top: Option[Entry] =
+          body.flatMap(b => {
+            val tt = Try {
+              upickle.default.read[Entry](b)
+            }
 
-          tt.toOption
-        } else None
+            tt.toOption
+          })
 
         // put it in the return
         ret = ret + (k -> top)

@@ -615,7 +615,6 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
       case Some(purl) =>
         TopLevel.indexLock.synchronized {
 
-          val purlFile = f"purl/${purl}.json"
 
           lazy val defaultPurlHolder = 
             Entry(identifier = purl,
@@ -636,9 +635,9 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
             _type = "purl"
           )
 
-          val ph: Entry = if (storage.exists(purlFile)) {
+          val ph: Entry = if (storage.exists(purl)) {
             try {
-              storage.read(purlFile) match {
+              storage.read(purl) match {
                 case Some(bytes) => upickle.default.read(bytes)
                 case _           => defaultPurlHolder
               }
@@ -653,7 +652,7 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
             _timestamp = System.currentTimeMillis(),
             contains = (Set(ph.contains :+ this.gitoid :_*).toVector.sorted)
           )
-          storage.write(purlFile, f"${write(ph2, indent = 2)}\n")
+          storage.write(purl, f"${write(ph2, indent = 2)}\n")
         }
       case _ =>
     }
@@ -663,9 +662,9 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
     val thispf = this.intoPackageFile()
     for { pf <- contains } {
       TopLevel.lockGitOid(pf.gitoid) {
-        val (path_1, path_2, fileName) = GitOID.urlToFileName(pf.gitoid)
+       
 
-        val toDo = f"${path_1}/${path_2}/${fileName}.json"
+        val toDo = pf.gitoid
         val core: Entry = if (storage.exists(toDo)) {
           Try {
             storage.read(toDo) match {

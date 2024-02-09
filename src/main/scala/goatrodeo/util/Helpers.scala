@@ -182,51 +182,51 @@ object Helpers {
     *   a tuple containing an HTTP response code. If it's 200, then the second
     *   item contains the `Array[Byte]` returned from the request
     */
-  def getData(
-      gitoid: GitOID,
-      base: URL,
-      splitter: String => (Vector[String], Option[String])
-  ): (Int, Array[Byte]) = {
+//   def getData(
+//       gitoid: GitOID,
+//       base: URL,
+//       splitter: String => (Vector[String], Option[String])
+//   ): (Int, Array[Byte]) = {
 
-    // FIXME Support SQLLite DB as well
-    val (split, suffix) = splitter(gitoid)
-    val actualPre = split.foldLeft(base)((url, v) => {
-      val uri = url.toURI()
-      uri
-        .resolve(f"${uri.getPath()}/${v}")
-        .toURL()
-    })
+//     // FIXME Support SQLLite DB as well
+//     val (split, suffix) = splitter(gitoid)
+//     val actualPre = split.foldLeft(base)((url, v) => {
+//       val uri = url.toURI()
+//       uri
+//         .resolve(f"${uri.getPath()}/${v}")
+//         .toURL()
+//     })
 
-    val actual = suffix match {
-      case None => actualPre
-      case Some(suff) => {
-        val uri = actualPre.toURI()
-        uri.resolve(f"${uri.getPath()}.${suff}").toURL()
-      }
-    }
+//     val actual = suffix match {
+//       case None => actualPre
+//       case Some(suff) => {
+//         val uri = actualPre.toURI()
+//         uri.resolve(f"${uri.getPath()}.${suff}").toURL()
+//       }
+//     }
 
-    try {
-      val input = actual.openConnection() match {
-        case http: HttpURLConnection =>
-          http.setRequestMethod("GET")
-          http.connect()
-          val resp = http.getResponseCode()
-          if (resp != 200) return (resp, "N/A".getBytes("UTF-8"))
-          http.getInputStream()
-        case other =>
-          other.connect()
-          other.getInputStream()
-      }
-      (200, Helpers.slurpInput(input))
-    } catch {
-      case e: Exception => 
-        {
-          (404, e.toString().getBytes("UTF-8"))
-        }
-    }
+//     try {
+//       val input = actual.openConnection() match {
+//         case http: HttpURLConnection =>
+//           http.setRequestMethod("GET")
+//           http.connect()
+//           val resp = http.getResponseCode()
+//           if (resp != 200) return (resp, "N/A".getBytes("UTF-8"))
+//           http.getInputStream()
+//         case other =>
+//           other.connect()
+//           other.getInputStream()
+//       }
+//       (200, Helpers.slurpInput(input))
+//     } catch {
+//       case e: Exception => 
+//         {
+//           (404, e.toString().getBytes("UTF-8"))
+//         }
+//     }
 
-  }
-}
+//   }
+ }
 
 class BoundedChannel[T](size: Int) extends Seq[Option[T]] {
   private var active: Boolean = true

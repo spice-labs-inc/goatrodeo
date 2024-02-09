@@ -83,9 +83,8 @@ object Builder {
               for { p <- Loader.buildPackage(fileUnfixed, file.getName()) } {
 
                 // compute the filename in Storage for the Root entry
-                val (path_1, path_2, fileName) = GitOID.urlToFileName(p.gitoid)
 
-                val targetFile = f"${path_1}/${path_2}/${fileName}.json"
+                val targetFile = p.gitoid 
 
                 // if we've already processed something with the same gitoid, don't do it again
                 if (!storage.exists(targetFile)) {
