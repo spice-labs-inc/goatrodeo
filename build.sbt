@@ -5,7 +5,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "goatrodeo",
-    version := "0.2.0-SNAPSHOT",
+    version := "0.2.1-SNAPSHOT",
     scalaVersion := scala3Version,
     libraryDependencies += "org.scala-lang" %% "toolkit" % "0.1.7",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.2.0",

@@ -32,3 +32,6 @@ metals.sbt
 /.worksheet/
 
 frood.db
+info_repo*.txt
+frood.txt
+

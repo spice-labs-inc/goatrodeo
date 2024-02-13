@@ -17,6 +17,9 @@ limitations under the License. */
 import upickle.default.*
 import scala.collection.SortedSet
 import goatrodeo.util.GitOID
+import goatrodeo.util.Helpers
+import java.util.Base64
+import scala.util.Try
 
 object Entry {
 
@@ -110,6 +113,7 @@ case class Entry(
     _version: Int,
     _type: String
 ) derives ReadWriter {
+  override def toString(): String = f"gitoid: ${identifier}\nContains: ${contains.sorted.mkString(", ")}\nContainedBy: ${containedBy.sorted.mkString(", ")}\nMetadata ${metadata}\nTimestamp ${_timestamp}, type ${_type}"
   def merge(other: Entry): Entry = {
     import Entry._
 
@@ -176,6 +180,42 @@ case class EntryMetaData(
         other = chooseJson(this.other, other.other),
         _version = 1
       )
+    }
+  }
+}
+
+case class LineItem(md5hash: String, name: String, entry: Entry) {
+  def encode(): String = {
+    f"${md5hash},${name}||,||${Base64.getEncoder().encodeToString(upickle.default.writeToByteArray(entry, indent = 2))}"
+  }
+
+  def merge(other: LineItem): LineItem = 
+    this.copy(entry = this.entry.merge(other.entry))
+
+  override def toString(): String = f"${md5hash}\n${name}\n${entry}"
+}
+
+object LineItem {
+  def parse(inBase: String): Option[LineItem] = {
+    if (inBase == null) {
+      None
+    } else {
+      val in = inBase.trim()
+      val comma = in.indexOf(",")
+      val entryLoc = in.lastIndexOf("||,||")
+      if (comma <= 0 || entryLoc <= 0 || entryLoc < comma) {
+        None
+      } else {
+        val md5 = in.substring(0, comma)
+        val path = in.substring(comma + 1, entryLoc)
+        val entryb64 = in.substring(entryLoc + 5)
+        for {
+          entryBytes <- Try { Base64.getDecoder().decode(entryb64) }.toOption
+          theEntry <- Try { upickle.default.read[Entry](entryBytes) }.toOption
+        } yield {
+          LineItem(md5, path, theEntry)
+        }
+      }
     }
   }
 }

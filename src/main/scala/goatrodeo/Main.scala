@@ -28,7 +28,7 @@ import java.io.BufferedWriter
 import java.io.FileWriter
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import goatrodeo.omnibor.{Storage, FileSystemStorage, ListFileNames, Builder}
+import goatrodeo.omnibor.{Storage, FileSystemStorage, ListFileNames, Builder, Merger}
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.util.Base64
@@ -63,7 +63,8 @@ object Howdy {
       build: Option[File] = None,
       threads: Int = 4,
       inMem: Boolean = false,
-      fetchURL: URL = new URL("https://goatrodeo.org/omnibor")
+      fetchURL: URL = new URL("https://goatrodeo.org/omnibor"),
+      mergees: Option[Vector[File]] = None
   )
 
   lazy val builder = OParser.builder[Config]
@@ -80,6 +81,9 @@ object Howdy {
       opt[Unit]('m', "mem")
         .text("Compute value using in-memory data store")
         .action((x, c) => c.copy(inMem = true)),
+      opt[Seq[File]]("merge")
+        .text("Merge omnibor files created with 'build' command")
+        .action((x, c) => c.copy(mergees = Some(x.toVector))),
       opt[URL]('f', "fetch")
         .text("Fetch OmniBOR ids from which URL")
         .action((u, c) => c.copy(fetchURL = u)),
@@ -122,20 +126,39 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(Config(Some(_), _, _, Some(_), _, _, _)) =>
+      case Some(Config(Some(_), _, _, Some(_), _, _, _, _)) =>
         println("Cannot do both analysis and building...")
         println(OParser.usage(parser1))
         bailFail()
 
-      case Some(Config(None, _, _, None, _, _, _)) =>
-        println("You must either build or analyze...");
+      case Some(Config(_, _, _, Some(_), _, _, _, Some(_))) =>
+        println("Cannot do both merge and building...")
         println(OParser.usage(parser1))
         bailFail()
 
-      case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch)) =>
+      case Some(Config(Some(_), _, _, _, _, _, _, Some(_))) =>
+        println("Cannot do both analysis and merging...")
+        println(OParser.usage(parser1))
+        bailFail()
+
+      case Some(Config(None, _, _, None, _, _, _, None)) =>
+        println("You must either build, merge, or analyze...");
+        println(OParser.usage(parser1))
+        bailFail()
+
+      case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch,_)) =>
         Analyzer.analyze(analyzeFile, fetch)
 
-      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _))
+        
+      case Some(Config(_, out, _, _, _, _, _, Some(toMerge))) if toMerge.length > 1 =>
+        Merger.merge(toMerge, out)
+
+      case Some(Config(_, _, _, _, _, _, _, Some(_))) =>
+        println("You must supply at least 2 files to merge...");
+        println(OParser.usage(parser1))
+        bailFail()
+
+      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _, _))
           if out.isDefined || dbOut.isDefined =>
         Builder.buildDB(
           buildFrom,
@@ -143,7 +166,7 @@ object Howdy {
           threads
         )
 
-      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _)) =>
+      case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _, _)) =>
         println(
           "Either `out` or `db` must be defined... where does the build result go?"
         )
