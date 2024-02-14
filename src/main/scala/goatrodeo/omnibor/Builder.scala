@@ -107,7 +107,10 @@ object Builder {
                 )
               }
             } catch {
-              case e: Exception => println(f"Failed ${fileUnfixed} ${e}")
+              case e: Throwable => {
+                println(f"Failed ${fileUnfixed} ${e}")
+                System.exit(1)
+              }
             }
           },
         f"gitoid compute ${threadNum}"
