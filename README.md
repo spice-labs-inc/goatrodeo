@@ -64,6 +64,6 @@ to the `/tmp/gitoidcorpus` directory using 24 threads.
 
 We welcome participation and have a [Code of Conduct](code_of_conduct.md).
 
-Discussions are in the [OmniBOR Slack channel](https://openssf.slack.com/archives/C02D1JYQLPQ).
+Discussions on [Matrix](https://matrix.to/#/#spice-labs:matrix.org)
 
 Looking forward to making the dependencies in your projects a bit less of a Goat Rodeo.
