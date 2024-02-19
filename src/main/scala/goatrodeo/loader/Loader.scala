@@ -652,7 +652,7 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
             _timestamp = System.currentTimeMillis(),
             contains = (Set(ph.contains :+ this.gitoid :_*).toVector.sorted)
           )
-          storage.write(purl, f"${write(ph2, indent = 2)}\n")
+          storage.write(purl, f"${write(ph2, indent = -1, escapeUnicode = true)}")
         }
       case _ =>
     }
@@ -687,7 +687,7 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
           else core.containedBy :+ thispf.gitoid
 
         val res = core.copy(containedBy = updated)
-        storage.write(toDo, write(res, indent = 2))
+        storage.write(toDo, write(res, indent = -1, escapeUnicode = true))
       }
     }
   }

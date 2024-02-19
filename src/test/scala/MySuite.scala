@@ -71,11 +71,11 @@ class MySuite extends munit.FunSuite {
     }
     val st = SqlLiteStorage.getStorage(theFile)
     assertEquals(st.exists("wombat"), false)
-    val dogboy = "dogboy".getBytes("UTF-8")
+    val dogboy = "dogboy"
     st.write("wombat", dogboy)
     assertEquals(st.exists("wombat"), true)
-    val ret: Option[Array[Byte]] = st.read("wombat")
-    assertEquals(new String(dogboy), new String(ret.get))
+    val ret: Option[String] = st.read("wombat")
+    assertEquals(dogboy, ret.get)
 
     for {i <- 1 to 100000} {
       val it = f"store ${i}"

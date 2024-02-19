@@ -24,7 +24,6 @@ import java.io.FileOutputStream
 import java.util.zip.GZIPOutputStream
 import java.io.OutputStreamWriter
 import java.io.BufferedWriter
-import java.util.Base64
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -52,7 +51,8 @@ object Builder {
         f =>
           f.isFile() &&
             (f.getName().endsWith(".jar") ||
-              re.findFirstIn(f.getName()).isDefined))
+              re.findFirstIn(f.getName()).isDefined)
+      )
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
@@ -84,12 +84,15 @@ object Builder {
 
                 // compute the filename in Storage for the Root entry
 
-                val targetFile = p.gitoid 
+                val targetFile = p.gitoid
 
                 // if we've already processed something with the same gitoid, don't do it again
                 if (!storage.exists(targetFile)) {
                   // write the root Entry
-                  storage.write(targetFile, write(p.toEntry(), indent = 2))
+                  storage.write(
+                    targetFile,
+                    write(p.toEntry(), indent = -1, escapeUnicode = true)
+                  )
 
                   // update the Package URL index
                   p.updateIndex(storage)
@@ -156,7 +159,7 @@ object Builder {
 
               // write the item
               br.write(
-                f"${hash},${name}||,||${Base64.getEncoder().encodeToString(item)}\n"
+                f"${hash},${name}||,||${item.replace('\n', ' ')}\n"
               )
             }
 

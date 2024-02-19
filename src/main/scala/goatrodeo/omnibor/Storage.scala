@@ -44,7 +44,7 @@ trait Storage {
     * @return
     *   the bytes if they exist
     */
-  def read(path: String): Option[Array[Byte]]
+  def read(path: String): Option[String]
 
   /** Write data to the path
     *
@@ -53,7 +53,7 @@ trait Storage {
     * @param data
     *   the data to write
     */
-  def write(path: String, data: Array[Byte]): Unit
+  def write(path: String, data: String): Unit
 
   /** Write data to the path
     *
@@ -62,9 +62,9 @@ trait Storage {
     * @param data
     *   the data to write
     */
-  def write(path: String, data: String): Unit = {
-    write(path, data.getBytes("UTF-8"))
-  }
+  // def write(path: String, data: String): Unit = {
+  //   write(path, data.getBytes("UTF-8"))
+  // }
 
   /** Release the backing store or close files or commit the database.
     */
@@ -72,14 +72,14 @@ trait Storage {
 }
 
 trait StorageReader {
-  def read(path: String): Option[Array[Byte]]
+  def read(path: String): Option[String]
 }
 
 class WebStorageReader(base: URL) extends StorageReader {
-  def read(path: String): Option[Array[Byte]] = {
+  def read(path: String): Option[String] = {
     val u2 = new URL(base, path)
     Try {
-      Helpers.slurpInput(u2.openStream())
+      new String(Helpers.slurpInput(u2.openStream()), "UTF-8")
     }.toOption
   }
 }
@@ -87,14 +87,14 @@ class WebStorageReader(base: URL) extends StorageReader {
 class FileStorageReader(base: String) extends StorageReader {
   private val baseFile = new File(base)
 
-  def read(path: String): Option[Array[Byte]] = {
+  def read(path: String): Option[String] = {
     val stuff = GitOID.urlToFileName(path)
     val theFile =
       new File(baseFile, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
     if (theFile.exists()) {
 
       Try {
-        Helpers.slurpInput(theFile)
+        new String(Helpers.slurpInput(theFile), "UTF-8")
       }.toOption
     } else None
   }
@@ -186,7 +186,7 @@ object MemStorage {
 
     // use an atomic reference and an immutable map to store stuff to avoid
     // `synchronized` and lock contention
-    val db = new AtomicReference(Map[String, Array[Byte]]())
+    val db = new AtomicReference(Map[String, String]())
 
     new Storage with ListFileNames {
       override def paths(): Vector[String] = db.get().keys.toVector
@@ -199,10 +199,10 @@ object MemStorage {
 
       override def exists(path: String): Boolean = db.get().contains(path)
 
-      override def read(path: String): Option[Array[Byte]] = db.get().get(path)
+      override def read(path: String): Option[String] = db.get().get(path)
 
-      override def write(path: String, data: Array[Byte]): Unit = {
-        def doUpdate(in: Map[String, Array[Byte]]): Map[String, Array[Byte]] =
+      override def write(path: String, data: String): Unit = {
+        def doUpdate(in: Map[String, String]): Map[String, String] =
           in + (path -> data)
         var old = db.get()
         var updated = doUpdate(old)
@@ -236,12 +236,12 @@ object FileSystemStorage {
     new Storage {
       override def exists(path: String): Boolean = buildIt(path).exists()
 
-      override def read(path: String): Option[Array[Byte]] = {
+      override def read(path: String): Option[String] = {
         val wholePath = buildIt(path)
-        Try { Helpers.slurpInput(wholePath) }.toOption
+        Try { new String(Helpers.slurpInput(wholePath), "UTF-8") }.toOption
       }
 
-      override def write(path: String, data: Array[Byte]): Unit = {
+      override def write(path: String, data: String): Unit = {
         val wholePath = buildIt(path)
         val parent = wholePath.getAbsoluteFile().getParentFile().mkdirs()
         Helpers.writeOverFile(wholePath, data)
@@ -314,14 +314,14 @@ object SqlLiteStorage {
         }
       }
 
-      def read(path: String): Option[Array[Byte]] = lock.synchronized {
+      def read(path: String): Option[String] = lock.synchronized {
 
         readPS.setString(1, path)
         val rs = readPS.executeQuery()
         try {
           if (rs.next()) {
             val blob = rs.getBytes(1)
-            Some(blob)
+            Some(new String(blob, "UTF-8"))
           } else None
         } finally {
           rs.close()
@@ -329,12 +329,12 @@ object SqlLiteStorage {
         }
       }
 
-      def write(path: String, data: Array[Byte]): Unit = lock.synchronized {
+      def write(path: String, data: String): Unit = lock.synchronized {
         writePS.setString(1, path)
-        writePS.setBytes(2, data)
+        writePS.setBytes(2, data.getBytes("UTF-8"))
         writePS.setLong(3, System.currentTimeMillis())
         writePS.setInt(4, 0x666)
-        writePS.setBytes(5, data)
+        writePS.setBytes(5, data.getBytes("UTF-8"))
         writePS.setLong(6, System.currentTimeMillis())
         writePS.executeUpdate()
         cnt = cnt + 1

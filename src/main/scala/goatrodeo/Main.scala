@@ -28,10 +28,15 @@ import java.io.BufferedWriter
 import java.io.FileWriter
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import goatrodeo.omnibor.{Storage, FileSystemStorage, ListFileNames, Builder, Merger}
+import goatrodeo.omnibor.{
+  Storage,
+  FileSystemStorage,
+  ListFileNames,
+  Builder,
+  Merger
+}
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
-import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.net.URL
 
@@ -146,11 +151,11 @@ object Howdy {
         println(OParser.usage(parser1))
         bailFail()
 
-      case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch,_)) =>
+      case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch, _)) =>
         Analyzer.analyze(analyzeFile, fetch)
 
-        
-      case Some(Config(_, out, _, _, _, _, _, Some(toMerge))) if toMerge.length > 1 =>
+      case Some(Config(_, out, _, _, _, _, _, Some(toMerge)))
+          if toMerge.length > 1 =>
         Merger.merge(toMerge, out)
 
       case Some(Config(_, _, _, _, _, _, _, Some(_))) =>
