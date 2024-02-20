@@ -54,8 +54,21 @@ object Merger {
     def updateCurrent(): Unit = {
       for (i <- 0 until theLen) {
         if (current(i).isEmpty) {
-          val tmpRead = sources(i).readLine()
-          current(i) = LineItem.parse(tmpRead)
+          var tmpRead: String = ""
+          var found = false
+          while (!found && tmpRead != null) {
+            tmpRead = sources(i).readLine()
+            if (tmpRead != null) {
+              val parsed = LineItem.parse(tmpRead)
+              parsed match {
+                case Some(x) => {
+                  current(i) = Some(x)
+                  found = true
+                }
+                case _ =>
+              }
+            }
+          }
         }
       }
     }
@@ -113,6 +126,8 @@ object Merger {
       // set each line
       updateCurrent()
     }
+
+    println(f"Complete in ${System.currentTimeMillis() - start}, cnt ${cnt}")
 
   }
 }

@@ -39,6 +39,8 @@ import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.util.zip.GZIPOutputStream
 import java.net.URL
+import org.apache.commons.io.filefilter.WildcardFileFilter
+import java.io.FileFilter
 
 /** The `main` class
   */
@@ -120,6 +122,26 @@ object Howdy {
     throw new Exception()
   }
 
+  private object ExpandFiles {
+    def unapply(in: Option[Vector[File]]): Option[Vector[File]] =
+      in match {
+        case None => None
+        case Some(vf) =>
+          val ret = for {
+            f <- vf
+            i <- {
+              val parent = f.getAbsoluteFile().getParentFile()
+              val wcf: FileFilter = new WildcardFileFilter(f.getName())
+              parent.listFiles(wcf)
+            }
+          } yield {
+            i
+          }
+          println(ret)
+          Some(ret)
+      }
+  }
+
   /** The entrypoint
     *
     * @param args
@@ -154,8 +176,9 @@ object Howdy {
       case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch, _)) =>
         Analyzer.analyze(analyzeFile, fetch)
 
-      case Some(Config(_, out, _, _, _, _, _, Some(toMerge)))
+      case Some(Config(_, out, _, _, _, _, _, ExpandFiles(toMerge)))
           if toMerge.length > 1 =>
+            
         Merger.merge(toMerge, out)
 
       case Some(Config(_, _, _, _, _, _, _, Some(_))) =>

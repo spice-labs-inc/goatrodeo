@@ -16,6 +16,8 @@ lazy val root = project
     libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
     libraryDependencies += "org.xerial" % "sqlite-jdbc" % "3.45.0.0",
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
+    // https://mvnrepository.com/artifact/commons-io/commons-io
+    libraryDependencies += "commons-io" % "commons-io" % "2.15.1",
     assembly / mainClass := Some("goatrodeo.Howdy")
   )
 
