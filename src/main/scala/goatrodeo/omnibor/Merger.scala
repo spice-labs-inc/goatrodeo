@@ -90,11 +90,6 @@ object Merger {
         // the merging case
         case (item1, n1) :: (item2, n2) :: _
             if item1.md5hash == item2.md5hash =>
-          // printOut.println(f"Merging ${item1.md5hash}")
-          // printOut.println(item1)
-          // printOut.println(item2)
-          // printOut.println(item1.merge(item2))
-          // return
           current(n1) = None
           // replace the second one. If there are other matching hashes, we'll still merge
           current(n2) = Some(item1.merge(item2))
@@ -127,7 +122,7 @@ object Merger {
       updateCurrent()
     }
 
-    println(f"Complete in ${System.currentTimeMillis() - start}, cnt ${cnt}")
+    printOut.println(f"Complete in ${(System.currentTimeMillis() - start).toDouble / 1000.0}, cnt ${cnt}")
 
   }
 }

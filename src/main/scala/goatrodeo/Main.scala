@@ -128,7 +128,8 @@ object Howdy {
         case None => None
         case Some(vf) =>
           val ret = for {
-            f <- vf
+            fa <- vf
+            f = fixTilde(fa)
             i <- {
               val parent = f.getAbsoluteFile().getParentFile()
               val wcf: FileFilter = new WildcardFileFilter(f.getName())
@@ -137,9 +138,15 @@ object Howdy {
           } yield {
             i
           }
-          println(ret)
           Some(ret)
       }
+
+    def fixTilde(in: File): File = {
+      if (in.getPath().startsWith("~" + File.separator)) {
+        val path = System.getProperty("user.home") + in.getPath().substring(1)
+        new File(path)
+      } else in
+    }
   }
 
   /** The entrypoint
@@ -178,7 +185,6 @@ object Howdy {
 
       case Some(Config(_, out, _, _, _, _, _, ExpandFiles(toMerge)))
           if toMerge.length > 1 =>
-            
         Merger.merge(toMerge, out)
 
       case Some(Config(_, _, _, _, _, _, _, Some(_))) =>
