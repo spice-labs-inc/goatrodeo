@@ -24,6 +24,15 @@ import java.io.FileOutputStream
 import java.util.zip.GZIPOutputStream
 import java.io.OutputStreamWriter
 import java.io.BufferedWriter
+import scala.util.Try
+import java.io.ByteArrayInputStream
+import java.io.FileInputStream
+import scala.xml.Elem
+import java.util.concurrent.ConcurrentLinkedQueue
+import collection.convert.ImplicitConversions
+import collection.JavaConverters.asScalaIteratorConverter
+import goatrodeo.loader.PackageIdentifier
+import goatrodeo.loader.PackageProtocol
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -41,18 +50,20 @@ object Builder {
     *   the number of threads to use when computings
     */
   def buildDB(source: File, storage: Storage, threadCnt: Int): Unit = {
-    val re = "\\.jar\\.[0-9]+$".r
-    val onlyName = Pattern.compile("^(.*)\\.[0-9]+$")
+    // val re = "\\.jar\\.[0-9]+$".r
+    // val onlyName = Pattern.compile("^(.*)\\.[0-9]+$")
 
-    // get a channel to find all the JAR files
-    val files =
-      Helpers.findFiles(
-        source,
-        f =>
-          f.isFile() &&
-            (f.getName().endsWith(".jar") ||
-              re.findFirstIn(f.getName()).isDefined)
-      )
+    // // get a channel to find all the JAR files
+    // val files =
+    //   Helpers.findFiles(
+    //     source,
+    //     f =>
+    //       f.isFile() &&
+    //         (f.getName().endsWith(".jar") ||
+    //           re.findFirstIn(f.getName()).isDefined)
+    //   )
+
+    val files = ToProcess.buildQueue(source)
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
@@ -67,20 +78,51 @@ object Builder {
           // pull the files from the channel
           // if the channel is closed/empty, `None` will be
           // returned, handle it gracefully
-          for {
-            fileOpt <- files
-            fileUnfixed <- fileOpt
-          } {
+          // for {
+          //   toProcess <- files.iterator().asScala
+          // }
+          var toProcess = files.poll()
+          while (toProcess != null) {
             try {
 
               // Get the filename
-              val m = onlyName.matcher(fileUnfixed.getCanonicalPath())
-              val file: java.io.File = if (m.find()) {
-                new File(m.group(1))
-              } else { fileUnfixed }
+              // val m = onlyName.matcher(fileUnfixed.getCanonicalPath())
+              // val file: java.io.File = if (m.find()) {
+              //   new File(m.group(1))
+              // } else { fileUnfixed }
 
               // build the package
-              for { p <- Loader.buildPackage(fileUnfixed, file.getName()) } {
+              for { (p, srcPkg) <- Loader.buildPackage(toProcess) } {
+
+                val srcMap = srcPkg match {
+                  case Some(_ -> sm) => sm
+                  case None          => Map()
+                }
+
+                // do the optional source file
+                for { (p, _) <- srcPkg } {
+                  val targetFile = p.gitoid
+
+                  // if we've already processed something with the same gitoid, don't do it again
+                  if (!storage.exists(targetFile)) {
+                    // write the root Entry
+                    storage.write(
+                      targetFile,
+                      write(p.toEntry(), indent = -1, escapeUnicode = true)
+                    )
+
+                    // update the Package URL index
+                    p.updateIndex(storage)
+
+                    // write or update all the dependents
+                    p.fixDependents(storage)
+
+                  } else {
+                    println(
+                      f"Skipped duplicated ${toProcess.source.map(_.getName())}"
+                    )
+                  }
+                }
 
                 // compute the filename in Storage for the Root entry
 
@@ -101,21 +143,23 @@ object Builder {
                   p.fixDependents(storage)
 
                 } else {
-                  println(f"Skipped duplicated ${fileUnfixed.getName()}")
+                  println(f"Skipped duplicated ${toProcess.jar.getName()}")
                 }
                 val nc = cnt.incrementAndGet()
                 println(
-                  f"processed ${file.getName()}, count ${nc} time ${(System
+                  f"processed ${toProcess.jar.getName()}, count ${nc} time ${(System
                       .currentTimeMillis() - start) / 1000} seconds - thread ${threadNum}"
                 )
               }
             } catch {
               case e: Throwable => {
-                println(f"Failed ${fileUnfixed} ${e}")
-                System.exit(1)
+                println(f"Failed ${toProcess.jar} ${e}")
+                Helpers.bailFail()
               }
             }
-          },
+            toProcess = files.poll()
+          }
+        ,
         f"gitoid compute ${threadNum}"
       )
       t.start()
@@ -176,5 +220,98 @@ object Builder {
     }
 
     storage.release()
+  }
+}
+
+case class ToProcess(
+    pom: PackageIdentifier,
+    jar: File,
+    source: Option[File],
+    pomFile: File
+)
+
+object ToProcess {
+
+  def findTag(in: Elem, name: String): Option[String] = {
+    val topper = in \ name
+    if (topper.length == 1) {
+      topper.text match {
+        case s if s.length() > 0 => Some(s)
+        case _                   => None
+      }
+
+    } else {
+      val t2 = in \ "parent" \ name
+      if (t2.length == 1 && t2.text.length() > 0) { Some(t2.text) }
+      else None
+    }
+  }
+
+  def tryToFixVersion(
+      in: Option[String],
+      fileName: String
+  ): Option[String] = {
+    in match {
+      case Some(s) if s.startsWith("${") =>
+        val fn2 =
+          fileName.substring(0, fileName.length() - 4) // remove ".pom"
+        val li = fn2.lastIndexOf("-")
+        if (li >= 0) {
+          Some(fn2.substring(li + 1))
+        } else in
+      case _ => in
+    }
+  }
+
+  def buildQueue(root: File): ConcurrentLinkedQueue[ToProcess] = {
+
+    val poms = Helpers.findFiles(
+      root,
+      f => f.getName().endsWith(".pom")
+    )
+
+    val theQueue = (for {
+      v <- poms.iterator
+      f <- v
+      xml <- Try { scala.xml.XML.load(new FileInputStream(f)) }.toOption
+      item <- {
+        val grp = findTag(xml, "groupId")
+        val art = findTag(xml, "artifactId")
+        val ver = tryToFixVersion(findTag(xml, "version"), f.getName())
+        (grp, art, ver) match {
+          case (Some(g), Some(a), Some(v))
+              if !g.startsWith("$") && !a
+                .startsWith("$") && !v.startsWith("$") &&
+                f.getName() == f"${a}-${v}.pom" =>
+            val name = f.getName()
+            val jar = new File(
+              f.getAbsoluteFile().getParent(),
+              f"${name.substring(0, name.length() - 4)}.jar"
+            )
+            if (jar.exists()) {
+              Some(
+                ToProcess(
+                  PackageIdentifier(PackageProtocol.Maven, g, a, v),
+                  jar,
+                  Helpers.findSrcFile(f),
+                  f
+                )
+              )
+            } else None
+
+          case _ =>
+            None
+        }
+
+      }
+    } yield {
+      item
+    }).toVector
+
+    import collection.JavaConverters.seqAsJavaListConverter
+    import collection.JavaConverters.asJavaIterableConverter
+
+    val queue = new ConcurrentLinkedQueue(theQueue.asJava)
+    queue
   }
 }

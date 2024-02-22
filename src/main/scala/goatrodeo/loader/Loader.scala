@@ -39,6 +39,10 @@ import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import os.read
 import scala.collection.SortedSet
+import goatrodeo.omnibor.ToProcess
+import goatrodeo.loader.GitOID
+import goatrodeo.util
+import java.util.concurrent.atomic.AtomicLong
 
 /** Misc utilities to load a JAR file and do basic GitOID creation
   */
@@ -62,85 +66,95 @@ object Loader {
   /** Given an input (either a full path to a file or a `File`), compute a
     * `TopLevel` for the input
     *
-    * @param input
-    *   the path or File
-    * @param fileName
-    *   the canonical name of the file
     * @return
     *   the `TopLevel` computed
     */
-  def buildPackage(input: String | File, fileName: String): Option[TopLevel] = {
-    input match {
-      case s: String => buildPackage(new File(s), fileName)
-      case f: File =>
-        Try {
-          val is = new FileInputStream(f)
-          val bytes = Helpers.slurpInput(is)
-          val fileGitoid = GitOID.url(bytes)
-          val jar = new JarFile(f, true)
+  def buildPackage(
+      item: ToProcess
+  ): Option[(TopLevel, Option[(TopLevel, Map[String, PackageFile])])] = {
 
-          // compute the information for each of the files
-          val files =
-            (for { i <- jar.entries().asScala if !i.isDirectory() } yield {
+    Try {
+      val is = new FileInputStream(item.jar)
+      val bytes = Helpers.slurpInput(is)
+      val fileGitoid = GitOID.url(bytes)
+      val jar = new JarFile(item.jar, true)
 
-              val inputStream = jar.getInputStream(i)
-              val bytes = Helpers.slurpInput(inputStream)
-              val name = i.getName()
-              val fileType = FileType.theType(name, Some(bytes))
+      val srcIs = item.source.map(new FileInputStream(_))
+      val srcBytes = srcIs.map(Helpers.slurpInput(_))
+      val srcGitoid = srcBytes.map(GitOID.url(_))
+      val srcJar = item.source.map(new JarFile(_, true))
 
-              val gitoid = GitOID.url(bytes)
-              PackageFile(gitoid, Some(name), fileType)
+      val srcFiles =
+        for { si <- srcJar } yield {
+          (for { i <- si.entries().asScala if !i.isDirectory() } yield {
+            val inputStream = si.getInputStream(i)
+            val bytes = Helpers.slurpInput(inputStream)
+            val name = i.getName()
+            val fileType = FileType.theType(name, Some(bytes), Map())
 
-            }).toList
+            val gitoid = GitOID.url(bytes)
+            name -> PackageFile(gitoid, Some(name), fileType)
+          }).toVector
+        }
 
-              // compute the PackageIdentifier -- FIXME -- this can be done better... maybe look at pom.xml?
-          val packageId: Option[PackageIdentifier] =
-            files.filter(_.fileType.isPomProps()).map(_.fileType) match {
-              case FileType.POM(POMTypes.Properties, Some(bytes)) :: _ => {
-                val is = new ByteArrayInputStream(bytes.getBytes("UTF-8"))
-                val props = new Properties()
-                props.load(is)
-                val artifactId = props.get("artifactId") match {
-                  case s: String => s
-                  case _         => "???"
-                }
-                val groupId = props.get("groupId") match {
-                  case s: String => s
-                  case _         => "????"
-                }
-                val version = props.get("version") match {
-                  case s: String => s
-                  case _         => "?????"
-                }
-                Some(
-                  PackageIdentifier(
-                    PackageProtocol.Maven,
-                    groupId,
-                    artifactId,
-                    version
-                  )
-                )
-              }
-              case _ => None
-            }
+      val srcMap: Map[String, PackageFile] = srcFiles match {
+        case Some(v) => Map(v: _*)
+        case None    => Map()
+      }
 
-            // Get the vulnerabilities
-          val packageVulns: Option[ujson.Value] =
-            for {
-              pid <- packageId
-              vulns <- pid.getOSV().toOption
-            } yield vulns
+      // compute the information for each of the files
+      val files =
+        (for { i <- jar.entries().asScala if !i.isDirectory() } yield {
 
-          TopLevel.Package(
-            gitoid = fileGitoid,
-            contains = files.toVector,
-            containedBy = Vector(),
-            identifier = packageId,
-            vulnerabilities = packageVulns,
-            name = Some(fileName)
-          )
-        }.toOption
-    }
+          val inputStream = jar.getInputStream(i)
+          val bytes = Helpers.slurpInput(inputStream)
+          val name = i.getName()
+          val fileType = FileType.theType(name, Some(bytes), srcMap)
+
+          val gitoid = GitOID.url(bytes)
+          PackageFile(gitoid, Some(name), fileType)
+
+        }).toList
+
+          // compute the PackageIdentifier -- FIXME -- this can be done better... maybe look at pom.xml?
+      val packageId = item.pom
+
+      // Get the vulnerabilities
+      val packageVulns: Option[ujson.Value] =
+        for {
+
+          vulns <- packageId.getOSV().toOption
+        } yield vulns
+
+      val pkg = TopLevel.Package(
+        gitoid = fileGitoid,
+        contains = files.toVector,
+        containedBy = Vector(),
+        identifier = Some(packageId),
+        vulnerabilities = packageVulns,
+        name = Some(item.jar.getName())
+      )
+
+      val p2: Option[(TopLevel, Map[String, PackageFile])] =
+        (srcGitoid, srcFiles, item.source) match {
+          case (Some(gitoid), Some(files), Some(src)) =>
+            Some(
+              TopLevel.Package(
+                gitoid = gitoid,
+                contains = files.toVector.map(_._2),
+                containedBy = Vector(),
+                identifier = Some(packageId),
+                vulnerabilities = packageVulns,
+                name = Some(src.getName())
+              ) -> srcMap
+            )
+          case _ => None
+        }
+
+      val ret = (pkg -> p2)
+
+      ret
+    }.toOption
   }
 }
 
@@ -239,8 +253,6 @@ object GitOID {
 
     md.digest(bytes);
   }
-
-
 
   /** Take bytes, compute the GitOID and return the hexadecimal bytes
     * representing the GitOID
@@ -363,32 +375,52 @@ enum POMTypes derives ReadWriter {
   case Properties
 }
 
-enum FileType derives ReadWriter {
-  case ClassFile(source: Option[String])
+trait OptionalGitOID {
+  def getSourceGitOID(): Option[GitOID]
+}
+
+enum FileType extends OptionalGitOID {
+  case ClassFile(
+      source: Option[String],
+      sourceGitOID: Option[GitOID],
+      sourcePf: Option[PackageFile]
+  )
   case SourceFile(language: Option[String])
   case POM(subtype: POMTypes, contents: Option[String])
   case Package
   case Other
 
-  def isPomProps(): Boolean =
+  def getSourceGitOID(): Option[GitOID] = this match {
+    case ClassFile(_, gitoid, _) => gitoid
+    case _                       => None
+  }
+
+  def isPomProps(): Boolean = {
     this match {
       case POM(POMTypes.Properties, Some(bytes)) => true
       case _                                     => false
     }
+  }
+
+  def subContents(): List[PackageFile] = {
+    this match {
+      case ClassFile(_, _, sourcePackageFile) => sourcePackageFile.toList
+      case _                                  => Nil
+    }
+  }
 
   def typeName(): Option[String] = {
     this match {
-      case ClassFile(source)      => Some("class")
-      case SourceFile(language)   => Some("source")
-      case POM(subtype, contents) => Some("pom")
-      case Package                => Some("package")
-      case Other                  => Some("other")
+      case ClassFile(source, _, _) => Some("class")
+      case SourceFile(language)    => Some("source")
+      case POM(subtype, contents)  => Some("pom")
+      case Package                 => Some("package")
+      case Other                   => Some("other")
     }
   }
 
   def subType(): Option[String] = {
     this match {
-
       case SourceFile(language)   => language
       case POM(subtype, contents) => Some(subtype.toString())
       case _                      => None
@@ -411,7 +443,11 @@ object FileType {
       case e: Exception => None
     }
   }
-  def theType(name: String, contents: Option[Array[Byte]]): FileType = {
+  def theType(
+      name: String,
+      contents: Option[Array[Byte]],
+      sourceMap: Map[String, PackageFile]
+  ): FileType = {
     name match {
       case s
           if s.startsWith("META-INF/maven/") &&
@@ -428,48 +464,23 @@ object FileType {
           val clz = cp.parse()
           clz.getSourceFilePath()
         })
-        ClassFile(sourceName)
+
+        val sourceGitOID = for {
+          sn <- sourceName
+          pf <- sourceMap.get(sn)
+        } yield {
+          pf
+        }
+
+
+
+        ClassFile(sourceName, sourceGitOID.map(_.gitoid), sourceGitOID)
       }
       case s if s.endsWith(".java")  => SourceFile(Some("java"))
       case s if s.endsWith(".scala") => SourceFile(Some("scala"))
       case s if s.endsWith(".clj")   => SourceFile(Some("clojure"))
       case _                         => Other
     }
-  }
-}
-
-case class PackageFile(gitoid: String, name: Option[String], fileType: FileType)
-    derives ReadWriter {
-  def toTopLevelFile(from: TopLevel): TopLevel = {
-    TopLevel.File(
-      gitoid = gitoid,
-      contains = Vector(),
-      containedBy = Vector(from.intoPackageFile()),
-      identifier = None,
-      fileType = fileType,
-      name = name
-    )
-  }
-
-  def toEntry(from: TopLevel): Entry = {
-    Entry(
-      identifier = this.gitoid,
-      contains = Vector(),
-      containedBy = Vector(from.gitoid),
-      metadata = EntryMetaData(
-        this.name,
-        None,
-        None,
-        this.fileType.typeName(),
-        this.fileType.subType(),
-        None,
-        None,
-        _version = 1
-      ),
-      _timestamp = System.currentTimeMillis(),
-      _version = 1,
-      _type = "gitoid"
-    )
   }
 }
 
@@ -504,7 +515,7 @@ object TopLevel {
   }
 }
 
-enum TopLevel extends TopLevelStuff derives ReadWriter {
+enum TopLevel extends TopLevelStuff /*derives ReadWriter*/ {
   case Package(
       gitoid: String,
       contains: Vector[PackageFile],
@@ -527,6 +538,13 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
 
   def purl(): Option[String] = {
     identifier.map(_.purl())
+  }
+
+  def allContents(): Vector[PackageFile] = {
+    for {
+      pf <- contains
+      others <- pf :: pf.subContents()
+    } yield others
   }
 
   def toEntry(): Entry = {
@@ -615,25 +633,25 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
       case Some(purl) =>
         TopLevel.indexLock.synchronized {
 
-
-          lazy val defaultPurlHolder = 
-            Entry(identifier = purl,
-            contains = Vector(this.gitoid),
-            containedBy = Vector(),
-            metadata = EntryMetaData(
-              filename = Some(purl),
-              purl = Some(purl),
-              vulnerabilities = None,
-              filetype = Some("purl"),
-              filesubtype = None,
-              contents = None,
-              other = None,
-              _version = 1
-            ),
-            _timestamp = System.currentTimeMillis(),
-            _version = 1,
-            _type = "purl"
-          )
+          lazy val defaultPurlHolder =
+            Entry(
+              identifier = purl,
+              contains = Vector(this.gitoid),
+              containedBy = Vector(),
+              metadata = EntryMetaData(
+                filename = Some(purl),
+                purl = Some(purl),
+                vulnerabilities = None,
+                filetype = Some("purl"),
+                filesubtype = None,
+                contents = None,
+                other = None,
+                _version = 1
+              ),
+              _timestamp = System.currentTimeMillis(),
+              _version = 1,
+              _type = "purl"
+            )
 
           val ph: Entry = if (storage.exists(purl)) {
             try {
@@ -650,9 +668,12 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
 
           val ph2 = ph.copy(
             _timestamp = System.currentTimeMillis(),
-            contains = (Set(ph.contains :+ this.gitoid :_*).toVector.sorted)
+            contains = (Set(ph.contains :+ this.gitoid: _*).toVector.sorted)
           )
-          storage.write(purl, f"${write(ph2, indent = -1, escapeUnicode = true)}")
+          storage.write(
+            purl,
+            f"${write(ph2, indent = -1, escapeUnicode = true)}"
+          )
         }
       case _ =>
     }
@@ -662,7 +683,6 @@ enum TopLevel extends TopLevelStuff derives ReadWriter {
     val thispf = this.intoPackageFile()
     for { pf <- contains } {
       TopLevel.lockGitOid(pf.gitoid) {
-       
 
         val toDo = pf.gitoid
         val core: Entry = if (storage.exists(toDo)) {

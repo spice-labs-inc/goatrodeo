@@ -25,6 +25,7 @@ import java.net.URLEncoder
 import java.net.HttpURLConnection
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
+import java.util.concurrent.atomic.AtomicReference
 
 type GitOID = String
 
@@ -158,6 +159,15 @@ object Helpers {
     ret.toByteArray()
   }
 
+  /** Bail out... gracefully if we're running in SBT
+    *
+    * @return
+    */
+  def bailFail(): Nothing = {
+    if (Thread.currentThread().getStackTrace().length < 6) System.exit(1)
+    throw new Exception()
+  }
+
   /** Slurp the contents of a File
     *
     * @param what
@@ -168,6 +178,39 @@ object Helpers {
   def slurpInput(what: File): Array[Byte] = {
     val fis = new FileInputStream(what)
     slurpInput(fis)
+  }
+
+  private val allFiles: AtomicReference[Map[String, Set[String]]] =
+    new AtomicReference(Map())
+
+  def filesForParent(in: File): Set[String] = {
+    val parentFile = in.getAbsoluteFile().getParentFile()
+    val parentStr = parentFile.getAbsolutePath()
+
+    allFiles.get().get(parentStr) match {
+      case Some(r) => r
+      case None =>
+        val v = Set(parentFile.listFiles().map(f => f.getName()): _*)
+        allFiles.getAndUpdate(last => last + (parentStr -> v))
+        v
+    }
+  }
+
+  def findSrcFile(like: File): Option[File] = {
+    val name = like.getName()
+    val myNameIsh = name.substring(0, name.length() - 4)
+    val possible = filesForParent(like)
+    val ns = f"${myNameIsh}-sources.jar"
+
+    possible.contains(ns) match {
+      case true =>
+        val maybe = new File(like.getAbsoluteFile().getParentFile(), ns)
+        if (maybe.exists()) { Some(maybe) }
+        else { None }
+      case _ =>
+        None
+    }
+
   }
 
   /** Get data on a GitOID from a GitOID Corpus
@@ -219,14 +262,14 @@ object Helpers {
 //       }
 //       (200, Helpers.slurpInput(input))
 //     } catch {
-//       case e: Exception => 
+//       case e: Exception =>
 //         {
 //           (404, e.toString().getBytes("UTF-8"))
 //         }
 //     }
 
 //   }
- }
+}
 
 class BoundedChannel[T](size: Int) extends Seq[Option[T]] {
   private var active: Boolean = true

@@ -113,15 +113,6 @@ object Howdy {
     )
   }
 
-  /** Bail out... gracefully if we're running in SBT
-    *
-    * @return
-    */
-  private def bailFail(): Nothing = {
-    if (Thread.currentThread().getStackTrace().length < 6) System.exit(1)
-    throw new Exception()
-  }
-
   private object ExpandFiles {
     def unapply(in: Option[Vector[File]]): Option[Vector[File]] =
       in match {
@@ -155,6 +146,7 @@ object Howdy {
     *   an array of command line paramets
     */
   def main(args: Array[String]): Unit = {
+
     // parse the CLI params
     val parsed = OParser.parse(parser1, args, Config())
 
@@ -163,22 +155,22 @@ object Howdy {
       case Some(Config(Some(_), _, _, Some(_), _, _, _, _)) =>
         println("Cannot do both analysis and building...")
         println(OParser.usage(parser1))
-        bailFail()
+        Helpers.bailFail()
 
       case Some(Config(_, _, _, Some(_), _, _, _, Some(_))) =>
         println("Cannot do both merge and building...")
         println(OParser.usage(parser1))
-        bailFail()
+        Helpers.bailFail()
 
       case Some(Config(Some(_), _, _, _, _, _, _, Some(_))) =>
         println("Cannot do both analysis and merging...")
         println(OParser.usage(parser1))
-        bailFail()
+        Helpers.bailFail()
 
       case Some(Config(None, _, _, None, _, _, _, None)) =>
         println("You must either build, merge, or analyze...");
         println(OParser.usage(parser1))
-        bailFail()
+        Helpers.bailFail()
 
       case Some(Config(Some(analyzeFile), _, _, _, _, _, fetch, _)) =>
         Analyzer.analyze(analyzeFile, fetch)
@@ -190,7 +182,7 @@ object Howdy {
       case Some(Config(_, _, _, _, _, _, _, Some(_))) =>
         println("You must supply at least 2 files to merge...");
         println(OParser.usage(parser1))
-        bailFail()
+        Helpers.bailFail()
 
       case Some(Config(_, out, dbOut, Some(buildFrom), threads, inMem, _, _))
           if out.isDefined || dbOut.isDefined =>
@@ -205,9 +197,9 @@ object Howdy {
           "Either `out` or `db` must be defined... where does the build result go?"
         )
         println(OParser.usage(parser1))
-        bailFail()
+        Helpers.bailFail()
 
-      case None => bailFail()
+      case None => Helpers.bailFail()
     }
   }
 }

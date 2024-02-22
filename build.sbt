@@ -5,7 +5,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "goatrodeo",
-    version := "0.2.1-SNAPSHOT",
+    version := "0.3.0-SNAPSHOT",
     scalaVersion := scala3Version,
     libraryDependencies += "org.scala-lang" %% "toolkit" % "0.1.7",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.2.0",
@@ -18,6 +18,7 @@ lazy val root = project
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     // https://mvnrepository.com/artifact/commons-io/commons-io
     libraryDependencies += "commons-io" % "commons-io" % "2.15.1",
+    libraryDependencies += "com.lihaoyi" %% "upickle" % "3.2.0",
     assembly / mainClass := Some("goatrodeo.Howdy")
   )
 
