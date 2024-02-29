@@ -141,7 +141,8 @@ object Loader {
             Some(
               TopLevel.Package(
                 gitoid = gitoid,
-                contains = files.toVector.map(_._2),
+                contains =
+                  files.toVector.flatMap((_, pf) => pf :: pf.subContents()),
                 containedBy = Vector(),
                 identifier = Some(packageId),
                 vulnerabilities = packageVulns,
@@ -375,25 +376,15 @@ enum POMTypes derives ReadWriter {
   case Properties
 }
 
-trait OptionalGitOID {
-  def getSourceGitOID(): Option[GitOID]
-}
-
-enum FileType extends OptionalGitOID {
+enum FileType {
   case ClassFile(
       source: Option[String],
-      sourceGitOID: Option[GitOID],
       sourcePf: Option[PackageFile]
   )
   case SourceFile(language: Option[String])
   case POM(subtype: POMTypes, contents: Option[String])
   case Package
   case Other
-
-  def getSourceGitOID(): Option[GitOID] = this match {
-    case ClassFile(_, gitoid, _) => gitoid
-    case _                       => None
-  }
 
   def isPomProps(): Boolean = {
     this match {
@@ -404,18 +395,18 @@ enum FileType extends OptionalGitOID {
 
   def subContents(): List[PackageFile] = {
     this match {
-      case ClassFile(_, _, sourcePackageFile) => sourcePackageFile.toList
-      case _                                  => Nil
+      case ClassFile(_, sourcePackageFile) => sourcePackageFile.toList
+      case _                               => Nil
     }
   }
 
   def typeName(): Option[String] = {
     this match {
-      case ClassFile(source, _, _) => Some("class")
-      case SourceFile(language)    => Some("source")
-      case POM(subtype, contents)  => Some("pom")
-      case Package                 => Some("package")
-      case Other                   => Some("other")
+      case ClassFile(source, _)   => Some("class")
+      case SourceFile(language)   => Some("source")
+      case POM(subtype, contents) => Some("pom")
+      case Package                => Some("package")
+      case Other                  => Some("other")
     }
   }
 
@@ -472,9 +463,7 @@ object FileType {
           pf
         }
 
-
-
-        ClassFile(sourceName, sourceGitOID.map(_.gitoid), sourceGitOID)
+        ClassFile(sourceName, sourceGitOID)
       }
       case s if s.endsWith(".java")  => SourceFile(Some("java"))
       case s if s.endsWith(".scala") => SourceFile(Some("scala"))
@@ -623,7 +612,7 @@ enum TopLevel extends TopLevelStuff /*derives ReadWriter*/ {
     }
   }
 
-  def gitoids(): Seq[String] = {
+  def _gitoids(): Seq[String] = {
     gitoid :: (contains.toList ::: containedBy.toList).map(_.gitoid)
   }
 
@@ -679,36 +668,40 @@ enum TopLevel extends TopLevelStuff /*derives ReadWriter*/ {
     }
   }
 
-  def fixDependents(storage: Storage): Unit = {
-    val thispf = this.intoPackageFile()
-    for { pf <- contains } {
-      TopLevel.lockGitOid(pf.gitoid) {
-
-        val toDo = pf.gitoid
-        val core: Entry = if (storage.exists(toDo)) {
-          Try {
-            storage.read(toDo) match {
-              case Some(bytes) => upickle.default.read[Entry](bytes)
-              case _           => pf.toEntry(this)
-            }
-          } match {
-
-            case Success(value) => value
-            case _              => pf.toEntry(this)
-          }
+  private def fixItem(storage: Storage, item: PackageFile, parent: GitOID): Unit = {
+    TopLevel.lockGitOid(item.gitoid) {
+        val core: Entry = if (storage.exists(item.gitoid)) {
+          upickle.default.read[Entry](
+            storage.read(item.gitoid).get
+          ) // this is explicit. We've tested the entry. If it fails to read, that's a bigger bug
         } else {
-          pf.toEntry(this)
+          item.toEntry(parent)
         }
 
         val updated: Vector[GitOID] =
-          if (core.containedBy.contains(thispf.gitoid)) core.containedBy
+          if (core.containedBy.contains(parent)) core.containedBy
           else if (core.containedBy.length > 4096)
             core.containedBy // avoid reverse indexes of super common files
-          else core.containedBy :+ thispf.gitoid
+          else core.containedBy :+ parent
 
         val res = core.copy(containedBy = updated)
-        storage.write(toDo, write(res, indent = -1, escapeUnicode = true))
+        storage.write(item.gitoid, write(res, indent = -1, escapeUnicode = true))
       }
+  }
+
+  def fixDependents(storage: Storage): Unit = {
+
+    for {
+      pf <- contains
+    } {
+      // fix this item
+      fixItem(storage, pf, this.gitoid)
+
+      // deal with source file dependencies
+      for {ipf <- pf.subContents()} {
+        fixItem(storage, ipf, pf.gitoid)
+      }
+      
     }
   }
 

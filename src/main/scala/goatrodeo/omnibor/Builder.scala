@@ -50,19 +50,6 @@ object Builder {
     *   the number of threads to use when computings
     */
   def buildDB(source: File, storage: Storage, threadCnt: Int): Unit = {
-    // val re = "\\.jar\\.[0-9]+$".r
-    // val onlyName = Pattern.compile("^(.*)\\.[0-9]+$")
-
-    // // get a channel to find all the JAR files
-    // val files =
-    //   Helpers.findFiles(
-    //     source,
-    //     f =>
-    //       f.isFile() &&
-    //         (f.getName().endsWith(".jar") ||
-    //           re.findFirstIn(f.getName()).isDefined)
-    //   )
-
     val files = ToProcess.buildQueue(source)
 
     // The count of all the files found
@@ -78,19 +65,10 @@ object Builder {
           // pull the files from the channel
           // if the channel is closed/empty, `None` will be
           // returned, handle it gracefully
-          // for {
-          //   toProcess <- files.iterator().asScala
-          // }
-          var toProcess = files.poll()
+
+          var toProcess: ToProcess = files.poll()
           while (toProcess != null) {
             try {
-
-              // Get the filename
-              // val m = onlyName.matcher(fileUnfixed.getCanonicalPath())
-              // val file: java.io.File = if (m.find()) {
-              //   new File(m.group(1))
-              // } else { fileUnfixed }
-
               // build the package
               for { (p, srcPkg) <- Loader.buildPackage(toProcess) } {
 

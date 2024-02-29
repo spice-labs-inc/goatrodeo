@@ -18,6 +18,7 @@ package goatrodeo.loader
 import goatrodeo.omnibor.Entry
 import goatrodeo.omnibor.EntryMetaData
 import upickle.default.*
+import goatrodeo.util.GitOID
 
 case class PackageFile(gitoid: String, name: Option[String], fileType: FileType)
     /*derives ReadWriter*/ {
@@ -36,11 +37,11 @@ case class PackageFile(gitoid: String, name: Option[String], fileType: FileType)
     fileType.subContents()
   }
 
-  def toEntry(from: TopLevel): Entry = {
+  def toEntry(from: GitOID): Entry = {
     Entry(
       identifier = this.gitoid,
       contains = fileType.subContents().map(_.gitoid).toVector,
-      containedBy = Vector(from.gitoid),
+      containedBy = Vector(from),
       metadata = EntryMetaData(
         this.name,
         None,
