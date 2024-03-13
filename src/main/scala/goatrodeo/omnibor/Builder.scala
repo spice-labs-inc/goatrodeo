@@ -18,7 +18,7 @@ import java.io.File
 import java.util.regex.Pattern
 import goatrodeo.util.Helpers
 import java.util.concurrent.atomic.AtomicInteger
-import goatrodeo.loader.{Loader, GitOID}
+import goatrodeo.loader.{Loader, GitOIDUtils}
 import upickle.default.*
 import java.io.FileOutputStream
 import java.util.zip.GZIPOutputStream

@@ -21,7 +21,15 @@ import java.util.concurrent.atomic.AtomicReference
 import java.sql.Blob
 import java.sql.PreparedStatement
 import java.net.URL
-import goatrodeo.loader.GitOID
+import goatrodeo.loader.GitOIDUtils
+import goatrodeo.util.GitOID
+import sttp.client4.Response
+import sttp.model.StatusCode
+import ujson.Value
+import ujson.Obj
+import scala.util.Failure
+import scala.util.Success
+import scala.annotation.tailrec
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -72,15 +80,114 @@ trait Storage {
 }
 
 trait StorageReader {
-  def read(path: String): Option[String]
+  def read(path: GitOID): Option[String]
 }
 
-class WebStorageReader(base: URL) extends StorageReader {
+trait BulkStorageReader {
+  def bulkRead(
+      paths: Set[GitOID],
+      known: Map[GitOID, Option[Entry]],
+      totalBytes: Long = 0
+  ): Map[GitOID, Option[Entry]]
+}
+
+class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
   def read(path: String): Option[String] = {
-    val u2 = new URL(base, path)
+    val u2 = new URL(f"${base}/${path}")
+
     Try {
       new String(Helpers.slurpInput(u2.openStream()), "UTF-8")
     }.toOption
+  }
+
+  private def fixEntry(ent: Option[Entry]): Option[Entry] = {
+    ent.flatMap(e =>
+      e match {
+        case Entry(
+              identifier,
+              contains,
+              containedBy,
+              metadata,
+              _timestamp,
+              _version,
+              _type
+            ) if metadata.purl.isDefined =>
+          Some(e)
+        case _ => None
+      }
+    )
+  }
+
+  @tailrec
+  final def bulkRead(
+      paths: Set[GitOID],
+      known: Map[GitOID, Option[Entry]], totalBytes: Long = 0
+  ): Map[GitOID, Option[Entry]] = {
+    import sttp.client4.quick.*
+
+    val toRequest = 400
+
+    val knownKeys = known.keySet
+    val unknownSet = paths.diff(knownKeys)
+
+    if (unknownSet.size == 0) {
+      return known
+    }
+
+    println(f"Sending ${toRequest} of ${unknownSet.size}")
+    val toSend = upickle.default.write(unknownSet.toSeq.take(400), indent = -1)
+
+    val bulkURL = f"${base}/bulk"
+
+    val uri = uri"${bulkURL}"
+
+    val theRequest = quickRequest
+      .header("Content-Type", "application/json")
+      .post(uri)
+      .body(toSend)
+
+    theRequest.send() match {
+      case Response(body, code, _, _, _, _) if code != StatusCode.Ok =>
+        println(f"Failed ${code}")
+        // FIXME -- log errors
+        known
+
+      case Response(body, code, _, _, _, _) =>
+        println(f"Received ${Helpers.formatInt(body.size)} bytes total ${Helpers.formatInt(totalBytes + body.size)}")
+        val tryResponse = Try {
+          upickle.default.read[Map[GitOID, Option[Entry]]](body)
+        }
+
+        val response: Option[Map[GitOID, Option[Entry]]] = tryResponse match {
+          case Failure(exception) => {
+            println(exception)
+            println(body)
+            return known
+          }
+          case Success(value) => Some(value)
+        }
+
+        val intermediate: Map[GitOID, Option[Entry]] = known
+
+        response match {
+          case None => intermediate
+          case Some(v) =>
+            val addl: Set[GitOID] = Set((for {
+              r <- v.values.toSeq
+              r2 <- r.toSeq if r2.containedBy.length < 1000
+              i <- r2.containedBy
+            } yield i): _*)
+
+            val current =
+              v.foldLeft(intermediate)((last, kv) =>
+                last + (kv._1 -> fixEntry(kv._2))
+              )
+
+            val updatedPaths = paths.union(addl)
+
+            bulkRead(updatedPaths, current, totalBytes + body.size)
+        }
+    }
   }
 }
 
@@ -88,7 +195,7 @@ class FileStorageReader(base: String) extends StorageReader {
   private val baseFile = new File(base)
 
   def read(path: String): Option[String] = {
-    val stuff = GitOID.urlToFileName(path)
+    val stuff = GitOIDUtils.urlToFileName(path)
     val theFile =
       new File(baseFile, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
     if (theFile.exists()) {
@@ -226,7 +333,7 @@ object FileSystemStorage {
       if (path.startsWith("pkg:")) {
         new File(root, f"purl/${path}.json")
       } else {
-        val stuff = GitOID.urlToFileName(path)
+        val stuff = GitOIDUtils.urlToFileName(path)
 
         new File(root, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
       }

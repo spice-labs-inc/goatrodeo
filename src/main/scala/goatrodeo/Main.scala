@@ -14,7 +14,7 @@ limitations under the License. */
 
 package goatrodeo
 
-import goatrodeo.loader.{Loader, GitOID, Analyzer}
+import goatrodeo.loader.{Loader, Analyzer}
 import scala.collection.JavaConverters._
 import java.io.File
 import java.io.FileInputStream

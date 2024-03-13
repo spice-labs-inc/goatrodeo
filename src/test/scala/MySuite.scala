@@ -12,12 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.loader.GitOID
 import goatrodeo.loader.PackageIdentifier
 import goatrodeo.loader.PackageProtocol
 import goatrodeo.omnibor.SqlLiteStorage
 import java.util.regex.Pattern
 import goatrodeo.util.Helpers
+import goatrodeo.loader.GitOIDUtils
+import goatrodeo.util.GitOID
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -34,7 +35,7 @@ class MySuite extends munit.FunSuite {
     ":sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a",
     "880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a",
     )
-    test.foreach(v => assertEquals(GitOID.urlToFileName(v), ("880", "485", "f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a")))
+    test.foreach(v => assertEquals(GitOIDUtils.urlToFileName(v), ("880", "485", "f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a")))
   }
 
   test("Get OSV") {
@@ -60,7 +61,7 @@ class MySuite extends munit.FunSuite {
 
   test("good hex for sha256") {
     val txt = Array[Byte](49, 50, 51, 10)
-    val digest = GitOID.HashType.SHA256.getDigest()
+    val digest = GitOIDUtils.HashType.SHA256.getDigest()
     assertEquals(Helpers.toHex(digest.digest(txt)), "181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b")
   }
 

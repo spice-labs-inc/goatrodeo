@@ -26,6 +26,7 @@ import java.net.HttpURLConnection
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 import java.util.concurrent.atomic.AtomicReference
+import java.text.NumberFormat
 
 type GitOID = String
 
@@ -194,6 +195,15 @@ object Helpers {
         allFiles.getAndUpdate(last => last + (parentStr -> v))
         v
     }
+  }
+
+  def formatInt(in: Int): String = {
+    NumberFormat.getInstance().format(in)
+
+  }
+
+  def formatInt(in: Long): String = {
+    NumberFormat.getInstance().format(in)
   }
 
   def findSrcFile(like: File): Option[File] = {

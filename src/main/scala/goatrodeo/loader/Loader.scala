@@ -40,7 +40,7 @@ import java.io.OutputStreamWriter
 import os.read
 import scala.collection.SortedSet
 import goatrodeo.omnibor.ToProcess
-import goatrodeo.loader.GitOID
+import goatrodeo.loader.GitOIDUtils
 import goatrodeo.util
 import java.util.concurrent.atomic.AtomicLong
 
@@ -76,12 +76,12 @@ object Loader {
     Try {
       val is = new FileInputStream(item.jar)
       val bytes = Helpers.slurpInput(is)
-      val fileGitoid = GitOID.url(bytes)
+      val fileGitoid = GitOIDUtils.url(bytes)
       val jar = new JarFile(item.jar, true)
 
       val srcIs = item.source.map(new FileInputStream(_))
       val srcBytes = srcIs.map(Helpers.slurpInput(_))
-      val srcGitoid = srcBytes.map(GitOID.url(_))
+      val srcGitoid = srcBytes.map(GitOIDUtils.url(_))
       val srcJar = item.source.map(new JarFile(_, true))
 
       val srcFiles =
@@ -92,7 +92,7 @@ object Loader {
             val name = i.getName()
             val fileType = FileType.theType(name, Some(bytes), Map())
 
-            val gitoid = GitOID.url(bytes)
+            val gitoid = GitOIDUtils.url(bytes)
             name -> PackageFile(gitoid, Some(name), fileType)
           }).toVector
         }
@@ -111,7 +111,7 @@ object Loader {
           val name = i.getName()
           val fileType = FileType.theType(name, Some(bytes), srcMap)
 
-          val gitoid = GitOID.url(bytes)
+          val gitoid = GitOIDUtils.url(bytes)
           PackageFile(gitoid, Some(name), fileType)
 
         }).toList
@@ -161,7 +161,7 @@ object Loader {
 
 /** A set of helpers to manage GitOIDs
   */
-object GitOID {
+object GitOIDUtils {
 
   /** Given a full OmniBOR URI, parse into a triple of first 3 hex chars of
     * hash, second 3 hex chars of hash, rest of the hex chars of hash

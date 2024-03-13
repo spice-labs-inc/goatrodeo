@@ -27,6 +27,7 @@ import java.net.HttpURLConnection
 import java.io.InputStream
 import goatrodeo.util.{Helpers, GitOID}
 import goatrodeo.omnibor.{Entry, StorageReader}
+import goatrodeo.omnibor.BulkStorageReader
 
 /** Do analysis of the file to see what the composition of a particular JAR file
   * is
@@ -37,18 +38,24 @@ object Analyzer {
     *
     * @param what
     *   the file to analyze
-    * @param fetch -- the URL to fetch things from
+    * @param fetch
+    *   -- the URL to fetch things from
     */
   def analyze(what: File, fetch: URL): Unit = {
     val (main, gitoids) = buildGitOIDs(what)
 
     val reader: StorageReader = StorageReader.from(fetch)
 
-    val fetched =
-      fetchOmniBOR(main :: gitoids, reader)
+    val fetched = fetchOmniBOR(main :: gitoids, reader)
 
-    for { (info, probabily) <- toplinePercent(fetched) if probabily > 0.75 } {
-      println(f"${info.metadata.filename
+    // (for {
+    //   vv <- fetched.values
+    //   v <- vv
+    //   purl <- v.metadata.purl
+    // } yield purl).toVector.sorted.foreach(println(_))
+
+    for { (info, probabily) <- toplinePercent(main :: gitoids, fetched) if probabily > 0.5 } {
+      println(f"${info.metadata.purl
           .getOrElse("N/A")}, ${(probabily * 100).toInt} %%, ${info.metadata.vulnerabilities match {
           case None        => "No CVEs"
           case Some(vulns) => write(vulns, 2)
@@ -67,7 +74,7 @@ object Analyzer {
     // grab the GitOID for the file itself
     val is = new FileInputStream(f)
     val bytes = Helpers.slurpInput(is)
-    val fileGitoid = GitOID.url(bytes)
+    val fileGitoid = GitOIDUtils.url(bytes)
 
     val ret = fileGitoid
     val extra = Try {
@@ -79,7 +86,7 @@ object Analyzer {
           val inputStream = jar.getInputStream(i)
           val bytes = Helpers.slurpInput(inputStream)
           val name = i.getName()
-          val gitoid = GitOID.url(bytes)
+          val gitoid = GitOIDUtils.url(bytes)
           gitoid
 
         }).toList
@@ -89,67 +96,87 @@ object Analyzer {
     (ret, extra.getOrElse(Nil))
   }
 
-  // /** Split the filename for web lookup
-  //   */
-  // lazy val webSplitter: GitOID => (Vector[String], Option[String]) = s => (Vector(s), None)
-
-  // /** Splut the filename for filesystem lookup
-  //   */
-  // lazy val fileSplitter: GitOID => (Vector[String], Option[String]) = s => {
-  //   val (a, b, c) = GitOID.urlToFileName(s); (Vector(a, b, c), Some("json"))
-  // }
-
   /** For a set of gitoids, look up the entries (information about the GitOID)
     *
     * @param items
     *   the set of GitOIDs
-    * @param reader read the GitOID from a web or filesystem
-    *   
+    * @param reader
+    *   read the GitOID from a web or filesystem
+    *
     * @return
     *   a `Map` of `gitoid` -> `Entry`
     */
   def fetchOmniBOR(
       items: Seq[GitOID],
       reader: StorageReader
-  ): Map[String, Option[Entry]] = {
+  ): Map[GitOID, Option[Entry]] = {
     // what have we fetched
     var fetched = Map.from(items.map(i => (i, false)))
 
     // what are we going to return
-    var ret: Map[String, Option[Entry]] = Map()
+    var ret: Map[GitOID, Option[Entry]] = Map()
 
+    var triedBulk = false
     // okay... we could make this tail recursive, but well...
     // if there's an unfetched gitoid, run the fetching process
     while (fetched.values.exists(i => !i)) {
-      // for each GitOID we haven't fetched
-      for { (k, got) <- fetched if !got } {
-        // fetch the item
-        val body = reader.read(k)
 
-        // mark it as fetched
-        fetched = fetched + (k -> true)
+      reader match {
 
-        val top: Option[Entry] =
-          body.flatMap(b => {
-            val tt = Try {
-              upickle.default.read[Entry](b)
-            }
+        case bs: BulkStorageReader if !triedBulk => {
+          val toRead = fetched.filter(!_._2).keys.toVector
+          val latest = bs.bulkRead(Set(toRead: _*), Map())
 
-            tt.toOption
-          })
+          // if the bulk endpoint returns fewer values than we are looking for
+          // then go to the non-bulk interface
+          if (latest.size < toRead.size) {
+            triedBulk = true
+          }
+          // mark fetched as read
+          for (k <- toRead) {
+            fetched = fetched + (k -> true)
+          }
+          // update the list of stuff fetched
+          for ((k -> v) <- latest) {
+            fetched = fetched + (k -> true)
+            ret = ret + (k -> v)
+          }
+        }
 
-        // put it in the return
-        ret = ret + (k -> top)
-        top match {
-          case Some(v) => {
-            val gitoids = v.containedBy
-            for (go <- gitoids) {
-              if (!fetched.contains(go)) {
-                fetched = fetched + (go -> false)
+        // bulk doesn't work, so we'll get the items one by one
+        case _ => {
+
+          // for each GitOID we haven't fetched
+          for { (k, got) <- fetched if !got } {
+            // fetch the item
+            val body = reader.read(k)
+
+            // mark it as fetched
+            fetched = fetched + (k -> true)
+
+            val top: Option[Entry] =
+              body.flatMap(b => {
+                val tt = Try {
+                  upickle.default.read[Entry](b)
+                }
+
+                tt.toOption
+              })
+
+            // put it in the return
+            ret = ret + (k -> top)
+            top match {
+              case Some(v) => {
+                val gitoids = v.containedBy
+                for (go <- gitoids) {
+                  if (!fetched.contains(go)) {
+                    fetched = fetched + (go -> false)
+                  }
+                }
               }
+              case _ =>
             }
           }
-          case _ =>
         }
       }
     }
@@ -165,16 +192,18 @@ object Analyzer {
     *   the `Entry`s that have package URLs (e.g., containers for which there
     *   may be CVEs) and the percentage of files that are part of each Package
     */
-  def toplinePercent(
+  def toplinePercent(toCheck: Seq[String],
       in: Map[String, Option[Entry]]
   ): Map[Entry, Double] = {
+    val checkSet = toCheck.toSet
     val packages = in.values.collect {
       case Some(entry) if entry.metadata.purl.isDefined =>
         entry
     }
 
     val pairs = for { p <- packages } yield {
-      val contained = p.contains.filter(i => in.contains(i)).size.toDouble
+      val containedSet = p.contains.toSet.intersect(checkSet)
+      val contained = containedSet.size.toDouble
       p -> (contained / p.contains.length.toDouble)
     }
 
