@@ -30,6 +30,12 @@ import ujson.Obj
 import scala.util.Failure
 import scala.util.Success
 import scala.annotation.tailrec
+import java.net.http.HttpRequest
+import java.net.URI
+import java.net.http.HttpRequest.BodyPublishers
+import java.net.http.HttpClient
+import java.net.http.HttpResponse.BodyHandlers
+import java.io.ByteArrayInputStream
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -121,7 +127,8 @@ class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
   @tailrec
   final def bulkRead(
       paths: Set[GitOID],
-      known: Map[GitOID, Option[Entry]], totalBytes: Long = 0
+      known: Map[GitOID, Option[Entry]],
+      totalBytes: Long = 0
   ): Map[GitOID, Option[Entry]] = {
     import sttp.client4.quick.*
 
@@ -135,25 +142,38 @@ class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
     }
 
     println(f"Sending ${toRequest} of ${unknownSet.size}")
-    val toSend = upickle.default.write(unknownSet.toSeq.take(400), indent = -1)
-
+    val toSend = upickle.default.write(unknownSet.toSeq.take(400))
     val bulkURL = f"${base}/bulk"
 
     val uri = uri"${bulkURL}"
 
-    val theRequest = quickRequest
+    val client = HttpClient.newHttpClient();
+    val request = HttpRequest
+      .newBuilder()
+      .uri(URI.create(bulkURL))
       .header("Content-Type", "application/json")
-      .post(uri)
-      .body(toSend)
+      // .header("Content-Length", toSend.length.toString())
+      .POST(BodyPublishers.ofString(toSend))
+      // .POST(BodyPublishers.ofString(toSend))
+      .build();
 
-    theRequest.send() match {
-      case Response(body, code, _, _, _, _) if code != StatusCode.Ok =>
-        println(f"Failed ${code}")
+    val httpResponse = Try { client.send(request, BodyHandlers.ofByteArray()) }
+
+    httpResponse match {
+      case Failure(exception) =>
+        println(f"Failed ${exception}")
+        throw exception
+
+      case Success(resp) if resp.statusCode() != 200 =>
+        println(f"Failed ${resp.statusCode()}")
         // FIXME -- log errors
         known
 
-      case Response(body, code, _, _, _, _) =>
-        println(f"Received ${Helpers.formatInt(body.size)} bytes total ${Helpers.formatInt(totalBytes + body.size)}")
+      case Success(resp) =>
+        val body = resp.body()
+        // case Response(body, code, _, _, _, _) =>
+        println(f"Received ${Helpers.formatInt(body.size)} bytes total ${Helpers
+            .formatInt(totalBytes + body.size)}")
         val tryResponse = Try {
           upickle.default.read[Map[GitOID, Option[Entry]]](body)
         }

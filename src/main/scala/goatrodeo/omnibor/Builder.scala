@@ -48,8 +48,10 @@ object Builder {
     *   the storage destination of the corpus
     * @param threadCnt
     *   the number of threads to use when computings
+    * @param fetchVulns
+    *   Should the vulnerabilities be fetched from a remote vulnerability DB
     */
-  def buildDB(source: File, storage: Storage, threadCnt: Int): Unit = {
+  def buildDB(source: File, storage: Storage, threadCnt: Int, fetchVulns: Boolean): Unit = {
     val files = ToProcess.buildQueue(source)
 
     // The count of all the files found
@@ -70,7 +72,7 @@ object Builder {
           while (toProcess != null) {
             try {
               // build the package
-              for { (p, srcPkg) <- Loader.buildPackage(toProcess) } {
+              for { (p, srcPkg) <- Loader.buildPackage(toProcess, fetchVulns) } {
 
                 val srcMap = srcPkg match {
                   case Some(_ -> sm) => sm

@@ -70,7 +70,7 @@ object Loader {
     *   the `TopLevel` computed
     */
   def buildPackage(
-      item: ToProcess
+      item: ToProcess, fetchVulns: Boolean
   ): Option[(TopLevel, Option[(TopLevel, Map[String, PackageFile])])] = {
 
     Try {
@@ -120,11 +120,11 @@ object Loader {
       val packageId = item.pom
 
       // Get the vulnerabilities
-      val packageVulns: Option[ujson.Value] =
-        for {
-
-          vulns <- packageId.getOSV().toOption
-        } yield vulns
+      val packageVulns: Option[ujson.Value] = if (fetchVulns) {
+        packageId.getOSV().toOption
+      }
+      else None
+        
 
       val pkg = TopLevel.Package(
         gitoid = fileGitoid,
