@@ -60,6 +60,60 @@ To build a local GitOID Corpus from local JAR files: `java -jar target/scala-3.3
 The above command tells the system to "build" (`-b`) the corpus from the JAR files in `~/.m2` and output the corpus
 to the `/tmp/gitoidcorpus` directory using 24 threads. 
 
+## Development
+
+Download a small set of JAR files to use as tests from https://goatrodeo.org/repo_ea.tgz
+
+In `~/tmp` untar the file: `tar -xzvf repo_ea.tgz`
+
+This will be a set of files that Goat Rodeo will index as part of it's normal tests.
+
+In the same directory (dpp uses `~/proj/`) that you cloned Goat Rodeo, also clone
+[Big Tent](https://gitlab.com/spicelabs1/bigtent).
+
+When you run the Goat Rodeo tests, a `frood_dir` directory is created that contains
+generated index files. When you run Big Tent tests, the tests look for `../goatrodeo/frood_dir`
+and the generated files.
+
+To create a test data set from within SBT: `run "-b" "<path_to>/tmp/repo_ea" "-o" "/tmp/ff" "-t" "15"`
+
+Then use Cargo to build Big Tent: `dpp@halfpint:~/proj/bigtent$ cargo build`
+
+From the Big Tent directory, you can run Big Tent against the data set: `./target/debug/bigtent -r /tmp/ff/<generated>.grb`
+
+With Big Tent running, you can curl: `curl -v http://localhost:3000/omnibor/sha256:7c7b1dee41ae847f0d8aa66faf656f5f2fe777e4656db9fe4370d2972070c62b
+`
+
+That looks up the SHA256 value in the Corpus:
+
+```json
+{
+  "_timestamp": 1716324455639,
+  "_type": "Item",
+  "_version": 1,
+  "alt_identifiers": [],
+  "connections": [
+    [
+      "gitoid:blob:sha256:4a176f25ca66f78f902082466d2e64bbb3ce5db3a327f006d48dc17a6fb58784",
+      "AliasTo"
+    ]
+  ],
+  "identifier": "sha256:7c7b1dee41ae847f0d8aa66faf656f5f2fe777e4656db9fe4370d2972070c62b",
+  "merged_from": [],
+  "metadata": null,
+  "previous_reference": null,
+  "reference": [
+    8847588522402379377,
+    938
+  ]
+}
+```
+
+The `AliasTo` points to the actual GitOID which can also be fetched: `curl -v http://localhost:3000/omnibor/gitoid:blob:sha256:4a176f25ca66f78f902082466d2e64bbb3ce5db3a327f006d48dc17a6fb58784`
+
+Have fun!
+
+
 ## Participating
 
 We welcome participation and have a [Code of Conduct](code_of_conduct.md).
