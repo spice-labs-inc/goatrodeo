@@ -21,12 +21,8 @@ import java.util.concurrent.atomic.AtomicReference
 import java.sql.Blob
 import java.sql.PreparedStatement
 import java.net.URL
-import goatrodeo.loader.GitOIDUtils
+import goatrodeo.util.GitOIDUtils
 import goatrodeo.util.GitOID
-import sttp.client4.Response
-import sttp.model.StatusCode
-import ujson.Value
-import ujson.Obj
 import scala.util.Failure
 import scala.util.Success
 import scala.annotation.tailrec
@@ -36,6 +32,30 @@ import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.HttpClient
 import java.net.http.HttpResponse.BodyHandlers
 import java.io.ByteArrayInputStream
+import io.bullet.borer.Json
+import java.nio.file.Files
+import goatrodeo.envelopes.DataFileEnvelope
+import java.io.FileOutputStream
+import goatrodeo.envelopes.EntryEnvelope
+import goatrodeo.envelopes.MD5
+import goatrodeo.envelopes.Position
+import goatrodeo.envelopes.MultifilePosition
+import goatrodeo.envelopes.PayloadFormat
+import goatrodeo.envelopes.PayloadType
+import goatrodeo.envelopes.PayloadCompression
+import java.io.FileInputStream
+import io.bullet.borer.Cbor
+import goatrodeo.envelopes.IndexFileEnvelope
+import java.io.BufferedOutputStream
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.nio.channels.FileChannel
+import java.nio.ByteBuffer
+import goatrodeo.envelopes.BundleFileEnvelope
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.HashMap
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -58,7 +78,7 @@ trait Storage {
     * @return
     *   the bytes if they exist
     */
-  def read(path: String): Option[String]
+  def read(path: String): Option[Item]
 
   /** Write data to the path
     *
@@ -67,7 +87,7 @@ trait Storage {
     * @param data
     *   the data to write
     */
-  def write(path: String, data: String): Unit
+  def write(path: String, data: Item): Unit
 
   /** Write data to the path
     *
@@ -83,6 +103,19 @@ trait Storage {
   /** Release the backing store or close files or commit the database.
     */
   def release(): Unit
+
+  /** Get the count of items in storage, if computable
+    *
+    * @return
+    *   the count if it can be determined
+    */
+  def size(): Option[Int] = None
+
+  /** Get the keys from storage (if possible)
+    *
+    * @return
+    */
+  def keys(): Option[Vector[String]] = None
 }
 
 trait StorageReader {
@@ -92,9 +125,9 @@ trait StorageReader {
 trait BulkStorageReader {
   def bulkRead(
       paths: Set[GitOID],
-      known: Map[GitOID, Option[Entry]],
+      known: Map[GitOID, Option[Item]],
       totalBytes: Long = 0
-  ): Map[GitOID, Option[Entry]]
+  ): Map[GitOID, Option[Item]]
 }
 
 class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
@@ -106,108 +139,94 @@ class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
     }.toOption
   }
 
-  private def fixEntry(ent: Option[Entry]): Option[Entry] = {
-    ent.flatMap(e =>
-      e match {
-        case Entry(
-              identifier,
-              contains,
-              containedBy,
-              metadata,
-              _timestamp,
-              _version,
-              _type
-            ) if metadata.purl.isDefined =>
-          Some(e)
-        case _ => None
-      }
-    )
-  }
-
-  @tailrec
+  // @tailrec
   final def bulkRead(
       paths: Set[GitOID],
-      known: Map[GitOID, Option[Entry]],
+      known: Map[GitOID, Option[Item]],
       totalBytes: Long = 0
-  ): Map[GitOID, Option[Entry]] = {
-    import sttp.client4.quick.*
+  ): Map[GitOID, Option[Item]] = {
+    // import sttp.client4.quick.*
 
-    val toRequest = 400
+    // val toRequest = 400
 
-    val knownKeys = known.keySet
-    val unknownSet = paths.diff(knownKeys)
+    // val knownKeys = known.keySet
+    // val unknownSet = paths.diff(knownKeys)
 
-    if (unknownSet.size == 0) {
-      return known
-    }
+    // if (unknownSet.size == 0) {
+    //   return known
+    // }
 
-    println(f"Sending ${toRequest} of ${unknownSet.size}")
-    val toSend = upickle.default.write(unknownSet.toSeq.take(400))
-    val bulkURL = f"${base}/bulk"
+    // println(f"Sending ${toRequest} of ${unknownSet.size}")
+    // val toSend = upickle.default.write(unknownSet.toSeq.take(400))
+    // val bulkURL = f"${base}/bulk"
 
-    val uri = uri"${bulkURL}"
+    // val uri = uri"${bulkURL}"
 
-    val client = HttpClient.newHttpClient();
-    val request = HttpRequest
-      .newBuilder()
-      .uri(URI.create(bulkURL))
-      .header("Content-Type", "application/json")
-      // .header("Content-Length", toSend.length.toString())
-      .POST(BodyPublishers.ofString(toSend))
-      // .POST(BodyPublishers.ofString(toSend))
-      .build();
+    // val client = HttpClient.newHttpClient();
+    // val request = HttpRequest
+    //   .newBuilder()
+    //   .uri(URI.create(bulkURL))
+    //   .header("Content-Type", "application/json")
+    //   // .header("Content-Length", toSend.length.toString())
+    //   .POST(BodyPublishers.ofString(toSend))
+    //   // .POST(BodyPublishers.ofString(toSend))
+    //   .build();
 
-    val httpResponse = Try { client.send(request, BodyHandlers.ofByteArray()) }
+    // val httpResponse = Try { client.send(request, BodyHandlers.ofByteArray()) }
 
-    httpResponse match {
-      case Failure(exception) =>
-        println(f"Failed ${exception}")
-        throw exception
+    // httpResponse match {
+    //   case Failure(exception) =>
+    //     println(f"Failed ${exception}")
+    //     throw exception
 
-      case Success(resp) if resp.statusCode() != 200 =>
-        println(f"Failed ${resp.statusCode()}")
-        // FIXME -- log errors
-        known
+    //   case Success(resp) if resp.statusCode() != 200 =>
+    //     println(f"Failed ${resp.statusCode()}")
+    //     // FIXME -- log errors
+    //     known
 
-      case Success(resp) =>
-        val body = resp.body()
-        // case Response(body, code, _, _, _, _) =>
-        println(f"Received ${Helpers.formatInt(body.size)} bytes total ${Helpers
-            .formatInt(totalBytes + body.size)}")
-        val tryResponse = Try {
-          upickle.default.read[Map[GitOID, Option[Entry]]](body)
-        }
+    //   case Success(resp) =>
+    //     val body = resp.body()
+    //     // case Response(body, code, _, _, _, _) =>
+    //     println(f"Received ${Helpers.formatInt(body.size)} bytes total ${Helpers
+    //         .formatInt(totalBytes + body.size)}")
+    //     val tryResponse =
+    //       Json
+    //         .decode(body)
+    //         .to[Map[GitOID, Option[Entry]]]
+    //         .valueTry // .read[Map[GitOID, Option[Entry]]](body)
 
-        val response: Option[Map[GitOID, Option[Entry]]] = tryResponse match {
-          case Failure(exception) => {
-            println(exception)
-            println(body)
-            return known
-          }
-          case Success(value) => Some(value)
-        }
+    //     val response: Option[Map[GitOID, Option[Entry]]] = tryResponse match {
+    //       case Failure(exception) => {
+    //         println(exception)
+    //         println(body)
+    //         return known
+    //       }
+    //       case Success(value) => Some(value)
+    //     }
 
-        val intermediate: Map[GitOID, Option[Entry]] = known
+    //     val intermediate: Map[GitOID, Option[Entry]] = known
 
-        response match {
-          case None => intermediate
-          case Some(v) =>
-            val addl: Set[GitOID] = Set((for {
-              r <- v.values.toSeq
-              r2 <- r.toSeq if r2.containedBy.length < 1000
-              i <- r2.containedBy
-            } yield i): _*)
+    //     response match {
+    //       case None => intermediate
+    //       case Some(v) =>
+    //         val addl: Set[GitOID] = Set((for {
+    //           r <- v.values.toSeq
+    //           r2 <- r.toSeq if r2.containedBy.length < 1000
+    //           i <- r2.containedBy
+    //         } yield i)*)
 
-            val current =
-              v.foldLeft(intermediate)((last, kv) =>
-                last + (kv._1 -> fixEntry(kv._2))
-              )
+    //         val current =
+    //           v.foldLeft(intermediate)((last, kv) =>
+    //             last + (kv._1 -> fixEntry(kv._2))
+    //           )
 
-            val updatedPaths = paths.union(addl)
+    //         val updatedPaths = paths.union(addl)
 
-            bulkRead(updatedPaths, current, totalBytes + body.size)
-        }
-    }
+    //         bulkRead(updatedPaths, current, totalBytes + body.size)
+    //     }
+    // }
+
+    ???
   }
 }
 
@@ -268,6 +287,7 @@ trait ListFileNames {
     * @return
     */
   def target(): Option[File]
+
 }
 
 /** A helper/companion to Storage
@@ -286,14 +306,11 @@ object Storage {
     *   an appropriate storage instance
     */
   def getStorage(
-      inMem: Boolean,
-      dbLoc: Option[File],
       fsLoc: Option[File]
   ): Storage = {
-    (inMem, dbLoc, fsLoc) match {
-      case (false, Some(db), _) => SqlLiteStorage.getStorage(db)
-      case (false, _, Some(fs)) => FileSystemStorage.getStorage(fs)
-      case (_, _, target)       => MemStorage.getStorage(target)
+    fsLoc match {
+
+      case target => MemStorage.getStorage(target)
     }
   }
 }
@@ -309,37 +326,48 @@ object MemStorage {
     * @return
     *   the storage directory
     */
-  def getStorage(targetDir: Option[File]): Storage = {
-
+  def getStorage(targetDir: Option[File]): Storage with ListFileNames = {
+    import scala.collection.JavaConverters.asScalaSetConverter
+    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+    import scala.collection.JavaConverters.iterableAsScalaIterableConverter
     // use an atomic reference and an immutable map to store stuff to avoid
     // `synchronized` and lock contention
-    val db = new AtomicReference(Map[String, String]())
+    var db = new HashMap[String, Item]
+    val sync = new Object()
 
     new Storage with ListFileNames {
-      override def paths(): Vector[String] = db.get().keys.toVector
-
-      override def pathsSortedWithMD5(): Vector[(String, String)] = {
-        db.get().keys.map(k => (Helpers.md5hash(k), k)).toVector.sorted
-      }
-
-      override def target(): Option[File] = targetDir
-
-      override def exists(path: String): Boolean = db.get().contains(path)
-
-      override def read(path: String): Option[String] = db.get().get(path)
-
-      override def write(path: String, data: String): Unit = {
-        def doUpdate(in: Map[String, String]): Map[String, String] =
-          in + (path -> data)
-        var old = db.get()
-        var updated = doUpdate(old)
-        while (!db.compareAndSet(old, updated)) {
-          old = db.get()
-          updated = doUpdate(old)
+      override def paths(): Vector[String] = {
+        sync.synchronized {
+          db.keySet().asScala.toVector
         }
       }
 
-      override def release(): Unit = db.set(Map())
+      override def pathsSortedWithMD5(): Vector[(String, String)] = {
+        paths().map(k => (Helpers.md5hashHex(k), k)).sorted
+        // db.get().keys.map(k => (Helpers.md5hashHex(k), k)).toVector.sorted
+      }
+
+      override def size() = sync.synchronized { Some(db.size()) }
+
+      override def keys(): Option[Vector[String]] = Some(paths())
+      override def target(): Option[File] = targetDir
+
+      override def exists(path: String): Boolean = sync.synchronized {
+        db.containsKey(path)
+      }
+
+      override def read(path: String): Option[Item] = {
+        val ret = sync.synchronized { db.get(path) }
+        Option(ret)
+      }
+
+      override def write(path: String, data: Item): Unit = {
+        sync.synchronized {
+          db.put(path, data)
+        }
+      }
+
+      override def release(): Unit = sync.synchronized { db = new HashMap() }
     }
   }
 }
@@ -363,118 +391,22 @@ object FileSystemStorage {
     new Storage {
       override def exists(path: String): Boolean = buildIt(path).exists()
 
-      override def read(path: String): Option[String] = {
+      override def read(path: String): Option[Item] = {
         val wholePath = buildIt(path)
-        Try { new String(Helpers.slurpInput(wholePath), "UTF-8") }.toOption
+        Try {
+          Item
+            .decode(Helpers.slurpInput(wholePath), PayloadFormat.CBOR)
+            .toOption
+        }.toOption.flatten
       }
 
-      override def write(path: String, data: String): Unit = {
+      override def write(path: String, data: Item): Unit = {
         val wholePath = buildIt(path)
         val parent = wholePath.getAbsoluteFile().getParentFile().mkdirs()
-        Helpers.writeOverFile(wholePath, data)
+        Helpers.writeOverFile(wholePath, data.encodeCBOR())
       }
 
       def release(): Unit = {}
-    }
-  }
-}
-
-/** The GitOID Corpus in a SQLite database. Turns out this is not materially
-  * faster than using the filesystem
-  */
-object SqlLiteStorage {
-  import java.sql.Connection;
-  import java.sql.DriverManager;
-  import java.sql.ResultSet;
-  import java.sql.SQLException;
-  import java.sql.Statement
-  import org.sqlite.{SQLiteJDBCLoader, SQLiteConfig}
-
-  def getStorage(pathToDB: File): Storage = {
-    Class.forName("org.sqlite.JDBC");
-    val initialize = SQLiteJDBCLoader.initialize();
-    val lock = new Object()
-    var cnt: Long = 0
-    val jdbc = {
-      val config = new SQLiteConfig()
-      config.setCacheSize(100000)
-      val driverManager = DriverManager.getConnection(
-        f"jdbc:sqlite:${pathToDB.getAbsolutePath()}",
-        config.toProperties()
-      )
-      val stmt = driverManager.createStatement()
-      stmt.execute("""CREATE TABLE IF NOT EXISTS "files" (
-	"name" TEXT PRIMARY KEY, 
-	"content" BLOB,          
-	"modified" INTEGER,      
-	"mode" INTEGER           
-     );""")
-
-      // stmt.execute("CREATE INDEX IF NOT EXISTS pk_file ON files (name);")
-      driverManager.setAutoCommit(false)
-      driverManager
-    }
-
-    val countPS =
-      jdbc.prepareStatement("SELECT COUNT(*) FROM \"files\" WHERE name = ?")
-
-    val readPS =
-      jdbc.prepareStatement("SELECT content FROM files WHERE name = ?")
-
-    val writePS = jdbc.prepareStatement(
-      "INSERT INTO files(name, content, modified, mode) VALUES(?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET content = ?, modified = ?;"
-    )
-    new Storage {
-
-      def exists(path: String): Boolean = lock.synchronized {
-
-        countPS.setString(1, path)
-
-        val rs = countPS.executeQuery()
-        try {
-          if (rs.next()) {
-            rs.getInt(1) > 0
-          } else false
-        } finally {
-          rs.close()
-
-        }
-      }
-
-      def read(path: String): Option[String] = lock.synchronized {
-
-        readPS.setString(1, path)
-        val rs = readPS.executeQuery()
-        try {
-          if (rs.next()) {
-            val blob = rs.getBytes(1)
-            Some(new String(blob, "UTF-8"))
-          } else None
-        } finally {
-          rs.close()
-
-        }
-      }
-
-      def write(path: String, data: String): Unit = lock.synchronized {
-        writePS.setString(1, path)
-        writePS.setBytes(2, data.getBytes("UTF-8"))
-        writePS.setLong(3, System.currentTimeMillis())
-        writePS.setInt(4, 0x666)
-        writePS.setBytes(5, data.getBytes("UTF-8"))
-        writePS.setLong(6, System.currentTimeMillis())
-        writePS.executeUpdate()
-        cnt = cnt + 1
-        if (cnt % 5000 == 0) {
-          jdbc.commit()
-        }
-      }
-
-      def release(): Unit = lock.synchronized {
-        jdbc.commit()
-        jdbc.close()
-      }
-
     }
   }
 }

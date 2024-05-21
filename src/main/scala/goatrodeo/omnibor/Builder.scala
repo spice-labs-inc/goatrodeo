@@ -15,24 +15,27 @@ limitations under the License. */
 package goatrodeo.omnibor
 
 import java.io.File
-import java.util.regex.Pattern
-import goatrodeo.util.Helpers
 import java.util.concurrent.atomic.AtomicInteger
-import goatrodeo.loader.{Loader, GitOIDUtils}
-import upickle.default.*
 import java.io.FileOutputStream
 import java.util.zip.GZIPOutputStream
 import java.io.OutputStreamWriter
 import java.io.BufferedWriter
-import scala.util.Try
-import java.io.ByteArrayInputStream
-import java.io.FileInputStream
+import java.math.BigInteger
 import scala.xml.Elem
+import goatrodeo.util.PackageIdentifier
 import java.util.concurrent.ConcurrentLinkedQueue
-import collection.convert.ImplicitConversions
-import collection.JavaConverters.asScalaIteratorConverter
-import goatrodeo.loader.PackageIdentifier
-import goatrodeo.loader.PackageProtocol
+import goatrodeo.util.Helpers
+import scala.util.Try
+import java.io.FileInputStream
+import goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
+import org.apache.commons.compress.archivers.ArchiveInputStream
+import org.apache.commons.compress.compressors.CompressorStreamFactory
+import org.apache.commons.compress.archivers.ArchiveEntry
+import org.apache.commons.compress.archivers.ArchiveStreamFactory
+import java.io.BufferedInputStream
+import java.time.Instant
+import java.time.Duration
+import goatrodeo.envelopes.PayloadCompression
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -51,14 +54,20 @@ object Builder {
     * @param fetchVulns
     *   Should the vulnerabilities be fetched from a remote vulnerability DB
     */
-  def buildDB(source: File, storage: Storage, threadCnt: Int, fetchVulns: Boolean): Unit = {
+  def buildDB(
+      source: File,
+      storage: Storage,
+      threadCnt: Int
+  ): Unit = {
     val files = ToProcess.buildQueue(source)
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
 
+    val totalCnt = files.size()
+
     // start time
-    val start = System.currentTimeMillis()
+    val start = Instant.now()
 
     // fork `threadCnt` threads to do the work
     val threads = for { threadNum <- 0 until threadCnt } yield {
@@ -68,76 +77,24 @@ object Builder {
           // if the channel is closed/empty, `None` will be
           // returned, handle it gracefully
 
-          var toProcess: ToProcess = files.poll()
-          while (toProcess != null) {
+          var toProcess: ToProcess = null
+          while ({ toProcess = files.poll(); toProcess } != null) {
+
             try {
               // build the package
-              for { (p, srcPkg) <- Loader.buildPackage(toProcess, fetchVulns) } {
-
-                val srcMap = srcPkg match {
-                  case Some(_ -> sm) => sm
-                  case None          => Map()
-                }
-
-                // do the optional source file
-                for { (p, _) <- srcPkg } {
-                  val targetFile = p.gitoid
-
-                  // if we've already processed something with the same gitoid, don't do it again
-                  if (!storage.exists(targetFile)) {
-                    // write the root Entry
-                    storage.write(
-                      targetFile,
-                      write(p.toEntry(), indent = -1, escapeUnicode = true)
-                    )
-
-                    // update the Package URL index
-                    p.updateIndex(storage)
-
-                    // write or update all the dependents
-                    p.fixDependents(storage)
-
-                  } else {
-                    println(
-                      f"Skipped duplicated ${toProcess.source.map(_.getName())}"
-                    )
-                  }
-                }
-
-                // compute the filename in Storage for the Root entry
-
-                val targetFile = p.gitoid
-
-                // if we've already processed something with the same gitoid, don't do it again
-                if (!storage.exists(targetFile)) {
-                  // write the root Entry
-                  storage.write(
-                    targetFile,
-                    write(p.toEntry(), indent = -1, escapeUnicode = true)
-                  )
-
-                  // update the Package URL index
-                  p.updateIndex(storage)
-
-                  // write or update all the dependents
-                  p.fixDependents(storage)
-
-                } else {
-                  println(f"Skipped duplicated ${toProcess.jar.getName()}")
-                }
-                val nc = cnt.incrementAndGet()
-                println(
-                  f"processed ${toProcess.jar.getName()}, count ${nc} time ${(System
-                      .currentTimeMillis() - start) / 1000} seconds - thread ${threadNum}"
-                )
-              }
+              BuildGraph.graphForToProcess(toProcess, storage)
+              val updatedCnt = cnt.addAndGet(1)
+              println(f"Processed ${updatedCnt} of ${totalCnt} at ${Duration
+                  .between(start, Instant.now())}")
             } catch {
-              case e: Throwable => {
-                println(f"Failed ${toProcess.jar} ${e}")
-                Helpers.bailFail()
+              case ise: IllegalStateException => throw ise
+              case e: Exception => {
+                println(f"Failed ${toProcess.main} ${e}")
+                // Helpers.bailFail()
               }
+
             }
-            toProcess = files.poll()
+
           }
         ,
         f"gitoid compute ${threadNum}"
@@ -148,66 +105,80 @@ object Builder {
 
     // wait for the threads to complete
     for { t <- threads } t.join()
+    println(f"Finished processing ${totalCnt} at ${Duration
+        .between(start, Instant.now())}")
 
     storage match {
-      // if the attribute of the Storage includes the ability to
-      // list filenames, write sharded index
-      case v: ListFileNames =>
-        v.target() match {
-          case Some(target) =>
-            val start = System.currentTimeMillis()
-            // make sure the destination exists
-            target.getAbsoluteFile().getParentFile().mkdirs()
+      case lf: (ListFileNames with Storage) => writeGoatRodeoFiles(lf)
+      case _ => println("Didn't write")
+    }
+  }
 
-            // FIXME -- deal with proper sharding of the output
-            // based on 1 or 2 digits in the MD5 hash
-            val baseFos = new FileOutputStream(target)
-            val fos =
-              if (target.getName().endsWith(".gz"))
-                new GZIPOutputStream(baseFos)
-              else baseFos
-            val wr = new OutputStreamWriter(fos, "UTF-8")
-            val br = new BufferedWriter(wr)
+  def writeGoatRodeoFiles(store: ListFileNames with Storage): Unit = {
+    store.target() match {
+      case Some(target) =>
+        println(f"In store with target ${target}")
+        val start = Instant.now()
+        // make sure the destination exists
+        target.getAbsoluteFile().mkdirs()
+        val allItems = store
+          .paths()
+          .flatMap(store.read(_))
+        println(
+          f"Pre-sort at ${Duration.between(start, Instant.now())}"
+        )
+        val withMd5 = allItems.map(i => (Helpers.toHex(i.identifierMD5()), i))
+        val sorted = withMd5.sortBy(_._1).map(_._2)
+        println(
+          f"Post-sort at ${Duration.between(start, Instant.now())}"
+        )
+        val cnt = allItems.length
+        GraphManager.writeEntries(
+          target,
+          sorted.toIterator,
+          PayloadCompression.NONE
+        )
 
-            // how many records did we process
-            var cnt = 0
-
-            // Get the sorted (by MD5 of the path name)
-            for {
-              (hash, name) <- v.pathsSortedWithMD5()
-              item <- storage.read(name)
-            } {
-              cnt = cnt + 1
-              if (cnt % 10000 == 0)
-                println(f"Count ${cnt} writing ${hash},${name}")
-
-              // write the item
-              br.write(
-                f"${hash},${name}||,||${item.replace('\n', ' ')}\n"
-              )
-            }
-
-            // clean up
-            br.close()
-            wr.close()
-            fos.close()
-            println(
-              f"Wrote ${cnt} entries in ${(System.currentTimeMillis() - start) / 1000} seconds"
-            )
-          case _ =>
-        }
+        println(
+          f"Wrote ${cnt} entries in ${Duration.between(start, Instant.now())}"
+        )
       case _ =>
     }
 
-    storage.release()
+    store.release()
+  }
+
+  private def getSha256(f: File): Option[(File, Array[Byte])] = {
+    val name = f.getName()
+    val allHex = name
+      .chars()
+      .allMatch(i => (i >= '0' && i <= '9') || (i >= 'a' && i <= 'f'))
+    val rightLen = name.length() == 64
+    val hasDiff = {
+      val tf = (new File(f, "diff")); tf.exists() && tf.isDirectory()
+    }
+
+    if (allHex && rightLen && hasDiff)
+      Some(f -> new BigInteger(name, 16).toByteArray)
+    else None
+  }
+
+  def buildFromDocker(
+      root: File,
+      storage: Storage
+  ): Vector[(File, Array[Byte])] = {
+    val whichDirs =
+      root.listFiles().toVector.filter(_.isDirectory()).flatMap(getSha256(_))
+
+    whichDirs
   }
 }
 
 case class ToProcess(
-    pom: PackageIdentifier,
-    jar: File,
+    pom: Option[PackageIdentifier],
+    main: File,
     source: Option[File],
-    pomFile: File
+    pomFile: Option[File]
 )
 
 object ToProcess {
@@ -244,6 +215,21 @@ object ToProcess {
   }
 
   def buildQueue(root: File): ConcurrentLinkedQueue[ToProcess] = {
+    val pomLike = buildQueueForPOMS(root)
+    if (pomLike.isEmpty()) {
+      val files = Helpers
+        .findFiles(root, _ => true)
+        .map(f => ToProcess(None, f, None, None))
+
+      import collection.JavaConverters.seqAsJavaListConverter
+      import collection.JavaConverters.asJavaIterableConverter
+
+      val queue = new ConcurrentLinkedQueue(files.asJava)
+      queue
+    } else pomLike
+  }
+
+  def buildQueueForPOMS(root: File): ConcurrentLinkedQueue[ToProcess] = {
 
     val poms = Helpers.findFiles(
       root,
@@ -251,8 +237,8 @@ object ToProcess {
     )
 
     val theQueue = (for {
-      v <- poms.iterator
-      f <- v
+      f <- poms.iterator
+      // f = v
       xml <- Try { scala.xml.XML.load(new FileInputStream(f)) }.toOption
       item <- {
         val grp = findTag(xml, "groupId")
@@ -271,10 +257,10 @@ object ToProcess {
             if (jar.exists()) {
               Some(
                 ToProcess(
-                  PackageIdentifier(PackageProtocol.Maven, g, a, v),
+                  Some(PackageIdentifier(PackageProtocol.Maven, g, a, v)),
                   jar,
                   Helpers.findSrcFile(f),
-                  f
+                  Some(f)
                 )
               )
             } else None
@@ -294,4 +280,5 @@ object ToProcess {
     val queue = new ConcurrentLinkedQueue(theQueue.asJava)
     queue
   }
+
 }

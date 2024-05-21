@@ -1,5 +1,10 @@
-val scala3Version = "3.3.1"
+val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
+
+fork := true
+
+resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/public/"
+Test / logBuffered := false
 
 lazy val root = project
   .in(file("."))
@@ -11,15 +16,17 @@ lazy val root = project
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.2.0",
     libraryDependencies += "org.apache.bcel" % "bcel" % "6.8.1",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
-    libraryDependencies += "org.apache.lucene" % "lucene-core" % luceneVersion,
-    libraryDependencies += "org.apache.lucene" % "lucene-analyzers-common" % luceneVersion,
-    libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % luceneVersion,
-    libraryDependencies += "org.xerial" % "sqlite-jdbc" % "3.45.0.0",
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
-    // https://mvnrepository.com/artifact/commons-io/commons-io
     libraryDependencies += "commons-io" % "commons-io" % "2.15.1",
-    libraryDependencies += "com.lihaoyi" %% "upickle" % "3.2.0",
-    assembly / mainClass := Some("goatrodeo.Howdy")
+    libraryDependencies += "io.bullet" %% "borer-core" % "1.14.0",
+    libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.0",
+    // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
+    libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
+
+    // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
+    // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
+    assembly / mainClass := Some("goatrodeo.Howdy"),
+    compileOrder := CompileOrder.JavaThenScala
   )
 
 ThisBuild / assemblyJarName := "goatrodeo.jar"

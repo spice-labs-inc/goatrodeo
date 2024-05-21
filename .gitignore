@@ -34,4 +34,5 @@ metals.sbt
 frood.db
 info_repo*.txt
 frood.txt
-
+/frood_dir
+info_repo_*.txt

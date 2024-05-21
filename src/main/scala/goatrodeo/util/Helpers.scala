@@ -14,7 +14,6 @@ limitations under the License. */
 
 package goatrodeo.util
 
-import os.truncate
 import java.io.File
 import java.io.FileOutputStream
 import java.io.ByteArrayOutputStream
@@ -27,12 +26,71 @@ import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 import java.util.concurrent.atomic.AtomicReference
 import java.text.NumberFormat
+import java.security.SecureRandom
+import java.io.OutputStream
+import java.io.ObjectOutputStream
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.io.ByteArrayInputStream
+import scala.util.Try
+import scala.util.Failure
+import scala.util.Success
+import org.apache.bcel.classfile.ClassParser
 
 type GitOID = String
 
 /** A bunch of helpers/utilities
   */
 object Helpers {
+
+  /** The random number generator
+    */
+  private lazy val secRandom = new SecureRandom()
+
+  /** Get a random int
+    *
+    * @return
+    *   a random int
+    */
+  def randomInt(): Int = {
+    secRandom.synchronized {
+      while (true) {
+        val ret = secRandom.nextInt();
+        if (ret >= 0) return ret;
+      }
+      return 0;
+    }
+  }
+
+  /** Get a random long
+    *
+    * @return
+    *   random number
+    */
+  def randomLong(): Long = {
+    secRandom.synchronized {
+      while (true) {
+        val ret = secRandom.nextLong()
+        if (ret >= 0L) return ret;
+      }
+      return 0;
+    }
+  }
+
+  /** Get a random byte array
+    *
+    * @param len
+    *   the length of the array
+    * @return
+    *   the newly created random array
+    */
+  def randomBytes(len: Int): Array[Byte] = {
+    secRandom.synchronized {
+      val ret = new Array[Byte](len)
+      secRandom.nextBytes(ret)
+      ret
+    }
+  }
 
   /** Given a file root and a filter function, return a channel that contains
     * the files found in the folder and subfolders that match the filter.
@@ -48,35 +106,14 @@ object Helpers {
     */
   def findFiles(
       root: File,
-      ok: File => Boolean,
-      channelSize: Int = 250
-  ): BoundedChannel[File] = {
-    val ret = new BoundedChannel[File](channelSize)
+      ok: File => Boolean
+  ): Vector[File] = {
 
-    def slurp(root: File, top: Boolean): Unit = {
-      try {
-        if (root.isDirectory()) {
-          val fileList = root.listFiles()
-          if (fileList != null) {
-            for { kid <- fileList } {
-              slurp(kid, false)
-            }
-          }
-        } else {
-          if (ok(root)) {
-            ret.push(root)
-          }
-        }
-      } finally {
-        if (top) {
-          ret.close()
-        }
-      }
-    }
-
-    val thread =
-      new Thread(() => slurp(root, true), f"File finder ${root}").start()
-    ret
+    if (root.isDirectory()) {
+      root.listFiles().toVector.flatMap(findFiles(_, ok))
+    } else if (root.isFile() && ok(root)) {
+      Vector(root)
+    } else Vector()
   }
 
   /** Write data over a file
@@ -112,10 +149,117 @@ object Helpers {
     * @return
     *   the hex of the MD5 hash.
     */
-  def md5hash(in: String): String = {
+  def md5hashHex(in: String): String = {
+
+    toHex(computeMD5(stringToInputStream(in)))
+  }
+
+  def stringToInputStream(str: String): InputStream = {
+    new ByteArrayInputStream(str.getBytes("UTF-8"))
+  }
+
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
+  def computeMD5(in: InputStream): Array[Byte] = {
     val md = MessageDigest.getInstance("MD5")
-    val digested = md.digest(in.getBytes("UTF-8"))
-    toHex(digested)
+    val ba = new Array[Byte](4096)
+    while (true) {
+      val len = in.read(ba)
+      if (len <= 0) {
+        return md.digest()
+      }
+
+      md.update(ba, 0, len)
+    }
+    ???
+  }
+
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
+  def computeMD5(in: String): Array[Byte] = {
+    computeMD5(stringToInputStream(in))
+  }
+
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
+  def computeSHA1(in: String): Array[Byte] = {
+    computeSHA1(stringToInputStream(in))
+  }
+
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
+  def computeSHA256(in: String): Array[Byte] = {
+    computeSHA256(stringToInputStream(in))
+  }
+
+  /** Compute the SHA1 hash of an input stream.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the SHA1 hash
+    */
+  def computeSHA1(in: InputStream): Array[Byte] = {
+    val md = MessageDigest.getInstance("SHA1")
+    val ba = new Array[Byte](4096)
+    while (true) {
+      val len = in.read(ba)
+      if (len <= 0) {
+        return md.digest()
+      }
+
+      md.update(ba, 0, len)
+    }
+    ???
+  }
+
+  /** Compute the sha256 of an input stream
+    *
+    * @param in
+    *   the input stream
+    * @return
+    *   the bytes of the sha256 hash
+    */
+  def computeSHA256(in: InputStream): Array[Byte] = {
+    val md = MessageDigest.getInstance("SHA256")
+    val ba = new Array[Byte](4096)
+    while (true) {
+      val len = in.read(ba)
+      if (len <= 0) {
+        return md.digest()
+      }
+
+      md.update(ba, 0, len)
+    }
+    ???
   }
 
   /** Given a byte array, create a lowercase hexadecimal string representing the
@@ -132,6 +276,49 @@ object Helpers {
       sb.append(String.format("%02x", b))
     }
     sb.toString()
+  }
+
+  def toHex(id: Long): String = {
+    val bb = ByteBuffer.allocate(8)
+    toHex(bb.putLong(id).position(0).array())
+  }
+
+  def byteArrayToLong63Bits(bytes: Array[Byte]): Long = {
+    val toDo = new Array[Byte](8)
+
+    System.arraycopy(bytes, 0, toDo, 0, Math.min(8, bytes.length))
+    toDo(0) = (toDo(0) & 0x7f).toByte
+    val byteBuffer = ByteBuffer.wrap(toDo)
+    byteBuffer.position(0).getLong()
+  }
+
+  /** Slurp the first block (4K) from the File. If the File has less than 4K
+    * bytes, returns all the readable bytes
+    *
+    * @param in
+    * @return
+    */
+  def slurpBlock(in: File): Array[Byte] = {
+    slurpBlock(FileInputStream(in))
+  }
+
+  /** Slurp the first block (4K) from the InputStream. If the InputStream has
+    * less than 4K bytes, returns all the readable bytes
+    *
+    * @param in
+    * @return
+    */
+  def slurpBlock(in: InputStream): Array[Byte] = {
+    val ret = new ByteArrayOutputStream()
+    val buffer = new Array[Byte](4096)
+
+    val len = in.read(buffer)
+    if (len == 0) {
+      Array()
+    } else {
+      ret.write(buffer, 0, len)
+      ret.toByteArray()
+    }
   }
 
   /** Slurp the contents of an InputStream
@@ -158,6 +345,31 @@ object Helpers {
 
     what.close()
     ret.toByteArray()
+  }
+
+  /** Slurp the contents of an InputStream into a temp file
+    *
+    * @param what
+    *   the InputStream
+    * @return
+    *   a file that contains the contents of the stream
+    */
+  def tempFileFromStream(what: InputStream/*, suffix: String*/): File = {
+    val retFile = File.createTempFile("goat_rodeo", f".goats")
+    retFile.deleteOnExit()
+    val ret = FileOutputStream(retFile)
+    val buffer = new Array[Byte](4096)
+
+    while (true) {
+      val len = what.read(buffer)
+      if (len < 0) {
+        return retFile
+      }
+      if (len > 0) {
+        ret.write(buffer, 0, len)
+      }
+    }
+    retFile
   }
 
   /** Bail out... gracefully if we're running in SBT
@@ -191,7 +403,7 @@ object Helpers {
     allFiles.get().get(parentStr) match {
       case Some(r) => r
       case None =>
-        val v = Set(parentFile.listFiles().map(f => f.getName()): _*)
+        val v = Set(parentFile.listFiles().map(f => f.getName())*)
         allFiles.getAndUpdate(last => last + (parentStr -> v))
         v
     }
@@ -200,6 +412,22 @@ object Helpers {
   def formatInt(in: Int): String = {
     NumberFormat.getInstance().format(in)
 
+  }
+
+  def findAllFiles(root: File, start: Vector[File] = Vector()): Vector[File] = {
+    var base = start
+    if (root.isDirectory()) {
+      val fileList = root.listFiles()
+      if (fileList != null) {
+        for { kid <- fileList } {
+          base = findAllFiles(kid, base)
+        }
+        base
+      } else base
+    } else if (root.isFile()) {
+      base :+ root
+
+    } else base
   }
 
   def formatInt(in: Long): String = {
@@ -223,182 +451,377 @@ object Helpers {
 
   }
 
-  /** Get data on a GitOID from a GitOID Corpus
+  def readShort(reader: FileChannel): Int = {
+    val bytes = ByteBuffer.allocate(2)
+    reader.read(bytes)
+
+    bytes.position(0).getShort().toInt & 0xffff
+  }
+
+  def readInt(reader: FileChannel): Int = {
+    val bytes = ByteBuffer.allocate(4)
+    reader.read(bytes)
+
+    bytes.position(0).getInt()
+  }
+
+  def readLong(reader: FileChannel): Long = {
+    val bytes = ByteBuffer.allocate(8) // new Array[Byte](8)
+    reader.read(bytes)
+    val byteBuffer = bytes
+    byteBuffer.position(0).getLong()
+  }
+
+  def writeShort(writer: FileChannel, num: Int): Unit = {
+    val bytes = ByteBuffer.allocate(2)
+    bytes.putShort((num & 0xffff).toShort).position(0)
+    val len = writer.write(bytes)
+  }
+
+  def writeInt(writer: FileChannel, num: Int): Unit = {
+    val bytes = ByteBuffer.allocate(4).putInt(num).position(0)
+    writer.write(bytes)
+  }
+
+  def writeLong(writer: FileChannel, num: Long): Unit = {
+    val bytes = ByteBuffer.allocate(8).putLong(num).position(0)
+    writer.write(bytes)
+  }
+}
+
+/** A set of helpers to manage GitOIDs
+  */
+object GitOIDUtils {
+
+  /** Given a full OmniBOR URI, parse into a triple of first 3 hex chars of
+    * hash, second 3 hex chars of hash, rest of the hex chars of hash
     *
-    * @param gitoid
-    *   the gitoid to look up
-    * @param base
-    *   the base of the corpus (e.g., https or file)
-    * @param splitter
-    *   the function that splits the filename for lookup
+    * @param uri
+    *   the OmniBOR URI
     * @return
-    *   a tuple containing an HTTP response code. If it's 200, then the second
-    *   item contains the `Array[Byte]` returned from the request
+    *   the split filename
     */
-//   def getData(
-//       gitoid: GitOID,
-//       base: URL,
-//       splitter: String => (Vector[String], Option[String])
-//   ): (Int, Array[Byte]) = {
-
-//     // FIXME Support SQLLite DB as well
-//     val (split, suffix) = splitter(gitoid)
-//     val actualPre = split.foldLeft(base)((url, v) => {
-//       val uri = url.toURI()
-//       uri
-//         .resolve(f"${uri.getPath()}/${v}")
-//         .toURL()
-//     })
-
-//     val actual = suffix match {
-//       case None => actualPre
-//       case Some(suff) => {
-//         val uri = actualPre.toURI()
-//         uri.resolve(f"${uri.getPath()}.${suff}").toURL()
-//       }
-//     }
-
-//     try {
-//       val input = actual.openConnection() match {
-//         case http: HttpURLConnection =>
-//           http.setRequestMethod("GET")
-//           http.connect()
-//           val resp = http.getResponseCode()
-//           if (resp != 200) return (resp, "N/A".getBytes("UTF-8"))
-//           http.getInputStream()
-//         case other =>
-//           other.connect()
-//           other.getInputStream()
-//       }
-//       (200, Helpers.slurpInput(input))
-//     } catch {
-//       case e: Exception =>
-//         {
-//           (404, e.toString().getBytes("UTF-8"))
-//         }
-//     }
-
-//   }
-}
-
-class BoundedChannel[T](size: Int) extends Seq[Option[T]] {
-  private var active: Boolean = true
-  private var data: Vector[T] = Vector()
-
-  def close(): Unit = this.synchronized {
-    active = false
-    this.notifyAll()
+  def urlToFileName(uri: String): (String, String, String) = {
+    val idx = uri.lastIndexOf(":")
+    val str = if (idx >= 0) {
+      uri.substring(idx + 1)
+    } else uri
+    (str.substring(0, 3), str.substring(3, 6), str.substring(6))
   }
 
-  // only call if data is not empty
-  private def popNext(): T = this.synchronized {
-    val ret = data(0)
-    data = data.drop(1)
-    notifyAll()
-    ret
-  }
+  /** The object type
+    */
+  enum ObjectType {
+    case Blob, Tree, Commit, Tag
 
-  def push(v: T): Unit = this.synchronized {
-    while (data.length >= size && active) {
-      this.wait(100)
-    }
-
-    data = data.appended(v)
-    notifyAll()
-  }
-
-  override def iterator: Iterator[Option[T]] = {
-    new Iterator[Option[T]] {
-
-      override def hasNext: Boolean = BoundedChannel.this.synchronized {
-        if (!data.isEmpty) return true
-        while (data.isEmpty) {
-          BoundedChannel.this.wait(100)
-          if (!BoundedChannel.this.active) return !data.isEmpty
-        }
-
-        true
-      }
-
-      override def next(): Option[T] = BoundedChannel.this.synchronized {
-        if (BoundedChannel.this.active && !data.isEmpty) return Some(popNext())
-        while (data.isEmpty && active) {
-          BoundedChannel.this.wait(100)
-        }
-
-        if (!active) {
-          if (!data.isEmpty) Some(popNext()) else None
-        } else Some(popNext())
+    /** Get the canonical name for the Object Type
+      *
+      * @return
+      *   the canonical name for the object type
+      */
+    def gitoidName(): String = {
+      this match {
+        case Blob   => "blob"
+        case Tree   => "tree"
+        case Commit => "commit"
+        case Tag    => "tag"
       }
     }
   }
 
-  override def apply(i: Int): Option[T] = this.synchronized {
-    if (data.length > i) Some(data(i)) else None
+  /** The hash type
+    */
+  enum HashType {
+    case SHA1, SHA256
+
+    /** Based on the hash type, get the MessageDigest
+      *
+      * @return
+      *   the MessageDigest for the type
+      */
+    def getDigest(): MessageDigest = {
+      this match {
+        case SHA1   => MessageDigest.getInstance("SHA-1")
+        case SHA256 => MessageDigest.getInstance("SHA-256")
+      }
+    }
+
+    /** Get the canonical name for the hash type
+      *
+      * @return
+      *   the canonical name
+      */
+    def hashTypeName(): String = {
+      this match {
+        case SHA1   => "sha1"
+        case SHA256 => "sha256"
+      }
+    }
   }
 
-  override def length: Int = this.synchronized {
-    data.length
+  /** Given an object type, a pile of bytes, and a hash type, compute the GitOID
+    *
+    * @param hashType
+    *   the hash type
+    * @param type
+    *   the type of object
+    * @param bytes
+    *   the bytes to compute the gitoid for
+    * @return
+    *   the gitoid
+    */
+  def computeGitOID(
+      bytes: Array[Byte],
+      hashType: HashType = HashType.SHA256,
+      tpe: ObjectType = ObjectType.Blob
+  ): Array[Byte] = {
+    // get the prefix bytes in local encoding... which should be okay given that
+    // the string should be ASCII
+    val prefix =
+      String.format("%s %d\u0000", tpe.gitoidName(), bytes.length).getBytes();
+    val md = hashType.getDigest();
+    md.update(prefix);
+
+    md.digest(bytes);
+  }
+
+  /** Take bytes, compute the GitOID and return the hexadecimal bytes
+    * representing the GitOID
+    *
+    * @param bytes
+    *   the bytes to compute gitoid for
+    * @param hashType
+    *   the hash type... default SHA256
+    * @param tpe
+    *   the object type... default Blob
+    * @return
+    *   the hex representation of the GitOID
+    */
+  def hashAsHex(
+      bytes: Array[Byte],
+      hashType: HashType = HashType.SHA256,
+      tpe: ObjectType = ObjectType.Blob
+  ): String = {
+    Helpers.toHex(
+      computeGitOID(bytes, hashType, tpe)
+    )
+  }
+
+  /** A `gitoid` URL. See
+    * https://www.iana.org/assignments/uri-schemes/prov/gitoid
+    *
+    * @return
+    *   the `gitoid` URL
+    */
+  def url(
+      inputStream: InputStream,
+      hashType: HashType,
+      tpe: ObjectType = ObjectType.Blob
+  ): String = {
+    val bytes = Helpers.slurpInput(inputStream)
+    String.format(
+      "gitoid:%s:%s:%s",
+      tpe.gitoidName(),
+      hashType.hashTypeName(),
+      hashAsHex(bytes, hashType, tpe)
+    );
+  }
+
+  def computeAllHashes(theFile: File): (String, Vector[String]) = {
+    def is(): InputStream = FileInputStream(theFile)
+    val gitoidSha256 = url(is(), HashType.SHA256)
+
+    (
+      gitoidSha256,
+      Vector(
+        url(is(), HashType.SHA1),
+        String.format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is()))),
+        String.format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is()))),
+        String.format("md5:%s", Helpers.toHex(Helpers.computeSHA1(is())))
+      )
+    )
+  }
+}
+
+enum PackageProtocol {
+  case Maven, NPM, Docker, Deb, Gem
+
+  def name: String = {
+    this match {
+      case Maven  => "maven"
+      case NPM    => "npm"
+      case Docker => "docker"
+      case Deb    => "deb"
+      case Gem    => "gem"
+    }
+  }
+
+}
+case class PackageIdentifier(
+
+    protocol: PackageProtocol,
+    groupId: String,
+    artifactId: String,
+    version: String
+) {
+
+  def toStringMap(): Map[String, String] = {
+    Map(
+      "package_protocol" -> protocol.name,
+      "group_id" -> groupId,
+      "artifact_id" -> artifactId,
+      "version" -> version
+    )
+  }
+
+  def purl(): String = {
+    val ret = 
+    f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+        .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}"
+      ret
+  }
+
+  def getOSV(): Try[ujson.Value] = {
+    val body: Try[(Int, String)] = Try {
+      val purl = this.purl()
+      import sttp.client4.quick.*
+      import sttp.client4.Response
+      val response = quickRequest
+        .post(uri"https://api.osv.dev/v1/query")
+        .body(f"""{"package": {"purl": "${purl}"}}""")
+        .contentType("application/json")
+        .send()
+
+      (response.code.code, response.body)
+    }
+
+    body match {
+      case Failure(exception) => Failure(exception)
+      case Success((code, body)) if code / 100 == 2 && body.length() > 2 =>
+        Try {
+          ujson.read(body)
+        }
+      case Success((code, body)) =>
+        Failure(new Exception(f"HTTP Response ${code}, body ${body}"))
+    }
+  }
+}
+
+enum FileType {
+  case ObjectFile(
+      subtype: Option[String],
+      source: Option[String]
+  )
+  case SourceFile(language: Option[String])
+  case MetaData(subtype: Option[String])
+  case Package(subtype: Option[String])
+  case Other
+
+  def typeName(): Option[String] = {
+    this match {
+      case ObjectFile(Some(subtype), _) => Some(f"object: ${subtype}")
+      case ObjectFile(_, _)             => Some("object")
+      case SourceFile(Some(language))   => Some(f"source: ${language}")
+      case SourceFile(language)         => Some("source")
+      case MetaData(Some(subtype))      => Some(f"metadata: ${subtype}")
+      case MetaData(_)                  => Some("metadata")
+      case Package(Some(subtype))       => Some(f"package: ${subtype}")
+      case Package(_)                   => Some("package")
+      case Other                        => Some("other")
+    }
+  }
+
+  def subType(): Option[String] = {
+    this match {
+      case SourceFile(language)   => language
+      case ObjectFile(subtype, _) => subtype
+      case MetaData(subtype)      => subtype
+      case Package(subtype)       => subtype
+      case _                      => None
+    }
+  }
+
+  def sourceGitOid(): Option[GitOID] = {
+    this match {
+      case ObjectFile(_, source) => source
+      case _                     => None
+    }
+  }
+
+  def toStringMap(): Map[String, String] = {
+    Map(this match {
+      case ObjectFile(subtype, source) =>
+        Vector(
+          Some("type" -> "object"),
+          subtype.map(st => "subtype" -> st),
+          source.map(sf => "source" -> sf)
+        ).flatten
+
+      case SourceFile(language) =>
+        Vector(
+          Some("type" -> "source"),
+          language.map(st => "language" -> st)
+        ).flatten
+      case MetaData(subtype) =>
+        Vector(
+          Some("type" -> "metadata"),
+          subtype.map(st => "subtype" -> st)
+        ).flatten
+      case Package(subtype) =>
+        Vector(
+          Some("type" -> "package"),
+          subtype.map(st => "subtype" -> st)
+        ).flatten
+      case Other => Vector("type" -> "other")
+    }: _*)
   }
 
 }
 
-// Some utility code to pull data from the Maven Central Lucene index and create a set of URLs to JAR files in Maven Central
-// def computePath(s: String): String = {
-//   val items = s.split("\\|").toVector
-//   val basePath = items(0).replace(".", "/")
-//   val basePath2 = f"https://maven-central-eu.storage-download.googleapis.com/maven2/${basePath}/${items(1)}/${items(2)}/${items(1)}-${items(2)}${
-//     items.drop(3).toList match {
-//       case "sources" :: "jar" :: _ => "-sources.jar"
-//       case _ => ".jar"
-//     }
+object FileType {
 
-//   }"
+  def theType(
+      name: String,
+      contents: Option[File],
+      sourceMap: Map[String, GitOID]
+  ): FileType = {
+    name match {
+      case s
+          if s.startsWith("META-INF/maven/") &&
+            s.endsWith("/pom.properties") =>
+        MetaData(Some("pom.properties"))
+      case s
+          if s.startsWith("META-INF/maven/") &&
+            s.endsWith("/pom.xml") =>
+        MetaData(Some("pom.xml"))
+      case s if s.endsWith(".class") => {
+        val sourceName: Option[String] = contents
+          .map(theFile =>
+            Try {
+              val is = new FileInputStream(theFile)
+              val cp = new ClassParser(is, name)
+              val clz = cp.parse()
+              clz.getSourceFilePath()
+            }.toOption
+          )
+          .flatten
 
-//   basePath2
-// }
+        val sourceGitOID = for {
+          sn <- sourceName
+          pf <- sourceMap.get(sn)
+        } yield {
+          pf
+        }
 
-// def playLucene(): Unit = {
-//   import org.apache.lucene.analysis.standard.StandardAnalyzer;
-//   import org.apache.lucene.document.Document;
-//   import org.apache.lucene.document.Field;
-//   import org.apache.lucene.document.StringField;
-//   import org.apache.lucene.document.TextField;
-//   import org.apache.lucene.index.IndexWriter;
-//   import org.apache.lucene.index.IndexWriterConfig;
-//   import java.nio.file.Paths;
-//   import org.apache.lucene.store.FSDirectory;
-//   import org.apache.lucene.index.DirectoryReader;
-//   import org.apache.lucene.search.IndexSearcher;
-//   import scala.collection.JavaConverters.*
+        ObjectFile(Some("classfile"), sourceGitOID)
+      }
+      case s if s.endsWith(".o")     => ObjectFile(Some("o"), None)
+      case s if s.endsWith(".dll")   => ObjectFile(Some("dll"), None)
+      case s if s.endsWith(".java")  => SourceFile(Some("java"))
+      case s if s.endsWith(".scala") => SourceFile(Some("scala"))
+      case s if s.endsWith(".clj")   => SourceFile(Some("clojure"))
+      case _                         => Other
+    }
+  }
 
-//   val dir = FSDirectory.open(new File("/home/dpp/tmp/central-lucene-index/"))
-//   val reader = DirectoryReader.open(dir);
-//   val bw = new BufferedWriter(new FileWriter("/home/dpp/tmp/jars.txt"))
-//   var cnt = 0
-
-//   val searcher = new IndexSearcher(reader);
-//   for { i <- 1 to reader.numDocs()} {
-//     if (i % 10000 == 0) {
-//       println(i)
-//     }
-//     val d = reader.document(i)
-//     val f = d.getField("u")
-//     val f2 = d.getField("i")
-//     if (f != null && f2 != null) {
-//       val s = f.stringValue()
-//       if (
-//         /*s.indexOf("net.liftweb") >= 0 && */ f2.stringValue().indexOf("jar|") == 0
-//       ) {
-//         val path = computePath(s)
-
-//         bw.write(f"${path}\n")
-//         cnt = cnt + 1
-//       }
-//     }
-//     // println(d.getFields().asScala.toList)
-//     // println(d)
-
-//   }
-//   throw new Exception()
-// }
+}

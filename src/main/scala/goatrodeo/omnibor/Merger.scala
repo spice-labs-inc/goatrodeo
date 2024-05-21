@@ -27,102 +27,105 @@ import java.text.NumberFormat
   */
 object Merger {
 
-  /** Merge a set of files and output to a file or to `stdout` if no output is
-    * specified
-    *
-    * @param files
-    *   the `Vector` of files to merge
-    * @param out
-    *   the output
-    */
+  // /** Merge a set of files and output to a file or to `stdout` if no output is
+  //   * specified
+  //   *
+  //   * @param files
+  //   *   the `Vector` of files to merge
+  //   * @param out
+  //   *   the output
+  //   */
   def merge(files: Vector[File], out: Option[File]): Unit = {
-    val start = System.currentTimeMillis()
-    val (realOut, printOut) = out match {
-      case None => (System.out, System.err)
-      case Some(f) =>
-        (new PrintStream(new FileOutputStream(f, false)), System.out)
-    }
+    // FIXME
+    ???
 
-    val theLen = files.length
+    //   val start = System.currentTimeMillis()
+    //   val (realOut, printOut) = out match {
+    //     case None => (System.out, System.err)
+    //     case Some(f) =>
+    //       (new PrintStream(new FileOutputStream(f, false)), System.out)
+    //   }
 
-    val sources = files.map(f =>
-      new BufferedReader(new InputStreamReader(new FileInputStream(f)))
-    )
-    val current: Array[Option[LineItem]] = new Array(theLen)
-    for (i <- 0 until theLen) { current(i) = None }
+    //   val theLen = files.length
 
-    def updateCurrent(): Unit = {
-      for (i <- 0 until theLen) {
-        if (current(i).isEmpty) {
-          var tmpRead: String = ""
-          var found = false
-          while (!found && tmpRead != null) {
-            tmpRead = sources(i).readLine()
-            if (tmpRead != null) {
-              val parsed = LineItem.parse(tmpRead)
-              parsed match {
-                case Some(x) => {
-                  current(i) = Some(x)
-                  found = true
-                }
-                case _ =>
-              }
-            }
-          }
-        }
-      }
-    }
+    //   val sources = files.map(f =>
+    //     new BufferedReader(new InputStreamReader(new FileInputStream(f)))
+    //   )
+    //   val current: Array[Option[LineItem]] = new Array(theLen)
+    //   for (i <- 0 until theLen) { current(i) = None }
 
-    import math.Ordered.orderingToOrdered
-    var cnt = 0
-    var mergeCnt = 0
-    // set each line
-    updateCurrent()
+    //   def updateCurrent(): Unit = {
+    //     for (i <- 0 until theLen) {
+    //       if (current(i).isEmpty) {
+    //         var tmpRead: String = ""
+    //         var found = false
+    //         while (!found && tmpRead != null) {
+    //           tmpRead = sources(i).readLine()
+    //           if (tmpRead != null) {
+    //             val parsed = LineItem.parse(tmpRead)
+    //             parsed match {
+    //               case Some(x) => {
+    //                 current(i) = Some(x)
+    //                 found = true
+    //               }
+    //               case _ =>
+    //             }
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
 
-    while (current.forall(_.isDefined)) {
-      val lst = current.zipWithIndex
-        .filter(_._1.isDefined)
-        .map((i, n) => (i.get, n))
-        .sortWith((a, b) => a._1.md5hash < b._1.md5hash)
-        .toList
+    //   import math.Ordered.orderingToOrdered
+    //   var cnt = 0
+    //   var mergeCnt = 0
+    //   // set each line
+    //   updateCurrent()
 
-      lst match {
-        // the merging case
-        case (item1, n1) :: (item2, n2) :: _
-            if item1.md5hash == item2.md5hash =>
-          current(n1) = None
-          // replace the second one. If there are other matching hashes, we'll still merge
-          current(n2) = Some(item1.merge(item2))
-          mergeCnt += 1
+    //   while (current.forall(_.isDefined)) {
+    //     val lst = current.zipWithIndex
+    //       .filter(_._1.isDefined)
+    //       .map((i, n) => (i.get, n))
+    //       .sortWith((a, b) => a._1.md5hash < b._1.md5hash)
+    //       .toList
 
-        case (item, n) :: _ =>
-          current(n) = None // remove from set to process
-          realOut.println(item.encode())
+    //     lst match {
+    //       // the merging case
+    //       case (item1, n1) :: (item2, n2) :: _
+    //           if item1.md5hash == item2.md5hash =>
+    //         current(n1) = None
+    //         // replace the second one. If there are other matching hashes, we'll still merge
+    //         current(n2) = Some(item1.merge(item2))
+    //         mergeCnt += 1
 
-        case Nil => // do nothing... this shouldn't happen
-      }
-      cnt += 1
+    //       case (item, n) :: _ =>
+    //         current(n) = None // remove from set to process
+    //         realOut.println(item.encode())
 
-      if (cnt % 10000 == 0) {
-        val hash = lst.head._1.md5hash
-        val thing = {
-          val r = Integer
-            .valueOf(hash.substring(0, 4), 16)
-            .toDouble / (256.0 * 256.0); if (r == 0.0) 0.01 else r
-        }
-        val delta = (System.currentTimeMillis() - start).toDouble / 1000.0
-        val remaining = (delta / thing) - delta
-        printOut.println(
-          f"Records processed ${NumberFormat.getInstance().format(cnt)}, merged ${NumberFormat
-              .getInstance()
-              .format(mergeCnt)}, current hash ${hash}, seconds ${delta.round} remaining ${remaining.round}"
-        )
-      }
-      // set each line
-      updateCurrent()
-    }
+    //       case Nil => // do nothing... this shouldn't happen
+    //     }
+    //     cnt += 1
 
-    printOut.println(f"Complete in ${(System.currentTimeMillis() - start).toDouble / 1000.0}, cnt ${cnt}")
+    //     if (cnt % 10000 == 0) {
+    //       val hash = lst.head._1.md5hash
+    //       val thing = {
+    //         val r = Integer
+    //           .valueOf(hash.substring(0, 4), 16)
+    //           .toDouble / (256.0 * 256.0); if (r == 0.0) 0.01 else r
+    //       }
+    //       val delta = (System.currentTimeMillis() - start).toDouble / 1000.0
+    //       val remaining = (delta / thing) - delta
+    //       printOut.println(
+    //         f"Records processed ${NumberFormat.getInstance().format(cnt)}, merged ${NumberFormat
+    //             .getInstance()
+    //             .format(mergeCnt)}, current hash ${hash}, seconds ${delta.round} remaining ${remaining.round}"
+    //       )
+    //     }
+    //     // set each line
+    //     updateCurrent()
+    //   }
+
+    //   printOut.println(f"Complete in ${(System.currentTimeMillis() - start).toDouble / 1000.0}, cnt ${cnt}")
 
   }
 }
