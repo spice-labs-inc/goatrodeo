@@ -23,8 +23,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.nio.channels.FileChannel
 
-
-
 /** Manage many parts of persisting/retrieving the graph information
   */
 object GraphManager {
@@ -40,7 +38,8 @@ object GraphManager {
       targetDirectory: File,
       items: Iterator[Item],
       compression: PayloadCompression,
-      previous: Long
+      previous: Long,
+      afterWrite: Item => Unit
   ): DataAndIndexFiles = {
     // create temporary file
     val tempFile =
@@ -99,6 +98,8 @@ object GraphManager {
       writer.write(ByteBuffer.wrap(entryBytes))
       // set the previous position
       previousPosition = itemEnvelope.position.offset;
+
+      afterWrite(entry)
 
     }
     Helpers.writeShort(writer, -1) // a marker that says end of file
@@ -168,64 +169,80 @@ object GraphManager {
       targetDirectory: File,
       entries: Iterator[Item],
       compression: PayloadCompression = PayloadCompression.NONE
-  ): Try[(Seq[DataAndIndexFiles], String)] = {
+  ): (Seq[DataAndIndexFiles], String) = {
     var previousInChain: Long = 0L
-    Try {
+    var biggest: Vector[(Item, Int)] = Vector()
 
-      var fileSet: List[DataAndIndexFiles] = Nil
-      while (entries.hasNext) {
-        val dataAndIndex = writeABlock(
-          targetDirectory,
-          entries,
-          compression,
-          previous = previousInChain
-        )
-        previousInChain = dataAndIndex.dataFile
-        fileSet = dataAndIndex :: fileSet
-
+    def updateBiggest(item: Item): Unit = {
+      val containedBy = item.connections.filter(_._2 == EdgeType.ContainedBy).length
+      if (biggest.length <= 50) {
+        biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
+      } else if (biggest.last._2 < containedBy) {
+        biggest =
+          (biggest.dropRight(1) :+ (item -> containedBy)).sortBy(_._2).reverse
       }
+    }
 
-      val tempFile =
-        Files.createTempFile(
-          targetDirectory.toPath(),
-          "goat_rodeo_bundle_",
-          ".grb"
-        )
-      val fileWriter = new FileOutputStream(tempFile.toFile())
-      val writer = fileWriter.getChannel()
+    var fileSet: List[DataAndIndexFiles] = Nil
+    while (entries.hasNext) {
+      val dataAndIndex = writeABlock(
+        targetDirectory,
+        entries,
+        compression,
+        previous = previousInChain,
+        updateBiggest
+      )
+      previousInChain = dataAndIndex.dataFile
+      fileSet = dataAndIndex :: fileSet
 
-      Helpers.writeInt(writer, Consts.BundleFileMagicNumber)
-      val bundleEnvelope =
-        BundleFileEnvelope.build(
-          timestamp = System.currentTimeMillis(),
-          indexFiles = fileSet.map(_.indexFile).toVector,
-          dataFiles = fileSet.map(_.dataFile).toVector
-        )
-      val envelopeBytes = bundleEnvelope.encode()
-      Helpers.writeShort(writer, envelopeBytes.length)
-      writer.write(ByteBuffer.wrap(envelopeBytes))
-      writer.close()
-      val sha256Long = Helpers.byteArrayToLong63Bits(
-        Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
+    }
+
+    val tempFile =
+      Files.createTempFile(
+        targetDirectory.toPath(),
+        "goat_rodeo_bundle_",
+        ".grb"
+      )
+    val fileWriter = new FileOutputStream(tempFile.toFile())
+    val writer = fileWriter.getChannel()
+
+    Helpers.writeInt(writer, Consts.BundleFileMagicNumber)
+    val bundleEnvelope =
+      BundleFileEnvelope.build(
+        timestamp = System.currentTimeMillis(),
+        indexFiles = fileSet.map(_.indexFile).toVector,
+        dataFiles = fileSet.map(_.dataFile).toVector
+      )
+    val envelopeBytes = bundleEnvelope.encode()
+    Helpers.writeShort(writer, envelopeBytes.length)
+    writer.write(ByteBuffer.wrap(envelopeBytes))
+    writer.close()
+    val sha256Long = Helpers.byteArrayToLong63Bits(
+      Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
+    )
+
+    val now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
+
+    val targetFileName =
+      new File(
+        targetDirectory,
+        f"${now.getYear()}_${"%02d".format(now.getMonthValue())}_${"%02d"
+            .format(now.getDayOfMonth())}_${"%02d".format(
+            now
+              .getHour()
+          )}_${"%02d".format(now.getMinute())}_${"%02d"
+            .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grb"
       )
 
-      val now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
-
-      val targetFileName =
-        new File(
-          targetDirectory,
-          f"${now.getYear()}_${"%02d".format(now.getMonthValue())}_${"%02d"
-              .format(now.getDayOfMonth())}_${"%02d".format(
-              now
-                .getHour()
-            )}_${"%02d".format(now.getMinute())}_${"%02d"
-              .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grb"
-        )
-
-      tempFile.toFile().renameTo(targetFileName)
-      (fileSet, targetFileName.getName())
+    tempFile.toFile().renameTo(targetFileName)
+    for { i <- biggest } {
+      println(
+        f"Item ${i._1.identifier} ${i._1.metadata.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
+      )
     }
+    (fileSet, targetFileName.getName())
   }
+
 }
 
 class GRDWalker(source: FileChannel) {
