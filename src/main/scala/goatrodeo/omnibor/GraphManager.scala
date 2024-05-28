@@ -22,6 +22,7 @@ import java.time.LocalDateTime
 import java.time.Instant
 import java.time.ZoneOffset
 import java.nio.channels.FileChannel
+import java.time.Duration
 
 /** Manage many parts of persisting/retrieving the graph information
   */
@@ -41,6 +42,7 @@ object GraphManager {
       previous: Long,
       afterWrite: Item => Unit
   ): DataAndIndexFiles = {
+    val start = Instant.now()
     // create temporary file
     val tempFile =
       Files.createTempFile(targetDirectory.toPath(), "goat_rodeo_data_", ".grd")
@@ -60,8 +62,10 @@ object GraphManager {
 
     // write DataFileEnvelope
     val writtenLen = writer.write(ByteBuffer.wrap(envelopeBytes))
+    var loopCnt = 0
 
-    DataFileEnvelope.decode(envelopeBytes)
+    var pairs: Vector[(String, Array[Byte], Position)] = Vector()
+
     // loop writing entries until empty or the file is >= 16GB in size
     while (items.hasNext && writer.position() < Consts.TargetMaxFileSize) {
       val orgEntry = items.next()
@@ -72,11 +76,15 @@ object GraphManager {
 
       val entryBytes = compression.compress(entry.encodeCBOR())
 
+      // (for { env <- walker.envelopes() } yield {
+      //   (Helpers.toHex(env.keyMd5.hash), env.keyMd5.hash, env.position)
+      // }).toVector.sortBy(_._1)
+
       val itemEnvelope: ItemEnvelope = ItemEnvelope(
         MD5(md5),
-        Position(currentPosition),
+        currentPosition,
         entry._timestamp,
-        MultifilePosition.NA,
+        (0, 0),
         previousPosition,
         entryBytes.length,
         PayloadFormat.CBOR,
@@ -85,23 +93,34 @@ object GraphManager {
         false
       )
 
+      pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
+
       val envelopeBytes = itemEnvelope.encodeCBOR()
 
-      //   // write Entry Envelope size
-      Helpers.writeShort(writer, envelopeBytes.length)
-      //   // write Entry Size
-      Helpers.writeInt(writer, entryBytes.length)
+      val toAlloc = 256 + (envelopeBytes.length) + (entryBytes.length)
+      val bb = ByteBuffer.allocate(toAlloc)
+      // println(f"Writing # ${loopCnt} ${orgEntry.identifier} eb ${envelopeBytes.length} entB ${entryBytes.length} tried ${backing.length} bb alloc ${bb.capacity()}")
 
-      //   // Write Entry Envelope
-      writer.write(ByteBuffer.wrap(envelopeBytes))
-      //   // Write actual entry
-      writer.write(ByteBuffer.wrap(entryBytes))
-      // set the previous position
-      previousPosition = itemEnvelope.position.offset;
+      bb.putShort((envelopeBytes.length & 0xffff).toShort)
+      bb.putInt(entryBytes.length)
+      bb.put(envelopeBytes)
+      bb.put(entryBytes)
+
+      bb.flip()
+
+      writer.write(bb)
+
+      previousPosition = itemEnvelope.position;
 
       afterWrite(entry)
-
+      loopCnt += 1
+      if (loopCnt % 250000 == 0) {
+        println(
+          f"Write loop ${loopCnt} at ${Duration.between(start, Instant.now())}"
+        )
+      }
     }
+
     Helpers.writeShort(writer, -1) // a marker that says end of file
 
     // write final back-pointer (to the last entry record)
@@ -109,6 +128,8 @@ object GraphManager {
 
     // compute SHA256 of the file
     writer.close()
+
+    println(f"Finished write loop at ${Duration.between(start, Instant.now())}")
 
     // rename the file to <sha256>.grd
     val sha256Long = Helpers.byteArrayToLong63Bits(
@@ -120,16 +141,7 @@ object GraphManager {
 
     tempFile.toFile().renameTo(targetFileName)
 
-    val walker = GRDWalker(FileInputStream(targetFileName).getChannel())
-
-    val env = walker.open().get
-
-    // walk the generated file and get the items
-    val pairs =
-      (for { env <- walker.envelopes() } yield {
-        (Helpers.toHex(env.keyMd5.hash), env.keyMd5.hash, env.position.offset)
-      }).toVector.sortBy(_._1)
-    // walk the file
+    println(f"Finished rename at ${Duration.between(start, Instant.now())}")
 
     val targetIndexName =
       new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.gri")
@@ -144,14 +156,23 @@ object GraphManager {
     Helpers.writeShort(indexWriter, indexEnvBytes.length)
 
     indexWriter.write(ByteBuffer.wrap(indexEnvBytes))
-    for { v <- pairs } {
-      indexWriter.write(ByteBuffer.wrap(v._2))
-      Helpers.writeLong(indexWriter, sha256Long)
-      Helpers.writeLong(indexWriter, v._3)
+    val indexBB = ByteBuffer.allocate(pairs.length * 32)
 
+    for { v <- pairs } {
+      indexBB.put(v._2)
+      indexBB.putLong(sha256Long)
+      indexBB.putLong(v._3)
     }
 
+    indexBB.flip()
+
+    indexWriter.write(indexBB)
+
     indexWriter.close()
+
+    println(
+      f"Finished index write at ${Duration.between(start, Instant.now())}"
+    )
 
     val indexSha256Long = Helpers.byteArrayToLong63Bits(
       Helpers.computeSHA256(new FileInputStream(targetIndexName))
@@ -162,6 +183,10 @@ object GraphManager {
 
     targetIndexName.renameTo(indexTargetFileName)
 
+    println(
+      f"Finished index rename at ${Duration.between(start, Instant.now())}"
+    )
+
     DataAndIndexFiles(sha256Long, indexSha256Long)
   }
 
@@ -169,12 +194,13 @@ object GraphManager {
       targetDirectory: File,
       entries: Iterator[Item],
       compression: PayloadCompression = PayloadCompression.NONE
-  ): (Seq[DataAndIndexFiles], String) = {
+  ): (Seq[DataAndIndexFiles], File) = {
     var previousInChain: Long = 0L
     var biggest: Vector[(Item, Int)] = Vector()
 
     def updateBiggest(item: Item): Unit = {
-      val containedBy = item.connections.filter(_._2 == EdgeType.ContainedBy).length
+      val containedBy =
+        item.connections.filter(_._2 == EdgeType.ContainedBy).size
       if (biggest.length <= 50) {
         biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
       } else if (biggest.last._2 < containedBy) {
@@ -223,7 +249,7 @@ object GraphManager {
 
     val now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
 
-    val targetFileName =
+    val targetFile =
       new File(
         targetDirectory,
         f"${now.getYear()}_${"%02d".format(now.getMonthValue())}_${"%02d"
@@ -234,13 +260,13 @@ object GraphManager {
             .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grb"
       )
 
-    tempFile.toFile().renameTo(targetFileName)
+    tempFile.toFile().renameTo(targetFile)
     for { i <- biggest } {
       println(
         f"Item ${i._1.identifier} ${i._1.metadata.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
       )
     }
-    (fileSet, targetFileName.getName())
+    (fileSet, targetFile)
   }
 
 }
@@ -305,7 +331,7 @@ class GRDWalker(source: FileChannel) {
         val envelope =
           EntryEnvelope.decodeCBOR(envBytes.position(0).array()).get
         source.position(
-          envelope.position.offset + entryLen.toLong + envLen.toLong + 6L
+          envelope.position + entryLen.toLong + envLen.toLong + 6L
         )
 
         Some(envelope)

@@ -36,6 +36,9 @@ import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration
 import goatrodeo.envelopes.PayloadCompression
+import java.io.ByteArrayInputStream
+import java.util.concurrent.atomic.AtomicBoolean
+import java.io.IOException
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -58,7 +61,8 @@ object Builder {
       source: File,
       storage: Storage,
       threadCnt: Int
-  ): Unit = {
+  ): Option[File] = {
+    val totalStart = Instant.now()
     val files = ToProcess.buildQueue(source)
 
     // The count of all the files found
@@ -68,7 +72,7 @@ object Builder {
 
     // start time
     val start = Instant.now()
-
+    var dead_? = AtomicBoolean(false)
     // fork `threadCnt` threads to do the work
     val threads = for { threadNum <- 0 until threadCnt } yield {
       val t = new Thread(
@@ -78,16 +82,30 @@ object Builder {
           // returned, handle it gracefully
 
           var toProcess: ToProcess = null
-          while ({ toProcess = files.poll(); toProcess } != null) {
-
+          while (
+            !dead_?.get() && { toProcess = files.poll(); toProcess } != null
+          ) {
+            val localStart = Instant.now()
             try {
               // build the package
               BuildGraph.graphForToProcess(toProcess, storage)
               val updatedCnt = cnt.addAndGet(1)
               println(f"Processed ${updatedCnt} of ${totalCnt} at ${Duration
-                  .between(start, Instant.now())}")
+                  .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${Duration
+                  .between(localStart, Instant.now())} vertices ${storage.size()}")
             } catch {
-              case ise: IllegalStateException => throw ise
+              case ise: IllegalStateException => {
+                dead_?.set(true)
+                throw ise
+              }
+              case ioe: IOException => {
+                if (ioe.getMessage().indexOf("Too many open files") > 0) {
+                  dead_?.set(true)
+                  throw ioe
+
+                }
+                println(f"Failed ${toProcess.main} ${ioe}")
+              }
               case e: Exception => {
                 println(f"Failed ${toProcess.main} ${e}")
                 // Helpers.bailFail()
@@ -104,36 +122,56 @@ object Builder {
     }
 
     // wait for the threads to complete
-    for { t <- threads } t.join()
+    for { t <- threads } {
+      // deal with SIGKILL/ctrl-C
+      if (t.isInterrupted() || dead_?.get()) {
+        Thread.currentThread().interrupt()
+        throw InterruptedException(f"${t.getName()} was interrupted")
+      }
+      t.join()
+    }
     println(f"Finished processing ${totalCnt} at ${Duration
         .between(start, Instant.now())}")
 
-    storage match {
-      case lf: (ListFileNames with Storage) => writeGoatRodeoFiles(lf)
-      case _ => println("Didn't write")
+    val ret = storage match {
+      case lf: (ListFileNames with Storage) if !dead_?.get() =>
+        writeGoatRodeoFiles(lf)
+      case _ => println("Didn't write"); None
     }
+
+    println(f"Total build time ${Duration.between(totalStart, Instant.now())}")
+
+    ret
   }
 
-  def writeGoatRodeoFiles(store: ListFileNames with Storage): Unit = {
+  def writeGoatRodeoFiles(store: ListFileNames with Storage): Option[File] = {
     store.target() match {
-      case Some(target) =>
+      case Some(target) => {
         println(f"In store with target ${target}")
         val start = Instant.now()
         // make sure the destination exists
         target.getAbsoluteFile().mkdirs()
         val allItems = store
-          .paths()
+          .keys()
           .flatMap(store.read(_))
         println(
           f"Pre-sort at ${Duration.between(start, Instant.now())}"
         )
-        val withMd5 = allItems.map(i => (Helpers.toHex(i.identifierMD5()), i))
-        val sorted = withMd5.sortBy(_._1).map(_._2)
+        val withMd5 =
+          allItems.map(i => (Helpers.toHex(i.identifierMD5()), i))
+        println(
+          f"with MD5 at ${Duration.between(start, Instant.now())}"
+        )
+        val sortedWithMD5 = withMd5.sortBy(_._1)
+        println(
+          f"Sort but not pruned at ${Duration.between(start, Instant.now())}"
+        )
+        val sorted = withMd5.map(_._2)
         println(
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
         val cnt = allItems.length
-        GraphManager.writeEntries(
+        val ret = GraphManager.writeEntries(
           target,
           sorted.toIterator,
           PayloadCompression.NONE
@@ -142,10 +180,12 @@ object Builder {
         println(
           f"Wrote ${cnt} entries in ${Duration.between(start, Instant.now())}"
         )
-      case _ =>
+
+        Some(ret._2)
+      }
+      case _ => None
     }
 
-    store.release()
   }
 
   private def getSha256(f: File): Option[(File, Array[Byte])] = {
@@ -215,31 +255,46 @@ object ToProcess {
   }
 
   def buildQueue(root: File): ConcurrentLinkedQueue[ToProcess] = {
+    var fileSet = Set(
+      Helpers
+        .findFiles(root, _ => true).map(_.getAbsoluteFile()): _*
+    )
+
     val pomLike = buildQueueForPOMS(root)
-    if (pomLike.isEmpty()) {
-      val files = Helpers
-        .findFiles(root, _ => true)
-        .map(f => ToProcess(None, f, None, None))
+    for { pl <- pomLike } {
+      fileSet -= pl.main.getAbsoluteFile()
+      pl.pomFile.foreach(f => fileSet -= f.getAbsoluteFile())
+      pl.source.foreach(f => fileSet -= f.getAbsoluteFile())
+    }
 
-      import collection.JavaConverters.seqAsJavaListConverter
-      import collection.JavaConverters.asJavaIterableConverter
+    val nonPoms = fileSet.toVector.map(f => {
+      ToProcess(PackageIdentifier.computePurl(f), f, None, None)
+    })
 
-      val queue = new ConcurrentLinkedQueue(files.asJava)
-      queue
-    } else pomLike
+    import scala.collection.JavaConverters.seqAsJavaListConverter
+    import scala.collection.JavaConverters.asJavaIterableConverter
+
+    ConcurrentLinkedQueue((pomLike ++ nonPoms).asJava)
   }
 
-  def buildQueueForPOMS(root: File): ConcurrentLinkedQueue[ToProcess] = {
-
+  def buildQueueForPOMS(root: File): Vector[ToProcess] = {
+    val start = Instant.now()
     val poms = Helpers.findFiles(
       root,
       f => f.getName().endsWith(".pom")
     )
+    println(f"Finding all pom files got ${poms.length} in ${Duration
+        .between(start, Instant.now())}")
 
     val theQueue = (for {
       f <- poms.iterator
       // f = v
-      xml <- Try { scala.xml.XML.load(new FileInputStream(f)) }.toOption
+      xml <- Try {
+        scala.xml.XML.load({
+          val bytes = Helpers.slurpInput(f)
+          new ByteArrayInputStream(bytes)
+        })
+      }.toOption
       item <- {
         val grp = findTag(xml, "groupId")
         val art = findTag(xml, "artifactId")
@@ -257,7 +312,16 @@ object ToProcess {
             if (jar.exists()) {
               Some(
                 ToProcess(
-                  Some(PackageIdentifier(PackageProtocol.Maven, g, a, v)),
+                  Some(
+                    PackageIdentifier(
+                      PackageProtocol.Maven,
+                      g,
+                      a,
+                      v,
+                      None,
+                      None
+                    )
+                  ),
                   jar,
                   Helpers.findSrcFile(f),
                   Some(f)
@@ -274,11 +338,10 @@ object ToProcess {
       item
     }).toVector
 
-    import collection.JavaConverters.seqAsJavaListConverter
-    import collection.JavaConverters.asJavaIterableConverter
+    println(f"Finding parsing got ${theQueue.length} in ${Duration
+        .between(start, Instant.now())}")
 
-    val queue = new ConcurrentLinkedQueue(theQueue.asJava)
-    queue
+    theQueue
   }
 
 }

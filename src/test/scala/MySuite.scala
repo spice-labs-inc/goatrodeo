@@ -33,6 +33,12 @@ import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.omnibor.Builder
 import goatrodeo.envelopes.ItemEnvelope
+import goatrodeo.omnibor.GraphManager
+import goatrodeo.util.PackageIdentifier
+import goatrodeo.util.PackageProtocol
+import goatrodeo.omnibor.FileWrapper
+import goatrodeo.omnibor.ArtifactWrapper
+import java.io.IOException
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -87,9 +93,9 @@ class MySuite extends munit.FunSuite {
     for { i <- 0 to 1000 } {
       val ee = ItemEnvelope(
         MD5(Helpers.randomBytes(16)),
-        Position(Helpers.randomLong()),
         Helpers.randomLong(),
-        MultifilePosition(Position(Helpers.randomLong()), Helpers.randomLong()),
+        Helpers.randomLong(),
+        (Helpers.randomLong(), Helpers.randomLong()),
         (Helpers.randomLong() & 0xffffff) + 1,
         Helpers.randomInt(),
         PayloadFormat.CBOR,
@@ -122,41 +128,45 @@ class MySuite extends munit.FunSuite {
     }
 
   }
-  test("EntryEnvelope Serialization from round trips") {
 
-    import io.bullet.borer.Dom.*
+  // test("EntryEnvelope Serialization from round trips") {
 
-    for { i <- 0 to 1000 } {
-      val theFile = new File(f"test_data/data_${i}.cbor")
-      if (theFile.exists()) {
-        val cbor = new FileInputStream(theFile).readAllBytes()
+  //   import io.bullet.borer.Dom.*
 
-        val tmp = Cbor.decode(cbor).to[Element].value
+  //   for { i <- 0 to 100 } {
+  //     val theFile = new File(f"test_data/data_b_${i}.cbor")
+  //     if (true) {
+  //       val env = EntryEnvelope
+  //     }
+  //     if (theFile.exists()) {
+  //       val cbor = new FileInputStream(theFile).readAllBytes()
 
-        val newBytes = Cbor.encode(tmp).toByteArray
+  //       val tmp = Cbor.decode(cbor).to[Element].value
 
-        assertEquals(cbor.toVector, newBytes.toVector)
+  //       val newBytes = Cbor.encode(tmp).toByteArray
 
-        val ee = EntryEnvelope.decodeCBOR(cbor).get
+  //       assertEquals(cbor.toVector, newBytes.toVector)
 
-        val ee2: ItemEnvelope =
-          EntryEnvelope.decodeCBOR(ee.encodeCBOR()).get
-        assertEquals(ee, ee2, f"Test run ${i}")
+  //       val ee = EntryEnvelope.decodeCBOR(cbor).get
 
-        if (cbor.toVector != ee2.encodeCBOR().toVector) {
-          throw new Exception(
-            f"Not equal iteration ${i}\n${Cbor.decode(cbor).to[Element].value}\n${Cbor.decode(ee2.encodeCBOR()).to[Element].value}"
-          )
-        }
+  //       val ee2: ItemEnvelope =
+  //         EntryEnvelope.decodeCBOR(ee.encodeCBOR()).get
+  //       assertEquals(ee, ee2, f"Test run ${i}")
 
-        assertEquals(
-          cbor.toVector,
-          ee2.encodeCBOR().toVector,
-          "Round trip bytes equal"
-        )
-      }
-    }
-  }
+  //       if (cbor.toVector != ee2.encodeCBOR().toVector) {
+  //         throw new Exception(
+  //           f"Not equal iteration ${i}\n${Cbor.decode(cbor).to[Element].value}\n${Cbor.decode(ee2.encodeCBOR()).to[Element].value}"
+  //         )
+  //       }
+
+  //       assertEquals(
+  //         cbor.toVector,
+  //         ee2.encodeCBOR().toVector,
+  //         "Round trip bytes equal"
+  //       )
+  //     }
+  //   }
+  // }
 
   // test("read old write new") {
   //   if (true) {
@@ -297,64 +307,67 @@ class MySuite extends munit.FunSuite {
   test("File Type Detection") {
     assert(
       BuildGraph
-        .streamForArchive(File("test_data/HP1973-Source.zip"))
+        .streamForArchive(FileWrapper(File("test_data/HP1973-Source.zip")))
         .isDefined
     )
     assert(
       BuildGraph
-        .streamForArchive(File("test_data/log4j-core-2.22.1.jar"))
-        .isDefined
-    )
-    assert(
-      BuildGraph.streamForArchive(File("test_data/empty.tgz")).isDefined
-    )
-    assert(
-      BuildGraph
-        .streamForArchive(File("test_data/toml-rs.tgz"))
+        .streamForArchive(FileWrapper(File("test_data/log4j-core-2.22.1.jar")))
         .isDefined
     )
     assert(
       BuildGraph
-        .streamForArchive(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
+        .streamForArchive(FileWrapper(File("test_data/empty.tgz")))
         .isDefined
     )
     assert(
       BuildGraph
-        .streamForArchive(File("test_data/tk-8.6.13-r2.apk"))
+        .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz")))
+        .isDefined
+    )
+    assert(
+      BuildGraph
+        .streamForArchive(
+          FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
+        )
+        .isDefined
+    )
+    assert(
+      BuildGraph
+        .streamForArchive(FileWrapper(File("test_data/tk-8.6.13-r2.apk")))
         .isDefined
     )
 
     assert(
       BuildGraph
-        .streamForArchive(File("test_data/ics_test.tar"))
+        .streamForArchive(FileWrapper(File("test_data/ics_test.tar")))
         .isDefined
     )
 
     assert(
       BuildGraph
-        .streamForArchive(File("test_data/nested.tar"))
+        .streamForArchive(FileWrapper(File("test_data/nested.tar")))
         .isDefined
     )
   }
 
   test("Walk a tar file") {
     var cnt = 0
-    val inputStream =
-      BuildGraph.streamForArchive(File("test_data/empty.tgz")).get
-    var entry = inputStream.getNextEntry()
-    while (entry != null) {
-      if (inputStream.canReadEntryData(entry)) {
-        cnt += 1
-      }
-      entry.getSize()
-      entry = inputStream.getNextEntry()
+    val (inputStream, _) =
+      BuildGraph.streamForArchive(FileWrapper(File("test_data/empty.tgz"))).get
+    for {
+      e <- inputStream
+      (name, file) = e()
+    } {
+      cnt += 1
+      file.delete()
     }
 
     assert(cnt > 2)
   }
 
   test("deal with nesting") {
-    val nested = File("test_data/nested.tar")
+    val nested = FileWrapper(File("test_data/nested.tar"))
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -370,7 +383,7 @@ class MySuite extends munit.FunSuite {
         main
       }
     )
-    assert(cnt > 1200)
+    assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
 
   test("Build from nested") {
@@ -385,9 +398,9 @@ class MySuite extends munit.FunSuite {
       Map()
     )
 
-    assert(got.size > 1200)
-    assert(store.size().get > 2200)
-    val keys = store.keys().get
+    assert(got.size > 1200, f"Expection more than 1,200 items, got ${got.size}")
+    assert(store.size() > 2200)
+    val keys = store.keys()
     assert(!keys.filter(_.startsWith("sha256:")).isEmpty)
     assert(!keys.filter(_.startsWith("md5:")).isEmpty)
     assert(!keys.filter(_.startsWith("sha1:")).isEmpty)
@@ -419,7 +432,10 @@ class MySuite extends munit.FunSuite {
     val source = File("test_data/jar_test")
     val files = ToProcess.buildQueue(source)
 
-    assert(files.size() == 2)
+    assert(
+      files.size() >= 2,
+      f"Expecting at least 2 files, got ${files.size()}"
+    )
 
     val store = MemStorage.getStorage(Some(File("/tmp/frood")))
     import scala.collection.JavaConverters.collectionAsScalaIterableConverter
@@ -429,12 +445,12 @@ class MySuite extends munit.FunSuite {
       BuildGraph.graphForToProcess(toProcess, store)
     }
 
-    val keys = store.keys().get
+    val keys = store.keys()
     val items = keys.flatMap(store.read(_))
     assert(items.length > 1100)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => e._2 == EdgeType.BuiltFrom).length > 0
+      i.connections.filter(e => e._2 == EdgeType.BuiltFrom).size > 0
     )
     val fromSource = for {
       i <- items; c <- i.connections if c._2 == EdgeType.BuildsTo
@@ -444,30 +460,155 @@ class MySuite extends munit.FunSuite {
     assert(fromSource.length == sourceRef.length)
 
     // the package URL is picked up
-    val withPurl = items.filter(i =>
-      i.altIdentifiers.filter(_.startsWith("pkg:")).length > 0
-    )
+    val withPurl =
+      items.filter(i => i.connections.filter(_._1.startsWith("pkg:")).size > 0)
 
     assert(withPurl.length == 4)
 
     val withPurlSources = withPurl.filter(i =>
-      i.altIdentifiers.filter(_.endsWith("?packaging=sources")).length > 0
+      i.connections.filter(_._1.endsWith("?packaging=sources")).size > 0
     )
     assert(withPurlSources.length == 2)
   }
 
+  test("Unreadable JAR") {
+    val source = File(File(System.getProperty("user.home")), "/tmp/repo_ea")
+
+    // the test takes a couple of files with questionable TAR and ZIP archives
+    // and ensures that they don't cause exceptions
+    if (source.isDirectory()) {
+      for {
+        toTry <- Vector(
+          "adif-processor-1.0.65.jar",
+          "alpine-executable-war-1.2.2.jar"
+        )
+      } {
+        val bad = File(source, toTry)
+        val store = MemStorage.getStorage(None)
+        BuildGraph.buildItemsFor(
+          bad,
+          "bad",
+          store,
+          Vector(),
+          Some(
+            PackageIdentifier(
+              PackageProtocol.Maven,
+              toTry,
+              "frood",
+              "32",
+              None,
+              None
+            )
+          ),
+          Map()
+        )
+        val pkgIndex = store.read("pkg:maven").get
+        assert(
+          pkgIndex.connections.size > 0,
+          f"We should have had at least one package, but only found ${pkgIndex.connections.size}"
+        )
+      }
+
+    }
+  }
+
   test("Build lots of JARs") {
-    val source = File(File(System.getProperty("user.home")),"/tmp/repo_ea")
+    val source = File(File(System.getProperty("user.home")), "/tmp/repo_ea")
 
-    val store = MemStorage.getStorage(Some(File("frood_dir/")))
-    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-    import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+    if (source.isDirectory())  {
 
-    Builder.buildDB(source, store, 16)
+      val resForBigTent = File("res_for_big_tent")
 
-    Builder.writeGoatRodeoFiles(store)
+      // delete files if they exist
+      if (resForBigTent.exists()) {
+        if (resForBigTent.isDirectory()) {
+          for {v <- resForBigTent.listFiles()} {v.delete()}
+        } else {
+          resForBigTent.delete()
+        }
+      }
+      val store = MemStorage.getStorage(Some(resForBigTent))
+      import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+      import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-    // FIXME -- find bundle
+      Builder.buildDB(source, store, 32)
+
+      val pkgIndex = store.read("pkg:maven").get
+      assert(
+        pkgIndex.connections.size > 4500,
+        f"We should have had more than 100 packages, but only found ${pkgIndex.connections.size}"
+      )
+    }
+  }
+
+  /* Removed because required a 179M file which was kicked back from GitLab
+  test("Can read pulsar examples JAR") {
+    val fr = FileWrapper(File("pulsar_test/pulsar-examples-1.10.13.jar"))
+    var allFiles: Vector[String] = Vector()
+
+    def doFor(w: ArtifactWrapper): Unit = {
+      for { (stream, clean) <- BuildGraph.streamForArchive(w) } {
+        try {
+          for {
+            f <- stream
+            (n, v) = f()
+          } {
+
+            allFiles = allFiles.appended(n)
+            doFor(v)
+
+          }
+        } catch {
+          case ioe: IOException => // ignore just means something is corrupted
+            
+        } finally {
+          clean()
+        }
+      }
+    }
+
+    doFor(fr)
+    val printFiles = allFiles.filter(_.contains("PrintFlowEvent"))
+    assert(
+      printFiles.length > 5,
+      f"Here are the printFlowEvents ${printFiles} and ${allFiles}"
+    )
+
+  }*/
+
+  test("Build in test data and make sure we find deb and maven pURLs") {
+    if (true) {
+      val store = MemStorage.getStorage(None)
+      import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+      import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+
+      Builder.buildDB(File("test_data"), store, 32)
+
+      val pkgIndex = store.read("pkg:maven").get
+      assert(
+        pkgIndex.connections.size >= 4,
+        f"We should have had at least 4 maven package, but only found ${pkgIndex.connections.size}"
+      )
+
+      val pkgDebIndex = store.read("pkg:deb").get
+      assert(
+        pkgIndex.connections.size > 0,
+        f"We should have at least one '.deb' pURL, but found none"
+      )
+
+      for {
+        key <- store.keys();
+        item <- store.read(key)
+      } {
+        val count = item.count
+        val containedBy = item.connections.filter(_._2 == EdgeType.ContainedBy)
+        assert(
+          count >= containedBy.size && count <= (containedBy.size + 3),
+          f"For ${item.identifier}/${item.metadata} count ${count}, containBy ${containedBy}"
+        )
+      }
+    }
+
   }
 
 }

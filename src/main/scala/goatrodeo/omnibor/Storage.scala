@@ -55,7 +55,7 @@ import goatrodeo.envelopes.BundleFileEnvelope
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.util.HashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -87,7 +87,7 @@ trait Storage {
     * @param data
     *   the data to write
     */
-  def write(path: String, data: Item): Unit
+  def write(path: String, opr: Option[Item] => Item): Unit
 
   /** Write data to the path
     *
@@ -107,15 +107,15 @@ trait Storage {
   /** Get the count of items in storage, if computable
     *
     * @return
-    *   the count if it can be determined
+    *   the count
     */
-  def size(): Option[Int] = None
+  def size(): Int
 
   /** Get the keys from storage (if possible)
     *
     * @return
     */
-  def keys(): Option[Vector[String]] = None
+  def keys(): Vector[String]
 }
 
 trait StorageReader {
@@ -258,21 +258,14 @@ object StorageReader {
 
 /** Can the filenames be listed?
   */
-trait ListFileNames {
+trait ListFileNames extends Storage {
 
   /** A list of all the paths in the backing store, sorted
     *
     * @return
     *   the paths, sorted
     */
-  def sortedPaths(): Vector[String] = paths().sorted
-
-  /** All the paths in the backing store
-    *
-    * @return
-    *   the paths in the backing store
-    */
-  def paths(): Vector[String]
+  def sortedPaths(): Vector[String] = keys().sorted
 
   /** All the paths in the backing store and the MD5 hash of the path. Sorted by
     * MD5 hash
@@ -315,6 +308,71 @@ object Storage {
   }
 }
 
+class MemStorage(val targetDir: Option[File])
+    extends Storage
+    with ListFileNames {
+
+  private val sync = new Object()
+  private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
+  private val locks: java.util.HashMap[String, AtomicInteger] = java.util.HashMap()
+  def keys(): Vector[String] = {
+
+    db.get().keysIterator.toVector
+
+  }
+
+  override def pathsSortedWithMD5(): Vector[(String, String)] = {
+    keys().map(k => (Helpers.md5hashHex(k), k)).sorted
+  }
+
+  override def size() = db.get().size
+
+  override def target(): Option[File] = targetDir
+
+  override def exists(path: String): Boolean =
+    db.get().contains(path)
+
+  override def read(path: String): Option[Item] = {
+    val ret = db.get().get(path)
+    ret
+  }
+
+  override def write(path: String, opr: Option[Item] => Item): Unit = {
+    val lock = sync.synchronized {
+      val theLock = Option(locks.get(path)) match {
+        case Some(lock) => lock
+        case None => {
+          val lock = AtomicInteger(0)
+          locks.put(path, lock)
+          lock
+        }
+      }
+      
+      theLock.incrementAndGet()
+      theLock
+    }
+    try {
+      lock.synchronized {
+        val current = read(path)
+        val updated = opr(current)
+        sync.synchronized {
+          val newVal = db.get() + (path -> updated)
+          db.set(newVal)
+        }
+      }
+    } finally {
+      sync.synchronized {
+        val cnt = lock.decrementAndGet()
+        if (cnt == 0) {
+          locks.remove(path)
+        }
+      }
+    }
+  }
+
+  override def release(): Unit = sync.synchronized { db.set( Map()); locks.clear() }
+}
+
 /** Deal with in-memory storage
   */
 object MemStorage {
@@ -327,86 +385,46 @@ object MemStorage {
     *   the storage directory
     */
   def getStorage(targetDir: Option[File]): Storage with ListFileNames = {
-    import scala.collection.JavaConverters.asScalaSetConverter
-    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-    import scala.collection.JavaConverters.iterableAsScalaIterableConverter
-    // use an atomic reference and an immutable map to store stuff to avoid
-    // `synchronized` and lock contention
-    var db = new HashMap[String, Item]
-    val sync = new Object()
 
-    new Storage with ListFileNames {
-      override def paths(): Vector[String] = {
-        sync.synchronized {
-          db.keySet().asScala.toVector
-        }
-      }
-
-      override def pathsSortedWithMD5(): Vector[(String, String)] = {
-        paths().map(k => (Helpers.md5hashHex(k), k)).sorted
-        // db.get().keys.map(k => (Helpers.md5hashHex(k), k)).toVector.sorted
-      }
-
-      override def size() = sync.synchronized { Some(db.size()) }
-
-      override def keys(): Option[Vector[String]] = Some(paths())
-      override def target(): Option[File] = targetDir
-
-      override def exists(path: String): Boolean = sync.synchronized {
-        db.containsKey(path)
-      }
-
-      override def read(path: String): Option[Item] = {
-        val ret = sync.synchronized { db.get(path) }
-        Option(ret)
-      }
-
-      override def write(path: String, data: Item): Unit = {
-        sync.synchronized {
-          db.put(path, data)
-        }
-      }
-
-      override def release(): Unit = sync.synchronized { db = new HashMap() }
-    }
+    MemStorage(targetDir)
   }
 }
 
 /** Store the GitOID Corpus on the filesystem
   */
-object FileSystemStorage {
-  def getStorage(root: File): Storage = {
+// object FileSystemStorage {
+//   def getStorage(root: File): Storage = {
 
-    def buildIt(path: String): File = {
-      if (path.startsWith("pkg:")) {
-        new File(root, f"purl/${path}.json")
-      } else {
-        val stuff = GitOIDUtils.urlToFileName(path)
+//     def buildIt(path: String): File = {
+//       if (path.startsWith("pkg:")) {
+//         new File(root, f"purl/${path}.json")
+//       } else {
+//         val stuff = GitOIDUtils.urlToFileName(path)
 
-        new File(root, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
-      }
+//         new File(root, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
+//       }
 
-    }
+//     }
 
-    new Storage {
-      override def exists(path: String): Boolean = buildIt(path).exists()
+//     new Storage {
+//       override def exists(path: String): Boolean = buildIt(path).exists()
 
-      override def read(path: String): Option[Item] = {
-        val wholePath = buildIt(path)
-        Try {
-          Item
-            .decode(Helpers.slurpInput(wholePath), PayloadFormat.CBOR)
-            .toOption
-        }.toOption.flatten
-      }
+//       override def read(path: String): Option[Item] = {
+//         val wholePath = buildIt(path)
+//         Try {
+//           Item
+//             .decode(Helpers.slurpInput(wholePath), PayloadFormat.CBOR)
+//             .toOption
+//         }.toOption.flatten
+//       }
 
-      override def write(path: String, data: Item): Unit = {
-        val wholePath = buildIt(path)
-        val parent = wholePath.getAbsoluteFile().getParentFile().mkdirs()
-        Helpers.writeOverFile(wholePath, data.encodeCBOR())
-      }
+//       override def write(path: String, data: Item): Unit = {
+//         val wholePath = buildIt(path)
+//         val parent = wholePath.getAbsoluteFile().getParentFile().mkdirs()
+//         Helpers.writeOverFile(wholePath, data.encodeCBOR())
+//       }
 
-      def release(): Unit = {}
-    }
-  }
-}
+//       def release(): Unit = {}
+//     }
+//   }
+// }

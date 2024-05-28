@@ -105,44 +105,46 @@ object MD5 extends DecodeCBOR[MD5] {
 
 }
 
-/** A position within the blob... should be the
-  *
-  * @param offset
-  */
-final case class Position(offset: Long) extends EncodeCBOR {
+type Position = Long
 
-  override def encodeCBORElement(): Element = MapElem.Sized(
-    StringElem("o") -> (if (offset < 0) OverLongElem(false, offset)
-                        else LongElem(offset))
-  )
+// /** A position within the blob... should be the
+//   *
+//   * @param offset
+//   */
+// final case class Position(offset: Long) extends EncodeCBOR {
 
-  def isNA: Boolean = this == Position.NA
+//   override def encodeCBORElement(): Element = MapElem.Sized(
+//     StringElem("o") -> (if (offset < 0) OverLongElem(false, offset)
+//                         else LongElem(offset))
+//   )
 
-}
+//   def isNA: Boolean = this == Position.NA
 
-object Position extends DecodeCBOR[Position] {
-  val NA = Position(-1)
-  override def decodeCBORElement(in: Element): Try[Position] = in match {
-    case m: MapElem =>
-      val ret = for {
-        e <- m.apply("o")
-        lv <- e match {
-          case LongElem(value)               => Some(value)
-          case OverLongElem(negative, value) => Some(value)
-          case IntElem(value)                => Some(value.toLong)
-          case _                             => None
-        }
-      } yield {
-        Position(lv)
-      }
-      ret match {
-        case Some(ret) => Success(ret)
-        case _ => Failure(new Exception(f"Failed to decode ${in} as Position"))
-      }
-    case _ => Failure(new Exception(f"Failed to decode ${in} as Position"))
-  }
+// }
 
-}
+// object Position extends DecodeCBOR[Position] {
+//   val NA = Position(-1)
+//   override def decodeCBORElement(in: Element): Try[Position] = in match {
+//     case m: MapElem =>
+//       val ret = for {
+//         e <- m.apply("o")
+//         lv <- e match {
+//           case LongElem(value)               => Some(value)
+//           case OverLongElem(negative, value) => Some(value)
+//           case IntElem(value)                => Some(value.toLong)
+//           case _                             => None
+//         }
+//       } yield {
+//         Position(lv)
+//       }
+//       ret match {
+//         case Some(ret) => Success(ret)
+//         case _ => Failure(new Exception(f"Failed to decode ${in} as Position"))
+//       }
+//     case _ => Failure(new Exception(f"Failed to decode ${in} as Position"))
+//   }
+
+// }
 
 enum PayloadType extends EncodeCBOR {
   case ENTRY
@@ -227,51 +229,53 @@ object PayloadCompression extends DecodeCBOR[PayloadCompression] {
 
 }
 
-final case class MultifilePosition(
-    offset: Position,
-    other: Long
-) extends EncodeCBOR {
+type MultifilePosition = (Long, Long)
 
-  override def encodeCBORElement(): Element = MapElem.Sized(
-    StringElem("o") -> offset.encodeCBORElement(),
-    StringElem("t") -> (if (other < 0) OverLongElem(false, other)
-                        else LongElem(other))
-  )
+// final case class MultifilePosition(
+//     offset: Position,
+//     other: Long
+// ) extends EncodeCBOR {
 
-  def isNA: Boolean = this == MultifilePosition.NA
-}
+//   override def encodeCBORElement(): Element = MapElem.Sized(
+//     StringElem("o") -> offset.encodeCBORElement(),
+//     StringElem("t") -> (if (other < 0) OverLongElem(false, other)
+//                         else LongElem(other))
+//   )
 
-object MultifilePosition extends DecodeCBOR[MultifilePosition] {
+//   def isNA: Boolean = this == MultifilePosition.NA
+// }
 
-  val NA = MultifilePosition(Position.NA, 0)
-  override def decodeCBORElement(in: Element): Try[MultifilePosition] =
-    in match {
-      case m: MapElem =>
-        val ret = for {
-          t <- m.apply("t")
-          tv <- t match {
-            case LongElem(value)               => Some(value)
-            case OverLongElem(negative, value) => Some(value)
-            case IntElem(value)                => Some(value.toLong)
-            case _                             => None
-          }
-          p <- m.apply("o")
-          pv <- Position.decodeCBORElement(p).toOption
-        } yield {
-          MultifilePosition(pv, tv)
-        }
-        ret match {
-          case Some(ret) => Success(ret)
-          case _ =>
-            Failure(
-              new Exception(f"Failed to decode ${in} as MultifilePosition")
-            )
-        }
-      case _ =>
-        Failure(new Exception(f"Failed to decode ${in} as MultifilePosition"))
-    }
+// object MultifilePosition extends DecodeCBOR[MultifilePosition] {
 
-}
+//   val NA = MultifilePosition(Position.NA, 0)
+//   override def decodeCBORElement(in: Element): Try[MultifilePosition] =
+//     in match {
+//       case m: MapElem =>
+//         val ret = for {
+//           t <- m.apply("t")
+//           tv <- t match {
+//             case LongElem(value)               => Some(value)
+//             case OverLongElem(negative, value) => Some(value)
+//             case IntElem(value)                => Some(value.toLong)
+//             case _                             => None
+//           }
+//           p <- m.apply("o")
+//           pv <- Position.decodeCBORElement(p).toOption
+//         } yield {
+//           MultifilePosition(pv, tv)
+//         }
+//         ret match {
+//           case Some(ret) => Success(ret)
+//           case _ =>
+//             Failure(
+//               new Exception(f"Failed to decode ${in} as MultifilePosition")
+//             )
+//         }
+//       case _ =>
+//         Failure(new Exception(f"Failed to decode ${in} as MultifilePosition"))
+//     }
+
+// }
 
 object EntryEnvelope extends DecodeCBOR[ItemEnvelope] {
   private def longFrom(e: Element): Try[Long] = Try {
@@ -283,6 +287,18 @@ object EntryEnvelope extends DecodeCBOR[ItemEnvelope] {
       case x => throw new Exception(f"Couldn't turn ${e} into a long")
     }
   }
+
+  private def longPairFrom(e: Element): Try[(Long, Long)] = Try {
+    e match {
+      case ae: ArrayElem if ae.elems.length == 2 =>
+        for {
+          a <- longFrom(ae.elems(0))
+          b <- longFrom(ae.elems(1))
+        } yield (a, b)
+      case x => throw new Exception(f"Couldn't turn ${e} into a long pair")
+    }
+
+  }.flatten
 
   private def intFrom(e: Element): Try[Int] = Try {
     e match {
@@ -312,12 +328,12 @@ object EntryEnvelope extends DecodeCBOR[ItemEnvelope] {
     for {
       env <- Try { in.asInstanceOf[MapElem] }
       md5 <- elemFor(env, "h", MD5.decodeCBORElement(_))
-      position <- elemFor(env, "p", Position.decodeCBORElement(_))
+      position <- elemFor(env, "p", longFrom(_))
       timestamp <- elemFor(env, "t", longFrom(_))
       previousVersion <- elemFor(
         env,
         "pv",
-        MultifilePosition.decodeCBORElement(_)
+        longPairFrom(_)
       )
       backpointer <- elemFor(env, "bp", longFrom(_))
       dataLen <- elemFor(env, "l", intFrom(_))
@@ -354,13 +370,18 @@ case class ItemEnvelope(
 
   override def encodeCBORElement(): Element = MapElem.Sized(
     "h" -> keyMd5.encodeCBORElement(),
-    "p" -> position.encodeCBORElement(),
+    "p" -> LongElem(position),
     "t" -> LongElem(
       timestamp
     ), // (if (timestamp < 0) OverLongElem(true, timestamp)
     //        else LongElem(timestamp)),
 
-    "pv" -> previousVersion.encodeCBORElement(),
+    "pv" -> {
+      val a = previousVersion._1
+      val b = previousVersion._2
+
+      ArrayElem.Sized(LongElem(a), LongElem(b))
+    },
     "bp" -> (if (backpointer < 0) OverLongElem(false, backpointer)
              else LongElem(backpointer)),
     "l" -> IntElem(dataLen),

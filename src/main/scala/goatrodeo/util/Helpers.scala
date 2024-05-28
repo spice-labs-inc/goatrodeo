@@ -36,6 +36,8 @@ import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
 import org.apache.bcel.classfile.ClassParser
+import io.bullet.borer.Cbor
+import goatrodeo.omnibor.ArtifactWrapper
 
 type GitOID = String
 
@@ -173,6 +175,7 @@ object Helpers {
     while (true) {
       val len = in.read(ba)
       if (len <= 0) {
+        in.close()
         return md.digest()
       }
 
@@ -203,8 +206,34 @@ object Helpers {
     * @return
     *   the 16 bytes of the MD5 hash
     */
+  def computeMD5(in: File): Array[Byte] = {
+    computeMD5(FileInputStream(in))
+  }
+
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
   def computeSHA1(in: String): Array[Byte] = {
     computeSHA1(stringToInputStream(in))
+  }
+
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
+  def computeSHA1(in: File): Array[Byte] = {
+    computeSHA1(FileInputStream(in))
   }
 
   /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
@@ -220,6 +249,19 @@ object Helpers {
     computeSHA256(stringToInputStream(in))
   }
 
+  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
+    * efficient than secure hashes. It's used to compute the hash of file
+    * paths/names for indexing.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the 16 bytes of the MD5 hash
+    */
+  def computeSHA256(in: File): Array[Byte] = {
+    computeSHA256(FileInputStream(in))
+  }
+
   /** Compute the SHA1 hash of an input stream.
     *
     * @param in
@@ -233,6 +275,7 @@ object Helpers {
     while (true) {
       val len = in.read(ba)
       if (len <= 0) {
+        in.close()
         return md.digest()
       }
 
@@ -254,12 +297,34 @@ object Helpers {
     while (true) {
       val len = in.read(ba)
       if (len <= 0) {
+        in.close()
         return md.digest()
       }
 
       md.update(ba, 0, len)
     }
     ???
+  }
+
+  @inline def hexChar(b: Byte): Char = {
+    b match {
+      case 0  => '0'
+      case 1  => '1'
+      case 2  => '2'
+      case 3  => '3'
+      case 4  => '4'
+      case 5  => '5'
+      case 6  => '6'
+      case 7  => '7'
+      case 8  => '8'
+      case 9  => '9'
+      case 10 => 'a'
+      case 11 => 'b'
+      case 12 => 'c'
+      case 13 => 'd'
+      case 14 => 'e'
+      case 15 => 'f'
+    }
   }
 
   /** Given a byte array, create a lowercase hexadecimal string representing the
@@ -271,9 +336,14 @@ object Helpers {
     *   the hexadecimal representation of the bytes
     */
   def toHex(bytes: Array[Byte]): String = {
-    val sb = new StringBuilder()
-    for { b <- bytes } {
-      sb.append(String.format("%02x", b))
+    val len = bytes.length
+    val sb = new StringBuilder(len * 2)
+    var cur = 0
+    while (cur < len) {
+      val b = bytes(cur)
+      sb.append(hexChar(((b >> 4) & 0xf).toByte))
+      sb.append(hexChar((b & 0xf).toByte))
+      cur += 1
     }
     sb.toString()
   }
@@ -313,6 +383,7 @@ object Helpers {
     val buffer = new Array[Byte](4096)
 
     val len = in.read(buffer)
+    in.close()
     if (len == 0) {
       Array()
     } else {
@@ -347,6 +418,33 @@ object Helpers {
     ret.toByteArray()
   }
 
+    /** Slurp the contents of an InputStream
+    *
+    * @param what
+    *   the InputStream
+    * @return
+    *   the bytes contained in the InputStream
+    */
+  def slurpInputNoClose(what: InputStream): Array[Byte] = {
+    val ret = new ByteArrayOutputStream()
+    val buffer = new Array[Byte](4096)
+
+    while (true) {
+      val len = what.read(buffer)
+      if (len < 0) {
+        
+        return ret.toByteArray()
+      }
+      if (len > 0) {
+        ret.write(buffer, 0, len)
+      }
+    }
+
+    
+    ret.toByteArray()
+  }
+
+
   /** Slurp the contents of an InputStream into a temp file
     *
     * @param what
@@ -354,8 +452,23 @@ object Helpers {
     * @return
     *   a file that contains the contents of the stream
     */
-  def tempFileFromStream(what: InputStream/*, suffix: String*/): File = {
-    val retFile = File.createTempFile("goat_rodeo", f".goats")
+  def tempFileFromStream(
+      what: InputStream,
+      close_? : Boolean,
+      fileName: String
+  ): File = {
+    val lastDot = fileName.lastIndexOf(".")
+    val suffix = lastDot match {
+      case n if n <= 0 => "goat"
+      case n if {
+            val lastSlash = fileName.lastIndexOf("/")
+            lastSlash < n
+          } =>
+        val it = fileName.substring(n)
+        if (it.length() > 0) it else "goat"
+      case _ => "goat"
+    }
+    val retFile = File.createTempFile("goat_rodeo", f".${suffix}")
     retFile.deleteOnExit()
     val ret = FileOutputStream(retFile)
     val buffer = new Array[Byte](4096)
@@ -363,12 +476,17 @@ object Helpers {
     while (true) {
       val len = what.read(buffer)
       if (len < 0) {
+        if (close_?) {
+          what.close()
+        }
+        ret.close()
         return retFile
       }
       if (len > 0) {
         ret.write(buffer, 0, len)
       }
     }
+    ret.close()
     retFile
   }
 
@@ -379,6 +497,25 @@ object Helpers {
   def bailFail(): Nothing = {
     if (Thread.currentThread().getStackTrace().length < 6) System.exit(1)
     throw new Exception()
+  }
+
+  def readLenAndCBOR[A](
+      fc: FileChannel
+  )(implicit decoder: io.bullet.borer.Decoder[A]): A = {
+    val len = Helpers.readInt(fc)
+    readCBOR(fc, len)
+  }
+
+  def readCBOR[A](fc: FileChannel, len: Int)(implicit
+      decoder: io.bullet.borer.Decoder[A]
+  ): A = {
+
+    val dest = ByteBuffer.allocate(len)
+    val bytesRead = fc.read(dest)
+    if (bytesRead != len) {
+      throw Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
+    }
+    Cbor.decode(dest).to[A].value
   }
 
   /** Slurp the contents of a File
@@ -474,17 +611,17 @@ object Helpers {
 
   def writeShort(writer: FileChannel, num: Int): Unit = {
     val bytes = ByteBuffer.allocate(2)
-    bytes.putShort((num & 0xffff).toShort).position(0)
+    bytes.putShort((num & 0xffff).toShort).flip()
     val len = writer.write(bytes)
   }
 
   def writeInt(writer: FileChannel, num: Int): Unit = {
-    val bytes = ByteBuffer.allocate(4).putInt(num).position(0)
+    val bytes = ByteBuffer.allocate(4).putInt(num).flip()
     writer.write(bytes)
   }
 
   def writeLong(writer: FileChannel, num: Long): Unit = {
-    val bytes = ByteBuffer.allocate(8).putLong(num).position(0)
+    val bytes = ByteBuffer.allocate(8).putLong(num).flip()
     writer.write(bytes)
   }
 }
@@ -627,8 +764,8 @@ object GitOIDUtils {
     );
   }
 
-  def computeAllHashes(theFile: File): (String, Vector[String]) = {
-    def is(): InputStream = FileInputStream(theFile)
+  def computeAllHashes(theFile: ArtifactWrapper): (String, Vector[String]) = {
+    def is(): InputStream = theFile.asStream()
     val gitoidSha256 = url(is(), HashType.SHA256)
 
     (
@@ -637,7 +774,7 @@ object GitOIDUtils {
         url(is(), HashType.SHA1),
         String.format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is()))),
         String.format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is()))),
-        String.format("md5:%s", Helpers.toHex(Helpers.computeSHA1(is())))
+        String.format("md5:%s", Helpers.toHex(Helpers.computeMD5(is())))
       )
     )
   }
@@ -655,30 +792,67 @@ enum PackageProtocol {
       case Gem    => "gem"
     }
   }
+}
 
+object PackageIdentifier {
+  def computePurl(f: File): Option[PackageIdentifier] = {
+    val name = f.getName()
+
+    if (name.endsWith(".deb")) {
+      val n2 = name.substring(0, name.length() - 4) // lop off the '.deb'
+      val slubs = n2.split("_").toList
+      slubs match {
+        case pkg :: version :: arch :: _ =>
+          Some(
+            PackageIdentifier(
+              PackageProtocol.Deb,
+              groupId =
+                if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
+                else "debian",
+              artifactId = pkg,
+              arch = Some(arch),
+              distro = None,
+              version = version
+            )
+          )
+        case _ => None
+      }
+    } else
+      None
+  }
 }
 case class PackageIdentifier(
-
     protocol: PackageProtocol,
     groupId: String,
     artifactId: String,
-    version: String
+    version: String,
+    arch: Option[String],
+    distro: Option[String]
 ) {
 
   def toStringMap(): Map[String, String] = {
-    Map(
+    val info = Vector(
       "package_protocol" -> protocol.name,
       "group_id" -> groupId,
       "artifact_id" -> artifactId,
       "version" -> version
+    ) ++ arch.toVector.map(a => "arch" -> a) ++ distro.toVector.map(d =>
+      "distro" -> d
     )
+    Map(info: _*)
   }
 
   def purl(): String = {
-    val ret = 
-    f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-        .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}"
-      ret
+    val ret = protocol match {
+      case PackageProtocol.Deb =>
+        f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder.encode(artifactId, "UTF-8")}@${URLEncoder
+            .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch.getOrElse("unkonwn"), "UTF-8")}&distro=${URLEncoder
+            .encode(distro.getOrElse("unkonwn"), "UTF-8")}"
+      case _ =>
+        f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+            .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}"
+    }
+    ret
   }
 
   def getOSV(): Try[ujson.Value] = {
@@ -782,7 +956,7 @@ object FileType {
 
   def theType(
       name: String,
-      contents: Option[File],
+      contents: Option[ArtifactWrapper],
       sourceMap: Map[String, GitOID]
   ): FileType = {
     name match {
@@ -798,10 +972,15 @@ object FileType {
         val sourceName: Option[String] = contents
           .map(theFile =>
             Try {
-              val is = new FileInputStream(theFile)
-              val cp = new ClassParser(is, name)
-              val clz = cp.parse()
-              clz.getSourceFilePath()
+              val is = theFile.asStream()
+              try {
+                val cp = new ClassParser(is, name)
+
+                val clz = cp.parse()
+                clz.getSourceFilePath()
+              } finally {
+                is.close()
+              }
             }.toOption
           )
           .flatten

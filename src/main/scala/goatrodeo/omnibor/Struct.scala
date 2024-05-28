@@ -53,36 +53,10 @@ object EdgeType {
   }
 }
 
-type Edge = (String, EdgeType)
-// case class Edge(connection: String, @key("edge_type") edgeType: EdgeType) extends Ordered[Edge] {
-
-//   override def compare(that: Edge): Int = {
-//     val strDiff = this.connection.compare(this.connection)
-//     if (strDiff != 0) {
-//       strDiff
-//     } else {
-//       this.edgeType.toString().compare(that.edgeType.toString())
-//     }
-//   }
-
-//   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
-// }
-
-// object Edge {
-//   given Encoder[Edge] = {
-//     import io.bullet.borer.derivation.MapBasedCodecs.*
-//     deriveEncoder[Edge]
-//   }
-
-//   given Decoder[Edge] = {
-//     import io.bullet.borer.derivation.MapBasedCodecs.*
-//     deriveDecoder[Edge]
-//   }
-
-// }
+type Edge = (String, EdgeType, Option[String])
 
 case class ItemMetaData(
-    @key("file_names") fileNames: Vector[String],
+    @key("file_names") fileNames: Set[String],
     @key("file_type") fileType: String,
     @key("file_sub_type") fileSubType: String,
     extra: Map[String, String]
@@ -90,21 +64,12 @@ case class ItemMetaData(
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
   def merge(other: ItemMetaData): ItemMetaData = {
-    val myNames = Set(this.fileNames: _*)
-    val whatsLeft = other.fileNames.filterNot(s => myNames.contains(s))
-    val extraLeft =
-      other.extra.filterNot((k, v) => this.extra.get(k) == Some(v))
-
-    if (whatsLeft.isEmpty && extraLeft.isEmpty) {
-      this
-    } else {
-      ItemMetaData(
-        fileNames = (myNames ++ whatsLeft).toVector.sorted,
-        fileType = this.fileType,
-        fileSubType = this.fileSubType,
-        extra = this.extra ++ extraLeft
-      )
-    }
+    ItemMetaData(
+      fileNames = this.fileNames ++ other.fileNames,
+      fileType = this.fileType,
+      fileSubType = this.fileSubType,
+      extra = this.extra ++ other.extra
+    )
   }
 }
 
@@ -116,18 +81,18 @@ object ItemMetaData {
   ): ItemMetaData = {
     packageIdentifier match {
       case Some(
-            pid @ PackageIdentifier(protocol, groupId, artifactId, version)
+            pid
           ) =>
         ItemMetaData(
-          fileNames = Vector(fileName),
+          fileNames = Set(fileName),
           fileType = "package",
-          fileSubType = protocol.name,
+          fileSubType = pid.protocol.name,
           extra = fileType.toStringMap() ++ Map("purl" -> pid.purl()) ++ pid
             .toStringMap()
         )
       case None =>
         ItemMetaData(
-          fileNames = Vector(fileName),
+          fileNames = Set(fileName),
           fileType = fileType.typeName().getOrElse("Unknown"),
           fileSubType = fileType.subType().getOrElse(""),
           extra = fileType.toStringMap()
@@ -147,43 +112,29 @@ object ItemMetaData {
   }
 }
 
-// case class ItemReference(@key("file_hash") file_hash: Long, offset: Long) {
-//   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
-// }
-
-// object ItemReference {
-//   given Encoder[ItemReference] = {
-//     import io.bullet.borer.derivation.MapBasedCodecs.*
-//     deriveEncoder[ItemReference]
-//   }
-
-//   given Decoder[ItemReference] = {
-//     import io.bullet.borer.derivation.MapBasedCodecs.*
-//     deriveDecoder[ItemReference]
-//   }
-
-//   def noop = ItemReference(0, 0)
-// }
-
 type LocationReference = (Long, Long)
 
 case class Item(
     identifier: String,
     reference: LocationReference,
-    @key("alt_identifiers") altIdentifiers: Vector[String],
-    connections: Vector[Edge],
+    // @key("alt_identifiers") altIdentifiers: Vector[String],
+    connections: Set[Edge],
     @key("previous_reference") previousReference: Option[LocationReference],
     metadata: Option[ItemMetaData],
     @key("merged_from") mergedFrom: Vector[Item],
-    _timestamp: Long ,
-    _version: Int ,
-    _type: String 
+    count: Long,
+    _timestamp: Long,
+    _version: Int,
+    _type: String
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
   def fixReferencePosition(hash: Long, offset: Long): Item = {
     val hasCur = reference != Item.noopLocationReference
-    this.copy(reference = (hash, offset), previousReference = (if (hasCur) Some(this.reference) else None))
+    this.copy(
+      reference = (hash, offset),
+      previousReference = (if (hasCur) Some(this.reference) else None)
+    )
   }
 
   def identifierMD5(): Array[Byte] = Helpers.computeMD5(identifier)
@@ -197,87 +148,102 @@ case class Item(
   def fixReferences(store: Storage): Item = {
     for { edge <- this.connections } {
       edge match {
-        case Edge(connection, EdgeType.AliasFrom) => {
-          val alias = store
-            .read(connection)
-            .getOrElse(
-              Item(
-                identifier = connection,
-                reference = Item.noopLocationReference,
-                altIdentifiers = Vector(),
-                connections = Vector(),
-                previousReference = None,
-                metadata = None,
-                mergedFrom = Vector(),
-                _timestamp = System.currentTimeMillis(),
-                _version = 1,
-                _type = "Item"
+        case Edge(connection, EdgeType.AliasFrom, data) => {
+
+          store.write(
+            connection,
+            maybeAlias => {
+              val alias = maybeAlias.getOrElse(
+                Item(
+                  identifier = connection,
+                  reference = Item.noopLocationReference,
+                  connections = Set(),
+                  previousReference = None,
+                  metadata = None,
+                  count = 0,
+                  mergedFrom = Vector(),
+                  _timestamp = System.currentTimeMillis(),
+                  _version = 1,
+                  _type = "Item"
+                )
               )
-            )
-          val toAdd = (this.identifier, EdgeType.AliasTo)
-          val updatedAlias = if (alias.connections.contains(toAdd)) { alias }
-          else {
-            alias.copy(
-              connections = (alias.connections :+ toAdd).sortBy(_._1),
-              _timestamp = System.currentTimeMillis()
-            )
-          }
-          store.write(connection, updatedAlias)
+              val toAdd = (this.identifier, EdgeType.AliasTo, data)
+              val updatedAlias =
+                if (alias.connections.contains(toAdd)) { alias }
+                else {
+                  alias.copy(
+                    connections = (alias.connections + toAdd),
+                    _timestamp = System.currentTimeMillis()
+                  )
+                }
+              updatedAlias
+            }
+          )
         }
-        case Edge(connection, EdgeType.BuiltFrom) => {
-          val source = store
-            .read(connection)
-            .getOrElse(
-              Item(
-                identifier = connection,
-                reference = Item.noopLocationReference,
-                altIdentifiers = Vector(),
-                connections = Vector(),
-                previousReference = None,
-                metadata = None,
-                mergedFrom = Vector(),
-                _timestamp = System.currentTimeMillis(),
-                _version = 1,
-                _type = "Item"
+        case Edge(connection, EdgeType.BuiltFrom, data) => {
+
+          store.write(
+            connection,
+            maybeSource => {
+              val source = maybeSource.getOrElse(
+                Item(
+                  identifier = connection,
+                  reference = Item.noopLocationReference,
+                  connections = Set(),
+                  previousReference = None,
+                  metadata = None,
+                  count = 0,
+                  mergedFrom = Vector(),
+                  _timestamp = System.currentTimeMillis(),
+                  _version = 1,
+                  _type = "Item"
+                )
               )
-            )
-          val toAdd = (this.identifier, EdgeType.BuildsTo)
-          val updatedSource = if (source.connections.contains(toAdd)) { source }
-          else {
-            source.copy(
-              connections = (source.connections :+ toAdd).sortBy(_._1),
-              _timestamp = System.currentTimeMillis()
-            )
-          }
-          store.write(connection, updatedSource)
+              val toAdd = (this.identifier, EdgeType.BuildsTo, data)
+              val updatedSource =
+                if (source.connections.contains(toAdd)) { source }
+                else {
+                  source.copy(
+                    connections = (source.connections + toAdd),
+                    _timestamp = System.currentTimeMillis()
+                  )
+                }
+              updatedSource
+            }
+          )
         }
-        case Edge(connection, EdgeType.ContainedBy) => {
-          val container = store
-            .read(connection)
-            .getOrElse(
-              Item(
-                identifier = connection,
-                reference = Item.noopLocationReference,
-                altIdentifiers = Vector(),
-                connections = Vector(),
-                previousReference = None,
-                metadata = None,
-                mergedFrom = Vector(),
-                _timestamp = System.currentTimeMillis(),
-                _version = 1,
-                _type = "Item"
+        case Edge(connection, EdgeType.ContainedBy, data) => {
+
+          store.write(
+            connection,
+            maybeContainer => {
+              val container = maybeContainer.getOrElse(
+                Item(
+                  identifier = connection,
+                  reference = Item.noopLocationReference,
+                  // altIdentifiers = Vector(),
+                  connections = Set(),
+                  previousReference = None,
+                  metadata = None,
+                  count = 0,
+                  mergedFrom = Vector(),
+                  _timestamp = System.currentTimeMillis(),
+                  _version = 1,
+                  _type = "Item"
+                )
               )
-            )
-          val toAdd = (this.identifier, EdgeType.Contains)
-          val updatedSource = if (container.connections.contains(toAdd)) {
-            container
-          } else {
-            container.copy(
-              connections = (container.connections :+ toAdd).sortBy(_._1),
-              _timestamp = System.currentTimeMillis()
-            )
-          }
-          store.write(connection, updatedSource)
+              val toAdd = (this.identifier, EdgeType.Contains, data)
+              val updatedSource = if (container.connections.contains(toAdd)) {
+                container
+              } else {
+                container.copy(
+                  connections = (container.connections + toAdd),
+                  _timestamp = System.currentTimeMillis()
+                )
+              }
+              updatedSource
+            }
+          )
         }
         case _ =>
       }
@@ -286,69 +252,39 @@ case class Item(
 
   }
 
-  def merge(others: Vector[Item]): Item = {
-
-    val finalMetaData = others.foldLeft(this.metadata) { (a, b) =>
-      (a, b.metadata) match {
-        case (Some(me), Some(them)) => Some(me.merge(them))
-        case (None, Some(them))     => Some(them)
-        case (Some(me), None)       => Some(me)
-        case _                      => None
-      }
-    }
-
-    val myAlts = Set(this.altIdentifiers: _*)
-    val finalAlts = others.foldLeft(myAlts) { (me, them) =>
-      val theirAlts = Set(them.altIdentifiers: _*)
-      me ++ theirAlts
-    }
-
-    val myConnections = Set(this.connections: _*)
-    val finalConnections = others.foldLeft(myConnections) { (me, them) =>
-      val theirCons = Set(them.connections: _*)
-      me ++ theirCons
-    }
-    // nothing new
-    if (
-      myAlts == finalAlts && this.metadata == finalMetaData && myConnections == finalConnections
-    ) {
-      this
-    } else {
-      val notStored = this.reference == Item.noopLocationReference
-      this.copy(
-        altIdentifiers = finalAlts.toVector.sorted,
-        connections = finalConnections.toVector.sortBy(_._1),
-        previousReference = if (notStored) None else Some(this.reference),
-        metadata = finalMetaData,
-        mergedFrom = if (notStored) Vector() else others,
-        _timestamp = System.currentTimeMillis(),
-        _version = 1
-      )
-    }
+  def merge(other: Item): Item = {
+    Item(identifier = this.identifier, reference = this.reference, connections =  this.connections ++ other.connections,
+    previousReference = this.previousReference, metadata = (this.metadata, other.metadata) match {
+      case (Some(a), Some(b)) => Some(a.merge(b))
+      case (Some(a), _) => Some(a)
+      case (_, Some(b)) => Some(b)
+      case _ => None
+    }, mergedFrom = this.mergedFrom ++ other.mergedFrom, count = this.count + other.count, _timestamp = System.currentTimeMillis(),
+    _version = 1, _type = this._type)
 
   }
 }
 
 object Item {
   given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
-  new Encoder.DefaultValueAware[Option[T]] {
+    new Encoder.DefaultValueAware[Option[T]] {
 
-    def write(w: Writer, value: Option[T]) =
-      value match
-        case Some(x) => w.write(x)
-        case None    => w.writeNull()
+      def write(w: Writer, value: Option[T]) =
+        value match
+          case Some(x) => w.write(x)
+          case None    => w.writeNull()
 
-    def withDefaultValue(defaultValue: Option[T]): Encoder[Option[T]] =
-      if (defaultValue eq None)
-        new Encoder.PossiblyWithoutOutput[Option[T]] {
-          def producesOutputFor(value: Option[T]) = value ne None
-          def write(w: Writer, value: Option[T]) =
-            value match
-              case Some(x) => w.write(x)
-              case None    => w
-        }
-      else this
-  }
+      def withDefaultValue(defaultValue: Option[T]): Encoder[Option[T]] =
+        if (defaultValue eq None)
+          new Encoder.PossiblyWithoutOutput[Option[T]] {
+            def producesOutputFor(value: Option[T]) = value ne None
+            def write(w: Writer, value: Option[T]) =
+              value match
+                case Some(x) => w.write(x)
+                case None    => w
+          }
+        else this
+    }
 
   val noopLocationReference: LocationReference = (0L, 0L)
   given Encoder[Item] = {
@@ -368,3 +304,10 @@ object Item {
     }
   }
 }
+
+enum IndexLoc {
+  case Loc(offset: Long, fileHash: Long)
+  case Chain(chain: Vector[IndexLoc])
+}
+
+case class ItemOffset(hashHi: Long, hashLow: Long, loc: IndexLoc)
