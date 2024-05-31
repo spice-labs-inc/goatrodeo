@@ -29,6 +29,7 @@ import java.time.Instant
 import goatrodeo.util.FileType
 import goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
+import goatrodeo.util.Helpers.filesForParent
 
 enum EdgeType {
   case AliasTo
@@ -117,12 +118,10 @@ type LocationReference = (Long, Long)
 case class Item(
     identifier: String,
     reference: LocationReference,
-    // @key("alt_identifiers") altIdentifiers: Vector[String],
     connections: Set[Edge],
-    @key("previous_reference") previousReference: Option[LocationReference],
     metadata: Option[ItemMetaData],
-    @key("merged_from") mergedFrom: Vector[Item],
-    count: Long,
+    @key("merged_from") mergedFrom: Vector[LocationReference],
+    @key("file_size") fileSize: Long,
     _timestamp: Long,
     _version: Int,
     _type: String
@@ -133,7 +132,7 @@ case class Item(
     val hasCur = reference != Item.noopLocationReference
     this.copy(
       reference = (hash, offset),
-      previousReference = (if (hasCur) Some(this.reference) else None)
+      mergedFrom = (if (hasCur) Vector(this.reference) else Vector())
     )
   }
 
@@ -158,9 +157,8 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = Set(),
-                  previousReference = None,
                   metadata = None,
-                  count = 0,
+                  fileSize = this.fileSize,
                   mergedFrom = Vector(),
                   _timestamp = System.currentTimeMillis(),
                   _version = 1,
@@ -190,9 +188,8 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = Set(),
-                  previousReference = None,
                   metadata = None,
-                  count = 0,
+                  fileSize = -1,
                   mergedFrom = Vector(),
                   _timestamp = System.currentTimeMillis(),
                   _version = 1,
@@ -223,9 +220,8 @@ case class Item(
                   reference = Item.noopLocationReference,
                   // altIdentifiers = Vector(),
                   connections = Set(),
-                  previousReference = None,
                   metadata = None,
-                  count = 0,
+                  fileSize = -1,
                   mergedFrom = Vector(),
                   _timestamp = System.currentTimeMillis(),
                   _version = 1,
@@ -253,14 +249,22 @@ case class Item(
   }
 
   def merge(other: Item): Item = {
-    Item(identifier = this.identifier, reference = this.reference, connections =  this.connections ++ other.connections,
-    previousReference = this.previousReference, metadata = (this.metadata, other.metadata) match {
-      case (Some(a), Some(b)) => Some(a.merge(b))
-      case (Some(a), _) => Some(a)
-      case (_, Some(b)) => Some(b)
-      case _ => None
-    }, mergedFrom = this.mergedFrom ++ other.mergedFrom, count = this.count + other.count, _timestamp = System.currentTimeMillis(),
-    _version = 1, _type = this._type)
+    Item(
+      identifier = this.identifier,
+      reference = this.reference,
+      connections = this.connections ++ other.connections,
+      metadata = (this.metadata, other.metadata) match {
+        case (Some(a), Some(b)) => Some(a.merge(b))
+        case (Some(a), _)       => Some(a)
+        case (_, Some(b))       => Some(b)
+        case _                  => None
+      },
+      mergedFrom = this.mergedFrom ++ other.mergedFrom,
+      fileSize = if (this.fileSize == -1) other.fileSize else this.fileSize,
+      _timestamp = System.currentTimeMillis(),
+      _version = 1,
+      _type = this._type
+    )
 
   }
 }

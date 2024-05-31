@@ -26,7 +26,7 @@ trait ArtifactWrapper {
   def isFile(): Boolean
   def isDirectory(): Boolean
   def isRealFile(): Boolean
-  //def asFile(): (File, Boolean)
+  // def asFile(): (File, Boolean)
   def listFiles(): Vector[ArtifactWrapper]
   def getCanonicalPath(): String
   def getParentDirectory(): File
@@ -140,7 +140,9 @@ object BuildGraph {
     if (
       in
         .name()
-        .endsWith(".zip") || in.name().endsWith(".jar") || in.name().endsWith(".war")
+        .endsWith(".zip") || in.name().endsWith(".jar") || in
+        .name()
+        .endsWith(".war")
     ) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
@@ -153,16 +155,23 @@ object BuildGraph {
           .stream()
           .iterator()
           .asScala
-          .filter(v => {!v.isDirectory()})
+          .filter(v => { !v.isDirectory() })
           .map(v =>
             () => {
               val name = v.getName()
 
               val wrapper =
-                if (name.endsWith(".zip") || name.endsWith(".jar") || name.endsWith(".war")) {
+                if (
+                  name.endsWith(".zip") || name.endsWith(".jar") || name
+                    .endsWith(".war")
+                ) {
                   FileWrapper(
                     Helpers
-                      .tempFileFromStream(zipFile.getInputStream(v), false, name)
+                      .tempFileFromStream(
+                        zipFile.getInputStream(v),
+                        false,
+                        name
+                      )
                   )
                 } else {
                   ByteWrapper(
@@ -450,7 +459,7 @@ object BuildGraph {
               .map(alias => (alias, EdgeType.AliasFrom, None))
               .sortBy(_._1)
           )
-          ++ // FIXME pURL DB?
+          ++
           // create the pURL DB
           (
             packageId.toVector.map(id =>
@@ -462,9 +471,7 @@ object BuildGraph {
           identifier = main,
           reference = Item.noopLocationReference,
           connections = computedConnections,
-          // altIdentifiers = aliases,
-          previousReference = None,
-          count = 1,
+          fileSize = file.size(),
           metadata = Some(
             ItemMetaData.from(
               name,

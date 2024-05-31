@@ -418,7 +418,7 @@ object Helpers {
     ret.toByteArray()
   }
 
-    /** Slurp the contents of an InputStream
+  /** Slurp the contents of an InputStream
     *
     * @param what
     *   the InputStream
@@ -432,7 +432,7 @@ object Helpers {
     while (true) {
       val len = what.read(buffer)
       if (len < 0) {
-        
+
         return ret.toByteArray()
       }
       if (len > 0) {
@@ -440,10 +440,8 @@ object Helpers {
       }
     }
 
-    
     ret.toByteArray()
   }
-
 
   /** Slurp the contents of an InputStream into a temp file
     *

@@ -257,7 +257,8 @@ object ToProcess {
   def buildQueue(root: File): ConcurrentLinkedQueue[ToProcess] = {
     var fileSet = Set(
       Helpers
-        .findFiles(root, _ => true).map(_.getAbsoluteFile()): _*
+        .findFiles(root, _ => true)
+        .map(_.getAbsoluteFile()): _*
     )
 
     val pomLike = buildQueueForPOMS(root)
@@ -286,9 +287,12 @@ object ToProcess {
     println(f"Finding all pom files got ${poms.length} in ${Duration
         .between(start, Instant.now())}")
 
+    val possibleSize = poms.length
+    var cnt = 0
+
     val theQueue = (for {
-      f <- poms.iterator
-      // f = v
+      f <- poms
+
       xml <- Try {
         scala.xml.XML.load({
           val bytes = Helpers.slurpInput(f)
@@ -334,9 +338,17 @@ object ToProcess {
         }
 
       }
+
+      _ = {
+        cnt += 1
+        if (cnt % 5000 == 0) {
+          println(f"pom loading ${cnt} of ${possibleSize} at ${Duration
+              .between(start, Instant.now())}")
+        }
+      }
     } yield {
       item
-    }).toVector
+    })
 
     println(f"Finding parsing got ${theQueue.length} in ${Duration
         .between(start, Instant.now())}")
