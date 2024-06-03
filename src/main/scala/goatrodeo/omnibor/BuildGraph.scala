@@ -313,7 +313,8 @@ object BuildGraph {
       root: ArtifactWrapper,
       name: String,
       parentId: Option[String],
-      action: (ArtifactWrapper, String, Option[String]) => String
+      dontSkipFound: Boolean,
+      action: (ArtifactWrapper, String, Option[String]) => (String, Boolean)
   ): Unit = {
     val toProcess: Vector[ArtifactWrapper] = if (root.isFile()) { Vector(root) }
     else if (root.isDirectory()) { root.listFiles() }
@@ -321,7 +322,7 @@ object BuildGraph {
 
     for { workOn <- toProcess } {
       if (workOn.size() > 4) {
-        val ret = action(
+        val (ret, found) = action(
           workOn,
           if (workOn == root) name
           else
@@ -331,28 +332,37 @@ object BuildGraph {
           parentId
         )
 
-        for {
-          (stream, toDelete) <- streamForArchive(workOn)
-        } {
-          try {
-            for {
-              theFn <- stream
-            } {
-              val (name, file) = theFn()
+        // don't go into archives we've already seen
+        if (dontSkipFound || !found) {
+          for {
+            (stream, toDelete) <- streamForArchive(workOn)
+          } {
+            try {
+              for {
+                theFn <- stream
+              } {
+                val (name, file) = theFn()
 
-              processFileAndSubfiles(file, name, Some(ret), action)
-              file.delete()
+                processFileAndSubfiles(
+                  file,
+                  name,
+                  Some(ret),
+                  dontSkipFound,
+                  action
+                )
+                file.delete()
+              }
+
+            } catch {
+              case ioe: IOException if parentId.isDefined =>
+              // println(
+              //   f"Swallowed bad substream ${name} with exception ${ioe.getMessage()}"
+              // )
             }
 
-          } catch {
-            case ioe: IOException if parentId.isDefined =>
-            // println(
-            //   f"Swallowed bad substream ${name} with exception ${ioe.getMessage()}"
-            // )
+            // stream.close()
+            toDelete()
           }
-
-          // stream.close()
-          toDelete()
         }
       }
     }
@@ -363,7 +373,7 @@ object BuildGraph {
       case ToProcess(pom, main, Some(source), pomFile) => {
         // process the POM file
         pomFile.foreach(pf =>
-          buildItemsFor(pf, pf.getName(), store, Vector(), None, Map())
+          buildItemsFor(pf, pf.getName(), store, Vector(), None, Map(), false)
         )
 
         // process the sources
@@ -373,7 +383,8 @@ object BuildGraph {
           store,
           Vector(),
           pom,
-          Map()
+          Map(),
+          true
         )
 
         // process the main class file
@@ -383,7 +394,8 @@ object BuildGraph {
           store,
           Vector(),
           pom,
-          sourceMap
+          sourceMap,
+          false
         )
 
       }
@@ -395,7 +407,8 @@ object BuildGraph {
           store,
           Vector(),
           pom,
-          Map()
+          Map(),
+          false
         )
     }
   }
@@ -413,16 +426,18 @@ object BuildGraph {
       store: Storage,
       topConnections: Vector[Edge],
       topPackageIdentifier: Option[PackageIdentifier],
-      associatedFiles: Map[String, GitOID]
+      associatedFiles: Map[String, GitOID],
+      dontSkipFound: Boolean
   ): Map[String, String] = {
     var ret: Map[String, String] = Map()
     processFileAndSubfiles(
       FileWrapper(root),
       name,
       None,
+      dontSkipFound,
       (file, name, parent) => {
-        val (main, foundAliases) = GitOIDUtils.computeAllHashes(file)
-
+        val (main, foundAliases) = GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
+        val foundGitOID = store.exists(main)
         val packageId = topPackageIdentifier
           .map(
             _.purl() +
@@ -453,12 +468,9 @@ object BuildGraph {
             case None => topConnections
           })
           ++
-          // include aliases
-          (
-            aliases
-              .map(alias => (alias, EdgeType.AliasFrom, None))
-              .sortBy(_._1)
-          )
+          // include aliases only if we aren't merging this item (if we're)
+          // merging, then the aliases already exist and no point in regenerating them
+          (aliases.map(alias => (alias, EdgeType.AliasFrom, None))).toSet
           ++
           // create the pURL DB
           (
@@ -495,7 +507,7 @@ object BuildGraph {
             }
           }
         )
-        main
+        (main, foundGitOID)
       }
     )
     ret

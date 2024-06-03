@@ -38,6 +38,7 @@ import scala.util.Success
 import org.apache.bcel.classfile.ClassParser
 import io.bullet.borer.Cbor
 import goatrodeo.omnibor.ArtifactWrapper
+import java.util.concurrent.atomic.AtomicInteger
 
 type GitOID = String
 
@@ -112,7 +113,9 @@ object Helpers {
   ): Vector[File] = {
 
     if (root.isDirectory()) {
-      root.listFiles().toVector.flatMap(findFiles(_, ok))
+      Option(root.listFiles()).toVector
+        .flatMap(_.toVector)
+        .flatMap(findFiles(_, ok))
     } else if (root.isFile() && ok(root)) {
       Vector(root)
     } else Vector()
@@ -762,19 +765,30 @@ object GitOIDUtils {
     );
   }
 
-  def computeAllHashes(theFile: ArtifactWrapper): (String, Vector[String]) = {
+  def computeAllHashes(
+      theFile: ArtifactWrapper,
+      continue_? : String => Boolean
+  ): (String, Vector[String]) = {
     def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), HashType.SHA256)
+    val gitoidSha256 = url(is(), HashType.SHA256).intern()
 
-    (
-      gitoidSha256,
-      Vector(
-        url(is(), HashType.SHA1),
-        String.format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is()))),
-        String.format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is()))),
-        String.format("md5:%s", Helpers.toHex(Helpers.computeMD5(is())))
+    if (continue_?(gitoidSha256)) {
+      (
+        gitoidSha256,
+        Vector(
+          url(is(), HashType.SHA1).intern(),
+          String
+            .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is())))
+            .intern(),
+          String
+            .format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is())))
+            .intern(),
+          String
+            .format("md5:%s", Helpers.toHex(Helpers.computeMD5(is())))
+            .intern()
+        )
       )
-    )
+    } else (gitoidSha256, Vector())
   }
 }
 
@@ -1000,5 +1014,4 @@ object FileType {
       case _                         => Other
     }
   }
-
 }

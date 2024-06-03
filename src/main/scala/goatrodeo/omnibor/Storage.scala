@@ -314,7 +314,8 @@ class MemStorage(val targetDir: Option[File])
 
   private val sync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
-  private val locks: java.util.HashMap[String, AtomicInteger] = java.util.HashMap()
+  private val locks: java.util.HashMap[String, AtomicInteger] =
+    java.util.HashMap()
   def keys(): Vector[String] = {
 
     db.get().keysIterator.toVector
@@ -347,7 +348,7 @@ class MemStorage(val targetDir: Option[File])
           lock
         }
       }
-      
+
       theLock.incrementAndGet()
       theLock
     }
@@ -370,7 +371,9 @@ class MemStorage(val targetDir: Option[File])
     }
   }
 
-  override def release(): Unit = sync.synchronized { db.set( Map()); locks.clear() }
+  override def release(): Unit = sync.synchronized {
+    db.set(Map()); locks.clear()
+  }
 }
 
 /** Deal with in-memory storage

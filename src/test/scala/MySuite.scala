@@ -376,11 +376,12 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
+      false,
       (file, name, parent) => {
         cnt += 1
-        val (main, _) = GitOIDUtils.computeAllHashes(file)
+        val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
-        main
+        (main, false)
       }
     )
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
@@ -395,7 +396,8 @@ class MySuite extends munit.FunSuite {
       store,
       Vector(),
       None,
-      Map()
+      Map(),
+      false
     )
 
     assert(got.size > 1200, f"Expection more than 1,200 items, got ${got.size}")
@@ -430,18 +432,18 @@ class MySuite extends munit.FunSuite {
 
   test("Build from Java") {
     val source = File("test_data/jar_test")
-    val files = ToProcess.buildQueue(source)
+    val files = ToProcess.buildQueueAsVec(source)
 
     assert(
-      files.size() >= 2,
-      f"Expecting at least 2 files, got ${files.size()}"
+      files.length >= 2,
+      f"Expecting at least 2 files, got ${files.length}"
     )
 
     val store = MemStorage.getStorage(Some(File("/tmp/frood")))
     import scala.collection.JavaConverters.collectionAsScalaIterableConverter
     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-    for { toProcess <- files.asScala } {
+    for { toProcess <- files } {
       BuildGraph.graphForToProcess(toProcess, store)
     }
 
@@ -500,7 +502,8 @@ class MySuite extends munit.FunSuite {
               None
             )
           ),
-          Map()
+          Map(),
+          false
         )
         val pkgIndex = store.read("pkg:maven").get
         assert(
