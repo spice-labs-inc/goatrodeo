@@ -471,13 +471,14 @@ object BuildGraph {
           // include aliases only if we aren't merging this item (if we're)
           // merging, then the aliases already exist and no point in regenerating them
           (aliases.map(alias => (alias, EdgeType.AliasFrom, None))).toSet
+          /* no pURL... index is took expensive
           ++
           // create the pURL DB
           (
             packageId.toVector.map(id =>
               (packageType(id), EdgeType.ContainedBy, Some(id))
             )
-          )
+          )*/
 
         val item = Item(
           identifier = main,

@@ -505,11 +505,12 @@ class MySuite extends munit.FunSuite {
           Map(),
           false
         )
-        val pkgIndex = store.read("pkg:maven").get
-        assert(
-          pkgIndex.connections.size > 0,
-          f"We should have had at least one package, but only found ${pkgIndex.connections.size}"
-        )
+        // No pURL
+        // val pkgIndex = store.read("pkg:maven").get
+        // assert(
+        //   pkgIndex.connections.size > 0,
+        //   f"We should have had at least one package, but only found ${pkgIndex.connections.size}"
+        // )
       }
 
     }
@@ -536,11 +537,12 @@ class MySuite extends munit.FunSuite {
 
       Builder.buildDB(source, store, 32)
 
-      val pkgIndex = store.read("pkg:maven").get
-      assert(
-        pkgIndex.connections.size > 4500,
-        f"We should have had more than 100 packages, but only found ${pkgIndex.connections.size}"
-      )
+      // no pURL
+      // val pkgIndex = store.read("pkg:maven").get
+      // assert(
+      //   pkgIndex.connections.size > 4500,
+      //   f"We should have had more than 100 packages, but only found ${pkgIndex.connections.size}"
+      // )
     }
   }
 
@@ -579,25 +581,25 @@ class MySuite extends munit.FunSuite {
 
   }*/
 
-  test("Build in test data and make sure we find deb and maven pURLs") {
-    if (true) {
-      val store = MemStorage.getStorage(None)
-      import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-      import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+  // test("Build in test data and make sure we find deb and maven pURLs") {
+  //   if (true) {
+  //     val store = MemStorage.getStorage(None)
+  //     import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+  //     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-      Builder.buildDB(File("test_data"), store, 32)
+  //     Builder.buildDB(File("test_data"), store, 32)
 
-      val pkgIndex = store.read("pkg:maven").get
-      assert(
-        pkgIndex.connections.size >= 4,
-        f"We should have had at least 4 maven package, but only found ${pkgIndex.connections.size}"
-      )
+  //     val pkgIndex = store.read("pkg:maven").get
+  //     assert(
+  //       pkgIndex.connections.size >= 4,
+  //       f"We should have had at least 4 maven package, but only found ${pkgIndex.connections.size}"
+  //     )
 
-      val pkgDebIndex = store.read("pkg:deb").get
-      assert(
-        pkgIndex.connections.size > 0,
-        f"We should have at least one '.deb' pURL, but found none"
-      )
-    }
-  }
+  //     val pkgDebIndex = store.read("pkg:deb").get
+  //     assert(
+  //       pkgIndex.connections.size > 0,
+  //       f"We should have at least one '.deb' pURL, but found none"
+  //     )
+  //   }
+  // }
 }

@@ -107,9 +107,14 @@ object Builder {
               // build the package
               BuildGraph.graphForToProcess(toProcess, storage)
               val updatedCnt = cnt.addAndGet(1)
-              println(f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
-                  .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${Duration
-                  .between(localStart, Instant.now())} vertices ${storage.size()}")
+              val theDuration = Duration
+                .between(localStart, Instant.now())
+              if (theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0) {
+                println(
+                  f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
+                      .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}"
+                )
+              }
             } catch {
               case ise: IllegalStateException => {
                 dead_?.set(true)
@@ -174,21 +179,6 @@ object Builder {
             .flatMap(v => store.read(v._2))
 
           allItems
-          /*
-          println(
-            f"Pre-sort at ${Duration.between(start, Instant.now())}"
-          )
-
-          val withMd5 =
-            allItems.map(i => (Helpers.toHex(i.identifierMD5()), i))
-          println(
-            f"with MD5 at ${Duration.between(start, Instant.now())}"
-          )
-          val sortedWithMD5 = withMd5.sortBy(_._1)
-          println(
-            f"Sort but not pruned at ${Duration.between(start, Instant.now())}"
-          )
-          withMd5.map(_._2)*/
         }
 
         println(

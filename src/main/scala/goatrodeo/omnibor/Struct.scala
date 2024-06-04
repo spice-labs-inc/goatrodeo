@@ -136,7 +136,9 @@ case class Item(
     )
   }
 
-  def identifierMD5(): Array[Byte] = Helpers.computeMD5(identifier)
+  private lazy val md5 = Helpers.computeMD5(identifier)
+
+  def identifierMD5(): Array[Byte] = md5
 
   def cmpMd5(that: Item): Boolean = {
     val myHash = Helpers.md5hashHex(identifier)

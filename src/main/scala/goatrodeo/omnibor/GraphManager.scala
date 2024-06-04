@@ -114,7 +114,7 @@ object GraphManager {
 
       afterWrite(entry)
       loopCnt += 1
-      if (loopCnt % 250000 == 0) {
+      if (loopCnt % 1000000 == 0) {
         println(
           f"Write loop ${loopCnt} at ${Duration.between(start, Instant.now())}"
         )
@@ -261,10 +261,12 @@ object GraphManager {
       )
 
     tempFile.toFile().renameTo(targetFile)
-    for { i <- biggest } {
-      println(
-        f"Item ${i._1.identifier} ${i._1.metadata.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
-      )
+    if (false) {
+      for { i <- biggest } {
+        println(
+          f"Item ${i._1.identifier} ${i._1.metadata.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
+        )
+      }
     }
     (fileSet, targetFile)
   }
