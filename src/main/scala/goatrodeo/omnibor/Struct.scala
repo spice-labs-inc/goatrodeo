@@ -58,18 +58,29 @@ type Edge = (String, EdgeType, Option[String])
 
 case class ItemMetaData(
     @key("file_names") fileNames: Set[String],
-    @key("file_type") fileType: String,
-    @key("file_sub_type") fileSubType: String,
-    extra: Map[String, String]
+    @key("file_type") fileType: Set[String],
+    @key("file_sub_type") fileSubType: Set[String],
+    extra: Map[String, Set[String]]
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
   def merge(other: ItemMetaData): ItemMetaData = {
     ItemMetaData(
       fileNames = this.fileNames ++ other.fileNames,
-      fileType = this.fileType,
-      fileSubType = this.fileSubType,
-      extra = this.extra ++ other.extra
+      fileType = this.fileType ++ other.fileType,
+      fileSubType = this.fileSubType ++ other.fileSubType,
+      extra = {
+        var ret = this.extra;
+        for {(k, v) <- other.extra} {
+          val nv = ret.get(k) match {
+            case None => v
+            case Some(mv) => v ++ mv
+          }
+          ret = ret + (k -> nv)
+        }
+
+        ret
+      }
     )
   }
 }
@@ -86,16 +97,17 @@ object ItemMetaData {
           ) =>
         ItemMetaData(
           fileNames = Set(fileName),
-          fileType = "package",
-          fileSubType = pid.protocol.name,
-          extra = fileType.toStringMap() ++ Map("purl" -> pid.purl()) ++ pid
-            .toStringMap()
+          fileType = Set("package"),
+          fileSubType = Set(pid.protocol.name),
+          extra = fileType.toStringMap() ++ 
+          Map("purl" -> Set(pid.purl())) ++ 
+          pid.toStringMap()
         )
       case None =>
         ItemMetaData(
           fileNames = Set(fileName),
-          fileType = fileType.typeName().getOrElse("Unknown"),
-          fileSubType = fileType.subType().getOrElse(""),
+          fileType = fileType.typeName().map(Set(_)).getOrElse(Set()),
+          fileSubType = fileType.subType().map(Set(_)).getOrElse(Set()),
           extra = fileType.toStringMap()
         )
     }

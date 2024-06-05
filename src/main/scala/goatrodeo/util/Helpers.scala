@@ -842,14 +842,14 @@ case class PackageIdentifier(
     distro: Option[String]
 ) {
 
-  def toStringMap(): Map[String, String] = {
+  def toStringMap(): Map[String, Set[String]] = {
     val info = Vector(
-      "package_protocol" -> protocol.name,
-      "group_id" -> groupId,
-      "artifact_id" -> artifactId,
-      "version" -> version
-    ) ++ arch.toVector.map(a => "arch" -> a) ++ distro.toVector.map(d =>
-      "distro" -> d
+      "package_protocol" -> Set(protocol.name),
+      "group_id" -> Set(groupId),
+      "artifact_id" -> Set(artifactId),
+      "version" -> Set(version)
+    ) ++ arch.toVector.map(a => "arch" -> Set(a)) ++ distro.toVector.map(d =>
+      "distro" -> Set(d)
     )
     Map(info: _*)
   }
@@ -934,31 +934,31 @@ enum FileType {
     }
   }
 
-  def toStringMap(): Map[String, String] = {
+  def toStringMap(): Map[String, Set[String]] = {
     Map(this match {
       case ObjectFile(subtype, source) =>
         Vector(
-          Some("type" -> "object"),
-          subtype.map(st => "subtype" -> st),
-          source.map(sf => "source" -> sf)
+          Some("type" -> Set("object")),
+          subtype.map(st => "subtype" -> Set(st)),
+          source.map(sf => "source" -> Set(sf))
         ).flatten
 
       case SourceFile(language) =>
         Vector(
-          Some("type" -> "source"),
-          language.map(st => "language" -> st)
+          Some("type" -> Set("source")),
+          language.map(st => "language" -> Set(st))
         ).flatten
       case MetaData(subtype) =>
         Vector(
-          Some("type" -> "metadata"),
-          subtype.map(st => "subtype" -> st)
+          Some("type" -> Set( "metadata")),
+          subtype.map(st => "subtype" -> Set(st))
         ).flatten
       case Package(subtype) =>
         Vector(
-          Some("type" -> "package"),
-          subtype.map(st => "subtype" -> st)
+          Some("type" -> Set("package")),
+          subtype.map(st => "subtype" -> Set(st))
         ).flatten
-      case Other => Vector("type" -> "other")
+      case Other => Vector("type" -> Set("other"))
     }: _*)
   }
 
