@@ -36,11 +36,9 @@ import io.bullet.borer.Json
 import java.nio.file.Files
 import goatrodeo.envelopes.DataFileEnvelope
 import java.io.FileOutputStream
-import goatrodeo.envelopes.EntryEnvelope
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadFormat
 import goatrodeo.envelopes.PayloadType
 import goatrodeo.envelopes.PayloadCompression
 import java.io.FileInputStream

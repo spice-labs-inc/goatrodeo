@@ -709,18 +709,31 @@ object GitOIDUtils {
     *   the gitoid
     */
   def computeGitOID(
-      bytes: Array[Byte],
+      bytes: InputStream,
+      len: Long,
       hashType: HashType = HashType.SHA256,
       tpe: ObjectType = ObjectType.Blob
   ): Array[Byte] = {
     // get the prefix bytes in local encoding... which should be okay given that
     // the string should be ASCII
     val prefix =
-      String.format("%s %d\u0000", tpe.gitoidName(), bytes.length).getBytes();
+      String.format("%s %d\u0000", tpe.gitoidName(), len).getBytes();
     val md = hashType.getDigest();
     md.update(prefix);
 
-    md.digest(bytes);
+    val buf = new Array[Byte](4096)
+    var keepRunning = true
+    while (keepRunning) {
+      val read = bytes.read(buf)
+      if (read <= 0) {
+        bytes.close()
+        keepRunning = false
+      } else {
+        md.update(buf, 0, read)
+      }
+    }
+
+    md.digest()
   }
 
   /** Take bytes, compute the GitOID and return the hexadecimal bytes
@@ -736,12 +749,13 @@ object GitOIDUtils {
     *   the hex representation of the GitOID
     */
   def hashAsHex(
-      bytes: Array[Byte],
+      bytes: InputStream,
+      len: Long,
       hashType: HashType = HashType.SHA256,
       tpe: ObjectType = ObjectType.Blob
   ): String = {
     Helpers.toHex(
-      computeGitOID(bytes, hashType, tpe)
+      computeGitOID(bytes, len, hashType, tpe)
     )
   }
 
@@ -753,15 +767,16 @@ object GitOIDUtils {
     */
   def url(
       inputStream: InputStream,
+      len: Long,
       hashType: HashType,
       tpe: ObjectType = ObjectType.Blob
   ): String = {
-    val bytes = Helpers.slurpInput(inputStream)
+    // val bytes = Helpers.slurpInput(inputStream)
     String.format(
       "gitoid:%s:%s:%s",
       tpe.gitoidName(),
       hashType.hashTypeName(),
-      hashAsHex(bytes, hashType, tpe)
+      hashAsHex(inputStream, len, hashType, tpe)
     );
   }
 
@@ -770,13 +785,13 @@ object GitOIDUtils {
       continue_? : String => Boolean
   ): (String, Vector[String]) = {
     def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), HashType.SHA256).intern()
+    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256).intern()
 
     if (continue_?(gitoidSha256)) {
       (
         gitoidSha256,
         Vector(
-          url(is(), HashType.SHA1).intern(),
+          url(is(), theFile.size(), HashType.SHA1).intern(),
           String
             .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is())))
             .intern(),
@@ -950,7 +965,7 @@ enum FileType {
         ).flatten
       case MetaData(subtype) =>
         Vector(
-          Some("type" -> Set( "metadata")),
+          Some("type" -> Set("metadata")),
           subtype.map(st => "subtype" -> Set(st))
         ).flatten
       case Package(subtype) =>

@@ -7,11 +7,9 @@ import java.io.FileOutputStream
 import goatrodeo.util.Helpers
 import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.ByteBuffer
-import goatrodeo.envelopes.EntryEnvelope
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadFormat
 import goatrodeo.envelopes.PayloadType
 import goatrodeo.envelopes.ItemEnvelope
 import java.io.FileInputStream
@@ -81,16 +79,11 @@ object GraphManager {
       // }).toVector.sortBy(_._1)
 
       val itemEnvelope: ItemEnvelope = ItemEnvelope(
-        MD5(md5),
-        currentPosition,
-        entry._timestamp,
-        (0, 0),
-        previousPosition,
-        entryBytes.length,
-        PayloadFormat.CBOR,
-        PayloadType.ENTRY,
-        compression,
-        false
+        keyMd5 = MD5(md5),
+        position = currentPosition,
+        backpointer = previousPosition,
+        dataLen = entryBytes.length,
+        dataType = PayloadType.ENTRY
       )
 
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
@@ -305,12 +298,11 @@ class GRDWalker(source: FileChannel) {
         source.read(envBytes)
         source.read(entryByteBuffer)
 
-        val envelope = EntryEnvelope
+        val envelope = ItemEnvelope
           .decodeCBOR(envBytes.position(0).array())
           .get
-        val entryBytes =
-          envelope.compression.deCompress(entryByteBuffer.array())
-        val entry = Item.decode(entryBytes, envelope.dataFormat).get
+        val entryBytes =entryByteBuffer.array()
+        val entry = Item.decode(entryBytes).get
         Some(envelope -> entry)
       }
     }
@@ -331,7 +323,7 @@ class GRDWalker(source: FileChannel) {
 
         source.read(envBytes)
         val envelope =
-          EntryEnvelope.decodeCBOR(envBytes.position(0).array()).get
+          ItemEnvelope.decodeCBOR(envBytes.position(0).array()).get
         source.position(
           envelope.position + entryLen.toLong + envLen.toLong + 6L
         )

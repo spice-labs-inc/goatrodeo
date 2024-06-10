@@ -23,7 +23,6 @@ import io.bullet.borer.Codec
 import io.bullet.borer.Encoder
 import io.bullet.borer.Decoder
 import io.bullet.borer.Cbor
-import goatrodeo.envelopes.PayloadFormat
 import io.bullet.borer.derivation.key
 import java.time.Instant
 import goatrodeo.util.FileType
@@ -315,11 +314,8 @@ object Item {
     deriveDecoder[Item]
   }
 
-  def decode(bytes: Array[Byte], format: PayloadFormat): Try[Item] = {
-    format match {
-      case PayloadFormat.CBOR => Cbor.decode(bytes).to[Item].valueTry
-      case PayloadFormat.JSON => Json.decode(bytes).to[Item].valueTry
-    }
+  def decode(bytes: Array[Byte]): Try[Item] = {
+    Cbor.decode(bytes).to[Item].valueTry
   }
 }
 

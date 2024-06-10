@@ -10,7 +10,6 @@ import goatrodeo.omnibor.GraphManager.DataAndIndexFiles
 import goatrodeo.envelopes.IndexFileEnvelope
 import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.channels.FileChannel
-import goatrodeo.envelopes.EntryEnvelope
 import goatrodeo.envelopes.ItemEnvelope
 
 case class IndexFile(

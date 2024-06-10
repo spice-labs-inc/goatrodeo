@@ -121,7 +121,7 @@ object Builder {
                 throw ise
               }
               case ioe: IOException => {
-                if (ioe.getMessage().indexOf("Too many open files") > 0) {
+                if (ioe.getMessage() != null && ioe.getMessage().indexOf("Too many open files") > 0) {
                   dead_?.set(true)
                   throw ioe
 

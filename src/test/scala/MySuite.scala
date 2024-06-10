@@ -16,13 +16,11 @@ import goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
 import goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import goatrodeo.envelopes.EntryEnvelope
+import goatrodeo.envelopes.ItemEnvelope
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadFormat
 import goatrodeo.envelopes.PayloadType
-import goatrodeo.envelopes.PayloadCompression
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
@@ -92,16 +90,11 @@ class MySuite extends munit.FunSuite {
 
     for { i <- 0 to 1000 } {
       val ee = ItemEnvelope(
-        MD5(Helpers.randomBytes(16)),
+        keyMd5 = MD5(Helpers.randomBytes(16)),
         Helpers.randomLong(),
         Helpers.randomLong(),
-        (Helpers.randomLong(), Helpers.randomLong()),
-        (Helpers.randomLong() & 0xffffff) + 1,
         Helpers.randomInt(),
-        PayloadFormat.CBOR,
-        PayloadType.ENTRY,
-        PayloadCompression.NONE,
-        false
+        PayloadType.ENTRY
       )
 
       val bytes = ee.encodeCBOR()
@@ -116,7 +109,7 @@ class MySuite extends munit.FunSuite {
         f"The Entry Envelope should be < 200 bytes long, not ${bytes.length}"
       )
 
-      val ee3 = EntryEnvelope.decodeCBOR(bytes).get
+      val ee3 = ItemEnvelope.decodeCBOR(bytes).get
 
       assertEquals(ee, ee3, "Should be the same before and after serialization")
 
@@ -230,123 +223,55 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  val toCompress = """public final class goatrodeo.Howdy$ implements java.io.Serializable {
-  public static final long OFFSET$_m_1;
-
-  public static final long OFFSET$_m_0;
-
-  public static final goatrodeo.Howdy$Config$ Config;
-
-  private volatile java.lang.Object builder$lzy1;
-
-  private volatile java.lang.Object parser1$lzy1;
-
-  private static final goatrodeo.Howdy$ExpandFiles$ ExpandFiles;
-
-  public static final goatrodeo.Howdy$ MODULE$;
-
-  private goatrodeo.Howdy$();
-    Code:
-       0: aload_0
-       1: invokespecial #57                 // Method java/lang/Object."<init>":()V
-       4: return
-
-  private static {};
-    Code:
-       0: getstatic     #64                 // Field scala/runtime/LazyVals$.MODULE$:Lscala/runtime/LazyVals$;
-       3: ldc           #2                  // class goatrodeo/Howdy$
-       5: ldc           #65                 // String parser1$lzy1
-       7: invokevirtual #71                 // Method java/lang/Class.getDeclaredField:(Ljava/lang/String;)Ljava/lang/reflect/Field;
-      10: invokevirtual #75                 // Method scala/runtime/LazyVals$.getOffsetStatic:(Ljava/lang/reflect/Field;)J
-      13: putstatic     #77                 // Field OFFSET$_m_1:J
-      16: getstatic     #64                 // Field scala/runtime/LazyVals$.MODULE$:Lscala/runtime/LazyVals$;
-      19: ldc           #2                  // class goatrodeo/Howdy$
-      21: ldc           #78                 // String builder$lzy1
-      23: invokevirtual #71                 // Method java/lang/Class.getDeclaredField:(Ljava/lang/String;)Ljava/lang/reflect/Field;
-      26: invokevirtual #75                 // Method scala/runtime/LazyVals$.getOffsetStatic:(Ljava/lang/reflect/Field;)J
-      29: putstatic     #80                 // Field OFFSET$_m_0:J
-      32: new           #2                  // class goatrodeo/Howdy$
-      35: dup
-      36: invokespecial #81                 // Method "<init>":()V
-      39: putstatic     #83                 // Field MODULE$:Lgoatrodeo/Howdy$;
-"""
-
-  test("Compression") {
-    val bytes = toCompress.getBytes("UTF-8")
-
-    var b2 = PayloadCompression.NONE.compress(bytes)
-    assertEquals(bytes.length, b2.length)
-    assertEquals(bytes.toVector, b2.toVector)
-    b2 = PayloadCompression.NONE.deCompress(b2)
-
-    assertEquals(bytes.length, b2.length)
-    assertEquals(bytes.toVector, b2.toVector)
-
-    b2 = PayloadCompression.GZIP.compress(bytes)
-    assert(bytes.length > b2.length)
-    b2 = PayloadCompression.GZIP.deCompress(b2)
-
-    assertEquals(bytes.length, b2.length)
-    assertEquals(bytes.toVector, b2.toVector)
-
-    b2 = PayloadCompression.DEFLATE.compress(bytes)
-    assert(bytes.length > b2.length)
-    b2 = PayloadCompression.DEFLATE.deCompress(b2)
-
-    assertEquals(bytes.length, b2.length)
-    assertEquals(bytes.toVector, b2.toVector)
-
-    assert(
-      PayloadCompression.DEFLATE
-        .compress(bytes)
-        .toVector != PayloadCompression.GZIP.compress(bytes).toVector,
-      "The different compression algorithms should produce different results"
-    )
-  }
-
   test("File Type Detection") {
     assert(
       BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/HP1973-Source.zip")))
-        .isDefined
-    )
-    assert(
-      BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/log4j-core-2.22.1.jar")))
-        .isDefined
-    )
-    assert(
-      BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz")))
-        .isDefined
-    )
-    assert(
-      BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz")))
-        .isDefined
-    )
-    assert(
-      BuildGraph
         .streamForArchive(
-          FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
+          FileWrapper(File("test_data/HP1973-Source.zip"), false)
         )
         .isDefined
     )
     assert(
       BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/tk-8.6.13-r2.apk")))
+        .streamForArchive(
+          FileWrapper(File("test_data/log4j-core-2.22.1.jar"), false)
+        )
+        .isDefined
+    )
+    assert(
+      BuildGraph
+        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .isDefined
+    )
+    assert(
+      BuildGraph
+        .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz"), false))
+        .isDefined
+    )
+    assert(
+      BuildGraph
+        .streamForArchive(
+          FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+        )
+        .isDefined
+    )
+    assert(
+      BuildGraph
+        .streamForArchive(
+          FileWrapper(File("test_data/tk-8.6.13-r2.apk"), false)
+        )
         .isDefined
     )
 
     assert(
       BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/ics_test.tar")))
+        .streamForArchive(FileWrapper(File("test_data/ics_test.tar"), false))
         .isDefined
     )
 
     assert(
       BuildGraph
-        .streamForArchive(FileWrapper(File("test_data/nested.tar")))
+        .streamForArchive(FileWrapper(File("test_data/nested.tar"), false))
         .isDefined
     )
   }
@@ -354,7 +279,9 @@ class MySuite extends munit.FunSuite {
   test("Walk a tar file") {
     var cnt = 0
     val (inputStream, _) =
-      BuildGraph.streamForArchive(FileWrapper(File("test_data/empty.tgz"))).get
+      BuildGraph
+        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .get
     for {
       e <- inputStream
       (name, file) = e()
@@ -367,7 +294,7 @@ class MySuite extends munit.FunSuite {
   }
 
   test("deal with nesting") {
-    val nested = FileWrapper(File("test_data/nested.tar"))
+    val nested = FileWrapper(File("test_data/nested.tar"), false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0

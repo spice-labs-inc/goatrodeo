@@ -34,7 +34,15 @@ trait ArtifactWrapper {
   def exists(): Boolean
 }
 
-case class FileWrapper(f: File) extends ArtifactWrapper {
+case class FileWrapper(f: File, deleteOnFinalize: Boolean)
+    extends ArtifactWrapper {
+
+  override protected def finalize(): Unit = {
+    if (deleteOnFinalize) {
+      f.delete()
+    }
+  }
+
   def exists(): Boolean = f.exists()
   override def isRealFile(): Boolean = true
 
@@ -43,7 +51,7 @@ case class FileWrapper(f: File) extends ArtifactWrapper {
   override def isFile(): Boolean = f.isFile()
 
   override def listFiles(): Vector[ArtifactWrapper] =
-    f.listFiles().toVector.map(FileWrapper(_))
+    f.listFiles().toVector.map(FileWrapper(_, false))
 
   override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
 
@@ -147,7 +155,7 @@ object BuildGraph {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
         val theFile = in match {
-          case FileWrapper(f) => f
+          case FileWrapper(f, _) => f
           case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
         }
         val zipFile = ZipFile(theFile)
@@ -162,6 +170,7 @@ object BuildGraph {
 
               val wrapper =
                 if (
+                  v.getSize() > (1024L * 1024L * 1024L) ||
                   name.endsWith(".zip") || name.endsWith(".jar") || name
                     .endsWith(".war")
                 ) {
@@ -171,7 +180,8 @@ object BuildGraph {
                         zipFile.getInputStream(v),
                         false,
                         name
-                      )
+                      ),
+                    true
                   )
                 } else {
                   ByteWrapper(
@@ -209,10 +219,14 @@ object BuildGraph {
                 val name = ae.getName()
 
                 val wrapper =
-                  if (name.endsWith(".zip") || name.endsWith(".jar")) {
+                  if (
+                    ae.getSize() > (1024L * 1024L * 1024L) || name
+                      .endsWith(".zip") || name.endsWith(".jar")
+                  ) {
                     FileWrapper(
                       Helpers
-                        .tempFileFromStream(input, false, name)
+                        .tempFileFromStream(input, false, name),
+                      true
                     )
                   } else {
                     ByteWrapper(Helpers.slurpInputNoClose(input), name)
@@ -248,10 +262,14 @@ object BuildGraph {
                     val name = ae.getName()
 
                     val wrapper =
-                      if (name.endsWith(".zip") || name.endsWith(".jar")) {
+                      if (
+                        ae.getSize() > (1024L * 1024L * 1024L) || name
+                          .endsWith(".zip") || name.endsWith(".jar")
+                      ) {
                         FileWrapper(
                           Helpers
-                            .tempFileFromStream(input, false, name)
+                            .tempFileFromStream(input, false, name),
+                          true
                         )
                       } else {
                         ByteWrapper(Helpers.slurpInputNoClose(input), name)
@@ -431,12 +449,13 @@ object BuildGraph {
   ): Map[String, String] = {
     var ret: Map[String, String] = Map()
     processFileAndSubfiles(
-      FileWrapper(root),
+      FileWrapper(root, false),
       name,
       None,
       dontSkipFound,
       (file, name, parent) => {
-        val (main, foundAliases) = GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
+        val (main, foundAliases) =
+          GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
         val foundGitOID = store.exists(main)
         val packageId = topPackageIdentifier
           .map(
