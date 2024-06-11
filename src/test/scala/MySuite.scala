@@ -37,6 +37,8 @@ import goatrodeo.util.PackageProtocol
 import goatrodeo.omnibor.FileWrapper
 import goatrodeo.omnibor.ArtifactWrapper
 import java.io.IOException
+import java.io.BufferedWriter
+import java.io.FileWriter
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -323,7 +325,12 @@ class MySuite extends munit.FunSuite {
       store,
       Vector(),
       None,
-      Map(),
+      Map(), {
+        val file = File.createTempFile("goat_rodeo_purls", "_out")
+        file.delete()
+        file.mkdirs()
+        BufferedWriter(FileWriter(File(file, "purls.txt")))
+      },
       false
     )
 
@@ -429,7 +436,12 @@ class MySuite extends munit.FunSuite {
               None
             )
           ),
-          Map(),
+          Map(), {
+            val file = File.createTempFile("goat_rodeo_purls", "_out")
+            file.delete()
+            file.mkdirs()
+            BufferedWriter(FileWriter(File(file, "purls.txt")))
+          },
           false
         )
         // No pURL

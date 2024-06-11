@@ -40,6 +40,7 @@ import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.io.IOException
 import scala.annotation.tailrec
+import java.io.FileWriter
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -105,7 +106,11 @@ object Builder {
             val localStart = Instant.now()
             try {
               // build the package
-              BuildGraph.graphForToProcess(toProcess, storage)
+
+              BuildGraph.graphForToProcess(
+                toProcess,
+                storage
+              )
               val updatedCnt = cnt.addAndGet(1)
               val theDuration = Duration
                 .between(localStart, Instant.now())
@@ -121,7 +126,11 @@ object Builder {
                 throw ise
               }
               case ioe: IOException => {
-                if (ioe.getMessage() != null && ioe.getMessage().indexOf("Too many open files") > 0) {
+                if (
+                  ioe.getMessage() != null && ioe
+                    .getMessage()
+                    .indexOf("Too many open files") > 0
+                ) {
                   dead_?.set(true)
                   throw ioe
 

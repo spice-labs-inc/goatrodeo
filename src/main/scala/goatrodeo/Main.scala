@@ -26,11 +26,7 @@ import java.io.BufferedWriter
 import java.io.FileWriter
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import goatrodeo.omnibor.{
-  Storage,
-  ListFileNames,
-  Builder
-}
+import goatrodeo.omnibor.{Storage, ListFileNames, Builder}
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.util.zip.GZIPOutputStream
@@ -61,8 +57,7 @@ object Howdy {
       out: Option[File] = None,
       build: Option[File] = None,
       threads: Int = 4,
-      fetchURL: URL = new URL("https://goatrodeo.org/omnibor"),
-      
+      fetchURL: URL = new URL("https://goatrodeo.org/omnibor")
   )
 
   lazy val builder = OParser.builder[Config]
@@ -146,9 +141,7 @@ object Howdy {
       case Some(Config(Some(analyzeFile), _, _, _, fetch)) =>
         Analyzer.analyze(analyzeFile, fetch)
 
-
-      case Some(Config(_, out, Some(buildFrom), threads, _))
-          if out.isDefined =>
+      case Some(Config(_, out, Some(buildFrom), threads, _)) if out.isDefined =>
         Builder.buildDB(
           buildFrom,
           Storage.getStorage(out),

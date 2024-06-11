@@ -114,6 +114,8 @@ trait Storage {
     * @return
     */
   def keys(): Vector[String]
+
+  def destDirectory(): Option[File]
 }
 
 trait StorageReader {
@@ -310,6 +312,8 @@ class MemStorage(val targetDir: Option[File])
     extends Storage
     with ListFileNames {
 
+  override def destDirectory(): Option[File] = targetDir
+
   private val sync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
   private val locks: java.util.HashMap[String, AtomicInteger] =
@@ -390,42 +394,3 @@ object MemStorage {
     MemStorage(targetDir)
   }
 }
-
-/** Store the GitOID Corpus on the filesystem
-  */
-// object FileSystemStorage {
-//   def getStorage(root: File): Storage = {
-
-//     def buildIt(path: String): File = {
-//       if (path.startsWith("pkg:")) {
-//         new File(root, f"purl/${path}.json")
-//       } else {
-//         val stuff = GitOIDUtils.urlToFileName(path)
-
-//         new File(root, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
-//       }
-
-//     }
-
-//     new Storage {
-//       override def exists(path: String): Boolean = buildIt(path).exists()
-
-//       override def read(path: String): Option[Item] = {
-//         val wholePath = buildIt(path)
-//         Try {
-//           Item
-//             .decode(Helpers.slurpInput(wholePath), PayloadFormat.CBOR)
-//             .toOption
-//         }.toOption.flatten
-//       }
-
-//       override def write(path: String, data: Item): Unit = {
-//         val wholePath = buildIt(path)
-//         val parent = wholePath.getAbsoluteFile().getParentFile().mkdirs()
-//         Helpers.writeOverFile(wholePath, data.encodeCBOR())
-//       }
-
-//       def release(): Unit = {}
-//     }
-//   }
-// }

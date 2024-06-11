@@ -99,7 +99,7 @@ object ItemMetaData {
           fileType = Set("package"),
           fileSubType = Set(pid.protocol.name),
           extra = fileType.toStringMap() ++ 
-          Map("purl" -> Set(pid.purl())) ++ 
+          Map("purl" -> pid.purl().toSet) ++ 
           pid.toStringMap()
         )
       case None =>
