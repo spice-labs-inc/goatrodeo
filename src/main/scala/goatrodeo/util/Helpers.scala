@@ -37,8 +37,12 @@ import scala.util.Failure
 import scala.util.Success
 import org.apache.bcel.classfile.ClassParser
 import io.bullet.borer.Cbor
-import goatrodeo.omnibor.ArtifactWrapper
 import java.util.concurrent.atomic.AtomicInteger
+import org.apache.commons.compress.archivers.ArchiveStreamFactory
+import org.apache.commons.compress.archivers.ArchiveInputStream
+import org.apache.commons.compress.archivers.ArchiveEntry
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 type GitOID = String
 
@@ -307,6 +311,28 @@ object Helpers {
       md.update(ba, 0, len)
     }
     ???
+  }
+
+  /** Create a Scala `Iterator` for the `ArchiveInputStream`
+    *
+    * @param archive
+    *   the ArchiveInputStream to iterate over
+    * @return
+    *   an iterator
+    */
+  def iteratorFor(
+      archive: ArchiveInputStream[ArchiveEntry]
+  ): Iterator[ArchiveEntry] = {
+    new Iterator[ArchiveEntry] {
+      var last: ArchiveEntry = null
+      override def hasNext: Boolean = {
+        last = archive.getNextEntry()
+        last != null
+      }
+
+      override def next(): ArchiveEntry = last
+
+    }
   }
 
   @inline def hexChar(b: Byte): Char = {
@@ -826,35 +852,86 @@ object PackageIdentifier {
     val name = f.getName()
 
     if (name.endsWith(".deb")) {
-      val n2 = name.substring(0, name.length() - 4) // lop off the '.deb'
-      val slubs = n2.split("_").toList
-      slubs match {
-        case pkg :: version :: arch :: _ =>
+      var lines: Vector[String] = Vector()
+      FileWalker.processFileAndSubfiles(
+        FileWrapper(f, false),
+        f.getName(),
+        None,
+        true,
+        (wrapper, name, thing) => {
+          import scala.jdk.CollectionConverters.*
+          if (name == "./control") {
+            val lr = BufferedReader(InputStreamReader(wrapper.asStream()))
+            lines = lr.lines().iterator().asScala.toVector
+            ("na", false, Some(FileAction.End))
+          } else if (name.startsWith("data.tar")) {
+            ("na", false, Some(FileAction.SkipDive))
+          } else
+            ("na", false, None)
+        }
+      )
+      val attrs = Map(lines.flatMap(s => {
+        s.split(":").toList match {
+          case a :: b :: _ => Vector((a.trim().toLowerCase(), b.trim()))
+          case _           => Vector()
+        }
+      }): _*)
+
+      val pkg = attrs.get("package")
+      val version = attrs.get("version")
+      val arch = attrs.get("architecture")
+
+      (pkg, version) match {
+        case (Some(thePkg), Some(theVersion)) =>
           Some(
             PackageIdentifier(
-              PackageProtocol.Deb,
+              protocol = PackageProtocol.Deb,
               groupId =
                 if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
                 else "debian",
-              artifactId = pkg,
-              arch = Some(arch),
+              artifactId = thePkg,
+              version = theVersion,
+              arch = arch,
               distro = None,
-              version = version
+              attrs.map((k, v) => k -> Set(v))
             )
           )
-        case _ => None
+        case _ => {
+
+          val n2 = name.substring(0, name.length() - 4) // lop off the '.deb'
+          val slubs = n2.split("_").toList
+          slubs match {
+            case pkg :: version :: arch :: _ =>
+              Some(
+                PackageIdentifier(
+                  PackageProtocol.Deb,
+                  groupId =
+                    if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
+                    else "debian",
+                  artifactId = pkg,
+                  arch = Some(arch),
+                  distro = None,
+                  version = version,
+                  Map()
+                )
+              )
+            case _ => None
+          }
+
+        }
       }
-    } else
-      None
+    } else { None }
   }
 }
+
 case class PackageIdentifier(
     protocol: PackageProtocol,
     groupId: String,
     artifactId: String,
     version: String,
     arch: Option[String],
-    distro: Option[String]
+    distro: Option[String],
+    extra: Map[String, Set[String]]
 ) {
 
   def toStringMap(): Map[String, Set[String]] = {
@@ -866,7 +943,7 @@ case class PackageIdentifier(
     ) ++ arch.toVector.map(a => "arch" -> Set(a)) ++ distro.toVector.map(d =>
       "distro" -> Set(d)
     )
-    Map(info: _*)
+    Map(info: _*) ++ this.extra
   }
 
   def purl(): Vector[String] = {
