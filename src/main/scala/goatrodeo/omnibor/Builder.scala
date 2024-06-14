@@ -130,7 +130,8 @@ object Builder {
               if (theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0) {
                 println(
                   f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
-                      .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}"
+                      .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${String
+                      .format("%,d", storage.size())}"
                 )
               }
             } catch {
