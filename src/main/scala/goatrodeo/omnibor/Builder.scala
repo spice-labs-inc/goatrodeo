@@ -71,6 +71,22 @@ object Builder {
     // The count of all the files found
     val cnt = new AtomicInteger(0)
 
+    val destDir = storage
+      .destDirectory()
+      .getOrElse({
+        val file = File.createTempFile("goat_rodeo_purls", "_out")
+        file.delete()
+        file.mkdirs()
+        file
+      })
+
+    destDir.mkdirs()
+    val purlOut = BufferedWriter(
+      FileWriter(
+        File(destDir, "purls.txt")
+      )
+    )
+
     // start time
     val start = Instant.now()
     var dead_? = AtomicBoolean(false)
@@ -109,7 +125,8 @@ object Builder {
 
               BuildGraph.graphForToProcess(
                 toProcess,
-                storage
+                storage,
+                purlOut
               )
               val updatedCnt = cnt.addAndGet(1)
               val theDuration = Duration
@@ -163,6 +180,9 @@ object Builder {
     }
     println(f"Finished processing ${runningCnt.get()} at ${Duration
         .between(start, Instant.now())}")
+
+    purlOut.flush()
+    purlOut.close()
 
     val ret = storage match {
       case lf: (ListFileNames with Storage) if !dead_?.get() =>

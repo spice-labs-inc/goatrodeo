@@ -390,23 +390,10 @@ object BuildGraph {
 
   def graphForToProcess(
       item: ToProcess,
-      store: Storage
+      store: Storage,
+      purlOut: BufferedWriter
   ): Unit = {
-    val destDir = store
-      .destDirectory()
-      .getOrElse({
-        val file = File.createTempFile("goat_rodeo_purls", "_out")
-        file.delete()
-        file.mkdirs()
-        file
-      })
-
-    destDir.mkdirs()
-    val purlOut = BufferedWriter(
-      FileWriter(
-        File(destDir, "purls.txt")
-      )
-    )
+    
     item match {
       case ToProcess(pom, main, Some(source), pomFile) => {
         // process the POM file
@@ -469,8 +456,7 @@ object BuildGraph {
           false
         )
     }
-    purlOut.flush()
-    purlOut.close()
+
   }
 
   private def packageType(name: String): String = {

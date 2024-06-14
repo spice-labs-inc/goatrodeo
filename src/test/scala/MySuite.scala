@@ -39,6 +39,8 @@ import goatrodeo.omnibor.ArtifactWrapper
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
+import java.io.ByteArrayOutputStream
+import java.io.OutputStreamWriter
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -373,12 +375,15 @@ class MySuite extends munit.FunSuite {
       f"Expecting at least 2 files, got ${files.length}"
     )
 
+    val bos = ByteArrayOutputStream()
+    val purlOut = BufferedWriter(OutputStreamWriter(bos))
+
     val store = MemStorage.getStorage(Some(File("/tmp/frood")))
     import scala.collection.JavaConverters.collectionAsScalaIterableConverter
     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
     for { toProcess <- files } {
-      BuildGraph.graphForToProcess(toProcess, store)
+      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut )
     }
 
     val keys = store.keys()
