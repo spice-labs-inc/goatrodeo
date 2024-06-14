@@ -18,6 +18,8 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipEntry
 import java.io.InputStream
 import java.io.ByteArrayInputStream
+import java.io.BufferedWriter
+import java.io.FileWriter
 
 trait ArtifactWrapper {
   def asStream(): InputStream
@@ -384,49 +386,89 @@ object BuildGraph {
     }
   }
 
-  def graphForToProcess(item: ToProcess, store: Storage): Unit = {
+  def graphForToProcess(
+      item: ToProcess,
+      store: Storage
+  ): Unit = {
+    val destDir = store
+      .destDirectory()
+      .getOrElse({
+        val file = File.createTempFile("goat_rodeo_purls", "_out")
+        file.delete()
+        file.mkdirs()
+        file
+      })
+
+    destDir.mkdirs()
+    val purlOut = BufferedWriter(
+      FileWriter(
+        File(destDir, "purls.txt")
+      )
+    )
     item match {
       case ToProcess(pom, main, Some(source), pomFile) => {
         // process the POM file
         pomFile.foreach(pf =>
-          buildItemsFor(pf, pf.getName(), store, Vector(), None, Map(), false)
+          buildItemsFor(
+            pf,
+            pf.getName(),
+            store,
+            Vector(),
+            None,
+            Map(),
+            purlOut,
+            false
+          )
         )
 
         // process the sources
         val sourceMap = buildItemsFor(
           source,
-          pom.map(_.purl() + "?packaging=sources").getOrElse(main.getName()),
+          pom
+            .flatMap(_.purl().headOption.map(_ + "?packaging=sources"))
+            .getOrElse(main.getName()),
           store,
           Vector(),
           pom,
           Map(),
+          purlOut,
           true
         )
+
+        pom.toVector
+          .flatMap(_.purl().map(_ + "?packaging=sources"))
+          .foreach(pid => purlOut.write(f"${pid}\n"))
 
         // process the main class file
         buildItemsFor(
           main,
-          pom.map(_.purl()).getOrElse(main.getName()),
+          pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
           store,
           Vector(),
           pom,
           sourceMap,
+          purlOut,
           false
         )
-
+        pom.toVector
+          .flatMap(_.purl())
+          .foreach(pid => purlOut.write(f"${pid}\n"))
       }
 
       case ToProcess(pom, main, _, _) =>
         buildItemsFor(
           main,
-          pom.map(_.purl()).getOrElse(main.getName()),
+          pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
           store,
           Vector(),
           pom,
           Map(),
+          purlOut = purlOut,
           false
         )
     }
+    purlOut.flush()
+    purlOut.close()
   }
 
   private def packageType(name: String): String = {
@@ -443,6 +485,7 @@ object BuildGraph {
       topConnections: Vector[Edge],
       topPackageIdentifier: Option[PackageIdentifier],
       associatedFiles: Map[String, GitOID],
+      purlOut: BufferedWriter,
       dontSkipFound: Boolean
   ): Map[String, String] = {
     var ret: Map[String, String] = Map()
@@ -455,18 +498,21 @@ object BuildGraph {
         val (main, foundAliases) =
           GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
         val foundGitOID = store.exists(main)
-        val packageId = topPackageIdentifier
-          .map(
-            _.purl() +
-              (if (
-                 name.endsWith("?packaging=sources") ||
-                 file.name().indexOf("-sources.") >= 0 ||
-                 name.indexOf("-sources.") >= 0
-               ) { "?packaging=sources" }
-               else { "" })
+        val packageIds: Vector[String] = topPackageIdentifier.toVector
+          .flatMap(
+            _.purl().map(
+              _ +
+                (if (
+                   name.endsWith("?packaging=sources") ||
+                   file.name().indexOf("-sources.") >= 0 ||
+                   name.indexOf("-sources.") >= 0
+                 ) { "?packaging=sources" }
+                 else { "" })
+            )
           )
           .filter(_ => parent.isEmpty)
-        val aliases = foundAliases ++ packageId.toVector
+        packageIds.foreach(pid => purlOut.write(f"${pid}\n"))
+        val aliases = foundAliases ++ packageIds
 
         val fileType = FileType.theType(name, Some(file), associatedFiles)
 

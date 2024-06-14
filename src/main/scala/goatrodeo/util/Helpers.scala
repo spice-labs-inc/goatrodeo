@@ -869,15 +869,35 @@ case class PackageIdentifier(
     Map(info: _*)
   }
 
-  def purl(): String = {
-    val ret = protocol match {
+  def purl(): Vector[String] = {
+    val ret: Vector[String] = protocol match {
       case PackageProtocol.Deb =>
-        f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder.encode(artifactId, "UTF-8")}@${URLEncoder
-            .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch.getOrElse("unkonwn"), "UTF-8")}&distro=${URLEncoder
-            .encode(distro.getOrElse("unkonwn"), "UTF-8")}"
+        Vector(f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+            .encode(artifactId, "UTF-8")}@${URLEncoder
+            .encode(version, "UTF-8")}") ++
+          arch.toVector.map(arch =>
+            f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+                .encode(artifactId, "UTF-8")}@${URLEncoder
+                .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch, "UTF-8")}"
+          ) ++
+          distro.toVector.map(distro =>
+            f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+                .encode(artifactId, "UTF-8")}@${URLEncoder
+                .encode(version, "UTF-8")}?distro=${URLEncoder
+                .encode(distro, "UTF-8")}"
+          ) ++
+          arch.toVector.flatMap(arch =>
+            distro.toVector.map(distro =>
+              f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+                  .encode(artifactId, "UTF-8")}@${URLEncoder
+                  .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch, "UTF-8")}&distro=${URLEncoder
+                  .encode(distro, "UTF-8")}"
+            )
+          )
+
       case _ =>
-        f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-            .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}"
+        Vector(f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+            .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}")
     }
     ret
   }
