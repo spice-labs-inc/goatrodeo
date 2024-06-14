@@ -34,13 +34,13 @@ import goatrodeo.envelopes.ItemEnvelope
 import goatrodeo.omnibor.GraphManager
 import goatrodeo.util.PackageIdentifier
 import goatrodeo.util.PackageProtocol
-import goatrodeo.omnibor.FileWrapper
-import goatrodeo.omnibor.ArtifactWrapper
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
+import goatrodeo.util.FileWalker
+import goatrodeo.util.FileWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -229,38 +229,38 @@ class MySuite extends munit.FunSuite {
 
   test("File Type Detection") {
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(
           FileWrapper(File("test_data/HP1973-Source.zip"), false)
         )
         .isDefined
     )
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(
           FileWrapper(File("test_data/log4j-core-2.22.1.jar"), false)
         )
         .isDefined
     )
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
         .isDefined
     )
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz"), false))
         .isDefined
     )
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(
           FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
         )
         .isDefined
     )
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(
           FileWrapper(File("test_data/tk-8.6.13-r2.apk"), false)
         )
@@ -268,13 +268,13 @@ class MySuite extends munit.FunSuite {
     )
 
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(FileWrapper(File("test_data/ics_test.tar"), false))
         .isDefined
     )
 
     assert(
-      BuildGraph
+      FileWalker
         .streamForArchive(FileWrapper(File("test_data/nested.tar"), false))
         .isDefined
     )
@@ -283,7 +283,7 @@ class MySuite extends munit.FunSuite {
   test("Walk a tar file") {
     var cnt = 0
     val (inputStream, _) =
-      BuildGraph
+      FileWalker
         .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
         .get
     for {
@@ -303,7 +303,7 @@ class MySuite extends munit.FunSuite {
 
     var cnt = 0
 
-    BuildGraph.processFileAndSubfiles(
+    FileWalker.processFileAndSubfiles(
       nested,
       "nested",
       None,
@@ -312,11 +312,19 @@ class MySuite extends munit.FunSuite {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false)
+        (main, false, None)
       }
     )
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
+
+  test("Compute pURL for .deb") {
+    val purl = PackageIdentifier.computePurl(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
+    assert(purl.isDefined, "Should compute a purl")
+    assertEquals(purl.get.artifactId, "tk8.6")
+    assert(purl.get.extra.get("maintainer").get.size > 0, "Should have a mainter")
+  }
+
 
   test("deal with .deb and zst") {
     val nested = FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
@@ -324,7 +332,7 @@ class MySuite extends munit.FunSuite {
 
     var cnt = 0
 
-    BuildGraph.processFileAndSubfiles(
+    FileWalker.processFileAndSubfiles(
       nested,
       "nested",
       None,
@@ -333,7 +341,7 @@ class MySuite extends munit.FunSuite {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false)
+        (main, false, None)
       }
     )
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
@@ -461,7 +469,8 @@ class MySuite extends munit.FunSuite {
               "frood",
               "32",
               None,
-              None
+              None,
+              Map()
             )
           ),
           Map(), {
