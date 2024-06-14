@@ -28,10 +28,6 @@ import goatrodeo.util.Helpers
 import scala.util.Try
 import java.io.FileInputStream
 import goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
-import org.apache.commons.compress.archivers.ArchiveInputStream
-import org.apache.commons.compress.compressors.CompressorStreamFactory
-import org.apache.commons.compress.archivers.ArchiveEntry
-import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration

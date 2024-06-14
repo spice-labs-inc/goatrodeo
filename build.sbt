@@ -20,6 +20,7 @@ lazy val root = project
     libraryDependencies += "commons-io" % "commons-io" % "2.15.1",
     libraryDependencies += "io.bullet" %% "borer-core" % "1.14.0",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.0",
+    libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-3",
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
 

@@ -314,6 +314,29 @@ class MySuite extends munit.FunSuite {
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
 
+  test("deal with .deb and zst") {
+    val nested = FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+    assert(nested.isFile() && nested.exists())
+
+    var cnt = 0
+
+    BuildGraph.processFileAndSubfiles(
+      nested,
+      "nested",
+      None,
+      false,
+      (file, name, parent) => {
+        cnt += 1
+        val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
+        // println(f"hash for ${name} is ${main} parent ${parent}")
+        (main, false)
+      }
+    )
+    assert(cnt > 10, f"expected more than 10, got ${cnt}")
+  }
+
+  
+
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
     val nested = File("test_data/nested.tar")
@@ -473,60 +496,4 @@ class MySuite extends munit.FunSuite {
     }
   }
 
-  /* Removed because required a 179M file which was kicked back from GitLab
-  test("Can read pulsar examples JAR") {
-    val fr = FileWrapper(File("pulsar_test/pulsar-examples-1.10.13.jar"))
-    var allFiles: Vector[String] = Vector()
-
-    def doFor(w: ArtifactWrapper): Unit = {
-      for { (stream, clean) <- BuildGraph.streamForArchive(w) } {
-        try {
-          for {
-            f <- stream
-            (n, v) = f()
-          } {
-
-            allFiles = allFiles.appended(n)
-            doFor(v)
-
-          }
-        } catch {
-          case ioe: IOException => // ignore just means something is corrupted
-
-        } finally {
-          clean()
-        }
-      }
-    }
-
-    doFor(fr)
-    val printFiles = allFiles.filter(_.contains("PrintFlowEvent"))
-    assert(
-      printFiles.length > 5,
-      f"Here are the printFlowEvents ${printFiles} and ${allFiles}"
-    )
-
-  }*/
-
-  // test("Build in test data and make sure we find deb and maven pURLs") {
-  //   if (true) {
-  //     val store = MemStorage.getStorage(None)
-  //     import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-  //     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
-
-  //     Builder.buildDB(File("test_data"), store, 32)
-
-  //     val pkgIndex = store.read("pkg:maven").get
-  //     assert(
-  //       pkgIndex.connections.size >= 4,
-  //       f"We should have had at least 4 maven package, but only found ${pkgIndex.connections.size}"
-  //     )
-
-  //     val pkgDebIndex = store.read("pkg:deb").get
-  //     assert(
-  //       pkgIndex.connections.size > 0,
-  //       f"We should have at least one '.deb' pURL, but found none"
-  //     )
-  //   }
-  // }
 }

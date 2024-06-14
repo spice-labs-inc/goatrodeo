@@ -144,7 +144,6 @@ object BuildGraph {
   def streamForArchive(
       in: ArtifactWrapper
   ): Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)] = {
-
     if (
       in
         .name()
@@ -170,7 +169,7 @@ object BuildGraph {
 
               val wrapper =
                 if (
-                  v.getSize() > (1024L * 1024L * 1024L) ||
+                  v.getSize() > (512L * 1024L * 1024L) ||
                   name.endsWith(".zip") || name.endsWith(".jar") || name
                     .endsWith(".war")
                 ) {
@@ -201,7 +200,6 @@ object BuildGraph {
         case e: Exception => {} // fall through
       }
     }
-
     val factory = (new ArchiveStreamFactory())
     val ret = Try {
       {
