@@ -209,7 +209,7 @@ class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
     //     response match {
     //       case None => intermediate
     //       case Some(v) =>
-    //         val addl: Set[GitOID] = Set((for {
+    //         val addl: Set[GitOID] = SortedSet((for {
     //           r <- v.values.toSeq
     //           r2 <- r.toSeq if r2.containedBy.length < 1000
     //           i <- r2.containedBy

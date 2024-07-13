@@ -238,7 +238,7 @@ object ItemEnvelope extends DecodeCBOR[ItemEnvelope] {
       position = position,
       backpointer = backpointer,
       dataLen = dataLen,
-      dataType = dataType,
+      dataType = dataType
     )
 }
 
@@ -247,7 +247,7 @@ case class ItemEnvelope(
     position: Position,
     backpointer: Long,
     dataLen: Int,
-    dataType: PayloadType,
+    dataType: PayloadType
 ) extends EncodeCBOR {
 
   override def encodeCBORElement(): Element = MapElem.Sized(
@@ -256,7 +256,7 @@ case class ItemEnvelope(
     "bp" -> (if (backpointer < 0) OverLongElem(false, backpointer)
              else LongElem(backpointer)),
     "l" -> IntElem(dataLen),
-    "pt" -> dataType.encodeCBORElement(),
+    "pt" -> dataType.encodeCBORElement()
   )
 
 }
@@ -267,7 +267,6 @@ case class DataFileEnvelope(
     @key("the_type") theType: String,
     previous: Long,
     @key("depends_on") dependsOn: Vector[Long],
-    timestamp: Long,
     @key("built_from_merge") builtFromMerge: Boolean,
     info: Map[String, String]
 ) {
@@ -281,7 +280,6 @@ object DataFileEnvelope {
       theType: String = "Goat Rodeo Data",
       previous: Long,
       dependsOn: Vector[Long] = Vector(),
-      timestamp: Long,
       builtFromMerge: Boolean,
       info: Map[String, String] = Map()
   ) = DataFileEnvelope(
@@ -290,7 +288,6 @@ object DataFileEnvelope {
     theType,
     previous,
     dependsOn,
-    timestamp,
     builtFromMerge,
     info
   )
@@ -313,7 +310,6 @@ case class IndexFileEnvelope(
     size: Int,
     @key("data_files") dataFiles: Vector[Long],
     encoding: String,
-    timestamp: Long,
     info: Map[String, String]
 ) {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -328,7 +324,6 @@ object IndexFileEnvelope {
       size: Int,
       dataFiles: Vector[Long],
       encoding: String = "MD5/Long/Long",
-      timestamp: Long = System.currentTimeMillis(),
       info: Map[String, String] = Map()
   ) = IndexFileEnvelope(
     version = version,
@@ -337,7 +332,6 @@ object IndexFileEnvelope {
     size = size,
     dataFiles = dataFiles,
     encoding = encoding,
-    timestamp = timestamp,
     info = info
   )
 
@@ -357,7 +351,6 @@ case class BundleFileEnvelope(
     theType: String,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
-    timestamp: Long,
     info: Map[String, String]
 ) {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -371,13 +364,11 @@ object BundleFileEnvelope {
       theType: String = "Goat Rodeo Bundle",
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],
-      timestamp: Long = System.currentTimeMillis(),
       info: Map[String, String] = Map()
   ) = BundleFileEnvelope(
     version = version,
     magic = magic,
     theType = theType,
-    timestamp = timestamp,
     dataFiles = dataFiles,
     indexFiles = indexFiles,
     info = info

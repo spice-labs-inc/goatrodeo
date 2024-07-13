@@ -118,9 +118,6 @@ case class Entry(
     contains: Vector[GitOID],
     containedBy: Vector[GitOID],
     metadata: EntryMetaData,
-    _timestamp: Long,
-    _version: Int,
-    _type: String
 )
 ```
 
@@ -133,6 +130,6 @@ case class EntryMetaData(
     filesubtype: Option[String] = None,
     contents: Option[String] = None,
     other: Option[ujson.Value],
-    _version: Int
+
 )
 ```

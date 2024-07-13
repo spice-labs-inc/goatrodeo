@@ -6,6 +6,7 @@ fork := true
 resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/public/"
 Test / logBuffered := false
 
+
 lazy val root = project
   .in(file("."))
   .settings(

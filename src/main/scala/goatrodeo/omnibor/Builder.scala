@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.io.IOException
 import scala.annotation.tailrec
 import java.io.FileWriter
-
+import scala.collection.immutable.SortedSet
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
   */
@@ -319,7 +319,7 @@ object ToProcess {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
     val buildIt: Runnable = () => {
-      var fileSet = Set(
+      var fileSet = SortedSet(
         Helpers
           .findFiles(root, _ => true)
           .map(_.getAbsoluteFile()): _*

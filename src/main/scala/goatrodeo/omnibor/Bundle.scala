@@ -11,6 +11,7 @@ import goatrodeo.envelopes.IndexFileEnvelope
 import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.channels.FileChannel
 import goatrodeo.envelopes.ItemEnvelope
+import scala.collection.immutable.SortedSet
 
 case class IndexFile(
     envelope: IndexFileEnvelope,
@@ -174,7 +175,7 @@ object GoatRodeoBundle {
         (indexFile -> IndexFile.open(theDir, indexFile))
       }): _*)
 
-      val dataFileHashes = Set((for {
+      val dataFileHashes = SortedSet((for {
         idx <- indexFiles.values; dataFile <- idx.envelope.dataFiles
       } yield dataFile).toSeq: _*)
 

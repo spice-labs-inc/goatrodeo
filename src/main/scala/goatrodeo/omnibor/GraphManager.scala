@@ -21,6 +21,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.nio.channels.FileChannel
 import java.time.Duration
+import scala.math.Ordering.Implicits._
 
 /** Manage many parts of persisting/retrieving the graph information
   */
@@ -50,7 +51,6 @@ object GraphManager {
     Helpers.writeInt(writer, Consts.DataFileMagicNumber)
     val dataFileEnvelope =
       DataFileEnvelope.build(
-        timestamp = System.currentTimeMillis(),
         previous = previous,
         builtFromMerge = false
       )
@@ -193,7 +193,7 @@ object GraphManager {
 
     def updateBiggest(item: Item): Unit = {
       val containedBy =
-        item.connections.filter(_._2 == EdgeType.ContainedBy).size
+        item.connections.filter(_._1 == EdgeType.ContainedBy).size
       if (biggest.length <= 50) {
         biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
       } else if (biggest.last._2 < containedBy) {
@@ -228,7 +228,6 @@ object GraphManager {
     Helpers.writeInt(writer, Consts.BundleFileMagicNumber)
     val bundleEnvelope =
       BundleFileEnvelope.build(
-        timestamp = System.currentTimeMillis(),
         indexFiles = fileSet.map(_.indexFile).toVector,
         dataFiles = fileSet.map(_.dataFile).toVector
       )
@@ -301,7 +300,7 @@ class GRDWalker(source: FileChannel) {
         val envelope = ItemEnvelope
           .decodeCBOR(envBytes.position(0).array())
           .get
-        val entryBytes =entryByteBuffer.array()
+        val entryBytes = entryByteBuffer.array()
         val entry = Item.decode(entryBytes).get
         Some(envelope -> entry)
       }

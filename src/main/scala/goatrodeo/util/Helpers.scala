@@ -43,7 +43,7 @@ import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
 import java.io.BufferedReader
 import java.io.InputStreamReader
-
+import scala.collection.immutable.SortedSet
 type GitOID = String
 
 /** A bunch of helpers/utilities
@@ -557,17 +557,17 @@ object Helpers {
     slurpInput(fis)
   }
 
-  private val allFiles: AtomicReference[Map[String, Set[String]]] =
+  private val allFiles: AtomicReference[Map[String, SortedSet[String]]] =
     new AtomicReference(Map())
 
-  def filesForParent(in: File): Set[String] = {
+  def filesForParent(in: File): SortedSet[String] = {
     val parentFile = in.getAbsoluteFile().getParentFile()
     val parentStr = parentFile.getAbsolutePath()
 
     allFiles.get().get(parentStr) match {
       case Some(r) => r
       case None =>
-        val v = Set(parentFile.listFiles().map(f => f.getName())*)
+        val v = SortedSet(parentFile.listFiles().map(f => f.getName())*)
         allFiles.getAndUpdate(last => last + (parentStr -> v))
         v
     }
@@ -893,7 +893,7 @@ object PackageIdentifier {
               version = theVersion,
               arch = arch,
               distro = None,
-              attrs.map((k, v) => k -> Set(v))
+              attrs.map((k, v) => k -> SortedSet(v))
             )
           )
         case _ => {
@@ -931,17 +931,17 @@ case class PackageIdentifier(
     version: String,
     arch: Option[String],
     distro: Option[String],
-    extra: Map[String, Set[String]]
+    extra: Map[String, SortedSet[String]]
 ) {
 
-  def toStringMap(): Map[String, Set[String]] = {
+  def toStringMap(): Map[String, SortedSet[String]] = {
     val info = Vector(
-      "package_protocol" -> Set(protocol.name),
-      "group_id" -> Set(groupId),
-      "artifact_id" -> Set(artifactId),
-      "version" -> Set(version)
-    ) ++ arch.toVector.map(a => "arch" -> Set(a)) ++ distro.toVector.map(d =>
-      "distro" -> Set(d)
+      "package_protocol" -> SortedSet(protocol.name),
+      "group_id" -> SortedSet(groupId),
+      "artifact_id" -> SortedSet(artifactId),
+      "version" -> SortedSet(version)
+    ) ++ arch.toVector.map(a => "arch" -> SortedSet(a)) ++ distro.toVector.map(d =>
+      "distro" -> SortedSet(d)
     )
     Map(info: _*) ++ this.extra
   }
@@ -1046,31 +1046,31 @@ enum FileType {
     }
   }
 
-  def toStringMap(): Map[String, Set[String]] = {
+  def toStringMap(): Map[String, SortedSet[String]] = {
     Map(this match {
       case ObjectFile(subtype, source) =>
         Vector(
-          Some("type" -> Set("object")),
-          subtype.map(st => "subtype" -> Set(st)),
-          source.map(sf => "source" -> Set(sf))
+          Some("type" -> SortedSet("object")),
+          subtype.map(st => "subtype" -> SortedSet(st)),
+          source.map(sf => "source" -> SortedSet(sf))
         ).flatten
 
       case SourceFile(language) =>
         Vector(
-          Some("type" -> Set("source")),
-          language.map(st => "language" -> Set(st))
+          Some("type" -> SortedSet("source")),
+          language.map(st => "language" -> SortedSet(st))
         ).flatten
       case MetaData(subtype) =>
         Vector(
-          Some("type" -> Set("metadata")),
-          subtype.map(st => "subtype" -> Set(st))
+          Some("type" -> SortedSet("metadata")),
+          subtype.map(st => "subtype" -> SortedSet(st))
         ).flatten
       case Package(subtype) =>
         Vector(
-          Some("type" -> Set("package")),
-          subtype.map(st => "subtype" -> Set(st))
+          Some("type" -> SortedSet("package")),
+          subtype.map(st => "subtype" -> SortedSet(st))
         ).flatten
-      case Other => Vector("type" -> Set("other"))
+      case Other => Vector("type" -> SortedSet("other"))
     }: _*)
   }
 

@@ -379,12 +379,12 @@ class MySuite extends munit.FunSuite {
         "sha256:82ceabe5192a5c3803f8b73536e83cd59e219fb560d8ed9e0c165728b199c0d7"
       )
       .get
-    val gitoid = topAlias.connections.head._1
+    val gitoid = topAlias.connections.head._2
     assert(gitoid.startsWith("gitoid:"))
     val top = store.read(gitoid).get
     store.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
-    for { edge <- top.connections if edge._2 == EdgeType.Contains } {
-      val contained = store.read(edge._1).get
+    for { edge <- top.connections if edge._1 == EdgeType.Contains } {
+      val contained = store.read(edge._2).get
     }
 
     val log4j = store
@@ -393,7 +393,7 @@ class MySuite extends munit.FunSuite {
       )
       .get
     assert(
-      log4j.connections.filter(_._2 == EdgeType.Contains).size > 1200
+      log4j.connections.filter(_._1 == EdgeType.Contains).size > 1200
     )
   }
 
@@ -422,10 +422,10 @@ class MySuite extends munit.FunSuite {
     assert(items.length > 1100)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => e._2 == EdgeType.BuiltFrom).size > 0
+      i.connections.filter(e => e._1 == EdgeType.BuiltFrom).size > 0
     )
     val fromSource = for {
-      i <- items; c <- i.connections if c._2 == EdgeType.BuildsTo
+      i <- items; c <- i.connections if c._1 == EdgeType.BuildsTo
     } yield c
     assert(sourceRef.length > 100)
 
@@ -433,12 +433,12 @@ class MySuite extends munit.FunSuite {
 
     // the package URL is picked up
     val withPurl =
-      items.filter(i => i.connections.filter(_._1.startsWith("pkg:")).size > 0)
+      items.filter(i => i.connections.filter(_._2.startsWith("pkg:")).size > 0)
 
     assert(withPurl.length == 4)
 
     val withPurlSources = withPurl.filter(i =>
-      i.connections.filter(_._1.endsWith("?packaging=sources")).size > 0
+      i.connections.filter(_._2.endsWith("?packaging=sources")).size > 0
     )
     assert(withPurlSources.length == 2)
   }
