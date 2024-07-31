@@ -20,6 +20,12 @@ import java.util.zip.InflaterInputStream
 import java.util.zip.GZIPInputStream
 import java.io.InputStream
 import goatrodeo.util.Helpers
+// import scala.collection.immutable.HashSet
+import io.bullet.borer.Encoder
+import io.bullet.borer.Writer
+import io.bullet.borer.Decoder
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
 trait EncodeCBOR {
   def encodeCBORElement(): Element
@@ -107,168 +113,18 @@ object MD5 extends DecodeCBOR[MD5] {
 
 type Position = Long
 
-enum PayloadType extends EncodeCBOR {
-  case ENTRY
-
-  override def encodeCBORElement(): Element = StringElem(this.toString())
-
-}
-
-object PayloadType extends DecodeCBOR[PayloadType] {
-
-  override def decodeCBORElement(in: Element): Try[PayloadType] = Try {
-    PayloadType.valueOf(in.asInstanceOf[StringElem].value)
-  }
-
-}
-
-// enum PayloadCompression extends EncodeCBOR {
-//   case NONE, DEFLATE, GZIP
-
-//   private def compressWith(
-//       out: OutputStream => OutputStream,
-//       bytes: Array[Byte]
-//   ): Array[Byte] = {
-//     val bos = new ByteArrayOutputStream()
-//     val compressor = out(bos)
-//     compressor.write(bytes)
-//     compressor.flush()
-//     compressor.close()
-//     bos.flush()
-//     bos.toByteArray()
-//   }
-
-//   private def unCompressWith(
-//       out: InputStream => InputStream,
-//       bytes: Array[Byte]
-//   ): Array[Byte] = {
-//     val bos = new ByteArrayInputStream(bytes)
-//     val uncompressor = out(bos)
-//     Helpers.slurpInput(uncompressor)
-//   }
-
-//   def compress(bytes: Array[Byte]): Array[Byte] = {
-//     this match {
-//       case NONE => bytes
-//       case DEFLATE =>
-//         compressWith(os => new DeflaterOutputStream(os), bytes)
-//       case GZIP => compressWith(os => new GZIPOutputStream(os), bytes)
-//     }
-//   }
-
-//   def deCompress(bytes: Array[Byte]): Array[Byte] = {
-//     this match {
-//       case NONE => bytes
-//       case DEFLATE =>
-//         unCompressWith(os => new InflaterInputStream(os), bytes)
-//       case GZIP => unCompressWith(os => new GZIPInputStream(os), bytes)
-//     }
-//   }
-
-//   override def encodeCBORElement(): Element = StringElem(this.toString())
-// }
-
-// object PayloadCompression extends DecodeCBOR[PayloadCompression] {
-
-//   override def decodeCBORElement(in: Element): Try[PayloadCompression] = Try {
-//     PayloadCompression.valueOf(in.asInstanceOf[StringElem].value)
-//   }
-
-// }
-
 type MultifilePosition = (Long, Long)
-
-// object ItemEnvelope extends DecodeCBOR[ItemEnvelope] {
-//   private def longFrom(e: Element): Try[Long] = Try {
-//     e match {
-//       case LongElem(value) => value
-//       case OverLongElem(negative, value) =>
-//         if (negative && value > 0L) -1L * value else value
-//       case IntElem(value) => value
-//       case x => throw new Exception(f"Couldn't turn ${e} into a long")
-//     }
-//   }
-
-//   private def longPairFrom(e: Element): Try[(Long, Long)] = Try {
-//     e match {
-//       case ae: ArrayElem if ae.elems.length == 2 =>
-//         for {
-//           a <- longFrom(ae.elems(0))
-//           b <- longFrom(ae.elems(1))
-//         } yield (a, b)
-//       case x => throw new Exception(f"Couldn't turn ${e} into a long pair")
-//     }
-
-//   }.flatten
-
-//   private def intFrom(e: Element): Try[Int] = Try {
-//     e match {
-//       case IntElem(value) => value
-//       case x => throw new Exception(f"Couldn't turn ${e} into a int")
-//     }
-//   }
-
-//   private def boolFrom(e: Element): Try[Boolean] = Try {
-//     e match {
-//       case BooleanElem(value) => value
-//       case x => throw new Exception(f"Couldn't turn ${e} into a bool")
-//     }
-//   }
-//   private def elemFor[T](
-//       map: MapElem,
-//       key: String,
-//       converter: Element => Try[T]
-//   ): Try[T] = Try {
-//     val elem = map(key) match {
-//       case Some(e) => e
-//       case _       => throw new Exception(f"Couldn't find key ${key} in ${map}")
-//     }
-//     converter(elem)
-//   }.flatten
-//   override def decodeCBORElement(in: Element): Try[ItemEnvelope] =
-//     for {
-//       env <- Try { in.asInstanceOf[MapElem] }
-//       md5 <- elemFor(env, "h", MD5.decodeCBORElement(_))
-//       position <- elemFor(env, "p", longFrom(_))
-//       backpointer <- elemFor(env, "bp", longFrom(_))
-//       dataLen <- elemFor(env, "l", intFrom(_))
-//       dataType <- elemFor(env, "pt", PayloadType.decodeCBORElement(_))
-//     } yield ItemEnvelope(
-//       md5,
-//       position = position,
-//       backpointer = backpointer,
-//       dataLen = dataLen,
-//       dataType = dataType
-//     )
-// }
-
-// case class ItemEnvelope(
-//     keyMd5: MD5,
-//     position: Position,
-//     backpointer: Long,
-//     dataLen: Int,
-//     dataType: PayloadType
-// ) extends EncodeCBOR {
-
-//   override def encodeCBORElement(): Element = MapElem.Sized(
-//     "h" -> keyMd5.encodeCBORElement(),
-//     "p" -> LongElem(position),
-//     "bp" -> (if (backpointer < 0) OverLongElem(false, backpointer)
-//              else LongElem(backpointer)),
-//     "l" -> IntElem(dataLen),
-//     "pt" -> dataType.encodeCBORElement()
-//   )
-
-// }
+ import io.bullet.borer.derivation.MapBasedCodecs.derived
 
 case class DataFileEnvelope(
     version: Int,
     magic: Int,
     previous: Long,
-    @key("depends_on") dependsOn: Vector[Long],
+    @key("depends_on") dependsOn: TreeSet[Long],
     @key("built_from_merge") builtFromMerge: Boolean,
-    info: Map[String, String]
-) {
+    info: TreeMap[String, String]
+) derives Codec
+ {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 }
 
@@ -277,9 +133,9 @@ object DataFileEnvelope {
       version: Int = 1,
       magic: Int = GraphManager.Consts.DataFileMagicNumber,
       previous: Long,
-      dependsOn: Vector[Long] = Vector(),
+      dependsOn: TreeSet[Long] = TreeSet(),
       builtFromMerge: Boolean,
-      info: Map[String, String] = Map()
+      info: TreeMap[String, String] = TreeMap()
   ) = DataFileEnvelope(
     version,
     magic,
@@ -288,11 +144,6 @@ object DataFileEnvelope {
     builtFromMerge,
     info
   )
-
-  given Codec[DataFileEnvelope] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveCodec[DataFileEnvelope]
-  }
 
   def decode(bytes: Array[Byte]): Try[DataFileEnvelope] = {
 
@@ -306,8 +157,8 @@ case class IndexFileEnvelope(
     size: Int,
     @key("data_files") dataFiles: Vector[Long],
     encoding: String,
-    info: Map[String, String]
-) {
+    info: TreeMap[String, String]
+) derives Codec {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 }
 
@@ -319,7 +170,7 @@ object IndexFileEnvelope {
       size: Int,
       dataFiles: Vector[Long],
       encoding: String = "MD5/Long/Long",
-      info: Map[String, String] = Map()
+      info: TreeMap[String, String] = TreeMap()
   ) = IndexFileEnvelope(
     version = version,
     magic = magic,
@@ -328,11 +179,6 @@ object IndexFileEnvelope {
     encoding = encoding,
     info = info
   )
-
-  given Codec[IndexFileEnvelope] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveCodec[IndexFileEnvelope]
-  }
 
   def decode(bytes: Array[Byte]): Try[IndexFileEnvelope] =
     Cbor.decode(bytes).to[IndexFileEnvelope].valueTry
@@ -343,7 +189,7 @@ case class ClusterFileEnvelope(
     magic: Int,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
-    info: Map[String, String]
+    info: TreeMap[String, String]
 ) {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 
@@ -355,7 +201,7 @@ object ClusterFileEnvelope {
       magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],
-      info: Map[String, String] = Map()
+      info: TreeMap[String, String] = TreeMap()
   ) = ClusterFileEnvelope(
     version = version,
     magic = magic,
@@ -363,6 +209,8 @@ object ClusterFileEnvelope {
     indexFiles = indexFiles,
     info = info
   )
+
+  
 
   given Codec[ClusterFileEnvelope] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*

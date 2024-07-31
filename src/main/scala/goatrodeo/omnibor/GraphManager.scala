@@ -9,7 +9,6 @@ import java.nio.ByteBuffer
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadType
 import java.io.FileInputStream
 import goatrodeo.envelopes.IndexFileEnvelope
 import scala.util.Try

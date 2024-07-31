@@ -10,7 +10,7 @@ import goatrodeo.omnibor.GraphManager.DataAndIndexFiles
 import goatrodeo.envelopes.IndexFileEnvelope
 import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.channels.FileChannel
-import scala.collection.immutable.SortedSet
+import scala.collection.immutable.TreeSet
 
 case class IndexFile(
     envelope: IndexFileEnvelope,
@@ -165,7 +165,7 @@ object GoatRodeoCluster {
         (indexFile -> IndexFile.open(theDir, indexFile))
       }): _*)
 
-      val dataFileHashes = SortedSet((for {
+      val dataFileHashes = TreeSet((for {
         idx <- indexFiles.values; dataFile <- idx.envelope.dataFiles
       } yield dataFile).toSeq: _*)
 

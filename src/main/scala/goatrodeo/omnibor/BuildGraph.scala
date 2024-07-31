@@ -8,13 +8,13 @@ import java.io.FileWriter
 import goatrodeo.util.PackageIdentifier
 import goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
 import goatrodeo.util.FileType
-import scala.collection.immutable.SortedSet
+import scala.collection.immutable.TreeSet
 
 /** Tools for opening files including containing files and building graphs
   */
 object BuildGraph {
 
-  def foo(a: EdgeType, b: EdgeType): SortedSet[EdgeType] = SortedSet(a, b)
+  def foo(a: EdgeType, b: EdgeType): TreeSet[EdgeType] = TreeSet(a, b)
 
   def graphForToProcess(
       item: ToProcess,
@@ -132,12 +132,12 @@ object BuildGraph {
 
         val fileType = FileType.theType(name, Some(file), associatedFiles)
 
-        val computedConnections: SortedSet[Edge] =
+        val computedConnections: TreeSet[Edge] =
           // built from a source file
           (fileType.sourceGitOid() match {
-            case None => SortedSet[Edge]()
+            case None => TreeSet[Edge]()
             case Some(source) =>
-              SortedSet[Edge]((EdgeType.BuiltFrom, source))
+              TreeSet[Edge]((EdgeType.BuiltFrom, source))
           })
           ++
           // include parent back-reference
@@ -171,7 +171,7 @@ object BuildGraph {
               if (parent.isEmpty) topPackageIdentifier else None
             )
           ),
-          mergedFrom = Vector(),
+          mergedFrom = TreeSet(),
         ).fixReferences(store)
         ret = ret + (name -> main)
 

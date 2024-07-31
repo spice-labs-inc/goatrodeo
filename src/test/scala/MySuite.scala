@@ -19,7 +19,6 @@ import java.io.ByteArrayInputStream
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadType
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream

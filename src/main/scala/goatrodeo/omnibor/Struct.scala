@@ -28,7 +28,8 @@ import goatrodeo.util.FileType
 import goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
 import goatrodeo.util.Helpers.filesForParent
-import scala.collection.immutable.SortedSet
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
 enum EdgeType extends Comparable[EdgeType] {
   case AliasTo
@@ -38,9 +39,8 @@ enum EdgeType extends Comparable[EdgeType] {
   case BuildsTo
   case BuiltFrom
 
-
-  override def compareTo(other: EdgeType): Int = this.toString().compareTo(other.toString())
-
+  override def compareTo(other: EdgeType): Int =
+    this.toString().compareTo(other.toString())
 
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 }
@@ -59,12 +59,11 @@ object EdgeType {
 
 type Edge = (EdgeType, String)
 
-
 case class ItemMetaData(
-    @key("file_names") fileNames: SortedSet[String],
-    @key("file_type") fileType: SortedSet[String],
-    @key("file_sub_type") fileSubType: SortedSet[String],
-    extra: Map[String, SortedSet[String]]
+    @key("file_names") fileNames: TreeSet[String],
+    @key("file_type") fileType: TreeSet[String],
+    @key("file_sub_type") fileSubType: TreeSet[String],
+    extra: TreeMap[String, TreeSet[String]]
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
@@ -100,26 +99,25 @@ object ItemMetaData {
             pid
           ) =>
         ItemMetaData(
-          fileNames = SortedSet(fileName),
-          fileType = SortedSet("package"),
-          fileSubType = SortedSet(pid.protocol.name),
+          fileNames = TreeSet(fileName),
+          fileType = TreeSet("package"),
+          fileSubType = TreeSet(pid.protocol.name),
           extra = fileType.toStringMap() ++
-            Map("purl" -> SortedSet(pid.purl(): _*)) ++
+            TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
             pid.toStringMap()
         )
       case None =>
         ItemMetaData(
-          fileNames = SortedSet(fileName),
+          fileNames = TreeSet(fileName),
           fileType =
-            fileType.typeName().map(SortedSet(_)).getOrElse(SortedSet()),
+            fileType.typeName().map(TreeSet(_)).getOrElse(TreeSet()),
           fileSubType =
-            fileType.subType().map(SortedSet(_)).getOrElse(SortedSet()),
+            fileType.subType().map(TreeSet(_)).getOrElse(TreeSet()),
           extra = fileType.toStringMap()
         )
     }
 
   }
-
   given Encoder[ItemMetaData] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
     deriveEncoder[ItemMetaData]
@@ -136,12 +134,11 @@ type LocationReference = (Long, Long)
 case class Item(
     identifier: String,
     reference: LocationReference,
-    connections: SortedSet[Edge],
+    connections: TreeSet[Edge],
     metadata: Option[ItemMetaData],
-    @key("merged_from") mergedFrom: Vector[LocationReference],
+    @key("merged_from") mergedFrom: TreeSet[LocationReference],
     @key("file_size") fileSize: Long
 ) {
-
 
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
@@ -149,7 +146,7 @@ case class Item(
     val hasCur = reference != Item.noopLocationReference
     this.copy(
       reference = (hash, offset),
-      mergedFrom = (if (hasCur) Vector(this.reference) else Vector())
+      mergedFrom = (if (hasCur) TreeSet(this.reference) else TreeSet())
     )
   }
 
@@ -175,10 +172,10 @@ case class Item(
                 Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
-                  connections = SortedSet(),
+                  connections = TreeSet(),
                   metadata = None,
                   fileSize = this.fileSize,
-                  mergedFrom = Vector()
+                  mergedFrom = TreeSet()
                 )
               )
               val toAdd = (EdgeType.AliasTo, this.identifier)
@@ -202,10 +199,10 @@ case class Item(
                 Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
-                  connections = SortedSet(),
+                  connections = TreeSet(),
                   metadata = None,
                   fileSize = -1,
-                  mergedFrom = Vector()
+                  mergedFrom = TreeSet()
                 )
               )
               val toAdd = (EdgeType.BuildsTo, this.identifier)
@@ -229,10 +226,10 @@ case class Item(
                 Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
-                  connections = SortedSet(),
+                  connections = TreeSet(),
                   metadata = None,
                   fileSize = -1,
-                  mergedFrom = Vector()
+                  mergedFrom = TreeSet()
                 )
               )
               val toAdd = (EdgeType.Contains, this.identifier)
@@ -274,7 +271,7 @@ case class Item(
 
 object Item {
   // given itemCmp: java.util.Comparator[Item] = {
-    
+
   // }
 
   given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
