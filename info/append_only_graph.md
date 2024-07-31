@@ -95,6 +95,6 @@ There are three classes of file that Goat Rodeo will emit:
   previous files. 
 * The Index file which contains the MD5 hash of the primary key, the Goat Rodeo Data (`.grd`) file that contains the entry, and the offset in that file. These files will be named based on the hex of 8 most significant bytes of the file's SHA256 hash with `.gri` appended.
   This is the Goat Rodeo Index `.gri` file. The indexes should be in ascending order.
-* The Goat Rodeo Bundle (`.grb`) file which contains the ordered list of `.grd` files including SHA256 hash, the set of `.gri` files with SHA256 hash
-  and database metadata. The `.grb` file will be named based on the time the file was created and hex value of the most significant 8 bytes of the SHA256 of the file's hash. For example `2024_04_30_18_23_07_334f42bf1be490ee.grb` The timestamp prefix allows for determining the newest or most
-  recent bundle file.
+* The Goat Rodeo Cluster (`.grc`) file which contains the ordered list of `.grd` files including SHA256 hash, the set of `.gri` files with SHA256 hash
+  and database metadata. The `.grc` file will be named based on the time the file was created and hex value of the most significant 8 bytes of the SHA256 of the file's hash. For example `2024_04_30_18_23_07_334f42bf1be490ee.grc` The timestamp prefix allows for determining the newest or most
+  recent cluster file.

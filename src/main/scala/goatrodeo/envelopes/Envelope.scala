@@ -122,149 +122,148 @@ object PayloadType extends DecodeCBOR[PayloadType] {
 
 }
 
-enum PayloadCompression extends EncodeCBOR {
-  case NONE, DEFLATE, GZIP
+// enum PayloadCompression extends EncodeCBOR {
+//   case NONE, DEFLATE, GZIP
 
-  private def compressWith(
-      out: OutputStream => OutputStream,
-      bytes: Array[Byte]
-  ): Array[Byte] = {
-    val bos = new ByteArrayOutputStream()
-    val compressor = out(bos)
-    compressor.write(bytes)
-    compressor.flush()
-    compressor.close()
-    bos.flush()
-    bos.toByteArray()
-  }
+//   private def compressWith(
+//       out: OutputStream => OutputStream,
+//       bytes: Array[Byte]
+//   ): Array[Byte] = {
+//     val bos = new ByteArrayOutputStream()
+//     val compressor = out(bos)
+//     compressor.write(bytes)
+//     compressor.flush()
+//     compressor.close()
+//     bos.flush()
+//     bos.toByteArray()
+//   }
 
-  private def unCompressWith(
-      out: InputStream => InputStream,
-      bytes: Array[Byte]
-  ): Array[Byte] = {
-    val bos = new ByteArrayInputStream(bytes)
-    val uncompressor = out(bos)
-    Helpers.slurpInput(uncompressor)
-  }
+//   private def unCompressWith(
+//       out: InputStream => InputStream,
+//       bytes: Array[Byte]
+//   ): Array[Byte] = {
+//     val bos = new ByteArrayInputStream(bytes)
+//     val uncompressor = out(bos)
+//     Helpers.slurpInput(uncompressor)
+//   }
 
-  def compress(bytes: Array[Byte]): Array[Byte] = {
-    this match {
-      case NONE => bytes
-      case DEFLATE =>
-        compressWith(os => new DeflaterOutputStream(os), bytes)
-      case GZIP => compressWith(os => new GZIPOutputStream(os), bytes)
-    }
-  }
+//   def compress(bytes: Array[Byte]): Array[Byte] = {
+//     this match {
+//       case NONE => bytes
+//       case DEFLATE =>
+//         compressWith(os => new DeflaterOutputStream(os), bytes)
+//       case GZIP => compressWith(os => new GZIPOutputStream(os), bytes)
+//     }
+//   }
 
-  def deCompress(bytes: Array[Byte]): Array[Byte] = {
-    this match {
-      case NONE => bytes
-      case DEFLATE =>
-        unCompressWith(os => new InflaterInputStream(os), bytes)
-      case GZIP => unCompressWith(os => new GZIPInputStream(os), bytes)
-    }
-  }
+//   def deCompress(bytes: Array[Byte]): Array[Byte] = {
+//     this match {
+//       case NONE => bytes
+//       case DEFLATE =>
+//         unCompressWith(os => new InflaterInputStream(os), bytes)
+//       case GZIP => unCompressWith(os => new GZIPInputStream(os), bytes)
+//     }
+//   }
 
-  override def encodeCBORElement(): Element = StringElem(this.toString())
-}
+//   override def encodeCBORElement(): Element = StringElem(this.toString())
+// }
 
-object PayloadCompression extends DecodeCBOR[PayloadCompression] {
+// object PayloadCompression extends DecodeCBOR[PayloadCompression] {
 
-  override def decodeCBORElement(in: Element): Try[PayloadCompression] = Try {
-    PayloadCompression.valueOf(in.asInstanceOf[StringElem].value)
-  }
+//   override def decodeCBORElement(in: Element): Try[PayloadCompression] = Try {
+//     PayloadCompression.valueOf(in.asInstanceOf[StringElem].value)
+//   }
 
-}
+// }
 
 type MultifilePosition = (Long, Long)
 
-object ItemEnvelope extends DecodeCBOR[ItemEnvelope] {
-  private def longFrom(e: Element): Try[Long] = Try {
-    e match {
-      case LongElem(value) => value
-      case OverLongElem(negative, value) =>
-        if (negative && value > 0L) -1L * value else value
-      case IntElem(value) => value
-      case x => throw new Exception(f"Couldn't turn ${e} into a long")
-    }
-  }
+// object ItemEnvelope extends DecodeCBOR[ItemEnvelope] {
+//   private def longFrom(e: Element): Try[Long] = Try {
+//     e match {
+//       case LongElem(value) => value
+//       case OverLongElem(negative, value) =>
+//         if (negative && value > 0L) -1L * value else value
+//       case IntElem(value) => value
+//       case x => throw new Exception(f"Couldn't turn ${e} into a long")
+//     }
+//   }
 
-  private def longPairFrom(e: Element): Try[(Long, Long)] = Try {
-    e match {
-      case ae: ArrayElem if ae.elems.length == 2 =>
-        for {
-          a <- longFrom(ae.elems(0))
-          b <- longFrom(ae.elems(1))
-        } yield (a, b)
-      case x => throw new Exception(f"Couldn't turn ${e} into a long pair")
-    }
+//   private def longPairFrom(e: Element): Try[(Long, Long)] = Try {
+//     e match {
+//       case ae: ArrayElem if ae.elems.length == 2 =>
+//         for {
+//           a <- longFrom(ae.elems(0))
+//           b <- longFrom(ae.elems(1))
+//         } yield (a, b)
+//       case x => throw new Exception(f"Couldn't turn ${e} into a long pair")
+//     }
 
-  }.flatten
+//   }.flatten
 
-  private def intFrom(e: Element): Try[Int] = Try {
-    e match {
-      case IntElem(value) => value
-      case x => throw new Exception(f"Couldn't turn ${e} into a int")
-    }
-  }
+//   private def intFrom(e: Element): Try[Int] = Try {
+//     e match {
+//       case IntElem(value) => value
+//       case x => throw new Exception(f"Couldn't turn ${e} into a int")
+//     }
+//   }
 
-  private def boolFrom(e: Element): Try[Boolean] = Try {
-    e match {
-      case BooleanElem(value) => value
-      case x => throw new Exception(f"Couldn't turn ${e} into a bool")
-    }
-  }
-  private def elemFor[T](
-      map: MapElem,
-      key: String,
-      converter: Element => Try[T]
-  ): Try[T] = Try {
-    val elem = map(key) match {
-      case Some(e) => e
-      case _       => throw new Exception(f"Couldn't find key ${key} in ${map}")
-    }
-    converter(elem)
-  }.flatten
-  override def decodeCBORElement(in: Element): Try[ItemEnvelope] =
-    for {
-      env <- Try { in.asInstanceOf[MapElem] }
-      md5 <- elemFor(env, "h", MD5.decodeCBORElement(_))
-      position <- elemFor(env, "p", longFrom(_))
-      backpointer <- elemFor(env, "bp", longFrom(_))
-      dataLen <- elemFor(env, "l", intFrom(_))
-      dataType <- elemFor(env, "pt", PayloadType.decodeCBORElement(_))
-    } yield ItemEnvelope(
-      md5,
-      position = position,
-      backpointer = backpointer,
-      dataLen = dataLen,
-      dataType = dataType
-    )
-}
+//   private def boolFrom(e: Element): Try[Boolean] = Try {
+//     e match {
+//       case BooleanElem(value) => value
+//       case x => throw new Exception(f"Couldn't turn ${e} into a bool")
+//     }
+//   }
+//   private def elemFor[T](
+//       map: MapElem,
+//       key: String,
+//       converter: Element => Try[T]
+//   ): Try[T] = Try {
+//     val elem = map(key) match {
+//       case Some(e) => e
+//       case _       => throw new Exception(f"Couldn't find key ${key} in ${map}")
+//     }
+//     converter(elem)
+//   }.flatten
+//   override def decodeCBORElement(in: Element): Try[ItemEnvelope] =
+//     for {
+//       env <- Try { in.asInstanceOf[MapElem] }
+//       md5 <- elemFor(env, "h", MD5.decodeCBORElement(_))
+//       position <- elemFor(env, "p", longFrom(_))
+//       backpointer <- elemFor(env, "bp", longFrom(_))
+//       dataLen <- elemFor(env, "l", intFrom(_))
+//       dataType <- elemFor(env, "pt", PayloadType.decodeCBORElement(_))
+//     } yield ItemEnvelope(
+//       md5,
+//       position = position,
+//       backpointer = backpointer,
+//       dataLen = dataLen,
+//       dataType = dataType
+//     )
+// }
 
-case class ItemEnvelope(
-    keyMd5: MD5,
-    position: Position,
-    backpointer: Long,
-    dataLen: Int,
-    dataType: PayloadType
-) extends EncodeCBOR {
+// case class ItemEnvelope(
+//     keyMd5: MD5,
+//     position: Position,
+//     backpointer: Long,
+//     dataLen: Int,
+//     dataType: PayloadType
+// ) extends EncodeCBOR {
 
-  override def encodeCBORElement(): Element = MapElem.Sized(
-    "h" -> keyMd5.encodeCBORElement(),
-    "p" -> LongElem(position),
-    "bp" -> (if (backpointer < 0) OverLongElem(false, backpointer)
-             else LongElem(backpointer)),
-    "l" -> IntElem(dataLen),
-    "pt" -> dataType.encodeCBORElement()
-  )
+//   override def encodeCBORElement(): Element = MapElem.Sized(
+//     "h" -> keyMd5.encodeCBORElement(),
+//     "p" -> LongElem(position),
+//     "bp" -> (if (backpointer < 0) OverLongElem(false, backpointer)
+//              else LongElem(backpointer)),
+//     "l" -> IntElem(dataLen),
+//     "pt" -> dataType.encodeCBORElement()
+//   )
 
-}
+// }
 
 case class DataFileEnvelope(
     version: Int,
     magic: Int,
-    @key("the_type") theType: String,
     previous: Long,
     @key("depends_on") dependsOn: Vector[Long],
     @key("built_from_merge") builtFromMerge: Boolean,
@@ -277,7 +276,6 @@ object DataFileEnvelope {
   def build(
       version: Int = 1,
       magic: Int = GraphManager.Consts.DataFileMagicNumber,
-      theType: String = "Goat Rodeo Data",
       previous: Long,
       dependsOn: Vector[Long] = Vector(),
       builtFromMerge: Boolean,
@@ -285,7 +283,6 @@ object DataFileEnvelope {
   ) = DataFileEnvelope(
     version,
     magic,
-    theType,
     previous,
     dependsOn,
     builtFromMerge,
@@ -306,7 +303,6 @@ object DataFileEnvelope {
 case class IndexFileEnvelope(
     version: Int,
     magic: Int,
-    @key("the_type") theType: String,
     size: Int,
     @key("data_files") dataFiles: Vector[Long],
     encoding: String,
@@ -320,7 +316,6 @@ object IndexFileEnvelope {
   def build(
       version: Int = 1,
       magic: Int = GraphManager.Consts.IndexFileMagicNumber,
-      theType: String = "Goat Rodeo Index",
       size: Int,
       dataFiles: Vector[Long],
       encoding: String = "MD5/Long/Long",
@@ -328,7 +323,6 @@ object IndexFileEnvelope {
   ) = IndexFileEnvelope(
     version = version,
     magic = magic,
-    theType = theType,
     size = size,
     dataFiles = dataFiles,
     encoding = encoding,
@@ -344,11 +338,9 @@ object IndexFileEnvelope {
     Cbor.decode(bytes).to[IndexFileEnvelope].valueTry
 }
 
-case class BundleFileEnvelope(
+case class ClusterFileEnvelope(
     version: Int,
     magic: Int,
-    @key("the_type")
-    theType: String,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
     info: Map[String, String]
@@ -357,25 +349,23 @@ case class BundleFileEnvelope(
 
 }
 
-object BundleFileEnvelope {
+object ClusterFileEnvelope {
   def build(
       version: Int = 1,
-      magic: Int = GraphManager.Consts.BundleFileMagicNumber,
-      theType: String = "Goat Rodeo Bundle",
+      magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],
       info: Map[String, String] = Map()
-  ) = BundleFileEnvelope(
+  ) = ClusterFileEnvelope(
     version = version,
     magic = magic,
-    theType = theType,
     dataFiles = dataFiles,
     indexFiles = indexFiles,
     info = info
   )
 
-  given Codec[BundleFileEnvelope] = {
+  given Codec[ClusterFileEnvelope] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveCodec[BundleFileEnvelope]
+    deriveCodec[ClusterFileEnvelope]
   }
 }

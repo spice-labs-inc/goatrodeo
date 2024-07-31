@@ -79,7 +79,7 @@ To create a test data set from within SBT: `run "-b" "<path_to>/tmp/repo_ea" "-o
 
 Then use Cargo to build Big Tent: `dpp@halfpint:~/proj/bigtent$ cargo build`
 
-From the Big Tent directory, you can run Big Tent against the data set: `./target/debug/bigtent -r /tmp/ff/<generated>.grb`
+From the Big Tent directory, you can run Big Tent against the data set: `./target/debug/bigtent -r /tmp/ff/<generated>.grc`
 
 With Big Tent running, you can curl: `curl -v http://localhost:3000/omnibor/sha256:7c7b1dee41ae847f0d8aa66faf656f5f2fe777e4656db9fe4370d2972070c62b
 `

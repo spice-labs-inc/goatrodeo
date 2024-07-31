@@ -40,7 +40,6 @@ import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
 import goatrodeo.envelopes.PayloadType
-import goatrodeo.envelopes.PayloadCompression
 import java.io.FileInputStream
 import io.bullet.borer.Cbor
 import goatrodeo.envelopes.IndexFileEnvelope
@@ -49,7 +48,6 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.channels.FileChannel
 import java.nio.ByteBuffer
-import goatrodeo.envelopes.BundleFileEnvelope
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset

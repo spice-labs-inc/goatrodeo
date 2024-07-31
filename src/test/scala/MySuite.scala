@@ -16,7 +16,6 @@ import goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
 import goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import goatrodeo.envelopes.ItemEnvelope
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
@@ -30,7 +29,6 @@ import goatrodeo.omnibor.MemStorage
 import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.omnibor.Builder
-import goatrodeo.envelopes.ItemEnvelope
 import goatrodeo.omnibor.GraphManager
 import goatrodeo.util.PackageIdentifier
 import goatrodeo.util.PackageProtocol
@@ -90,41 +88,6 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("EntryEnvelope Serialization") {
-
-    for { i <- 0 to 1000 } {
-      val ee = ItemEnvelope(
-        keyMd5 = MD5(Helpers.randomBytes(16)),
-        Helpers.randomLong(),
-        Helpers.randomLong(),
-        Helpers.randomInt(),
-        PayloadType.ENTRY
-      )
-
-      val bytes = ee.encodeCBOR()
-
-      if (false) {
-        import io.bullet.borer.Dom.*
-        val tmp = Cbor.decode(bytes).to[Element].value
-        throw new Exception(tmp.toString())
-      }
-      assert(
-        bytes.length < 200,
-        f"The Entry Envelope should be < 200 bytes long, not ${bytes.length}"
-      )
-
-      val ee3 = ItemEnvelope.decodeCBOR(bytes).get
-
-      assertEquals(ee, ee3, "Should be the same before and after serialization")
-
-      if (false) {
-        (new FileOutputStream(f"test_data/data_${i}.cbor")).write(bytes)
-
-      }
-
-    }
-
-  }
 
   // test("EntryEnvelope Serialization from round trips") {
 
