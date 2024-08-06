@@ -796,15 +796,22 @@ object GitOIDUtils {
       inputStream: InputStream,
       len: Long,
       hashType: HashType,
-      tpe: ObjectType = ObjectType.Blob
+      tpe: ObjectType = ObjectType.Blob,
+      swhid: Boolean
   ): String = {
-    // val bytes = Helpers.slurpInput(inputStream)
-    String.format(
-      "gitoid:%s:%s:%s",
-      tpe.gitoidName(),
-      hashType.hashTypeName(),
-      hashAsHex(inputStream, len, hashType, tpe)
-    );
+    if (swhid) {
+      String.format(
+        "swh:1:cnt:%s",
+        hashAsHex(inputStream, len, HashType.SHA1, ObjectType.Blob)
+      );
+    } else {
+      String.format(
+        "gitoid:%s:%s:%s",
+        tpe.gitoidName(),
+        hashType.hashTypeName(),
+        hashAsHex(inputStream, len, hashType, tpe)
+      );
+    }
   }
 
   def computeAllHashes(
@@ -812,13 +819,14 @@ object GitOIDUtils {
       continue_? : String => Boolean
   ): (String, Vector[String]) = {
     def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256).intern()
+    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256, swhid = false)
 
     if (continue_?(gitoidSha256)) {
       (
         gitoidSha256,
         Vector(
-          url(is(), theFile.size(), HashType.SHA1).intern(),
+          url(is(), theFile.size(), HashType.SHA1, swhid = false),
+          url(is(), theFile.size(), HashType.SHA1, swhid = true),
           String
             .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is())))
             .intern(),
@@ -941,8 +949,8 @@ case class PackageIdentifier(
       "group_id" -> TreeSet(groupId),
       "artifact_id" -> TreeSet(artifactId),
       "version" -> TreeSet(version)
-    ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(d =>
-      "distro" -> TreeSet(d)
+    ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
+      d => "distro" -> TreeSet(d)
     )
     Map(info: _*) ++ this.extra
   }
