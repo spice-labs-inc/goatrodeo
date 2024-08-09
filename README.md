@@ -4,9 +4,9 @@ The Software Supply Chain is a big gnarly mess of unknowns... and it's
 baked right into all the systems you and your company build an run. 😱
 
 [Goat Rodeo](https://www.urbandictionary.com/define.php?term=Goat%20%20Rodeo)
-is a bit of an attempt to reign in the chaos that is the software supply chain.
+is a bit of an attempt to rein in the chaos that is the software supply chain.
 
-Based on the specs and tenits of [OmniBOR](https://omnibor.io), Goat Rodeo
+Based on the specs and tenets of [OmniBOR](https://omnibor.io), Goat Rodeo
 creates and queries the set of [gitoids](https://www.iana.org/assignments/uri-schemes/prov/gitoid)
 for a container (starting with Java [JAR](https://docs.oracle.com/javase/tutorial/deployment/jar/basicsindex.html) files)
 and the container's contents.
