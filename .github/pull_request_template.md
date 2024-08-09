@@ -1,7 +1,7 @@
-### 💻 Description of Change (w/ context)
+### 💻 Description of Change(s) (w/ context)
 What did you change, and what additional context do reviewers need?
 
-### 🧠 Rationale Behind Change
+### 🧠 Rationale Behind Change(s)
 Why were these changes made? What tradeoffs were considered?
 
 ### 📝 Test Plan
@@ -10,6 +10,7 @@ Beyond unit tests, how did you make sure this code is ready for production?
 ### 💣 Quality Control
 (All items must be checked before a PR is merged)
 Did you…
+- [ ] Mention an issue number in the PR title?
 - [ ] Update the version # in the build file?
 - [ ] Create new and/or update relevant existing tests?
 - [ ] Create or update relevant documentation and/or diagrams?
