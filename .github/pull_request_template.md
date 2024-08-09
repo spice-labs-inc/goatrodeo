@@ -12,7 +12,7 @@ Beyond unit tests, how did you make sure this code is ready for production?
 Did you…
 - [ ] Update the version # in the build file?
 - [ ] Create new and/or update relevant existing tests?
-- [ ] Create or update relevant documentation?
+- [ ] Create or update relevant documentation and/or diagrams?
 - [ ] Comment your code?
 - [ ] Fix any stray verbose logging (removing, or moving to debug / trace level)?
 
