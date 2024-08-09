@@ -14,7 +14,7 @@ Did you…
 - [ ] Create new and/or update relevant existing tests?
 - [ ] Create or update relevant documentation?
 - [ ] Comment your code?
-- [ ] Fix any stray 'debug' level logging?
+- [ ] Fix any stray verbose logging (removing, or moving to debug / trace level)?
 
 ### Before Merging…
 - Make sure the Quality Control boxes are all ticked
