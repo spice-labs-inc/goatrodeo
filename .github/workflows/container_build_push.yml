@@ -1,4 +1,4 @@
-name: Publish Container Images to Docker and GHCR
+name: Publish Container Images
 
 on:
   release:
