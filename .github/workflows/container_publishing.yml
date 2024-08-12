@@ -12,7 +12,9 @@ name: Publish Container Images
   #    - completed
 on:
   push:
-    branches: [ "main" ]
+    branches:  
+      - "main"
+      - 'ci-builds'
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
