@@ -7,6 +7,10 @@ Why were these changes made? What tradeoffs were considered?
 ### 📝 Test Plan
 Beyond unit tests, how did you make sure this code is ready for production?
 
+### 📜 Documentation
+What documentation did you add or update? 
+Was the documentation appropriate for the scope of this change?
+
 ### 💣 Quality Control
 (All items must be checked before a PR is merged)
 Did you…
