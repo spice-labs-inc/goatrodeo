@@ -6,8 +6,10 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs: []
+  workflow_run:
+    workflows: [Scala Build & Test]
+    types:
+      - completed
 
 jobs:
     push_to_registry:
