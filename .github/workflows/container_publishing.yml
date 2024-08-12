@@ -47,6 +47,13 @@ jobs:
           uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
           with:
             images: spicelabs/goatrodeo
-        - name: Build and publish local image
+        - name: Stage Docker build environment from sbt
           run: |
-            sbt Docker/publishLocal
+            sbt Docker/stage
+        - name: Build and Push
+          uses: docker/build-push-action@v6
+          with:
+            context: target/docker/stage
+            push: true
+            tags: ${{ steps.meta.outputs.tags }}
+            labels: ${{ steps.meta.outputs.labels }} 
