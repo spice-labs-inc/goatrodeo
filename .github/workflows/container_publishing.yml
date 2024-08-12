@@ -10,7 +10,13 @@ on: workflow_dispatch
   #  workflows: [Scala Build & Test]
   #  types:
   #    - completed
-
+on:
+  push:
+    branches: [ "main" ]
+    # Publish semver tags as releases.
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ "main" ]
 jobs:
     push_to_registry:
       name: Push Docker image to Docker Hub
