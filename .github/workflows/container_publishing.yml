@@ -1,6 +1,6 @@
 name: Publish Container Images
 
-on: workflow_dispatch
+#on: workflow_dispatch
   #release:
   #  types: [published] # todo - change this to trigger on other workflows
   #push:
