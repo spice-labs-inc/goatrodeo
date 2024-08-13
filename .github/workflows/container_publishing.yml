@@ -37,6 +37,11 @@ jobs:
             java-version: '21'
             distribution: 'adopt-hotspot'
             cache: 'sbt'
+        - name: Declare some variables
+          shell: bash
+          run: |
+            echo "short_git_hash=$(git rev-parse --short "$GITHUB_SHA")" >> "$GIHUB_ENV" 
+            echo "git_branch=$(git rev-parse --short "$GITHUB_SHA")" >> "$GIHUB_ENV" 
         - name: Log in to Docker Hub
           uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
           with:
@@ -47,6 +52,15 @@ jobs:
           uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
           with:
             images: spicelabs/goatrodeo
+            tags: |
+              type=semver,pattern={{version}}
+              type=semver,pattern={{major}}.{{minor}}
+              type=semver,pattern={{major}}
+              type=ref,event=branch
+              type=ref,event=pr
+              type=sha
+              type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+
         - name: Stage Docker build environment from sbt
           run: |
             sbt Docker/stage
