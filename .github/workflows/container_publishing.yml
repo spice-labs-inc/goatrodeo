@@ -59,7 +59,7 @@ jobs:
               type=ref,event=branch
               type=ref,event=pr
               type=sha
-              type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+              type=raw,value=latest,enable={{is_default_branch}}
 
         - name: Stage Docker build environment from sbt
           run: |
