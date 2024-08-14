@@ -72,6 +72,7 @@ jobs:
           run: |
             sbt Docker/stage
         - name: Build and Push
+          id: push
           uses: docker/build-push-action@v6
           with:
             context: target/docker/stage
