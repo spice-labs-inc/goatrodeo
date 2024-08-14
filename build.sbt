@@ -47,6 +47,6 @@ Docker / packageName := projectName
 Docker / version := projectVersion
 Docker / maintainer := "engineering@spicelabs.io"
 
-dockerBaseImage := "eclipse-temurin"
+dockerBaseImage := "eclipse-temurin:21-alpine"
 dockerLabels := Map.empty
 dockerExposedPorts := Seq.empty
