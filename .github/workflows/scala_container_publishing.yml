@@ -39,6 +39,8 @@ jobs:
         attestations: write
         id-token: write
       steps:
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
         - name: Check out the repository
           uses: actions/checkout@v4
         - name: Set up JDK 21
@@ -90,6 +92,7 @@ jobs:
             context: target/docker/stage
             push: true
             provenance: mode=max
+            sbom: true
             tags: ${{ steps.meta.outputs.tags }}
             labels: ${{ steps.meta.outputs.labels }} 
         - name: Generate artifact attestation
