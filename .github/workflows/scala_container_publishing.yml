@@ -57,20 +57,19 @@ jobs:
           with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_TOKEN }}
-        #- name: Log in to Github Container Registry
-        #  uses: docker/login-action@v3
-        #  with:
-        #    registry: ${{ env.REGISTRY }}
-        #    username: ${{ github.actor }}
-        #    password: ${{ secrets.GITHUB_TOKEN }}
+        - name: Log in to Github Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
         - name: Extract metadata (tags, labels) for Docker
           id: meta
           uses: docker/metadata-action@v5
           with:
-            images: spicelabs/goatrodeo
-            #images: |
-            #  spicelabs/goatrodeo
-            #  ghcr.io/${{ github.repository }}
+            images: |
+              spicelabs/goatrodeo
+              ghcr.io/${{ github.repository }}
             tags: |
               type=semver,pattern={{version}}
               type=semver,pattern={{major}}.{{minor}}
@@ -91,12 +90,6 @@ jobs:
             push: true
             tags: ${{ steps.meta.outputs.tags }}
             labels: ${{ steps.meta.outputs.labels }} 
-        #- uses: imjasonh/setup-crane@v0.1
-        #- name: Get pushed chart digest
-        #  id: get-digest
-        #  run: |
-        #    digest=$(crane digest ${{ env.REGISTRY }}/${{ github.repository }}/${{ steps.release-details.outputs.release_name }}:${{ steps.release-details.outputs.release_version }})
-        #    echo digest=$digest >> $GITHUB_OUTPUT
         - name: Generate artifact attestation
           uses: actions/attest-build-provenance@v1
           with:
