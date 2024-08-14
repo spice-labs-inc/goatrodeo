@@ -95,6 +95,6 @@ jobs:
           uses: actions/attest-build-provenance@v1
           with:
             #subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-            subject-name: spicelabs/goatrodeo
+            subject-name: registry.hub.docker.com/library/spicelabs/goatrodeo
             subject-digest: ${{ steps.push.outputs.digest }}
             push-to-registry: true
