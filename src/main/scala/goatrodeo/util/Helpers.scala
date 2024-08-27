@@ -121,7 +121,7 @@ object Helpers {
       Option(root.listFiles()).toVector
         .flatMap(_.toVector)
         .flatMap(findFiles(_, ok))
-    } else if (root.isFile() && ok(root)) {
+    } else if (root.isFile() && ok(root) && !root.getName().startsWith(".")) {
       Vector(root)
     } else Vector()
   }

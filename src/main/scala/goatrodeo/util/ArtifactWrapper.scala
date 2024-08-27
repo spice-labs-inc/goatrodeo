@@ -38,7 +38,7 @@ case class FileWrapper(f: File, deleteOnFinalize: Boolean)
   override def isFile(): Boolean = f.isFile()
 
   override def listFiles(): Vector[ArtifactWrapper] =
-    f.listFiles().toVector.map(FileWrapper(_, false))
+    f.listFiles().toVector.filter(!_.getName().startsWith(".")).map(FileWrapper(_, false))
 
   override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
 
