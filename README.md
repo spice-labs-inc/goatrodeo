@@ -81,7 +81,7 @@ To create a test data set from within SBT: `run "-b" "<path_to>/tmp/repo_ea" "-o
 
 Then use Cargo to build Big Tent: `dpp@halfpint:~/proj/bigtent$ cargo build`
 
-From the Big Tent directory, you can run Big Tent against the data set: `./target/debug/bigtent -r /tmp/ff/<generated>.grb`
+From the Big Tent directory, you can run Big Tent against the data set: `./target/debug/bigtent -r /tmp/ff/<generated>.grc`
 
 With Big Tent running, you can curl: `curl -v http://localhost:3000/omnibor/sha256:7c7b1dee41ae847f0d8aa66faf656f5f2fe777e4656db9fe4370d2972070c62b
 `
@@ -90,14 +90,11 @@ That looks up the SHA256 value in the Corpus:
 
 ```json
 {
-  "_timestamp": 1716324455639,
-  "_type": "Item",
-  "_version": 1,
+
   "alt_identifiers": [],
   "connections": [
-    [
-      "gitoid:blob:sha256:4a176f25ca66f78f902082466d2e64bbb3ce5db3a327f006d48dc17a6fb58784",
-      "AliasTo"
+    [ "AliasTo",
+      "gitoid:blob:sha256:4a176f25ca66f78f902082466d2e64bbb3ce5db3a327f006d48dc17a6fb58784"
     ]
   ],
   "identifier": "sha256:7c7b1dee41ae847f0d8aa66faf656f5f2fe777e4656db9fe4370d2972070c62b",

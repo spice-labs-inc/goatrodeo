@@ -16,11 +16,9 @@ import goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
 import goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import goatrodeo.envelopes.ItemEnvelope
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadType
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
@@ -30,7 +28,6 @@ import goatrodeo.omnibor.MemStorage
 import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.omnibor.Builder
-import goatrodeo.envelopes.ItemEnvelope
 import goatrodeo.omnibor.GraphManager
 import goatrodeo.util.PackageIdentifier
 import goatrodeo.util.PackageProtocol
@@ -90,41 +87,6 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("EntryEnvelope Serialization") {
-
-    for { i <- 0 to 1000 } {
-      val ee = ItemEnvelope(
-        keyMd5 = MD5(Helpers.randomBytes(16)),
-        Helpers.randomLong(),
-        Helpers.randomLong(),
-        Helpers.randomInt(),
-        PayloadType.ENTRY
-      )
-
-      val bytes = ee.encodeCBOR()
-
-      if (false) {
-        import io.bullet.borer.Dom.*
-        val tmp = Cbor.decode(bytes).to[Element].value
-        throw new Exception(tmp.toString())
-      }
-      assert(
-        bytes.length < 200,
-        f"The Entry Envelope should be < 200 bytes long, not ${bytes.length}"
-      )
-
-      val ee3 = ItemEnvelope.decodeCBOR(bytes).get
-
-      assertEquals(ee, ee3, "Should be the same before and after serialization")
-
-      if (false) {
-        (new FileOutputStream(f"test_data/data_${i}.cbor")).write(bytes)
-
-      }
-
-    }
-
-  }
 
   // test("EntryEnvelope Serialization from round trips") {
 
@@ -379,12 +341,12 @@ class MySuite extends munit.FunSuite {
         "sha256:82ceabe5192a5c3803f8b73536e83cd59e219fb560d8ed9e0c165728b199c0d7"
       )
       .get
-    val gitoid = topAlias.connections.head._1
+    val gitoid = topAlias.connections.head._2
     assert(gitoid.startsWith("gitoid:"))
     val top = store.read(gitoid).get
     store.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
-    for { edge <- top.connections if edge._2 == EdgeType.Contains } {
-      val contained = store.read(edge._1).get
+    for { edge <- top.connections if edge._1 == EdgeType.Contains } {
+      val contained = store.read(edge._2).get
     }
 
     val log4j = store
@@ -393,7 +355,7 @@ class MySuite extends munit.FunSuite {
       )
       .get
     assert(
-      log4j.connections.filter(_._2 == EdgeType.Contains).size > 1200
+      log4j.connections.filter(_._1 == EdgeType.Contains).size > 1200
     )
   }
 
@@ -422,10 +384,10 @@ class MySuite extends munit.FunSuite {
     assert(items.length > 1100)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => e._2 == EdgeType.BuiltFrom).size > 0
+      i.connections.filter(e => e._1 == EdgeType.BuiltFrom).size > 0
     )
     val fromSource = for {
-      i <- items; c <- i.connections if c._2 == EdgeType.BuildsTo
+      i <- items; c <- i.connections if c._1 == EdgeType.BuildsTo
     } yield c
     assert(sourceRef.length > 100)
 
@@ -433,12 +395,12 @@ class MySuite extends munit.FunSuite {
 
     // the package URL is picked up
     val withPurl =
-      items.filter(i => i.connections.filter(_._1.startsWith("pkg:")).size > 0)
+      items.filter(i => i.connections.filter(_._2.startsWith("pkg:")).size > 0)
 
     assert(withPurl.length == 4)
 
     val withPurlSources = withPurl.filter(i =>
-      i.connections.filter(_._1.endsWith("?packaging=sources")).size > 0
+      i.connections.filter(_._2.endsWith("?packaging=sources")).size > 0
     )
     assert(withPurlSources.length == 2)
   }

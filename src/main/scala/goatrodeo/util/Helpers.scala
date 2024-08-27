@@ -43,7 +43,8 @@ import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
 import java.io.BufferedReader
 import java.io.InputStreamReader
-
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 type GitOID = String
 
 /** A bunch of helpers/utilities
@@ -120,7 +121,7 @@ object Helpers {
       Option(root.listFiles()).toVector
         .flatMap(_.toVector)
         .flatMap(findFiles(_, ok))
-    } else if (root.isFile() && ok(root)) {
+    } else if (root.isFile() && ok(root) && !root.getName().startsWith(".")) {
       Vector(root)
     } else Vector()
   }
@@ -557,17 +558,17 @@ object Helpers {
     slurpInput(fis)
   }
 
-  private val allFiles: AtomicReference[Map[String, Set[String]]] =
+  private val allFiles: AtomicReference[Map[String, TreeSet[String]]] =
     new AtomicReference(Map())
 
-  def filesForParent(in: File): Set[String] = {
+  def filesForParent(in: File): TreeSet[String] = {
     val parentFile = in.getAbsoluteFile().getParentFile()
     val parentStr = parentFile.getAbsolutePath()
 
     allFiles.get().get(parentStr) match {
       case Some(r) => r
       case None =>
-        val v = Set(parentFile.listFiles().map(f => f.getName())*)
+        val v = TreeSet(parentFile.listFiles().map(f => f.getName())*)
         allFiles.getAndUpdate(last => last + (parentStr -> v))
         v
     }
@@ -795,15 +796,22 @@ object GitOIDUtils {
       inputStream: InputStream,
       len: Long,
       hashType: HashType,
-      tpe: ObjectType = ObjectType.Blob
+      tpe: ObjectType = ObjectType.Blob,
+      swhid: Boolean
   ): String = {
-    // val bytes = Helpers.slurpInput(inputStream)
-    String.format(
-      "gitoid:%s:%s:%s",
-      tpe.gitoidName(),
-      hashType.hashTypeName(),
-      hashAsHex(inputStream, len, hashType, tpe)
-    );
+    if (swhid) {
+      String.format(
+        "swh:1:cnt:%s",
+        hashAsHex(inputStream, len, HashType.SHA1, ObjectType.Blob)
+      );
+    } else {
+      String.format(
+        "gitoid:%s:%s:%s",
+        tpe.gitoidName(),
+        hashType.hashTypeName(),
+        hashAsHex(inputStream, len, hashType, tpe)
+      );
+    }
   }
 
   def computeAllHashes(
@@ -811,13 +819,14 @@ object GitOIDUtils {
       continue_? : String => Boolean
   ): (String, Vector[String]) = {
     def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256).intern()
+    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256, swhid = false)
 
     if (continue_?(gitoidSha256)) {
       (
         gitoidSha256,
         Vector(
-          url(is(), theFile.size(), HashType.SHA1).intern(),
+          url(is(), theFile.size(), HashType.SHA1, swhid = false),
+          url(is(), theFile.size(), HashType.SHA1, swhid = true),
           String
             .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is())))
             .intern(),
@@ -893,7 +902,7 @@ object PackageIdentifier {
               version = theVersion,
               arch = arch,
               distro = None,
-              attrs.map((k, v) => k -> Set(v))
+              attrs.map((k, v) => k -> TreeSet(v))
             )
           )
         case _ => {
@@ -931,17 +940,17 @@ case class PackageIdentifier(
     version: String,
     arch: Option[String],
     distro: Option[String],
-    extra: Map[String, Set[String]]
+    extra: Map[String, TreeSet[String]]
 ) {
 
-  def toStringMap(): Map[String, Set[String]] = {
+  def toStringMap(): Map[String, TreeSet[String]] = {
     val info = Vector(
-      "package_protocol" -> Set(protocol.name),
-      "group_id" -> Set(groupId),
-      "artifact_id" -> Set(artifactId),
-      "version" -> Set(version)
-    ) ++ arch.toVector.map(a => "arch" -> Set(a)) ++ distro.toVector.map(d =>
-      "distro" -> Set(d)
+      "package_protocol" -> TreeSet(protocol.name),
+      "group_id" -> TreeSet(groupId),
+      "artifact_id" -> TreeSet(artifactId),
+      "version" -> TreeSet(version)
+    ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
+      d => "distro" -> TreeSet(d)
     )
     Map(info: _*) ++ this.extra
   }
@@ -1046,31 +1055,31 @@ enum FileType {
     }
   }
 
-  def toStringMap(): Map[String, Set[String]] = {
-    Map(this match {
+  def toStringMap(): TreeMap[String, TreeSet[String]] = {
+    TreeMap(this match {
       case ObjectFile(subtype, source) =>
         Vector(
-          Some("type" -> Set("object")),
-          subtype.map(st => "subtype" -> Set(st)),
-          source.map(sf => "source" -> Set(sf))
+          Some("type" -> TreeSet("object")),
+          subtype.map(st => "subtype" -> TreeSet(st)),
+          source.map(sf => "source" -> TreeSet(sf))
         ).flatten
 
       case SourceFile(language) =>
         Vector(
-          Some("type" -> Set("source")),
-          language.map(st => "language" -> Set(st))
+          Some("type" -> TreeSet("source")),
+          language.map(st => "language" -> TreeSet(st))
         ).flatten
       case MetaData(subtype) =>
         Vector(
-          Some("type" -> Set("metadata")),
-          subtype.map(st => "subtype" -> Set(st))
+          Some("type" -> TreeSet("metadata")),
+          subtype.map(st => "subtype" -> TreeSet(st))
         ).flatten
       case Package(subtype) =>
         Vector(
-          Some("type" -> Set("package")),
-          subtype.map(st => "subtype" -> Set(st))
+          Some("type" -> TreeSet("package")),
+          subtype.map(st => "subtype" -> TreeSet(st))
         ).flatten
-      case Other => Vector("type" -> Set("other"))
+      case Other => Vector("type" -> TreeSet("other"))
     }: _*)
   }
 

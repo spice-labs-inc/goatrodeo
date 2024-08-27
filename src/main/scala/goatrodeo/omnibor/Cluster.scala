@@ -5,12 +5,12 @@ import java.math.BigInteger
 import goatrodeo.util.Helpers
 import scala.util.Using
 import java.io.FileInputStream
-import goatrodeo.envelopes.BundleFileEnvelope
+import goatrodeo.envelopes.ClusterFileEnvelope
 import goatrodeo.omnibor.GraphManager.DataAndIndexFiles
 import goatrodeo.envelopes.IndexFileEnvelope
 import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.channels.FileChannel
-import goatrodeo.envelopes.ItemEnvelope
+import scala.collection.immutable.TreeSet
 
 case class IndexFile(
     envelope: IndexFileEnvelope,
@@ -47,7 +47,7 @@ case class IndexFile(
 
 object IndexFile {
   def open(dir: File, hash: Long): IndexFile = {
-    val file = GoatRodeoBundle.findFile(dir, hash, "gri");
+    val file = GoatRodeoCluster.findFile(dir, hash, "gri");
     val testedHash = Helpers.byteArrayToLong63Bits(Helpers.computeSHA256(file));
     if (testedHash != hash) {
       throw Exception(
@@ -77,28 +77,19 @@ case class DataFile(
     private val file: FileChannel,
     dataOffset: Long
 ) {
-  def readEnvelopeAt(pos: Long): ItemEnvelope = this.synchronized {
-    file.position(pos)
-    val len = Helpers.readShort(file)
-    Helpers.readInt(file)
-    Helpers.readCBOR(file, len)
-  }
-
-  def readEnvelopeAndItemAt(pos: Long): (ItemEnvelope, Item) =
+  def readItemAt(pos: Long): Item =
     this.synchronized {
       file.position(pos)
-      val len = Helpers.readShort(file)
       val itemLen = Helpers.readInt(file)
-      val env: ItemEnvelope = Helpers.readCBOR(file, len)
       val item: Item = Helpers.readCBOR[Item](file, itemLen)
 
-      (env -> item)
+      item
     }
 }
 
 object DataFile {
   def open(dir: File, hash: Long): DataFile = {
-    val file = GoatRodeoBundle.findFile(dir, hash, "grd");
+    val file = GoatRodeoCluster.findFile(dir, hash, "grd");
     val testedHash = Helpers.byteArrayToLong63Bits(Helpers.computeSHA256(file));
     if (testedHash != hash) {
       throw Exception(
@@ -123,18 +114,18 @@ object DataFile {
 
 }
 
-case class GoatRodeoBundle(
-    envelope: BundleFileEnvelope,
+case class GoatRodeoCluster(
+    envelope: ClusterFileEnvelope,
     path: File,
     dataFiles: Map[Long, DataFile],
     indexFiles: Map[Long, IndexFile]
 )
 
-object GoatRodeoBundle {
+object GoatRodeoCluster {
   def findFile(dir: File, hash: Long, suffix: String): File = {
     File(dir, f"${String.format("%016x", hash)}.${suffix}")
   }
-  def open(path: File): GoatRodeoBundle = {
+  def open(path: File): GoatRodeoCluster = {
 
     val fileName = path.getName()
     val fileNameLen = fileName.length()
@@ -146,26 +137,26 @@ object GoatRodeoBundle {
 
     if (testedHash != hash) {
       throw Exception(
-        f"Bundle file file for '${fileName}' does not match actual hash ${String
+        f"Cluster file file for '${fileName}' does not match actual hash ${String
             .format("%016x", testedHash)}"
       );
     }
     val theDir = path.getAbsoluteFile().getParentFile()
 
-    Using.resource(FileInputStream(path)) { bundleFile =>
-      val dfp = bundleFile.getChannel()
+    Using.resource(FileInputStream(path)) { clusterFile =>
+      val dfp = clusterFile.getChannel()
       val magic = Helpers.readInt(dfp)
-      if (magic != GraphManager.Consts.BundleFileMagicNumber) {
+      if (magic != GraphManager.Consts.ClusterFileMagicNumber) {
         throw Exception(
-          f"Unexpected magic number ${magic}, expecting ${GraphManager.Consts.BundleFileMagicNumber} for data file ${fileName}"
+          f"Unexpected magic number ${magic}, expecting ${GraphManager.Consts.ClusterFileMagicNumber} for data file ${fileName}"
         )
       }
 
-      val env: BundleFileEnvelope = Helpers.readLenAndCBOR(dfp)
+      val env: ClusterFileEnvelope = Helpers.readLenAndCBOR(dfp)
 
-      if (env.magic != GraphManager.Consts.BundleFileMagicNumber) {
+      if (env.magic != GraphManager.Consts.ClusterFileMagicNumber) {
         throw Exception(
-          f"Loaded a bundle with an invalid magic number: ${env}"
+          f"Loaded a cluster with an invalid magic number: ${env}"
         );
       }
 
@@ -174,7 +165,7 @@ object GoatRodeoBundle {
         (indexFile -> IndexFile.open(theDir, indexFile))
       }): _*)
 
-      val dataFileHashes = Set((for {
+      val dataFileHashes = TreeSet((for {
         idx <- indexFiles.values; dataFile <- idx.envelope.dataFiles
       } yield dataFile).toSeq: _*)
 
@@ -182,7 +173,7 @@ object GoatRodeoBundle {
         dataFileHash <- dataFileHashes.toSeq
       } yield (dataFileHash -> DataFile.open(theDir, dataFileHash))): _*)
 
-      GoatRodeoBundle(
+      GoatRodeoCluster(
         envelope = env,
         path = theDir,
         dataFiles = dataFiles,

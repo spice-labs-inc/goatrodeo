@@ -14,7 +14,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import scala.collection.SortedSet
 import goatrodeo.util.GitOID
 import goatrodeo.util.Helpers
 import scala.util.Try
@@ -29,14 +28,19 @@ import goatrodeo.util.FileType
 import goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
 import goatrodeo.util.Helpers.filesForParent
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
-enum EdgeType {
+enum EdgeType extends Comparable[EdgeType] {
   case AliasTo
   case AliasFrom
   case Contains
   case ContainedBy
   case BuildsTo
   case BuiltFrom
+
+  override def compareTo(other: EdgeType): Int =
+    this.toString().compareTo(other.toString())
 
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 }
@@ -53,13 +57,13 @@ object EdgeType {
   }
 }
 
-type Edge = (String, EdgeType, Option[String])
+type Edge = (EdgeType, String)
 
 case class ItemMetaData(
-    @key("file_names") fileNames: Set[String],
-    @key("file_type") fileType: Set[String],
-    @key("file_sub_type") fileSubType: Set[String],
-    extra: Map[String, Set[String]]
+    @key("file_names") fileNames: TreeSet[String],
+    @key("file_type") fileType: TreeSet[String],
+    @key("file_sub_type") fileSubType: TreeSet[String],
+    extra: TreeMap[String, TreeSet[String]]
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
@@ -70,9 +74,9 @@ case class ItemMetaData(
       fileSubType = this.fileSubType ++ other.fileSubType,
       extra = {
         var ret = this.extra;
-        for {(k, v) <- other.extra} {
+        for { (k, v) <- other.extra } {
           val nv = ret.get(k) match {
-            case None => v
+            case None     => v
             case Some(mv) => v ++ mv
           }
           ret = ret + (k -> nv)
@@ -95,24 +99,25 @@ object ItemMetaData {
             pid
           ) =>
         ItemMetaData(
-          fileNames = Set(fileName),
-          fileType = Set("package"),
-          fileSubType = Set(pid.protocol.name),
-          extra = fileType.toStringMap() ++ 
-          Map("purl" -> pid.purl().toSet) ++ 
-          pid.toStringMap()
+          fileNames = TreeSet(fileName),
+          fileType = TreeSet("package"),
+          fileSubType = TreeSet(pid.protocol.name),
+          extra = fileType.toStringMap() ++
+            TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
+            pid.toStringMap()
         )
       case None =>
         ItemMetaData(
-          fileNames = Set(fileName),
-          fileType = fileType.typeName().map(Set(_)).getOrElse(Set()),
-          fileSubType = fileType.subType().map(Set(_)).getOrElse(Set()),
+          fileNames = TreeSet(fileName),
+          fileType =
+            fileType.typeName().map(TreeSet(_)).getOrElse(TreeSet()),
+          fileSubType =
+            fileType.subType().map(TreeSet(_)).getOrElse(TreeSet()),
           extra = fileType.toStringMap()
         )
     }
 
   }
-
   given Encoder[ItemMetaData] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
     deriveEncoder[ItemMetaData]
@@ -129,21 +134,19 @@ type LocationReference = (Long, Long)
 case class Item(
     identifier: String,
     reference: LocationReference,
-    connections: Set[Edge],
+    connections: TreeSet[Edge],
     metadata: Option[ItemMetaData],
-    @key("merged_from") mergedFrom: Vector[LocationReference],
-    @key("file_size") fileSize: Long,
-    _timestamp: Long,
-    _version: Int,
-    _type: String
+    @key("merged_from") mergedFrom: TreeSet[LocationReference],
+    @key("file_size") fileSize: Long
 ) {
+
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
   def fixReferencePosition(hash: Long, offset: Long): Item = {
     val hasCur = reference != Item.noopLocationReference
     this.copy(
       reference = (hash, offset),
-      mergedFrom = (if (hasCur) Vector(this.reference) else Vector())
+      mergedFrom = (if (hasCur) TreeSet(this.reference) else TreeSet())
     )
   }
 
@@ -160,7 +163,7 @@ case class Item(
   def fixReferences(store: Storage): Item = {
     for { edge <- this.connections } {
       edge match {
-        case Edge(connection, EdgeType.AliasFrom, data) => {
+        case Edge(EdgeType.AliasFrom, connection) => {
 
           store.write(
             connection,
@@ -169,29 +172,25 @@ case class Item(
                 Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
-                  connections = Set(),
+                  connections = TreeSet(),
                   metadata = None,
                   fileSize = this.fileSize,
-                  mergedFrom = Vector(),
-                  _timestamp = System.currentTimeMillis(),
-                  _version = 1,
-                  _type = "Item"
+                  mergedFrom = TreeSet()
                 )
               )
-              val toAdd = (this.identifier, EdgeType.AliasTo, data)
+              val toAdd = (EdgeType.AliasTo, this.identifier)
               val updatedAlias =
                 if (alias.connections.contains(toAdd)) { alias }
                 else {
                   alias.copy(
-                    connections = (alias.connections + toAdd),
-                    _timestamp = System.currentTimeMillis()
+                    connections = (alias.connections + toAdd)
                   )
                 }
               updatedAlias
             }
           )
         }
-        case Edge(connection, EdgeType.BuiltFrom, data) => {
+        case Edge(EdgeType.BuiltFrom, connection) => {
 
           store.write(
             connection,
@@ -200,29 +199,25 @@ case class Item(
                 Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
-                  connections = Set(),
+                  connections = TreeSet(),
                   metadata = None,
                   fileSize = -1,
-                  mergedFrom = Vector(),
-                  _timestamp = System.currentTimeMillis(),
-                  _version = 1,
-                  _type = "Item"
+                  mergedFrom = TreeSet()
                 )
               )
-              val toAdd = (this.identifier, EdgeType.BuildsTo, data)
+              val toAdd = (EdgeType.BuildsTo, this.identifier)
               val updatedSource =
                 if (source.connections.contains(toAdd)) { source }
                 else {
                   source.copy(
-                    connections = (source.connections + toAdd),
-                    _timestamp = System.currentTimeMillis()
+                    connections = (source.connections + toAdd)
                   )
                 }
               updatedSource
             }
           )
         }
-        case Edge(connection, EdgeType.ContainedBy, data) => {
+        case Edge(EdgeType.ContainedBy, connection) => {
 
           store.write(
             connection,
@@ -231,23 +226,18 @@ case class Item(
                 Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
-                  // altIdentifiers = Vector(),
-                  connections = Set(),
+                  connections = TreeSet(),
                   metadata = None,
                   fileSize = -1,
-                  mergedFrom = Vector(),
-                  _timestamp = System.currentTimeMillis(),
-                  _version = 1,
-                  _type = "Item"
+                  mergedFrom = TreeSet()
                 )
               )
-              val toAdd = (this.identifier, EdgeType.Contains, data)
+              val toAdd = (EdgeType.Contains, this.identifier)
               val updatedSource = if (container.connections.contains(toAdd)) {
                 container
               } else {
                 container.copy(
-                  connections = (container.connections + toAdd),
-                  _timestamp = System.currentTimeMillis()
+                  connections = (container.connections + toAdd)
                 )
               }
               updatedSource
@@ -273,16 +263,17 @@ case class Item(
         case _                  => None
       },
       mergedFrom = this.mergedFrom ++ other.mergedFrom,
-      fileSize = if (this.fileSize == -1) other.fileSize else this.fileSize,
-      _timestamp = System.currentTimeMillis(),
-      _version = 1,
-      _type = this._type
+      fileSize = if (this.fileSize == -1) other.fileSize else this.fileSize
     )
 
   }
 }
 
 object Item {
+  // given itemCmp: java.util.Comparator[Item] = {
+
+  // }
+
   given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
     new Encoder.DefaultValueAware[Option[T]] {
 

@@ -1,7 +1,6 @@
 package goatrodeo.omnibor
 
 import java.io.File
-import goatrodeo.envelopes.PayloadCompression
 import java.nio.file.Files
 import java.io.FileOutputStream
 import goatrodeo.util.Helpers
@@ -10,17 +9,16 @@ import java.nio.ByteBuffer
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadType
-import goatrodeo.envelopes.ItemEnvelope
 import java.io.FileInputStream
 import goatrodeo.envelopes.IndexFileEnvelope
 import scala.util.Try
-import goatrodeo.envelopes.BundleFileEnvelope
+import goatrodeo.envelopes.ClusterFileEnvelope
 import java.time.LocalDateTime
 import java.time.Instant
 import java.time.ZoneOffset
 import java.nio.channels.FileChannel
 import java.time.Duration
+import scala.math.Ordering.Implicits._
 
 /** Manage many parts of persisting/retrieving the graph information
   */
@@ -28,7 +26,7 @@ object GraphManager {
   object Consts {
     val DataFileMagicNumber: Int = 0x00be1100 // Bell
     val IndexFileMagicNumber: Int = 0x54154170 // Shishitō
-    val BundleFileMagicNumber: Int = 0xba4a4a // Banana
+    val ClusterFileMagicNumber: Int = 0xba4a4a // Banana
     val TargetMaxFileSize: Long = 15L * 1024L * 1024L * 1024L // 7G
   }
 
@@ -36,7 +34,6 @@ object GraphManager {
   private def writeABlock(
       targetDirectory: File,
       items: Iterator[Item],
-      compression: PayloadCompression,
       previous: Long,
       afterWrite: Item => Unit
   ): DataAndIndexFiles = {
@@ -50,7 +47,6 @@ object GraphManager {
     Helpers.writeInt(writer, Consts.DataFileMagicNumber)
     val dataFileEnvelope =
       DataFileEnvelope.build(
-        timestamp = System.currentTimeMillis(),
         previous = previous,
         builtFromMerge = false
       )
@@ -72,38 +68,38 @@ object GraphManager {
 
       val md5 = entry.identifierMD5()
 
-      val entryBytes = compression.compress(entry.encodeCBOR())
+      val entryBytes = entry.encodeCBOR() // compression.compress(entry.encodeCBOR())
 
       // (for { env <- walker.envelopes() } yield {
       //   (Helpers.toHex(env.keyMd5.hash), env.keyMd5.hash, env.position)
       // }).toVector.sortBy(_._1)
 
-      val itemEnvelope: ItemEnvelope = ItemEnvelope(
-        keyMd5 = MD5(md5),
-        position = currentPosition,
-        backpointer = previousPosition,
-        dataLen = entryBytes.length,
-        dataType = PayloadType.ENTRY
-      )
+      // val itemEnvelope: ItemEnvelope = ItemEnvelope(
+      //   keyMd5 = MD5(md5),
+      //   position = currentPosition,
+      //   backpointer = previousPosition,
+      //   dataLen = entryBytes.length,
+      //   dataType = PayloadType.ENTRY
+      // )
 
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
 
-      val envelopeBytes = itemEnvelope.encodeCBOR()
+     // val envelopeBytes = itemEnvelope.encodeCBOR()
 
-      val toAlloc = 256 + (envelopeBytes.length) + (entryBytes.length)
+      val toAlloc = 256 + /*(envelopeBytes.length) + */(entryBytes.length)
       val bb = ByteBuffer.allocate(toAlloc)
       // println(f"Writing # ${loopCnt} ${orgEntry.identifier} eb ${envelopeBytes.length} entB ${entryBytes.length} tried ${backing.length} bb alloc ${bb.capacity()}")
 
-      bb.putShort((envelopeBytes.length & 0xffff).toShort)
+     //  bb.putShort((envelopeBytes.length & 0xffff).toShort)
       bb.putInt(entryBytes.length)
-      bb.put(envelopeBytes)
+      //bb.put(envelopeBytes)
       bb.put(entryBytes)
 
       bb.flip()
 
       writer.write(bb)
 
-      previousPosition = itemEnvelope.position;
+      previousPosition = currentPosition; // itemEnvelope.position;
 
       afterWrite(entry)
       loopCnt += 1
@@ -186,14 +182,14 @@ object GraphManager {
   def writeEntries(
       targetDirectory: File,
       entries: Iterator[Item],
-      compression: PayloadCompression = PayloadCompression.NONE
+      
   ): (Seq[DataAndIndexFiles], File) = {
     var previousInChain: Long = 0L
     var biggest: Vector[(Item, Int)] = Vector()
 
     def updateBiggest(item: Item): Unit = {
       val containedBy =
-        item.connections.filter(_._2 == EdgeType.ContainedBy).size
+        item.connections.filter(_._1 == EdgeType.ContainedBy).size
       if (biggest.length <= 50) {
         biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
       } else if (biggest.last._2 < containedBy) {
@@ -207,7 +203,7 @@ object GraphManager {
       val dataAndIndex = writeABlock(
         targetDirectory,
         entries,
-        compression,
+       //  compression,
         previous = previousInChain,
         updateBiggest
       )
@@ -219,20 +215,19 @@ object GraphManager {
     val tempFile =
       Files.createTempFile(
         targetDirectory.toPath(),
-        "goat_rodeo_bundle_",
-        ".grb"
+        "goat_rodeo_cluster_",
+        ".grc"
       )
     val fileWriter = new FileOutputStream(tempFile.toFile())
     val writer = fileWriter.getChannel()
 
-    Helpers.writeInt(writer, Consts.BundleFileMagicNumber)
-    val bundleEnvelope =
-      BundleFileEnvelope.build(
-        timestamp = System.currentTimeMillis(),
+    Helpers.writeInt(writer, Consts.ClusterFileMagicNumber)
+    val clusterEnvelope =
+      ClusterFileEnvelope.build(
         indexFiles = fileSet.map(_.indexFile).toVector,
         dataFiles = fileSet.map(_.dataFile).toVector
       )
-    val envelopeBytes = bundleEnvelope.encode()
+    val envelopeBytes = clusterEnvelope.encode()
     Helpers.writeShort(writer, envelopeBytes.length)
     writer.write(ByteBuffer.wrap(envelopeBytes))
     writer.close()
@@ -250,7 +245,7 @@ object GraphManager {
             now
               .getHour()
           )}_${"%02d".format(now.getMinute())}_${"%02d"
-            .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grb"
+            .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grc"
       )
 
     tempFile.toFile().renameTo(targetFile)
@@ -283,78 +278,33 @@ class GRDWalker(source: FileChannel) {
     DataFileEnvelope.decode(ba.position(0).array())
   }
 
-  def readNext(): Option[(ItemEnvelope, Item)] = {
+  def readNext(): Option[Item] = {
     if (source.position() == source.size()) {
       None
     } else {
-      val envLen = Helpers.readShort(source)
-      if (envLen == 0xffff) {
-        Helpers.readLong(source) // advance to end of time
+      val entryLen = Helpers.readInt(source)
+      if (entryLen == -1) {
         None
       } else {
-        val entryLen = Helpers.readInt(source)
-        val envBytes = ByteBuffer.allocate(envLen)
         val entryByteBuffer = ByteBuffer.allocate(entryLen)
-        source.read(envBytes)
         source.read(entryByteBuffer)
 
-        val envelope = ItemEnvelope
-          .decodeCBOR(envBytes.position(0).array())
-          .get
-        val entryBytes =entryByteBuffer.array()
+        val entryBytes = entryByteBuffer.array()
         val entry = Item.decode(entryBytes).get
-        Some(envelope -> entry)
+        Some(entry)
       }
     }
   }
 
-  def readNextEnvelope(): Option[ItemEnvelope] = {
-    val startPosition = source.position()
-    if (startPosition == source.size()) {
-      None
-    } else {
-      val envLen = Helpers.readShort(source)
-      if (envLen == 0xffff) {
-        Helpers.readLong(source) // advance to end of time
-        None
-      } else {
-        val entryLen = Helpers.readInt(source)
-        val envBytes = ByteBuffer.allocate(envLen)
+  
 
-        source.read(envBytes)
-        val envelope =
-          ItemEnvelope.decodeCBOR(envBytes.position(0).array()).get
-        source.position(
-          envelope.position + entryLen.toLong + envLen.toLong + 6L
-        )
-
-        Some(envelope)
-      }
-    }
-  }
-
-  def envelopes(): Iterator[ItemEnvelope] = {
-    var nextItem: Option[ItemEnvelope] = readNextEnvelope()
-    new Iterator[ItemEnvelope] {
-
-      override def hasNext: Boolean = nextItem.isDefined
-
-      override def next(): ItemEnvelope = {
-        val ret = nextItem
-        nextItem = readNextEnvelope()
-        ret.get // should be save because tested in hasNext
-      }
-
-    }
-  }
-
-  def items(): Iterator[(ItemEnvelope, Item)] = {
+  def items(): Iterator[Item] = {
     var nextItem = readNext()
-    new Iterator[(ItemEnvelope, Item)] {
+    new Iterator[ Item] {
 
       override def hasNext: Boolean = nextItem.isDefined
 
-      override def next(): (ItemEnvelope, Item) = {
+      override def next(): Item = {
         val ret = nextItem
         nextItem = readNext()
         ret.get // should be save because tested in hasNext

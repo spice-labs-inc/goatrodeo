@@ -8,12 +8,13 @@ import java.io.FileWriter
 import goatrodeo.util.PackageIdentifier
 import goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
 import goatrodeo.util.FileType
-
+import scala.collection.immutable.TreeSet
 
 /** Tools for opening files including containing files and building graphs
   */
 object BuildGraph {
 
+  def foo(a: EdgeType, b: EdgeType): TreeSet[EdgeType] = TreeSet(a, b)
 
   def graphForToProcess(
       item: ToProcess,
@@ -131,24 +132,24 @@ object BuildGraph {
 
         val fileType = FileType.theType(name, Some(file), associatedFiles)
 
-        val computedConnections: Set[Edge] =
+        val computedConnections: TreeSet[Edge] =
           // built from a source file
           (fileType.sourceGitOid() match {
-            case None => Set()
+            case None => TreeSet[Edge]()
             case Some(source) =>
-              Set[Edge]((source, EdgeType.BuiltFrom, None))
+              TreeSet[Edge]((EdgeType.BuiltFrom, source))
           })
           ++
           // include parent back-reference
           (parent match {
             case Some(parentId) =>
-              Vector[Edge]((parentId, EdgeType.ContainedBy, None))
+              Vector[Edge]((EdgeType.ContainedBy, parentId))
             case None => topConnections
           })
           ++
           // include aliases only if we aren't merging this item (if we're)
           // merging, then the aliases already exist and no point in regenerating them
-          (aliases.map(alias => (alias, EdgeType.AliasFrom, None))).toSet
+          (aliases.map(alias => (EdgeType.AliasFrom, alias))).toSet
           /* no pURL... index is took expensive
           ++
           // create the pURL DB
@@ -170,10 +171,7 @@ object BuildGraph {
               if (parent.isEmpty) topPackageIdentifier else None
             )
           ),
-          mergedFrom = Vector(),
-          _timestamp = System.currentTimeMillis(),
-          _type = "Item",
-          _version = 1
+          mergedFrom = TreeSet(),
         ).fixReferences(store)
         ret = ret + (name -> main)
 

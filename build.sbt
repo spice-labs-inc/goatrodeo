@@ -1,5 +1,5 @@
 val projectName = "goatrodeo"
-val projectVersion = "0.3.0-SNAPSHOT"
+val projectVersion = "0.4.0-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -19,7 +19,7 @@ lazy val root = project
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
     libraryDependencies += "org.apache.bcel" % "bcel" % "6.10.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
-    libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "commons-io" % "commons-io" % "2.16.1",
     libraryDependencies += "io.bullet" %% "borer-core" % "1.14.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",

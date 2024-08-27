@@ -31,12 +31,12 @@ import goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration
-import goatrodeo.envelopes.PayloadCompression
 import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.io.IOException
 import scala.annotation.tailrec
 import java.io.FileWriter
+import scala.collection.immutable.TreeSet
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -85,7 +85,7 @@ object Builder {
 
     // start time
     val start = Instant.now()
-    var dead_? = AtomicBoolean(false)
+    @volatile var dead_? = false
     // fork `threadCnt` threads to do the work
     val threads = for { threadNum <- 0 until threadCnt } yield {
       val t = new Thread(
@@ -109,7 +109,7 @@ object Builder {
 
           var toProcess: ToProcess = null
           while (
-            !dead_?.get() && {
+            !dead_? && {
               toProcess = doPoll();
 
               toProcess
@@ -136,7 +136,7 @@ object Builder {
               }
             } catch {
               case ise: IllegalStateException => {
-                dead_?.set(true)
+                dead_? = true
                 throw ise
               }
               case ioe: IOException => {
@@ -145,7 +145,7 @@ object Builder {
                     .getMessage()
                     .indexOf("Too many open files") > 0
                 ) {
-                  dead_?.set(true)
+                  dead_? = true
                   throw ioe
 
                 }
@@ -169,7 +169,7 @@ object Builder {
     // wait for the threads to complete
     for { t <- threads } {
       // deal with SIGKILL/ctrl-C
-      if (t.isInterrupted() || dead_?.get()) {
+      if (t.isInterrupted() || dead_?) {
         Thread.currentThread().interrupt()
         throw InterruptedException(f"${t.getName()} was interrupted")
       }
@@ -182,7 +182,7 @@ object Builder {
     purlOut.close()
 
     val ret = storage match {
-      case lf: (ListFileNames with Storage) if !dead_?.get() =>
+      case lf: (ListFileNames with Storage) if !dead_? =>
         writeGoatRodeoFiles(lf)
       case _ => println("Didn't write"); None
     }
@@ -214,8 +214,7 @@ object Builder {
 
         val ret = GraphManager.writeEntries(
           target,
-          sorted.toIterator,
-          PayloadCompression.NONE
+          sorted.toIterator
         )
 
         println(
@@ -319,7 +318,7 @@ object ToProcess {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
     val buildIt: Runnable = () => {
-      var fileSet = Set(
+      var fileSet = TreeSet(
         Helpers
           .findFiles(root, _ => true)
           .map(_.getAbsoluteFile()): _*

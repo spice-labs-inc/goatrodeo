@@ -39,7 +39,7 @@ frood.txt
 info_repo_*.txt
 
 build_repo_*.txt
-res_for_big_tent
+res_for_big_tent*
 
 # VIM
 # VIM Swap

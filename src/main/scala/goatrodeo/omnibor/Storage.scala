@@ -39,8 +39,6 @@ import java.io.FileOutputStream
 import goatrodeo.envelopes.MD5
 import goatrodeo.envelopes.Position
 import goatrodeo.envelopes.MultifilePosition
-import goatrodeo.envelopes.PayloadType
-import goatrodeo.envelopes.PayloadCompression
 import java.io.FileInputStream
 import io.bullet.borer.Cbor
 import goatrodeo.envelopes.IndexFileEnvelope
@@ -49,7 +47,6 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.channels.FileChannel
 import java.nio.ByteBuffer
-import goatrodeo.envelopes.BundleFileEnvelope
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -209,7 +206,7 @@ class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
     //     response match {
     //       case None => intermediate
     //       case Some(v) =>
-    //         val addl: Set[GitOID] = Set((for {
+    //         val addl: Set[GitOID] = SortedSet((for {
     //           r <- v.values.toSeq
     //           r2 <- r.toSeq if r2.containedBy.length < 1000
     //           i <- r2.containedBy
