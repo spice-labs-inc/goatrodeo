@@ -1,3 +1,5 @@
+val projectName = "goatrodeo"
+val projectVersion = "0.3.0-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -10,8 +12,8 @@ Test / logBuffered := false
 lazy val root = project
   .in(file("."))
   .settings(
-    name := "goatrodeo",
-    version := "0.3.0-SNAPSHOT",
+    name := projectName,
+    version := projectVersion,
     scalaVersion := scala3Version,
     libraryDependencies += "org.scala-lang" %% "toolkit" % "0.4.0",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
@@ -37,3 +39,14 @@ ThisBuild / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
   case _                                   => MergeStrategy.last
 }
+
+enablePlugins(JavaAppPackaging)
+enablePlugins(DockerPlugin)
+
+Docker / packageName := projectName
+Docker / version := projectVersion
+Docker / maintainer := "engineering@spicelabs.io"
+
+dockerBaseImage := "eclipse-temurin:21-alpine"
+dockerLabels := Map.empty
+dockerExposedPorts := Seq.empty
