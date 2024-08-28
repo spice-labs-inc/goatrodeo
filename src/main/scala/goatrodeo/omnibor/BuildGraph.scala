@@ -13,9 +13,6 @@ import scala.collection.immutable.TreeSet
 /** Tools for opening files including containing files and building graphs
   */
 object BuildGraph {
-
-  def foo(a: EdgeType, b: EdgeType): TreeSet[EdgeType] = TreeSet(a, b)
-
   def graphForToProcess(
       item: ToProcess,
       store: Storage,
@@ -39,7 +36,7 @@ object BuildGraph {
         )
 
         // process the sources
-        val sourceMap = buildItemsFor(
+        val (sourceMap, _) = buildItemsFor(
           source,
           pom
             .flatMap(_.purl().headOption.map(_ + "?packaging=sources"))
@@ -94,6 +91,20 @@ object BuildGraph {
     }
   }
 
+  /**
+    * Build a graph of identifiers for a given File
+    *
+    * @param root the root file to test
+    * @param name the name of the file
+    * @param store the backing store to load/save/inspect for the graph
+    * @param topConnections the back-reference for connections/aliases
+    * @param topPackageIdentifier the top level package identifier
+    * @param associatedFiles files associated with this artifact. Used to create graphs between source archives/jars and 
+    * compiled artifacts
+    * @param purlOut where to write pURLs
+    * @param dontSkipFound flag if true, even if the artifact was already found in the graph, process it again
+    * @return a tuple of (Map[file-name, gitoid-sha256], Map[Vector[filenames-for-embedded-artifacts], gitoid-sha256])
+    */
   def buildItemsFor(
       root: File,
       name: String,
@@ -103,14 +114,17 @@ object BuildGraph {
       associatedFiles: Map[String, GitOID],
       purlOut: BufferedWriter,
       dontSkipFound: Boolean
-  ): Map[String, String] = {
+  ): (Map[String, String], Map[Vector[String], String]) = {
     var ret: Map[String, String] = Map()
+    var ret2: Map[Vector[String], String] = Map()
     FileWalker.processFileAndSubfiles(
       FileWrapper(root, false),
       name,
       None,
+      Vector(name),
       dontSkipFound,
-      (file, name, parent) => {
+      (file, name, parent, parentStack) => {
+        // Compute the gitoid-sha256 (main) and other hash aliases for the item
         val (main, foundAliases) =
           GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
         val foundGitOID = store.exists(main)
@@ -174,6 +188,7 @@ object BuildGraph {
           mergedFrom = TreeSet(),
         ).fixReferences(store)
         ret = ret + (name -> main)
+        ret2 = ret2 + (parentStack -> main)
 
         store.write(
           main,
@@ -187,6 +202,6 @@ object BuildGraph {
         (main, foundGitOID, None)
       }
     )
-    ret
+    ret -> ret2
   }
 }

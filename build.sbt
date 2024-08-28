@@ -1,5 +1,5 @@
 val projectName = "goatrodeo"
-val projectVersion = "0.4.0-SNAPSHOT"
+val projectVersion = "0.4.1-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -7,7 +7,6 @@ fork := true
 
 resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/public/"
 Test / logBuffered := false
-
 
 lazy val root = project
   .in(file("."))
@@ -23,6 +22,9 @@ lazy val root = project
     libraryDependencies += "commons-io" % "commons-io" % "2.16.1",
     libraryDependencies += "io.bullet" %% "borer-core" % "1.14.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
+
+    // json4s
+    libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",

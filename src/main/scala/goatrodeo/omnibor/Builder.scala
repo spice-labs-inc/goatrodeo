@@ -407,6 +407,64 @@ object ToProcess {
                   Some(f)
                 )
               )
+            } else if ({
+              val jar = new File(
+                f.getAbsoluteFile().getParent(),
+                f"${name.substring(0, name.length() - 4)}.war"
+              )
+              jar.exists()
+            }) {
+              Some(
+                ToProcess(
+                  Some(
+                    PackageIdentifier(
+                      PackageProtocol.Maven,
+                      g,
+                      a,
+                      v,
+                      None,
+                      None,
+                      Map()
+                    )
+                  ),
+                  new File(
+                    f.getAbsoluteFile().getParent(),
+                    f"${name.substring(0, name.length() - 4)}.war"
+                  ),
+                  Helpers.findSrcFile(f),
+                  Some(f)
+                )
+              )
+
+            } else if ({
+              val jar = new File(
+                f.getAbsoluteFile().getParent(),
+                f"${name.substring(0, name.length() - 4)}.aar"
+              )
+              jar.exists()
+            }) {
+              Some(
+                ToProcess(
+                  Some(
+                    PackageIdentifier(
+                      PackageProtocol.Maven,
+                      g,
+                      a,
+                      v,
+                      None,
+                      None,
+                      Map()
+                    )
+                  ),
+                  new File(
+                    f.getAbsoluteFile().getParent(),
+                    f"${name.substring(0, name.length() - 4)}.aar"
+                  ),
+                  Helpers.findSrcFile(f),
+                  Some(f)
+                )
+              )
+
             } else None
 
           case _ =>

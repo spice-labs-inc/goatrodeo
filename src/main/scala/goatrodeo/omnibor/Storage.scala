@@ -127,105 +127,6 @@ trait BulkStorageReader {
   ): Map[GitOID, Option[Item]]
 }
 
-class WebStorageReader(base: URL) extends StorageReader with BulkStorageReader {
-  def read(path: String): Option[String] = {
-    val u2 = new URL(f"${base}/${path}")
-
-    Try {
-      new String(Helpers.slurpInput(u2.openStream()), "UTF-8")
-    }.toOption
-  }
-
-  // @tailrec
-  final def bulkRead(
-      paths: Set[GitOID],
-      known: Map[GitOID, Option[Item]],
-      totalBytes: Long = 0
-  ): Map[GitOID, Option[Item]] = {
-    // import sttp.client4.quick.*
-
-    // val toRequest = 400
-
-    // val knownKeys = known.keySet
-    // val unknownSet = paths.diff(knownKeys)
-
-    // if (unknownSet.size == 0) {
-    //   return known
-    // }
-
-    // println(f"Sending ${toRequest} of ${unknownSet.size}")
-    // val toSend = upickle.default.write(unknownSet.toSeq.take(400))
-    // val bulkURL = f"${base}/bulk"
-
-    // val uri = uri"${bulkURL}"
-
-    // val client = HttpClient.newHttpClient();
-    // val request = HttpRequest
-    //   .newBuilder()
-    //   .uri(URI.create(bulkURL))
-    //   .header("Content-Type", "application/json")
-    //   // .header("Content-Length", toSend.length.toString())
-    //   .POST(BodyPublishers.ofString(toSend))
-    //   // .POST(BodyPublishers.ofString(toSend))
-    //   .build();
-
-    // val httpResponse = Try { client.send(request, BodyHandlers.ofByteArray()) }
-
-    // httpResponse match {
-    //   case Failure(exception) =>
-    //     println(f"Failed ${exception}")
-    //     throw exception
-
-    //   case Success(resp) if resp.statusCode() != 200 =>
-    //     println(f"Failed ${resp.statusCode()}")
-    //     // FIXME -- log errors
-    //     known
-
-    //   case Success(resp) =>
-    //     val body = resp.body()
-    //     // case Response(body, code, _, _, _, _) =>
-    //     println(f"Received ${Helpers.formatInt(body.size)} bytes total ${Helpers
-    //         .formatInt(totalBytes + body.size)}")
-    //     val tryResponse =
-    //       Json
-    //         .decode(body)
-    //         .to[Map[GitOID, Option[Entry]]]
-    //         .valueTry // .read[Map[GitOID, Option[Entry]]](body)
-
-    //     val response: Option[Map[GitOID, Option[Entry]]] = tryResponse match {
-    //       case Failure(exception) => {
-    //         println(exception)
-    //         println(body)
-    //         return known
-    //       }
-    //       case Success(value) => Some(value)
-    //     }
-
-    //     val intermediate: Map[GitOID, Option[Entry]] = known
-
-    //     response match {
-    //       case None => intermediate
-    //       case Some(v) =>
-    //         val addl: Set[GitOID] = SortedSet((for {
-    //           r <- v.values.toSeq
-    //           r2 <- r.toSeq if r2.containedBy.length < 1000
-    //           i <- r2.containedBy
-    //         } yield i)*)
-
-    //         val current =
-    //           v.foldLeft(intermediate)((last, kv) =>
-    //             last + (kv._1 -> fixEntry(kv._2))
-    //           )
-
-    //         val updatedPaths = paths.union(addl)
-
-    //         bulkRead(updatedPaths, current, totalBytes + body.size)
-    //     }
-    // }
-
-    ???
-  }
-}
 
 class FileStorageReader(base: String) extends StorageReader {
   private val baseFile = new File(base)
@@ -248,7 +149,7 @@ object StorageReader {
     if (url.getProtocol() == "file") {
       new FileStorageReader(url.getPath())
     } else {
-      new WebStorageReader(url)
+      throw new Exception(f"Cannot build storage reader for ${url}")
     }
   }
 }
@@ -299,7 +200,6 @@ object Storage {
       fsLoc: Option[File]
   ): Storage = {
     fsLoc match {
-
       case target => MemStorage.getStorage(target)
     }
   }

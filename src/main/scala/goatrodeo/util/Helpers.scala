@@ -866,8 +866,9 @@ object PackageIdentifier {
         FileWrapper(f, false),
         f.getName(),
         None,
+        Vector(),
         true,
-        (wrapper, name, thing) => {
+        (wrapper, name, thing, parentStack) => {
           import scala.jdk.CollectionConverters.*
           if (name == "./control") {
             val lr = BufferedReader(InputStreamReader(wrapper.asStream()))

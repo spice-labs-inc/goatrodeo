@@ -42,11 +42,6 @@ import goatrodeo.util.FileWrapper
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
 class MySuite extends munit.FunSuite {
-  test("example test that succeeds") {
-    val obtained = 42
-    val expected = 42
-    assertEquals(obtained, expected)
-  }
 
   test("gitoid to file") {
     val test = List(
@@ -86,7 +81,6 @@ class MySuite extends munit.FunSuite {
       "181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b"
     )
   }
-
 
   // test("EntryEnvelope Serialization from round trips") {
 
@@ -281,15 +275,20 @@ class MySuite extends munit.FunSuite {
   }
 
   test("Compute pURL for .deb") {
-    val purl = PackageIdentifier.computePurl(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
+    val purl = PackageIdentifier.computePurl(
+      File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
+    )
     assert(purl.isDefined, "Should compute a purl")
     assertEquals(purl.get.artifactId, "tk8.6")
-    assert(purl.get.extra.get("maintainer").get.size > 0, "Should have a mainter")
+    assert(
+      purl.get.extra.get("maintainer").get.size > 0,
+      "Should have a mainter"
+    )
   }
 
-
   test("deal with .deb and zst") {
-    val nested = FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+    val nested =
+      FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -308,8 +307,6 @@ class MySuite extends munit.FunSuite {
     )
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
   }
-
-  
 
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
@@ -376,7 +373,7 @@ class MySuite extends munit.FunSuite {
     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
     for { toProcess <- files } {
-      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut )
+      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut)
     }
 
     val keys = store.keys()
