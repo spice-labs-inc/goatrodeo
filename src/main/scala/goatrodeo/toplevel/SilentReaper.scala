@@ -12,6 +12,8 @@ import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.io.ByteArrayOutputStream
 import java.util.Date
+import java.util.Calendar
+import java.util.GregorianCalendar
 
 /** Methods associated with discovering Silent Reaper issues
   */
@@ -26,9 +28,9 @@ object SilentReaper {
     * @param outDir
     */
   def deGrimmify(silentDir: File, outDir: File): Unit = {
-    val (artToContainer, containerToArtifacts) = readGrim(new File("data"))
-
-    val artSet: Set[String] = artToContainer.keySet
+    val (artToContainer, containerToArtifacts, artSet) = readGrim(
+      new File("data")
+    )
 
     val toTest = Files
       .find(silentDir.toPath(), 100000, (a, b) => !b.isDirectory())
@@ -46,19 +48,32 @@ object SilentReaper {
       } yield tested).toVector
 
     if (!bad.isEmpty) {
-      val d = new Date()
-      val badFile = new File(
-        outDir,
-        f"grim_found_${d.getYear()}_${String.format("%02d", d.getMonth())}_${String
-            .format("%02d", d.getDay())}_${String.format("%02d", d.getHours())}_${String
-            .format("%02d", d.getMinutes())}.json"
+      val json = pretty(
+        render(Extraction.decompose(bad), alwaysEscapeUnicode = true)
       )
-      Files.writeString(
-        badFile.toPath(),
-        pretty(render(Extraction.decompose(bad), alwaysEscapeUnicode = true)),
-        Charset.forName("UTF-8")
-      )
-      println(f"Wrote grim list to ${badFile.getPath()}")
+
+      if (outDir.getName() == "-" || outDir.getName() == "stderr") {
+        System.err.print(json)
+        System.err.flush()
+        println(f"Wrote grim list to `stderr`")
+      } else {
+        val d = new GregorianCalendar()
+        val badFile = new File(
+          outDir,
+          f"grim_found_${d.get(Calendar.YEAR)}_${String
+              .format("%02d", d.get(Calendar.MONTH))}_${String
+              .format("%02d", d.get(Calendar.DAY_OF_MONTH))}_${String
+              .format("%02d", d.get(Calendar.HOUR_OF_DAY))}_${String
+              .format("%02d", d.get(Calendar.MINUTE))}.json"
+        )
+        Files.writeString(
+          badFile.toPath(),
+          json,
+          Charset.forName("UTF-8")
+        )
+        println(f"Wrote grim list to ${badFile.getPath()}")
+      }
+      
     }
   }
 
@@ -87,7 +102,7 @@ object SilentReaper {
       artifactToContainer: Map[String, String],
       containerToArtifacts: Map[String, List[String]],
       artifactSet: Set[String]
-  ): Map[String, (String, Double, Vector[String])] = {
+  ): Map[String, GrimInfo] = {
     val store = MemStorage(None)
     val (_, res) = BuildGraph.buildItemsFor(
       toTest,
@@ -146,9 +161,14 @@ object SilentReaper {
           (id, overlap) <- realFound
           subArtifact <- containerToArtifacts(id)
           if artifactIdToFoundItem.contains(subArtifact)
-        } yield subArtifact -> (id, overlap, artifactIdToFoundItem(
-          subArtifact
-        ))): _*
+        } yield subArtifact -> GrimInfo(
+          id,
+          subArtifact,
+          overlap,
+          artifactIdToFoundItem(
+            subArtifact
+          )
+        )): _*
       )
     }
   }
@@ -162,7 +182,7 @@ object SilentReaper {
     */
   def readGrim(
       grimDir: File
-  ): (Map[String, String], Map[String, List[String]]) = {
+  ): (Map[String, String], Map[String, List[String]], Set[String]) = {
     val f2 = new File(grimDir, "grim.json")
     val json = Files.readString(f2.toPath(), Charset.forName("UTF-8"))
     val containerToArtifactList = parse(json).extract[Map[String, List[String]]]
@@ -171,7 +191,14 @@ object SilentReaper {
       v <- vs
     } yield v -> k): _*)
 
-    artToContainer -> containerToArtifactList
+    (artToContainer, containerToArtifactList, artToContainer.keySet)
   }
 
 }
+
+case class GrimInfo(
+    containingArtifact: String,
+    markerArtifact: String,
+    overlapWithContaining: Double,
+    path: Vector[String]
+)
