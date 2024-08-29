@@ -9,6 +9,7 @@ import goatrodeo.util.PackageIdentifier
 import goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
 import goatrodeo.util.FileType
 import scala.collection.immutable.TreeSet
+import scala.collection.immutable.TreeSet
 
 /** Tools for opening files including containing files and building graphs
   */
