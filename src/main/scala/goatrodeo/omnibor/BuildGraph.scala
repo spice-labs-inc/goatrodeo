@@ -1,13 +1,13 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import java.io.File
 import scala.util.Try
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers
 import java.io.BufferedWriter
 import java.io.FileWriter
-import goatrodeo.util.PackageIdentifier
-import goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
-import goatrodeo.util.FileType
+import io.spicelabs.goatrodeo.util.PackageIdentifier
+import io.spicelabs.goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
+import io.spicelabs.goatrodeo.util.FileType
 import scala.collection.immutable.TreeSet
 import scala.collection.immutable.TreeSet
 

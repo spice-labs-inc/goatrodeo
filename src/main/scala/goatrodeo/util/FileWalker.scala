@@ -1,4 +1,4 @@
-package goatrodeo.util
+package io.spicelabs.goatrodeo.util
 
 import java.io.File
 import scala.util.Try
@@ -254,7 +254,8 @@ object FileWalker {
             workOn
               .getCanonicalPath()
               .substring(root.getParentDirectory().getCanonicalPath().length()),
-          parentId, parentStack
+          parentId,
+          parentStack
         )
 
         fileAction match {

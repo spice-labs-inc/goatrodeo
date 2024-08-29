@@ -1,4 +1,4 @@
-package goatrodeo.toplevel
+package io.spicelabs.goatrodeo.toplevel
 
 import java.io.File
 import org.json4s._
@@ -6,8 +6,8 @@ import org.json4s.native.JsonMethods._
 import java.nio.file.Files
 import java.nio.charset.Charset
 import scala.collection.JavaConverters.asScalaIteratorConverter
-import goatrodeo.omnibor.BuildGraph
-import goatrodeo.omnibor.MemStorage
+import io.spicelabs.goatrodeo.omnibor.BuildGraph
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.io.ByteArrayOutputStream
@@ -15,25 +15,25 @@ import java.util.Date
 import java.util.Calendar
 import java.util.GregorianCalendar
 
-/** Methods associated with discovering Silent Reaper issues
+/** Methods associated with discovering Hidden Reaper issues
   */
-object SilentReaper {
+object HiddenReaper {
   implicit def jsonFormat: DefaultFormats = org.json4s.DefaultFormats
 
   /** Given the directories that contain the artifacts to scan and the "outDir"
     * which is expected to contain "grim.json" and where any found artifacts
     * will be deposited
     *
-    * @param silentDir
+    * @param toAnalyzeDir
     * @param outDir
     */
-  def deGrimmify(silentDir: File, outDir: File): Unit = {
+  def deGrimmify(toAnalyzeDir: File, outDir: File): Unit = {
     val (artToContainer, containerToArtifacts, artSet) = readGrim(
       new File("data")
     )
 
     val toTest = Files
-      .find(silentDir.toPath(), 100000, (a, b) => !b.isDirectory())
+      .find(toAnalyzeDir.toPath(), 100000, (a, b) => !b.isDirectory())
       .iterator()
       .asScala
 

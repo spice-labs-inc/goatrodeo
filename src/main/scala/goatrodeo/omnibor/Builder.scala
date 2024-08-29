@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
@@ -22,12 +22,12 @@ import java.io.OutputStreamWriter
 import java.io.BufferedWriter
 import java.math.BigInteger
 import scala.xml.Elem
-import goatrodeo.util.PackageIdentifier
+import io.spicelabs.goatrodeo.util.PackageIdentifier
 import java.util.concurrent.ConcurrentLinkedQueue
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers
 import scala.util.Try
 import java.io.FileInputStream
-import goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
+import io.spicelabs.goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration

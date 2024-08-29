@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,21 +12,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo
+package io.spicelabs.goatrodeo
 
-import goatrodeo.loader.{Loader, Analyzer}
+import io.spicelabs.goatrodeo.loader.{Loader, Analyzer}
 import scala.collection.JavaConverters._
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.io.BufferedReader
 import scopt.OParser
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import goatrodeo.omnibor.{Storage, ListFileNames, Builder}
+import io.spicelabs.goatrodeo.omnibor.{Storage, ListFileNames, Builder}
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.util.zip.GZIPOutputStream
@@ -34,8 +34,8 @@ import java.net.URL
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import java.io.FileFilter
 import java.nio.ByteBuffer
-import goatrodeo.util.Helpers.bailFail
-import goatrodeo.toplevel.SilentReaper
+import io.spicelabs.goatrodeo.util.Helpers.bailFail
+import io.spicelabs.goatrodeo.toplevel.HiddenReaper
 
 /** The `main` class
   */
@@ -59,8 +59,8 @@ object Howdy {
       build: Option[File] = None,
       threads: Int = 4,
       fetchURL: URL = new URL("https://goatrodeo.org/omnibor"),
-      silentNoMore: Boolean = false,
-      silentDir: File = new File("/jars_to_test")
+      hiddenNoMore: Boolean = false,
+      toAnalyzeDir: File = new File("/jars_to_test")
   )
 
   lazy val builder = OParser.builder[Config]
@@ -85,12 +85,12 @@ object Howdy {
       opt[File]('o', "out")
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
-      opt[File]("silentdir")
-        .text("The directory to scan for silent items")
-        .action((x, c) => c.copy(silentDir = x)),
-      opt[Unit]("silentnomore")
+      opt[File]("toanalyzedir")
+        .text("The directory to scan for hidden reaper items")
+        .action((x, c) => c.copy(toAnalyzeDir = x)),
+      opt[Unit]("hiddennomore")
         .text("Test artifacts against the grim list")
-        .action((_, c) => c.copy(silentNoMore = true)),
+        .action((_, c) => c.copy(hiddenNoMore = true)),
       opt[Int]('t', "threads")
         .text(
           "How many threads to run (default 4). Should be 2x-3x number of cores"
@@ -137,8 +137,8 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(Config(None, outDir, None, _, _, true, silentDir)) =>
-        SilentReaper.deGrimmify(silentDir, outDir.getOrElse(new File("/out")))
+      case Some(Config(None, outDir, None, _, _, true, toAnalyzeDir)) =>
+        HiddenReaper.deGrimmify(toAnalyzeDir, outDir.getOrElse(new File("/out")))
 
       case Some(Config(Some(_), _, Some(_), _, _, false, _)) =>
         println("Cannot do both analysis and building...")

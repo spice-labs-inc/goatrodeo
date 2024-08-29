@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,32 +12,32 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import goatrodeo.envelopes.MD5
-import goatrodeo.envelopes.Position
-import goatrodeo.envelopes.MultifilePosition
+import io.spicelabs.goatrodeo.envelopes.MD5
+import io.spicelabs.goatrodeo.envelopes.Position
+import io.spicelabs.goatrodeo.envelopes.MultifilePosition
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import goatrodeo.omnibor.BuildGraph
-import goatrodeo.omnibor.MemStorage
-import goatrodeo.omnibor.EdgeType
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.omnibor.Builder
-import goatrodeo.omnibor.GraphManager
-import goatrodeo.util.PackageIdentifier
-import goatrodeo.util.PackageProtocol
+import io.spicelabs.goatrodeo.omnibor.BuildGraph
+import io.spicelabs.goatrodeo.omnibor.MemStorage
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.Builder
+import io.spicelabs.goatrodeo.omnibor.GraphManager
+import io.spicelabs.goatrodeo.util.PackageIdentifier
+import io.spicelabs.goatrodeo.util.PackageProtocol
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import goatrodeo.util.FileWalker
-import goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
+import io.spicelabs.goatrodeo.util.FileWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html

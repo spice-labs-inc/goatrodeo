@@ -1,18 +1,18 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import java.io.File
 import java.nio.file.Files
 import java.io.FileOutputStream
-import goatrodeo.util.Helpers
-import goatrodeo.envelopes.DataFileEnvelope
+import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
 import java.nio.ByteBuffer
-import goatrodeo.envelopes.MD5
-import goatrodeo.envelopes.Position
-import goatrodeo.envelopes.MultifilePosition
+import io.spicelabs.goatrodeo.envelopes.MD5
+import io.spicelabs.goatrodeo.envelopes.Position
+import io.spicelabs.goatrodeo.envelopes.MultifilePosition
 import java.io.FileInputStream
-import goatrodeo.envelopes.IndexFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
 import scala.util.Try
-import goatrodeo.envelopes.ClusterFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import java.time.LocalDateTime
 import java.time.Instant
 import java.time.ZoneOffset

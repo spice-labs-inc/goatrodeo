@@ -1,4 +1,4 @@
-# Finding Silent Reaper artifacts based on the Grim List
+# Finding Hidden Reaper artifacts based on the Grim List
 
 Spice Labs' OmniBOR Corpus contains the [gitoids](https://www.iana.org/assignments/uri-schemes/prov/gitoid)
 for artifacts in many different open source ecosystems including the JVM/Java ecosystem.
@@ -26,10 +26,10 @@ artifact depends on any other artifacts with known vulnerabilities.
 
 However, sometimes engineers copy/paste source code from projects into their
 project. When projects with copied/pasted code is built, the dependencies
-are silent and hidden.
+are hidden.
 
-When these silent dependencies have **critical** vulnerabilities,
-we call this "Silent Reaper".
+When these hidden dependencies have **critical** vulnerabilities,
+we call this "Hidden Reaper".
 
 ## Markers
 
@@ -48,10 +48,10 @@ However, there will be artifacts (e.g., `.class` files) that are unique
 to each version of Foo. These are "markers."
 
 If these "marker" artifacts are contained by other artifacts, those
-containing artifacts will very likely _silently_ contain a particular
+containing artifacts will very likely _hide_ contain a particular
 version of Foo.
 
-## Detecting Silent Reapers
+## Detecting Hidden Reapers
 
 Spice Labs has taken GitHub's [Advisory Database](https://github.com/advisories)
 and found all Java/JVM packages that have critical vulnerabilities.
@@ -65,4 +65,4 @@ For each artifact in each package with critical vulnerabilities, Spice Labs has 
 the "markers" for that artifact.
 
 Spice Labs then uses these markers to locate other artifacts
-that Silently contain the Reapers.
+that Hide containing the Reapers.

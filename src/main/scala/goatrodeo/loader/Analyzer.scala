@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo.loader
+package io.spicelabs.goatrodeo.loader
 
 import java.io.File
 import java.io.FileInputStream
@@ -24,9 +24,9 @@ import java.net.URL
 import java.net.URLEncoder
 import java.net.HttpURLConnection
 import java.io.InputStream
-import goatrodeo.util.{Helpers, GitOID}
-import goatrodeo.omnibor.{ StorageReader}
-import goatrodeo.omnibor.BulkStorageReader
+import io.spicelabs.goatrodeo.util.{Helpers, GitOID}
+import io.spicelabs.goatrodeo.omnibor.{ StorageReader}
+import io.spicelabs.goatrodeo.omnibor.BulkStorageReader
 import io.bullet.borer.Json
 
 /** Do analysis of the file to see what the composition of a particular JAR file

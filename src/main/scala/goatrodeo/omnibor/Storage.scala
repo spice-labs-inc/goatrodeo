@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,17 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import java.io.File
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers
 import scala.util.Try
 import java.util.concurrent.atomic.AtomicReference
 import java.sql.Blob
 import java.sql.PreparedStatement
 import java.net.URL
-import goatrodeo.util.GitOIDUtils
-import goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.GitOID
 import scala.util.Failure
 import scala.util.Success
 import scala.annotation.tailrec
@@ -34,14 +34,14 @@ import java.net.http.HttpResponse.BodyHandlers
 import java.io.ByteArrayInputStream
 import io.bullet.borer.Json
 import java.nio.file.Files
-import goatrodeo.envelopes.DataFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
 import java.io.FileOutputStream
-import goatrodeo.envelopes.MD5
-import goatrodeo.envelopes.Position
-import goatrodeo.envelopes.MultifilePosition
+import io.spicelabs.goatrodeo.envelopes.MD5
+import io.spicelabs.goatrodeo.envelopes.Position
+import io.spicelabs.goatrodeo.envelopes.MultifilePosition
 import java.io.FileInputStream
 import io.bullet.borer.Cbor
-import goatrodeo.envelopes.IndexFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -51,6 +51,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
+import java.io.IOException
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -127,7 +128,6 @@ trait BulkStorageReader {
   ): Map[GitOID, Option[Item]]
 }
 
-
 class FileStorageReader(base: String) extends StorageReader {
   private val baseFile = new File(base)
 
@@ -149,7 +149,7 @@ object StorageReader {
     if (url.getProtocol() == "file") {
       new FileStorageReader(url.getPath())
     } else {
-      throw new Exception(f"Cannot build storage reader for ${url}")
+      throw new IOException(f"Cannot build storage reader for ${url}")
     }
   }
 }

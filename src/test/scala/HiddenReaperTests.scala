@@ -1,16 +1,11 @@
-import goatrodeo.toplevel.SilentReaper
+import io.spicelabs.goatrodeo.toplevel.HiddenReaper
 import java.io.File
-class SilentReaperTests extends munit.FunSuite {
-  test("example test that succeeds") {
-    val obtained = 42
-    val expected = 42
-    assertEquals(obtained, expected)
-  }
+class HiddenReaperTests extends munit.FunSuite {
   var (
     artifactToContainer: Map[String, String],
     containerToArtifacts: Map[String, List[String]],
     artifactSet: Set[String]
-  ) = SilentReaper.readGrim(new File("data"))
+  ) = HiddenReaper.readGrim(new File("data"))
 
   test("Read grim") {
 
@@ -23,7 +18,7 @@ class SilentReaperTests extends munit.FunSuite {
   }
 
   test("hidden2.jar") {
-    val res = SilentReaper.testAFile(
+    val res = HiddenReaper.testAFile(
       new File("test_data/hidden2.jar"),
       artifactToContainer,
       containerToArtifacts,
@@ -39,7 +34,7 @@ class SilentReaperTests extends munit.FunSuite {
   }
 
   test("test_data/log4j-core-2.22.1.jar") {
-    val res = SilentReaper.testAFile(
+    val res = HiddenReaper.testAFile(
       new File("test_data/log4j-core-2.22.1.jar"),
       artifactToContainer,
       containerToArtifacts,
