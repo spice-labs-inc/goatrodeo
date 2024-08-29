@@ -45,10 +45,11 @@ ThisBuild / assemblyMergeStrategy := {
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
 
+Universal / mappings += file("data/grim.json") -> "data/grim.json"
 Docker / packageName := projectName
 Docker / version := projectVersion
 Docker / maintainer := "ext-engineering@spicelabs.io"
 
-dockerBaseImage := "eclipse-temurin:21-alpine"
+dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal" 
 dockerLabels := Map.empty
 dockerExposedPorts := Seq.empty

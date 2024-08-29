@@ -38,14 +38,14 @@ object SilentReaper {
       .asScala
 
     val bad =
-      (for {
+      Map((for {
         t <- toTest
         pf = t.toFile()
         _ = println(f"Testing ${pf.getPath()}")
         tested <- Some(
           testAFile(pf, artToContainer, containerToArtifacts, artSet)
         ) if !tested.isEmpty
-      } yield tested).toVector
+      } yield pf.getPath() -> tested).toVector: _*)
 
     if (!bad.isEmpty) {
       val json = pretty(
@@ -73,8 +73,7 @@ object SilentReaper {
         )
         println(f"Wrote grim list to ${badFile.getPath()}")
       }
-      
-    }
+    } else println("Hooray!!! No hidden reapers found")
   }
 
   /** Test a specific file against the "grim list".
