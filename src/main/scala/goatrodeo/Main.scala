@@ -68,7 +68,7 @@ object Howdy {
     import builder._
     OParser.sequence(
       programName("goatrodeo"),
-      head("goatrodeo", "0.4.1"),
+      head("goatrodeo", "0.4.2"),
       opt[File]('a', "analyze")
         .action((x, c) =>
           c.copy(analyze = Some(x).filter(f => f.exists() && f.isFile()))
@@ -86,10 +86,10 @@ object Howdy {
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
       opt[File]("toanalyzedir")
-        .text("The directory to scan for hidden reaper items")
+        .text("The directory to scan for Hidden Reaper items")
         .action((x, c) => c.copy(toAnalyzeDir = x)),
-      opt[Unit]("hiddennomore")
-        .text("Test artifacts against the grim list")
+      opt[Unit]("unmask")
+        .text("Test artifacts against the grim list and unmask Hidden Reapers")
         .action((_, c) => c.copy(hiddenNoMore = true)),
       opt[Int]('t', "threads")
         .text(

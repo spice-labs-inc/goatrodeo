@@ -313,7 +313,7 @@ class MySuite extends munit.FunSuite {
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
     val nested = File("test_data/nested.tar")
-    val (got, _) = BuildGraph.buildItemsFor(
+    val built = BuildGraph.buildItemsFor(
       nested,
       nested.getName(),
       store,
@@ -328,7 +328,7 @@ class MySuite extends munit.FunSuite {
       false
     )
 
-    assert(got.size > 1200, f"Expection more than 1,200 items, got ${got.size}")
+    assert(built.nameToGitOID.size > 1200, f"Expection more than 1,200 items, got ${built.nameToGitOID.size}")
     assert(store.size() > 2200)
     val keys = store.keys()
     assert(!keys.filter(_.startsWith("sha256:")).isEmpty)
