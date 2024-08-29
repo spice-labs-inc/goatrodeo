@@ -1,4 +1,4 @@
-package goatrodeo.util
+package io.spicelabs.goatrodeo.util
 
 import java.io.File
 import scala.util.Try
@@ -17,6 +17,7 @@ enum FileAction {
   case End
 }
 object FileWalker {
+
   /** Look at a File. If it's compressed, read the full stream into a new file
     * and return that file
     *
@@ -65,6 +66,8 @@ object FileWalker {
         .name()
         .endsWith(".zip") || in.name().endsWith(".jar") || in
         .name()
+        .endsWith(".aar") || in
+        .name()
         .endsWith(".war")
     ) {
       try {
@@ -87,6 +90,7 @@ object FileWalker {
                 if (
                   v.getSize() > (512L * 1024L * 1024L) ||
                   name.endsWith(".zip") || name.endsWith(".jar") || name
+                    .endsWith(".aar") || name
                     .endsWith(".war")
                 ) {
                   FileWrapper(
@@ -126,7 +130,8 @@ object FileWalker {
             .createArchiveInputStream(
               fis
             )
-          val theIterator = Helpers.iteratorFor(input)
+          val theIterator = Helpers
+            .iteratorFor(input)
             .filter(!_.isDirectory())
             .map(ae =>
               () => {
@@ -135,7 +140,8 @@ object FileWalker {
                 val wrapper =
                   if (
                     ae.getSize() > (1024L * 1024L * 1024L) || name
-                      .endsWith(".zip") || name.endsWith(".jar")
+                      .endsWith(".zip") || name.endsWith(".jar") || name
+                      .endsWith(".aar") || name.endsWith(".war")
                   ) {
                     FileWrapper(
                       Helpers
@@ -169,7 +175,8 @@ object FileWalker {
                 .createArchiveInputStream(
                   BufferedInputStream(fis)
                 )
-              val theIterator = Helpers.iteratorFor(input)
+              val theIterator = Helpers
+                .iteratorFor(input)
                 .filter(!_.isDirectory())
                 .map(ae =>
                   () => {
@@ -178,7 +185,8 @@ object FileWalker {
                     val wrapper =
                       if (
                         ae.getSize() > (1024L * 1024L * 1024L) || name
-                          .endsWith(".zip") || name.endsWith(".jar")
+                          .endsWith(".zip") || name.endsWith(".jar") || name
+                          .endsWith(".war") || name.endsWith(".aar")
                       ) {
                         FileWrapper(
                           Helpers
@@ -205,7 +213,6 @@ object FileWalker {
     }
   }
 
-
   /** Process a file and subfiles (if the file is an archive)
     *
     * @param root
@@ -224,15 +231,21 @@ object FileWalker {
       root: ArtifactWrapper,
       name: String,
       parentId: Option[String],
+      parentStack: Vector[String],
       dontSkipFound: Boolean,
-      action: (ArtifactWrapper, String, Option[String]) => (String, Boolean, Option[FileAction])
+      action: (
+          ArtifactWrapper,
+          String,
+          Option[String],
+          Vector[String]
+      ) => (String, Boolean, Option[FileAction])
   ): Unit = {
     val toProcess: Vector[ArtifactWrapper] = if (root.isFile()) { Vector(root) }
     else if (root.isDirectory()) { root.listFiles() }
     else Vector()
     var keepOn = true
 
-    for { workOn <- toProcess if keepOn} {
+    for { workOn <- toProcess if keepOn } {
       if (workOn.size() > 4) {
         val (ret, found, fileAction) = action(
           workOn,
@@ -241,17 +254,21 @@ object FileWalker {
             workOn
               .getCanonicalPath()
               .substring(root.getParentDirectory().getCanonicalPath().length()),
-          parentId
+          parentId,
+          parentStack
         )
 
-        fileAction match 
-        {
+        fileAction match {
           case Some(FileAction.End) => keepOn = false
-          case _ => 
+          case _                    =>
         }
 
         // don't go into archives we've already seen
-        if (keepOn && fileAction != Some(FileAction.SkipDive) && (dontSkipFound || !found)) {
+        if (
+          keepOn && fileAction != Some(
+            FileAction.SkipDive
+          ) && (dontSkipFound || !found)
+        ) {
           for {
             (stream, toDelete) <- streamForArchive(workOn)
           } {
@@ -265,6 +282,7 @@ object FileWalker {
                   file,
                   name,
                   Some(ret),
+                  parentStack :+ name,
                   dontSkipFound,
                   action
                 )

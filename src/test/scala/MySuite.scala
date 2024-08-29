@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,41 +12,36 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import goatrodeo.envelopes.MD5
-import goatrodeo.envelopes.Position
-import goatrodeo.envelopes.MultifilePosition
+import io.spicelabs.goatrodeo.envelopes.MD5
+import io.spicelabs.goatrodeo.envelopes.Position
+import io.spicelabs.goatrodeo.envelopes.MultifilePosition
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import goatrodeo.omnibor.BuildGraph
-import goatrodeo.omnibor.MemStorage
-import goatrodeo.omnibor.EdgeType
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.omnibor.Builder
-import goatrodeo.omnibor.GraphManager
-import goatrodeo.util.PackageIdentifier
-import goatrodeo.util.PackageProtocol
+import io.spicelabs.goatrodeo.omnibor.BuildGraph
+import io.spicelabs.goatrodeo.omnibor.MemStorage
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.Builder
+import io.spicelabs.goatrodeo.omnibor.GraphManager
+import io.spicelabs.goatrodeo.util.PackageIdentifier
+import io.spicelabs.goatrodeo.util.PackageProtocol
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import goatrodeo.util.FileWalker
-import goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
+import io.spicelabs.goatrodeo.util.FileWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
 class MySuite extends munit.FunSuite {
-  test("example test that succeeds") {
-    val obtained = 42
-    val expected = 42
-    assertEquals(obtained, expected)
-  }
 
   test("gitoid to file") {
     val test = List(
@@ -86,7 +81,6 @@ class MySuite extends munit.FunSuite {
       "181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b"
     )
   }
-
 
   // test("EntryEnvelope Serialization from round trips") {
 
@@ -269,8 +263,9 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
+      Vector(),
       false,
-      (file, name, parent) => {
+      (file, name, parent, _) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
@@ -281,15 +276,20 @@ class MySuite extends munit.FunSuite {
   }
 
   test("Compute pURL for .deb") {
-    val purl = PackageIdentifier.computePurl(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
+    val purl = PackageIdentifier.computePurl(
+      File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
+    )
     assert(purl.isDefined, "Should compute a purl")
     assertEquals(purl.get.artifactId, "tk8.6")
-    assert(purl.get.extra.get("maintainer").get.size > 0, "Should have a mainter")
+    assert(
+      purl.get.extra.get("maintainer").get.size > 0,
+      "Should have a mainter"
+    )
   }
 
-
   test("deal with .deb and zst") {
-    val nested = FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+    val nested =
+      FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -298,8 +298,9 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
+      Vector(),
       false,
-      (file, name, parent) => {
+      (file, name, parent, _) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
@@ -309,12 +310,10 @@ class MySuite extends munit.FunSuite {
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
   }
 
-  
-
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
     val nested = File("test_data/nested.tar")
-    val got = BuildGraph.buildItemsFor(
+    val (got, _) = BuildGraph.buildItemsFor(
       nested,
       nested.getName(),
       store,
@@ -376,7 +375,7 @@ class MySuite extends munit.FunSuite {
     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
     for { toProcess <- files } {
-      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut )
+      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut)
     }
 
     val keys = store.keys()

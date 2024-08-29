@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo.util
+package io.spicelabs.goatrodeo.util
 
 import java.io.File
 import java.io.FileOutputStream
@@ -866,8 +866,9 @@ object PackageIdentifier {
         FileWrapper(f, false),
         f.getName(),
         None,
+        Vector(),
         true,
-        (wrapper, name, thing) => {
+        (wrapper, name, thing, parentStack) => {
           import scala.jdk.CollectionConverters.*
           if (name == "./control") {
             val lr = BufferedReader(InputStreamReader(wrapper.asStream()))

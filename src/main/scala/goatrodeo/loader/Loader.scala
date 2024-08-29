@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo.loader
+package io.spicelabs.goatrodeo.loader
 
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.Item
 
 
 

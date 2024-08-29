@@ -1,4 +1,4 @@
-package goatrodeo.util
+package io.spicelabs.goatrodeo.util
 
 import java.io.InputStream
 import java.io.File

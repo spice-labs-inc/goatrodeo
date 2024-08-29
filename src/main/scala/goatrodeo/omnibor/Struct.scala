@@ -1,6 +1,6 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
-/* Copyright 2024 David Pollak & Contributors
+/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.util.GitOID
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Helpers
 import scala.util.Try
 import io.bullet.borer.Json
 import io.bullet.borer.Codec
@@ -24,10 +24,10 @@ import io.bullet.borer.Decoder
 import io.bullet.borer.Cbor
 import io.bullet.borer.derivation.key
 import java.time.Instant
-import goatrodeo.util.FileType
-import goatrodeo.util.PackageIdentifier
+import io.spicelabs.goatrodeo.util.FileType
+import io.spicelabs.goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
-import goatrodeo.util.Helpers.filesForParent
+import io.spicelabs.goatrodeo.util.Helpers.filesForParent
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
