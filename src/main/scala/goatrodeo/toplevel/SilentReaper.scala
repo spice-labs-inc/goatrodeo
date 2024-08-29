@@ -26,7 +26,7 @@ object SilentReaper {
     * @param outDir
     */
   def deGrimmify(silentDir: File, outDir: File): Unit = {
-    val (artToContainer, containerToArtifacts) = readGrim(outDir)
+    val (artToContainer, containerToArtifacts) = readGrim(new File("data"))
 
     val artSet: Set[String] = artToContainer.keySet
 

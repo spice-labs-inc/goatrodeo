@@ -263,8 +263,9 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
+      Vector(),
       false,
-      (file, name, parent) => {
+      (file, name, parent, _) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
@@ -297,8 +298,9 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
+      Vector(),
       false,
-      (file, name, parent) => {
+      (file, name, parent, _) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
@@ -311,7 +313,7 @@ class MySuite extends munit.FunSuite {
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
     val nested = File("test_data/nested.tar")
-    val got = BuildGraph.buildItemsFor(
+    val (got, _) = BuildGraph.buildItemsFor(
       nested,
       nested.getName(),
       store,
