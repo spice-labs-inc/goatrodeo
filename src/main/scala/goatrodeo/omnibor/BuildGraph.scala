@@ -37,7 +37,7 @@ object BuildGraph {
         )
 
         // process the sources
-        val (sourceMap, _) = buildItemsFor(
+        val sourceBuilt = buildItemsFor(
           source,
           pom
             .flatMap(_.purl().headOption.map(_ + "?packaging=sources"))
@@ -61,7 +61,7 @@ object BuildGraph {
           store,
           Vector(),
           pom,
-          sourceMap,
+          sourceBuilt.nameToGitOID,
           purlOut,
           false
         )
@@ -115,9 +115,11 @@ object BuildGraph {
       associatedFiles: Map[String, GitOID],
       purlOut: BufferedWriter,
       dontSkipFound: Boolean
-  ): (Map[String, String], Map[Vector[String], String]) = {
-    var ret: Map[String, String] = Map()
-    var ret2: Map[Vector[String], String] = Map()
+  ): BuiltItemResult = {
+    var nameToGitOID: Map[String, String] = Map()
+    var parentStackToGitOID: Map[Vector[String], String] = Map()
+    var rootGitoid: String = ""
+
     FileWalker.processFileAndSubfiles(
       FileWrapper(root, false),
       name,
@@ -128,6 +130,9 @@ object BuildGraph {
         // Compute the gitoid-sha256 (main) and other hash aliases for the item
         val (main, foundAliases) =
           GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
+        if (parent.isEmpty) {
+          rootGitoid = main
+        }
         val foundGitOID = store.exists(main)
         val packageIds: Vector[String] = topPackageIdentifier.toVector
           .flatMap(
@@ -188,8 +193,8 @@ object BuildGraph {
           ),
           mergedFrom = TreeSet(),
         ).fixReferences(store)
-        ret = ret + (name -> main)
-        ret2 = ret2 + (parentStack -> main)
+        nameToGitOID = nameToGitOID + (name -> main)
+        parentStackToGitOID = parentStackToGitOID + (parentStack -> main)
 
         store.write(
           main,
@@ -203,6 +208,15 @@ object BuildGraph {
         (main, foundGitOID, None)
       }
     )
-    ret -> ret2
+    BuiltItemResult(rootGitoid, nameToGitOID, parentStackToGitOID)
   }
 }
+
+/**
+  * The results of running `buildItemsFor`
+  *
+  * @param mainGitOID the GitOID SHA256 of the root file
+  * @param nameToGitOID the map of name to gitoid
+  * @param parentStackToGitOID the map of full path to gitoid
+  */
+case class BuiltItemResult(mainGitOID: String, nameToGitOID: Map[String, String], parentStackToGitOID: Map[Vector[String], String])

@@ -24,9 +24,9 @@ class HiddenReaperTests extends munit.FunSuite {
       containerToArtifacts,
       artifactSet
     )
-    assert(res.size > 0, "There must be some problems found")
+    assert(res.get.foundMarkers.size > 0, "There must be some problems found")
     assert(
-      res.contains(
+      res.get.foundMarkers.contains(
         "gitoid:blob:sha256:b2197d2875cc31da10a1ba848e2c615f4b5cb3ecfdd1653475164864486425ba"
       ),
       "Must find spring URI component"
@@ -40,7 +40,7 @@ class HiddenReaperTests extends munit.FunSuite {
       containerToArtifacts,
       artifactSet
     )
-    assert(res.size == 0, "log4j 2.22 should be clean")
+    assert(res.isEmpty, "log4j 2.22 should be clean")
   }
 
 }

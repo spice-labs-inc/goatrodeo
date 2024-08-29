@@ -42,9 +42,9 @@ object HiddenReaper {
         t <- toTest
         pf = t.toFile()
         _ = println(f"Testing ${pf.getPath()}")
-        tested <- Some(
+        tested <-
           testAFile(pf, artToContainer, containerToArtifacts, artSet)
-        ) if !tested.isEmpty
+
       } yield pf.getPath() -> tested).toVector: _*)
 
     if (!bad.isEmpty) {
@@ -101,9 +101,9 @@ object HiddenReaper {
       artifactToContainer: Map[String, String],
       containerToArtifacts: Map[String, List[String]],
       artifactSet: Set[String]
-  ): Map[String, GrimInfo] = {
+  ): Option[Unmasked] = {
     val store = MemStorage(None)
-    val (_, res) = BuildGraph.buildItemsFor(
+    val built = BuildGraph.buildItemsFor(
       toTest,
       toTest.getPath(),
       store,
@@ -116,10 +116,11 @@ object HiddenReaper {
 
     // map from the gitoid-sha256 into all the places the item was found
     val artifactIdToFoundItem: Map[String, Vector[String]] =
-      res.foldLeft(Map[String, Vector[String]]()) { case (cur, (items, id)) =>
-        cur.updatedWith(id) { v =>
-          Some(v.getOrElse(Vector()) ++ items)
-        }
+      built.parentStackToGitOID.foldLeft(Map[String, Vector[String]]()) {
+        case (cur, (items, id)) =>
+          cur.updatedWith(id) { v =>
+            Some(v.getOrElse(Vector()) ++ items)
+          }
       }
 
     // turn this into the keys
@@ -129,7 +130,7 @@ object HiddenReaper {
     val overlapping = artifactSet & foundKeys
 
     // Got no overlapping, return nothing
-    if (overlapping.isEmpty) Map()
+    if (overlapping.isEmpty) None
     else {
 
       // find all the containers that overlap the individual marker gitoids
@@ -155,7 +156,7 @@ object HiddenReaper {
         .filter(_._2 > 0.5)
 
       // Convert the results
-      Map(
+      val unmaskedDetail = Map(
         (for {
           (id, overlap) <- realFound
           subArtifact <- containerToArtifacts(id)
@@ -169,6 +170,7 @@ object HiddenReaper {
           )
         )): _*
       )
+      Some(Unmasked(built.mainGitOID, unmaskedDetail))
     }
   }
 
@@ -194,6 +196,11 @@ object HiddenReaper {
   }
 
 }
+
+case class Unmasked(
+    mainArtifactGitOID: String,
+    foundMarkers: Map[String, GrimInfo]
+)
 
 case class GrimInfo(
     containingArtifact: String,
