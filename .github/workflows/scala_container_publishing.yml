@@ -38,10 +38,10 @@ jobs:
       steps:
         - name: Set up Docker Buildx
           uses: docker/setup-buildx-action@v3
-	  - name: Checkout with LFS
-	    uses: actions/checkout@v4
-	    with:
-              lfs: true
+        - name: Checkout with LFS
+          uses: actions/checkout@v4
+          with:
+            lfs: true
         - name: Set up JDK 21
           uses: actions/setup-java@v3
           with:
