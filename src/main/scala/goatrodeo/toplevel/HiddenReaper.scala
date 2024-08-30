@@ -103,16 +103,30 @@ object HiddenReaper {
       artifactSet: Set[String]
   ): Option[Unmasked] = {
     val store = MemStorage(None)
-    val built = BuildGraph.buildItemsFor(
-      toTest,
-      toTest.getPath(),
-      store,
-      Vector(),
-      None,
-      Map(),
-      new BufferedWriter(new OutputStreamWriter(new ByteArrayOutputStream())),
-      false
-    )
+    // deal with failures in reading the file
+    // this may be because the file has certain markers
+    // as some sort of archive, but when the archive is
+    // opened, there's a problem... just log
+    // the problem and move to the next file
+    val built =
+      try {
+        BuildGraph.buildItemsFor(
+          toTest,
+          toTest.getPath(),
+          store,
+          Vector(),
+          None,
+          Map(),
+          new BufferedWriter(
+            new OutputStreamWriter(new ByteArrayOutputStream())
+          ),
+          false
+        )
+      } catch {
+        case e: Exception =>
+          println(f"Failed for file ${toTest} exception ${e.getMessage()}")
+          return None
+      }
 
     // map from the gitoid-sha256 into all the places the item was found
     val artifactIdToFoundItem: Map[String, Vector[String]] =
@@ -170,7 +184,12 @@ object HiddenReaper {
           )
         )): _*
       )
-      Some(Unmasked(built.mainGitOID, unmaskedDetail))
+      // maybe some phantom markers were found... but eliminated,
+      // so check again
+      if (unmaskedDetail.isEmpty)
+        None
+      else
+        Some(Unmasked(built.mainGitOID, unmaskedDetail))
     }
   }
 

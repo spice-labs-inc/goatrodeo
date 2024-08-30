@@ -1,5 +1,5 @@
 val projectName = "goatrodeo"
-val projectVersion = "0.4.4-SNAPSHOT"
+val projectVersion = "0.4.5-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
