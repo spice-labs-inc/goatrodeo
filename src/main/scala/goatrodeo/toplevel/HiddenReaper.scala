@@ -36,7 +36,11 @@ object HiddenReaper {
     val lock = new Object()
 
     var toTest = Files
-      .find(toAnalyzeDir.toPath(), 100000, (a, b) => !b.isDirectory())
+      .find(
+        toAnalyzeDir.toPath(),
+        100000,
+        (a, b) => !b.isDirectory() && !a.toFile().getName().startsWith(".")
+      )
       .iterator()
       .asScala
       .toVector
@@ -65,7 +69,9 @@ object HiddenReaper {
         dequeue() match {
           case None => return
           case Some(p -> left) =>
-            println(f"Testing ${p.getPath()} on ${name}. ${left} files left to analyze")
+            println(
+              f"Testing ${p.getPath()} on ${name}. ${left} files left to analyze"
+            )
             testAFile(p, artToContainer, containerToArtifacts, artSet) match {
               case None         => {}
               case Some(unmask) => pushRes(p.getPath(), unmask)
