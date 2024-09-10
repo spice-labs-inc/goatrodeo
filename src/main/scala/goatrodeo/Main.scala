@@ -68,7 +68,7 @@ object Howdy {
     import builder._
     OParser.sequence(
       programName("goatrodeo"),
-      head("goatrodeo", "0.4.5"),
+      head("goatrodeo", "0.4.6"),
       opt[File]('a', "analyze")
         .action((x, c) =>
           c.copy(analyze = Some(x).filter(f => f.exists() && f.isFile()))
