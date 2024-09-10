@@ -43,13 +43,13 @@ object HiddenReaper {
 
     var res: Vector[(String, Unmasked)] = Vector()
 
-    def dequeue(): Option[File] = {
+    def dequeue(): Option[(File, Int)] = {
       lock.synchronized {
         val ret = toTest.headOption
         if (ret.isDefined) {
           toTest = toTest.drop(1)
         }
-        ret.map(_.toFile())
+        ret.map(v => v.toFile() -> toTest.length)
       }
     }
 
@@ -64,8 +64,8 @@ object HiddenReaper {
       while (true) {
         dequeue() match {
           case None => return
-          case Some(p) =>
-            println(f"Testing ${p.getPath()} on ${name}")
+          case Some(p -> left) =>
+            println(f"Testing ${p.getPath()} on ${name}. ${left} files left to analyze")
             testAFile(p, artToContainer, containerToArtifacts, artSet) match {
               case None         => {}
               case Some(unmask) => pushRes(p.getPath(), unmask)
