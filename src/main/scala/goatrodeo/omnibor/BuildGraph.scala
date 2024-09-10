@@ -117,23 +117,25 @@ object BuildGraph {
       dontSkipFound: Boolean
   ): BuiltItemResult = {
     var nameToGitOID: Map[String, String] = Map()
-    var parentStackToGitOID: Map[Vector[String], String] = Map()
+    var parentStackToGitOID: Map[Vector[FileAndGitoid], String] = Map()
     var rootGitoid: String = ""
 
-    FileWalker.processFileAndSubfiles(
+    FileWalker.processFileAndSubfiles[Vector[FileAndGitoid]](
       FileWrapper(root, false),
       name,
       None,
-      Vector(name),
+      Vector(),
       dontSkipFound,
-      (file, name, parent, parentStack) => {
+      (file, name, parent, lastParentStack) => {
         // Compute the gitoid-sha256 (main) and other hash aliases for the item
-        val (main, foundAliases) =
+        val (mainFileGitOID, foundAliases) =
           GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
+
+        val parentStack = lastParentStack :+ FileAndGitoid(name, mainFileGitOID)
         if (parent.isEmpty) {
-          rootGitoid = main
+          rootGitoid = mainFileGitOID
         }
-        val foundGitOID = store.exists(main)
+        val foundGitOID = store.exists(mainFileGitOID)
         val packageIds: Vector[String] = topPackageIdentifier.toVector
           .flatMap(
             _.purl().map(
@@ -170,17 +172,10 @@ object BuildGraph {
           // include aliases only if we aren't merging this item (if we're)
           // merging, then the aliases already exist and no point in regenerating them
           (aliases.map(alias => (EdgeType.AliasFrom, alias))).toSet
-          /* no pURL... index is took expensive
-          ++
-          // create the pURL DB
-          (
-            packageId.toVector.map(id =>
-              (packageType(id), EdgeType.ContainedBy, Some(id))
-            )
-          )*/
+
 
         val item = Item(
-          identifier = main,
+          identifier = mainFileGitOID,
           reference = Item.noopLocationReference,
           connections = computedConnections,
           fileSize = file.size(),
@@ -193,11 +188,11 @@ object BuildGraph {
           ),
           mergedFrom = TreeSet(),
         ).fixReferences(store)
-        nameToGitOID = nameToGitOID + (name -> main)
-        parentStackToGitOID = parentStackToGitOID + (parentStack -> main)
+        nameToGitOID = nameToGitOID + (name -> mainFileGitOID)
+        parentStackToGitOID = parentStackToGitOID + (parentStack -> mainFileGitOID)
 
         store.write(
-          main,
+          mainFileGitOID,
           current => {
             current match {
               case None        => item
@@ -205,7 +200,7 @@ object BuildGraph {
             }
           }
         )
-        (main, foundGitOID, None)
+        (mainFileGitOID, foundGitOID, None, parentStack)
       }
     )
     BuiltItemResult(rootGitoid, nameToGitOID, parentStackToGitOID)
@@ -219,4 +214,6 @@ object BuildGraph {
   * @param nameToGitOID the map of name to gitoid
   * @param parentStackToGitOID the map of full path to gitoid
   */
-case class BuiltItemResult(mainGitOID: String, nameToGitOID: Map[String, String], parentStackToGitOID: Map[Vector[String], String])
+case class BuiltItemResult(mainGitOID: String, nameToGitOID: Map[String, String], parentStackToGitOID: Map[Vector[FileAndGitoid], String])
+
+case class FileAndGitoid(file: String, gitoid: String)

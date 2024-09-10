@@ -14,6 +14,8 @@ import java.io.ByteArrayOutputStream
 import java.util.Date
 import java.util.Calendar
 import java.util.GregorianCalendar
+import io.spicelabs.goatrodeo.omnibor.FileAndGitoid
+import java.nio.file.Path
 
 /** Methods associated with discovering Hidden Reaper issues
   */
@@ -27,29 +29,76 @@ object HiddenReaper {
     * @param toAnalyzeDir
     * @param outDir
     */
-  def deGrimmify(toAnalyzeDir: File, outDir: File): Unit = {
+  def deGrimmify(toAnalyzeDir: File, outDir: File, threads: Int): Unit = {
     val (artToContainer, containerToArtifacts, artSet) = readGrim(
       new File("data")
     )
+    val lock = new Object()
 
-    val toTest = Files
+    var toTest = Files
       .find(toAnalyzeDir.toPath(), 100000, (a, b) => !b.isDirectory())
       .iterator()
       .asScala
+      .toVector
+
+    var res: Vector[(String, Unmasked)] = Vector()
+
+    def dequeue(): Option[File] = {
+      lock.synchronized {
+        val ret = toTest.headOption
+        if (ret.isDefined) {
+          toTest = toTest.drop(1)
+        }
+        ret.map(_.toFile())
+      }
+    }
+
+    def pushRes(path: String, unmasked: Unmasked): Unit = {
+      lock.synchronized {
+        val next = res :+ path -> unmasked
+        res = next
+      }
+    }
+
+    def runFiles(name: String): Unit = {
+      while (true) {
+        dequeue() match {
+          case None => return
+          case Some(p) =>
+            println(f"Testing ${p.getPath()} on ${name}")
+            testAFile(p, artToContainer, containerToArtifacts, artSet) match {
+              case None         => {}
+              case Some(unmask) => pushRes(p.getPath(), unmask)
+            }
+        }
+      }
+    }
+
+    val toJoin = for { i <- 1 to threads } yield {
+      val name = f"Thread ${i} of ${threads}"
+      val t = new Thread(() => runFiles(name), name)
+      t.start()
+      t
+    }
+
+    for { t <- toJoin } {
+      val name = t.getName()
+      t.join()
+      println(f"Joined ${name}")
+    }
 
     val bad =
-      Map((for {
-        t <- toTest
-        pf = t.toFile()
-        _ = println(f"Testing ${pf.getPath()}")
-        tested <-
-          testAFile(pf, artToContainer, containerToArtifacts, artSet)
-
-      } yield pf.getPath() -> tested).toVector: _*)
+      Map(res: _*)
 
     if (!bad.isEmpty) {
+      import org.json4s.JsonDSL._
+
       val json = pretty(
-        render(Extraction.decompose(bad), alwaysEscapeUnicode = true)
+        render(
+          ("type" -> "unmasked") ~ ("version" -> 1) ~ ("data" -> Extraction
+            .decompose(bad)),
+          alwaysEscapeUnicode = true
+        )
       )
 
       if (outDir.getName() == "-" || outDir.getName() == "stderr") {
@@ -58,8 +107,12 @@ object HiddenReaper {
         println(f"Wrote grim list to `stderr`")
       } else {
         val d = new GregorianCalendar()
+
+        val realOutDir =
+          if (outDir.exists() && outDir.isDirectory()) outDir else new File(".")
+
         val badFile = new File(
-          outDir,
+          realOutDir,
           f"grim_found_${d.get(Calendar.YEAR)}_${String
               .format("%02d", d.get(Calendar.MONTH))}_${String
               .format("%02d", d.get(Calendar.DAY_OF_MONTH))}_${String
@@ -129,8 +182,8 @@ object HiddenReaper {
       }
 
     // map from the gitoid-sha256 into all the places the item was found
-    val artifactIdToFoundItem: Map[String, Vector[String]] =
-      built.parentStackToGitOID.foldLeft(Map[String, Vector[String]]()) {
+    val artifactIdToFoundItem: Map[String, Vector[FileAndGitoid]] =
+      built.parentStackToGitOID.foldLeft(Map[String, Vector[FileAndGitoid]]()) {
         case (cur, (items, id)) =>
           cur.updatedWith(id) { v =>
             Some(v.getOrElse(Vector()) ++ items)
@@ -225,5 +278,5 @@ case class GrimInfo(
     containingArtifact: String,
     markerArtifact: String,
     overlapWithContaining: Double,
-    path: Vector[String]
+    path: Vector[FileAndGitoid]
 )

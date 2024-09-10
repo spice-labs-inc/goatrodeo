@@ -866,18 +866,18 @@ object PackageIdentifier {
         FileWrapper(f, false),
         f.getName(),
         None,
-        Vector(),
+        42,
         true,
-        (wrapper, name, thing, parentStack) => {
+        (wrapper, name, thing, _) => {
           import scala.jdk.CollectionConverters.*
           if (name == "./control") {
             val lr = BufferedReader(InputStreamReader(wrapper.asStream()))
             lines = lr.lines().iterator().asScala.toVector
-            ("na", false, Some(FileAction.End))
+            ("na", false, Some(FileAction.End), 42)
           } else if (name.startsWith("data.tar")) {
-            ("na", false, Some(FileAction.SkipDive))
+            ("na", false, Some(FileAction.SkipDive), 42)
           } else
-            ("na", false, None)
+            ("na", false, None, 42)
         }
       )
       val attrs = Map(lines.flatMap(s => {

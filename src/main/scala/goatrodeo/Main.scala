@@ -137,8 +137,8 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(Config(None, outDir, None, _, _, true, toAnalyzeDir)) =>
-        HiddenReaper.deGrimmify(toAnalyzeDir, outDir.getOrElse(new File("/out")))
+      case Some(Config(None, outDir, None, threads, _, true, toAnalyzeDir)) =>
+        HiddenReaper.deGrimmify(toAnalyzeDir, outDir.getOrElse(new File("/out")), threads)
 
       case Some(Config(Some(_), _, Some(_), _, _, false, _)) =>
         println("Cannot do both analysis and building...")
