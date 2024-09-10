@@ -31,7 +31,7 @@ lazy val root = project
 
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
-    assembly / mainClass := Some("goatrodeo.Howdy"),
+    assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
   )
 
