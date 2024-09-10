@@ -1,5 +1,5 @@
 val projectName = "goatrodeo"
-val projectVersion = "0.4.5-SNAPSHOT"
+val projectVersion = "0.4.6-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -31,7 +31,7 @@ lazy val root = project
 
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
-    assembly / mainClass := Some("goatrodeo.Howdy"),
+    assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
   )
 

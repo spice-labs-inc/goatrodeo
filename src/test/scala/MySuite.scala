@@ -263,13 +263,13 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
-      Vector(),
+      Vector[String](),
       false,
-      (file, name, parent, _) => {
+      (file, name, parent, x) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false, None)
+        (main, false, None, x)
       }
     )
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
@@ -298,13 +298,13 @@ class MySuite extends munit.FunSuite {
       nested,
       "nested",
       None,
-      Vector(),
+      Vector[String](),
       false,
-      (file, name, parent, _) => {
+      (file, name, parent, x) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false, None)
+        (main, false, None, x)
       }
     )
     assert(cnt > 10, f"expected more than 10, got ${cnt}")

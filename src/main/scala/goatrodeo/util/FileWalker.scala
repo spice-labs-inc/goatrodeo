@@ -227,18 +227,18 @@ object FileWalker {
     *   the action to take with the file and any of the subfiles (if this is an
     *   archive)
     */
-  def processFileAndSubfiles(
+  def processFileAndSubfiles[T](
       root: ArtifactWrapper,
       name: String,
       parentId: Option[String],
-      parentStack: Vector[String],
+      specific: T,
       dontSkipFound: Boolean,
       action: (
           ArtifactWrapper,
           String,
           Option[String],
-          Vector[String]
-      ) => (String, Boolean, Option[FileAction])
+          T
+      ) => (String, Boolean, Option[FileAction], T)
   ): Unit = {
     val toProcess: Vector[ArtifactWrapper] = if (root.isFile()) { Vector(root) }
     else if (root.isDirectory()) { root.listFiles() }
@@ -247,7 +247,7 @@ object FileWalker {
 
     for { workOn <- toProcess if keepOn } {
       if (workOn.size() > 4) {
-        val (ret, found, fileAction) = action(
+        val (ret, found, fileAction, newSpecific) = action(
           workOn,
           if (workOn == root) name
           else
@@ -255,7 +255,7 @@ object FileWalker {
               .getCanonicalPath()
               .substring(root.getParentDirectory().getCanonicalPath().length()),
           parentId,
-          parentStack
+          specific
         )
 
         fileAction match {
@@ -282,7 +282,7 @@ object FileWalker {
                   file,
                   name,
                   Some(ret),
-                  parentStack :+ name,
+                  newSpecific,
                   dontSkipFound,
                   action
                 )
