@@ -178,12 +178,13 @@ object BuildGraph {
           identifier = mainFileGitOID,
           reference = Item.noopLocationReference,
           connections = computedConnections,
-          fileSize = file.size(),
+          
           metadata = Some(
             ItemMetaData.from(
               name,
               fileType,
-              if (parent.isEmpty) topPackageIdentifier else None
+              if (parent.isEmpty) topPackageIdentifier else None,
+              fileSize = file.size(),
             )
           ),
           mergedFrom = TreeSet(),
