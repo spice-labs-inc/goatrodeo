@@ -1,6 +1,6 @@
 # Goat Rodeo
 
-![Build Status](https://github.com/spice-labs-inc/goatrodeo/actions/workflows/scala.yml/badge.svg)
+![Build Status](https://github.com/spice-labs-inc/goatrodeo/actions/workflows/scala_ci.yml/badge.svg)
 
 The Software Supply Chain is a big gnarly mess of unknowns... and it's
 baked right into all the systems you and your company build an run. 😱
