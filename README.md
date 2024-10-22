@@ -2,54 +2,36 @@
 
 ![Build Status](https://github.com/spice-labs-inc/goatrodeo/actions/workflows/scala_ci.yml/badge.svg)
 
-The Software Supply Chain is a big gnarly mess of unknowns... and it's
-baked right into all the systems you and your company build an run. 😱
+Using Inherent Identifiers (e.g., cryptographic hashes) to describe nodes in
+[Artifact Dependency Graphs](https://omnibor.io/glossary/artifact_dependency_graph/) is the same
+technique [Git](https://git-scm.com/) uses to identify branches, tags, etc.
 
-[Goat Rodeo](https://www.urbandictionary.com/define.php?term=Goat%20%20Rodeo)
-is a bit of an attempt to rein in the chaos that is the software supply chain.
+Goat Rodeo builds an Artifact Dependency Graph of "things that contain other things". For example,
+[Apache Directory](https://directory.apache.org/studio/download/download-linux.html) is a `tar.gz`...
+a compressed [TAR](https://en.wikipedia.org/wiki/Tar_(computing)) file that contains a series of
+JVM [JAR](https://docs.oracle.com/javase/tutorial/deployment/jar/basicsindex.html) file that
+contains a series of [`.class`](https://en.wikipedia.org/wiki/Java_class_file) files. Goat
+Rodeo recursively builds an artifact dependency graph that describes all encountered artifacts.
 
-Based on the specs and tenets of [OmniBOR](https://omnibor.io), Goat Rodeo
-creates and queries the set of [gitoids](https://www.iana.org/assignments/uri-schemes/prov/gitoid)
-for a container (starting with Java [JAR](https://docs.oracle.com/javase/tutorial/deployment/jar/basicsindex.html) files)
-and the container's contents.
+The recursive building of the Artifact Dependency Graph is called "Deep Inspection."
 
-The indexed collection of GitOIDs is called a "GitOID Corpus". For example: [Log4J version 2.7](https://goatrodeo.org/omnibor/gitoid:blob:sha256:f14a09c612371efe86ff8068e9bf98440c0d59f80e09df1753303fe6b25dd994).
-The Entry in the corpus points to many other gitoids... the classfiles and other contents of the package. This
-includes [AbstractAction.class](https://goatrodeo.org/omnibor/gitoid:blob:sha256:76375cae82efa98bc0607b8a59b05e3ae05093a834fef2cede707a6537d78857)
-which is contained by 12 different pacakges. The bidirectional index of the Corpus allows
-discovery of the contents of unknown JAR files.
+The artifact dependency graphs for all inspected artifacts is emitted and can be queried
+and inspected using [Big Tent](https://github.com/spice-labs-inc/bigtent/).
 
 This [Scala 3](https://docs.scala-lang.org/tour/tour-of-scala.html) code is built with the nominal Simple Build Tool [sbt](https://www.scala-sbt.org/)
 and can be run on Java 17 or newer.
 
 The code is licensed under and Apache 2.0 license and is intended to be used, shared, contributed to, etc.
 
-## Why?
+## Hidden Reapers
 
-We use Open Source software in every one of our systems. Yet, we don't know
-the contents of what we use or build... and we don't understand the provenance of what
-we use.
+There are hundreds of thousands of [Hidden Reapers](info/hidden_reapers.md) in the JVM ecosystem.
+Sonatype has identied [336,000](https://www.sonatype.com/en/press-releases/sonatype-uncovers-millions-of-previously-hidden-open-source-vulnerabilities-through-unique-shaded-vulnerability-detection-system) across
+Maven Central. Goat Rodeo can be used to "unmask" the Hidden Reapers in any JAR files.
 
-OmniBOR defines cryptographic mechanisms for identifying and building [directed acyclic graphs](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAGs)
-of software artifacts... from source code through intermediate artifacts (`.class` files, `.so` files, etc.) all the way through to
-executables.
+## Building
 
-However, creating OmniBOR DAGs and the associated [Merkle trees](https://en.wikipedia.org/wiki/Merkle_tree) requires some integration
-with tooling (compilers, linkers, packaging tools, etc.) However that integration, as of January 2024, has not materialized.
-
-But it's possible to compute GitOIDs and DAGs for already published artifacts including Java JAR files storage in 
-[Maven Central](https://maven.apache.org/repository/index.html). With that information, it's possible
-to look at the composition of a JAR file and list potential CVEs in the code in the JAR file as
-shown in this [demo](https://www.youtube.com/watch?t=201&v=RDFeJwK088U&feature=youtu.be).
-
-The value is that the contents of existing JAR and [WAR](https://en.wikipedia.org/wiki/WAR_(file_format)) can be
-inspected against the Goat Rodeo GitOID Corpus to determine the contents and the potential vulnerabilities in the contents.
-
-## What?
-
-The Goat Rodeo code will generate GitOID Corpus segments from collections of JAR files.
-
-## How?
+**Goat Rodeo _requires_ [Git LFS](https://git-lfs.com/) to build**
 
 Install [large file support for Git](https://git-lfs.com/).
 
@@ -57,12 +39,25 @@ Install [sbt](https://www.scala-sbt.org/) to build and run Goat Rodeo.
 
 To create an "assembly" (a stand-alone executable JAR file): `sbt assembly`
 
-The resulting JAR file can be executed: `java -jar target/scala-3.3.1/goatrodeo.jar`
+The resulting JAR file can be executed: `java -jar target/scala-3.3.3/goatrodeo.jar`
 
-To build a local GitOID Corpus from local JAR files: `java -jar target/scala-3.3.1/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24`
+To build an artifact dependency graph from local JAR files: `java -jar target/scala-3.3.3/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24`
 
 The above command tells the system to "build" (`-b`) the corpus from the JAR files in `~/.m2` and output the corpus
 to the `/tmp/gitoidcorpus` directory using 24 threads. 
+
+The resulting directory:
+
+```shell
+-rw------- 1 dpp dpp        76 Oct 10 13:25 2024_10_10_17_25_36_7cb8b580887ff6df.grc
+-rw-rw-r-- 1 dpp dpp  14846423 Oct 10 13:25 6866766381176e9c.gri
+-rw------- 1 dpp dpp 156324566 Oct 10 13:25 7c0d3cda0eff07c9.grd
+-rw-rw-r-- 1 dpp dpp     20080 Oct 10 13:25 purls.txt
+```
+
+The `purls.txt` file contains the [Package URLs](https://github.com/package-url/purl-spec) of
+the discovered packages.
+
 
 ## Development
 
@@ -73,15 +68,15 @@ In `~/tmp` untar the file: `tar -xzvf repo_ea.tgz`
 This will be a set of files that Goat Rodeo will index as part of it's normal tests.
 
 In the same directory (dpp uses `~/proj/`) that you cloned Goat Rodeo, also clone
-[Big Tent](https://gitlab.com/spicelabs1/bigtent).
+[Big Tent](https://github.com/spice-labs-inc/bigtent).
 
-When you run the Goat Rodeo tests, a `frood_dir` directory is created that contains
-generated index files. When you run Big Tent tests, the tests look for `../goatrodeo/frood_dir`
+When you run the Goat Rodeo tests, a `res_for_big_tent` directory is created that contains
+generated index files. When you run Big Tent tests, the tests look for `../goatrodeo/res_for_big_tent`
 and the generated files.
 
 To create a test data set from within SBT: `run "-b" "<path_to>/tmp/repo_ea" "-o" "/tmp/ff" "-t" "15"`
 
-Then use Cargo to build Big Tent: `dpp@halfpint:~/proj/bigtent$ cargo build`
+Then use Cargo to build Big Tent: `cargo build`
 
 From the Big Tent directory, you can run Big Tent against the data set: `./target/debug/bigtent -r /tmp/ff/<generated>.grc`
 
@@ -119,6 +114,3 @@ Have fun!
 
 We welcome participation and have a [Code of Conduct](code_of_conduct.md).
 
-Discussions on [Matrix](https://matrix.to/#/#spice-labs:matrix.org)
-
-Looking forward to making the dependencies in your projects a bit less of a Goat Rodeo.

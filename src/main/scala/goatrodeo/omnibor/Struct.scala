@@ -63,6 +63,7 @@ case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("file_type") fileType: TreeSet[String],
     @key("file_sub_type") fileSubType: TreeSet[String],
+    @key("file_size") fileSize: Long,
     extra: TreeMap[String, TreeSet[String]]
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -72,6 +73,7 @@ case class ItemMetaData(
       fileNames = this.fileNames ++ other.fileNames,
       fileType = this.fileType ++ other.fileType,
       fileSubType = this.fileSubType ++ other.fileSubType,
+      fileSize = this.fileSize,
       extra = {
         var ret = this.extra;
         for { (k, v) <- other.extra } {
@@ -92,7 +94,8 @@ object ItemMetaData {
   def from(
       fileName: String,
       fileType: FileType,
-      packageIdentifier: Option[PackageIdentifier]
+      packageIdentifier: Option[PackageIdentifier],
+      fileSize: Long
   ): ItemMetaData = {
     packageIdentifier match {
       case Some(
@@ -102,6 +105,7 @@ object ItemMetaData {
           fileNames = TreeSet(fileName),
           fileType = TreeSet("package"),
           fileSubType = TreeSet(pid.protocol.name),
+          fileSize = fileSize,
           extra = fileType.toStringMap() ++
             TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
             pid.toStringMap()
@@ -109,10 +113,9 @@ object ItemMetaData {
       case None =>
         ItemMetaData(
           fileNames = TreeSet(fileName),
-          fileType =
-            fileType.typeName().map(TreeSet(_)).getOrElse(TreeSet()),
-          fileSubType =
-            fileType.subType().map(TreeSet(_)).getOrElse(TreeSet()),
+          fileType = fileType.typeName().map(TreeSet(_)).getOrElse(TreeSet()),
+          fileSubType = fileType.subType().map(TreeSet(_)).getOrElse(TreeSet()),
+          fileSize = fileSize,
           extra = fileType.toStringMap()
         )
     }
@@ -136,8 +139,7 @@ case class Item(
     reference: LocationReference,
     connections: TreeSet[Edge],
     metadata: Option[ItemMetaData],
-    @key("merged_from") mergedFrom: TreeSet[LocationReference],
-    @key("file_size") fileSize: Long
+    @key("merged_from") mergedFrom: TreeSet[LocationReference]
 ) {
 
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -174,7 +176,6 @@ case class Item(
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
                   metadata = None,
-                  fileSize = this.fileSize,
                   mergedFrom = TreeSet()
                 )
               )
@@ -201,7 +202,6 @@ case class Item(
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
                   metadata = None,
-                  fileSize = -1,
                   mergedFrom = TreeSet()
                 )
               )
@@ -228,7 +228,6 @@ case class Item(
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
                   metadata = None,
-                  fileSize = -1,
                   mergedFrom = TreeSet()
                 )
               )
@@ -262,8 +261,7 @@ case class Item(
         case (_, Some(b))       => Some(b)
         case _                  => None
       },
-      mergedFrom = this.mergedFrom ++ other.mergedFrom,
-      fileSize = if (this.fileSize == -1) other.fileSize else this.fileSize
+      mergedFrom = this.mergedFrom ++ other.mergedFrom
     )
 
   }
