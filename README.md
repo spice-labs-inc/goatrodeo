@@ -51,6 +51,8 @@ The Goat Rodeo code will generate GitOID Corpus segments from collections of JAR
 
 ## How?
 
+Install [large file support for Git](https://git-lfs.com/).
+
 Install [sbt](https://www.scala-sbt.org/) to build and run Goat Rodeo.
 
 To create an "assembly" (a stand-alone executable JAR file): `sbt assembly`
