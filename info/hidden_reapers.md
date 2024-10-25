@@ -317,13 +317,70 @@ that Hide the Reapers.
 
 ## Using the Hidden Reaper Unmasking tool
 
-Goat Rodeo (this project) is published as a [Docker](https://en.wikipedia.org/wiki/Docker_(software))
-container that you can use to unmask Hidden Reapers in your code.
+[Goat Rodeo](https://github.com/spice-labs-inc/goatrodeo) is published as a [Docker](https://en.wikipedia.org/wiki/Docker_(software)) container 
+that you can use to unmask Hidden Reapers in your code.
 
-Create a directory (e.g., `test_data`) and copy some artifacts (JAR files, Docker image layers (in `tar` format), etc)
-into that directory. Then run:
+Create a directory (e.g., `test_data`) and copy the artifacts you want to test for Hidden Reapers (JAR files, tar files, .deb packages,
+Docker image layers (in tar format), etc) into that directory. Then run:
 
-`docker run --rm --network none -v $(pwd)/test_data:/jars_to_test:ro spicelabs/goatrodeo:latest --unmask --out stderr 2> /tmp/hidden_reapers.json`
+`docker run --platform linux/amd64 --quiet --rm --network none -v $(pwd)/test_data:/jars_to_test:ro spicelabs/goatrodeo:latest --unmask --out stderr 2> hidden_reapers.json`
 
+The above command:
 
+* Runs docker
+* `--platform linux/amd64` uses the "amd64" container which ensures compatibility with Apple Silicon
+* `--quiet` Ensures that Docker will not emit status messages to `stderr`
+* `--rm` Removes the container at the end of execution
+* `--network none` Ensures there is no network access during the container's execution. For security oriented folks this is a double-check (beyond being able to inspect the Goat Rodeo source) that running the container will not contact any external systems.
+* `-v $(pwd)/test_data:/jars_to_test:ro` Mounts, as "read only" the directory where Goat Rodeo will inspect artifacts (files)
+* `spicelabs/goatrodeo:latest` The Docker image to run
+* `--unmask --out stderr` The Goat Rodeo commands to run the "unmasking" operation and output to `stderr`
+* `2> hidden_reapers.json` Send the output of stderr to the `hidden_reapers.json` file
+
+The above command uses Docker to download and run the Apache 2.0 licensed open source Goat Rodeo container
+to build inherent identifiers for each file in the tested file. For example, a tar file contains other files.
+Some of those files (e.g., a JAR) may contain other files. Goat Rodeo recursively opens all the containers
+files and builds inherent identifiers for every file encountered. Goat Rodeo then compares the inherent 
+identifiers with the "Grim List" of markers from packages with known Critical vulnerabilities. 
+If any markers are encountered, the information will be output to the `hidden_reapers.json` file.
+
+The contents of the hidden_reapers.json file will look something like:
+```json
+  "data":{
+    "/jars_to_test/core-0.7.0.RELEASE.jar":{
+      "mainArtifactGitOID":"gitoid:blob:sha256:e12a8c51d6ae770b34dc87851745b2f743552144284d5f8f2fd46a3803085b37",
+      "foundMarkers":{
+        "gitoid:blob:sha256:357c06bfdbfcc2b90130494387dcc349af3951f859239d806cf361e7a86a07ef":{
+          "containingArtifact":"gitoid:blob:sha256:dbe7dd1bcb617833ca36ddd76c40f855d41d2358f0cd23bc92ed89e4a1d4b794",
+          "markerArtifact":"gitoid:blob:sha256:357c06bfdbfcc2b90130494387dcc349af3951f859239d806cf361e7a86a07ef",
+          "overlapWithContaining":1.0,
+          "path":[{
+            "file":"/jars_to_test/core-0.7.0.RELEASE.jar",
+            "gitoid":"gitoid:blob:sha256:e12a8c51d6ae770b34dc87851745b2f743552144284d5f8f2fd46a3803085b37"
+          },{
+            "file":"org/jerkar/api/depmanagement/ivy-2.4.0.jar",
+            "gitoid":"gitoid:blob:sha256:dbe7dd1bcb617833ca36ddd76c40f855d41d2358f0cd23bc92ed89e4a1d4b794"
+          },{
+            "file":"org/apache/ivy/osgi/repo/AggregatedRepoDescriptor.class",
+            "gitoid":"gitoid:blob:sha256:357c06bfdbfcc2b90130494387dcc349af3951f859239d806cf361e7a86a07ef"
+          }]
+        },
+```
+
+The meaning of the fields is as follows:
+
+* `data` The field that contains the items that match contents of the "Grim List"
+* `/jars_to_test/core-0.7.0.RELEASE.jar` The name of the file on the filesystem that has contents that match the "Grim List."
+* `mainArtifactGitOID` The [GitOID SHA256](https://omnibor.dev/glossary/omnibor/#omnibor-identifier) of the file.
+* `foundMarkers` The markers that have been found that match the "Grim List". The keys in this object are the gitoids of the marker that were found.
+* `containingArtifact` The artifact that contains the marker... that's the open source artifact with a critical vulnerability.
+* `markerArtifact` The artifact that was found in the tested file and also in the "Grim List"
+* `overlapWithContaining` Markers are the inherent identifiers (gitoids) that are unique to a particular version of an artifact (packege + version)
+   that has a Critical CVE. For various reasons, sometimes not all markers are copied into another artifact (e.g., an Uber JAR tool may trim classes that are not accessed during execution). The overlap is the number of markers identified in the tested artifact divided by the number of markers belonging to the Grim artifact. This can assist in determining the confidence that the found file is an indication of a Hidden Reaper.
+* `path` The path and associate inherent identifier (gitoid) to the found marker. In the above example, 
+   the "core...jar" file contains the "ivy-2.4.0.jar" file which contains the `AggregatedRepoDescriptor.class` file, which is a marker file for the vulnerable Ivy 2.4.0 file.
+
+It's possible for you to double-check the results by [Verifying Hidden Reapers](https://hiddenreaper.com/verifying_hidden_reapers.pdf).
+[Spice Labs](https://spicelabs.io) is currently working on an online tool to convert the output of the "Unmasking" tool into addition
+information that identifies the specific vulnerable packages and, if available, lists a version of the package that no longer has the vulnerabilities. 
 
