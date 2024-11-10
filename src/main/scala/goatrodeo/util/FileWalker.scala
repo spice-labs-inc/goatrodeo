@@ -244,7 +244,7 @@ object FileWalker {
   ): Unit = {
     val toProcess: Vector[ArtifactWrapper] = if (root.isFile()) { Vector(root) }
     else if (root.isDirectory()) { root.listFiles() }
-    else Vector()
+    else Vector.empty
     var keepOn = true
 
     for { workOn <- toProcess if keepOn } {
