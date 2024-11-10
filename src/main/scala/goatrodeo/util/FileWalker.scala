@@ -64,11 +64,13 @@ object FileWalker {
     if (
       in
         .name()
-        .endsWith(".zip") || in.name().endsWith(".jar") || in
+          .endsWith(".zip") || in
         .name()
-        .endsWith(".aar") || in
+          .endsWith(".jar") || in
         .name()
-        .endsWith(".war")
+          .endsWith(".aar") || in
+        .name()
+          .endsWith(".war")
     ) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
