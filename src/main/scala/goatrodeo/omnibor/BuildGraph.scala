@@ -121,10 +121,10 @@ object BuildGraph {
     var rootGitoid: String = ""
 
     FileWalker.processFileAndSubfiles[Vector[FileAndGitoid]](
-      FileWrapper(root, false),
+      FileWrapper.fromFile(root, false),
       name,
       None,
-      Vector(),
+      Vector.empty,
       dontSkipFound,
       (file, name, parent, lastParentStack) => {
         // Compute the gitoid-sha256 (main) and other hash aliases for the item
