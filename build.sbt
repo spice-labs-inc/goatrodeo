@@ -29,6 +29,9 @@ lazy val root = project
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
 
+    // https://mvnrepository.com/artifact/com.palantir.isofilereader/isofilereader
+    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
+
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
