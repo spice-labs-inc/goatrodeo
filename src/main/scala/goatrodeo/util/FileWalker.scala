@@ -61,16 +61,118 @@ object FileWalker {
   def streamForArchive(
       in: ArtifactWrapper
   ): Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)] = {
+    in match {
+      case ISOFileWrapper(f, isoReader, deleteOnFinalize) => ???
+      case InternalISOFileWrapper(f, isoFileReader) => ???
+      // todo - a specific type for Compressed artifacts, and possibly a distinct one for Zipped ones
+      case _ =>
+        streamForZippedArchive(in) match {
+          case Some(toReturn) => return Some(toReturn)
+          case None => // fall through
+        }
+        val factory = new ArchiveStreamFactory()
+        val ret = Try {
+          {
+            val fis = in.asStream()
+
+            try {
+              val input: ArchiveInputStream[ArchiveEntry] = factory
+                .createArchiveInputStream(
+                  fis
+                )
+              val theIterator = Helpers
+                .iteratorFor(input)
+                .filter(!_.isDirectory())
+                .map(ae =>
+                  () => {
+                    val name = ae.getName()
+
+                    val wrapper =
+                      if (
+                        ae.getSize() > (1024L * 1024L * 1024L) || name
+                          .endsWith(".zip") || name.endsWith(".jar") || name
+                          .endsWith(".aar") || name.endsWith(".war")
+                      ) {
+                        FileWrapper.fromFile(
+                          Helpers
+                            .tempFileFromStream(input, false, name),
+                          true
+                        )
+                      } else {
+                        ByteWrapper(Helpers.slurpInputNoClose(input), name)
+                      }
+
+                    (name, wrapper)
+                  }
+                )
+              Some(theIterator -> (() => input.close()))
+            } catch {
+              case e: Throwable => fis.close(); None
+            }
+          }
+        }.toOption.flatten
+
+        ret match {
+          case Some(archive) => Some(archive)
+          case None => {
+            for {
+              uncompressedFile <- fileForCompressed(in.asStream())
+              ret <- Try {
+
+                val fis = FileInputStream(uncompressedFile)
+                try {
+                  val input: ArchiveInputStream[ArchiveEntry] = factory
+                    .createArchiveInputStream(
+                      BufferedInputStream(fis)
+                    )
+                  val theIterator = Helpers
+                    .iteratorFor(input)
+                    .filter(!_.isDirectory())
+                    .map(ae =>
+                      () => {
+                        val name = ae.getName()
+
+                        val wrapper =
+                          if (
+                            ae.getSize() > (1024L * 1024L * 1024L) || name
+                              .endsWith(".zip") || name.endsWith(".jar") || name
+                              .endsWith(".war") || name.endsWith(".aar")
+                          ) {
+                            FileWrapper.fromFile(
+                              Helpers
+                                .tempFileFromStream(input, false, name),
+                              true
+                            )
+                          } else {
+                            ByteWrapper(Helpers.slurpInputNoClose(input), name)
+                          }
+
+                        (name, wrapper)
+                      }
+                    )
+                  theIterator -> (() => {
+                    input.close();
+                    uncompressedFile.delete();
+                    ()
+                  })
+                } catch {
+                  case e: Exception => fis.close(); throw e
+                }
+              }.toOption
+            } yield ret
+          }
+
+        } //
+    }
+  }
+
+
+  private def streamForZippedArchive(in: ArtifactWrapper): Option[(Iterator[() => (GitOID, ArtifactWrapper)], () => Unit)] = {
     if (
-      in
-        .name()
-          .endsWith(".zip") || in
-        .name()
-          .endsWith(".jar") || in
-        .name()
-          .endsWith(".aar") || in
-        .name()
-          .endsWith(".war")
+      in.name().endsWith(".zip") ||
+      in.name().endsWith(".jar") ||
+      in.name().endsWith(".aar") ||
+      in.name().endsWith(".war")
     ) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
@@ -79,11 +181,13 @@ object FileWalker {
           case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
         }
         val zipFile = ZipFile(theFile)
-        val it: Iterator[() => (String, ArtifactWrapper)] = zipFile
+        val it: Iterator[() => (GitOID, ArtifactWrapper)] = zipFile
           .stream()
           .iterator()
           .asScala
-          .filter(v => { !v.isDirectory() })
+          .filter(v => {
+            !v.isDirectory()
+          })
           .map(v =>
             () => {
               val name = v.getName()
@@ -91,11 +195,11 @@ object FileWalker {
               val wrapper =
                 if (
                   v.getSize() > (512L * 1024L * 1024L) ||
-                  name.endsWith(".zip") || name.endsWith(".jar") || name
+                    name.endsWith(".zip") || name.endsWith(".jar") || name
                     .endsWith(".aar") || name
                     .endsWith(".war")
                 ) {
-                  FileWrapper(
+                  FileWrapper.fromFile(
                     Helpers
                       .tempFileFromStream(
                         zipFile.getInputStream(v),
@@ -117,102 +221,15 @@ object FileWalker {
               )
             }
           )
-        return Some((it -> (() => { zipFile.close(); () })))
+        return Some((it -> (() => {
+          zipFile.close();
+          ()
+        })))
       } catch {
         case e: Exception => {} // fall through
       }
     }
-    val factory = (new ArchiveStreamFactory())
-    val ret = Try {
-      {
-        val fis = in.asStream()
-
-        try {
-          val input: ArchiveInputStream[ArchiveEntry] = factory
-            .createArchiveInputStream(
-              fis
-            )
-          val theIterator = Helpers
-            .iteratorFor(input)
-            .filter(!_.isDirectory())
-            .map(ae =>
-              () => {
-                val name = ae.getName()
-
-                val wrapper =
-                  if (
-                    ae.getSize() > (1024L * 1024L * 1024L) || name
-                      .endsWith(".zip") || name.endsWith(".jar") || name
-                      .endsWith(".aar") || name.endsWith(".war")
-                  ) {
-                    FileWrapper(
-                      Helpers
-                        .tempFileFromStream(input, false, name),
-                      true
-                    )
-                  } else {
-                    ByteWrapper(Helpers.slurpInputNoClose(input), name)
-                  }
-
-                (name, wrapper)
-              }
-            )
-          Some(theIterator -> (() => input.close()))
-        } catch {
-          case e: Throwable => fis.close(); None
-        }
-      }
-    }.toOption.flatten
-
-    ret match {
-      case Some(archive) => Some(archive)
-      case None => {
-        for {
-          uncompressedFile <- fileForCompressed(in.asStream())
-          ret <- Try {
-
-            val fis = FileInputStream(uncompressedFile)
-            try {
-              val input: ArchiveInputStream[ArchiveEntry] = factory
-                .createArchiveInputStream(
-                  BufferedInputStream(fis)
-                )
-              val theIterator = Helpers
-                .iteratorFor(input)
-                .filter(!_.isDirectory())
-                .map(ae =>
-                  () => {
-                    val name = ae.getName()
-
-                    val wrapper =
-                      if (
-                        ae.getSize() > (1024L * 1024L * 1024L) || name
-                          .endsWith(".zip") || name.endsWith(".jar") || name
-                          .endsWith(".war") || name.endsWith(".aar")
-                      ) {
-                        FileWrapper(
-                          Helpers
-                            .tempFileFromStream(input, false, name),
-                          true
-                        )
-                      } else {
-                        ByteWrapper(Helpers.slurpInputNoClose(input), name)
-                      }
-
-                    (name, wrapper)
-                  }
-                )
-              theIterator -> (() => {
-                input.close(); uncompressedFile.delete(); ()
-              })
-            } catch {
-              case e: Exception => fis.close(); throw e
-            }
-          }.toOption
-        } yield ret
-      }
-
-    }
+    None
   }
 
   /** Process a file and subfiles (if the file is an archive)
@@ -255,7 +272,7 @@ object FileWalker {
           else
             workOn
               .getCanonicalPath()
-              .substring(root.getParentDirectory().getCanonicalPath().length()),
+              .substring(root.getParentDirectoryPath().length()),
           parentId,
           specific
         )
