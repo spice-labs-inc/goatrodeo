@@ -1,13 +1,17 @@
 package io.spicelabs.goatrodeo.util
 
+import com.typesafe.scalalogging.Logger
+
 import java.io.File
 import scala.util.Try
 import org.apache.commons.compress.compressors.CompressorStreamFactory
+
 import java.io.InputStream
 import java.util.zip.ZipFile
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
+
 import java.io.FileInputStream
 import java.io.BufferedInputStream
 import java.io.IOException
@@ -17,6 +21,7 @@ enum FileAction {
   case End
 }
 object FileWalker {
+  val logger = Logger("FileWalker")
 
   /** Look at a File. If it's compressed, read the full stream into a new file
     * and return that file
@@ -62,8 +67,12 @@ object FileWalker {
       in: ArtifactWrapper
   ): Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)] = {
     in match {
-      case ISOFileWrapper(f, isoReader, deleteOnFinalize) => ???
+      case ISOFileWrapper(f, isoReader, deleteOnFinalize) =>
+        logger.info(s"Found an ISOFileWrapper(${f}, ${isoReader}, ${deleteOnFinalize})")
+        None
       case InternalISOFileWrapper(f, isoFileReader) => ???
+        logger.info(s"Found an InternalISOFileWrapper(${f}, ${isoFileReader})")
+        None
       // todo - a specific type for Compressed artifacts, and possibly a distinct one for Zipped ones
       case _ =>
         streamForZippedArchive(in) match {

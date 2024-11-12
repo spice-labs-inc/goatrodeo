@@ -32,6 +32,11 @@ lazy val root = project
     // https://mvnrepository.com/artifact/com.palantir.isofilereader/isofilereader
     libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
 
+    // logging
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
+    libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
+
+
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
