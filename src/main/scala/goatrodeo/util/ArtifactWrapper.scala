@@ -170,10 +170,10 @@ object ISOFileWrapper {
  * This represents a file "inside" of the ISO, which is where you get the individual stream
  */
 
-case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoFileReader: IsoFileReader)
+case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileReader)
   extends ArtifactWrapper {
 
-  override def asStream(): InputStream = isoFileReader.getFileStream(f)
+  override def asStream(): InputStream = isoReader.getFileStream(f)
 
   override def name(): String = f.getFileName()
 
@@ -198,7 +198,7 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoFileReader: IsoF
     f.getChildren()
       .toVector
       .filter(!_.getFileName().startsWith(".")) // TODO - check what other filters we may need for ISO
-      .map(InternalISOFileWrapper(_, isoFileReader))
+      .map(InternalISOFileWrapper(_, isoReader))
 
   override def getCanonicalPath(): String = f.getFullFileName('/')
 

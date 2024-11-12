@@ -191,13 +191,14 @@ class MySuite extends munit.FunSuite {
         )
         .isDefined
     )
-    assert(
-      FileWalker
+    assert({
+      val x = FileWalker
         .streamForArchive(
           FileWrapper(File("test_data/log4j-core-2.22.1.jar"), false)
         )
-        .isDefined
-    )
+      //.isDefined
+      x.isDefined
+    } )
     assert(
       FileWalker
         .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))

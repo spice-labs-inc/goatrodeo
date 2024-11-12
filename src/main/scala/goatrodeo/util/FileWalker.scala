@@ -74,10 +74,21 @@ object FileWalker {
         logger.info(s"Found an InternalISOFileWrapper(${f}, ${isoFileReader})")
         None
       // todo - a specific type for Compressed artifacts, and possibly a distinct one for Zipped ones
-      case _ =>
-        streamForZippedArchive(in) match {
-          case Some(toReturn) => return Some(toReturn)
-          case None => // fall through
+      case FileWrapper(_, _) | ByteWrapper(_, _) =>
+        if (
+          in.name().endsWith(".zip") ||
+            in.name().endsWith(".jar") ||
+            in.name().endsWith(".aar") ||
+            in.name().endsWith(".war")
+        ) {
+          logger.info(s"Found a Zipped Archive '${in.name()}'…")
+          streamForZippedArchive(in) match {
+            case Some(toReturn) =>
+              logger.info(s"Got a result from Zipped Archive process: ${toReturn}")
+              return Some(toReturn)
+            case None =>
+              logger.info(s"Got nothing from streamForZippedArchive, falling through")// fall through
+          }
         }
         val factory = new ArchiveStreamFactory()
         val ret = Try {
@@ -177,68 +188,67 @@ object FileWalker {
 
 
   private def streamForZippedArchive(in: ArtifactWrapper): Option[(Iterator[() => (GitOID, ArtifactWrapper)], () => Unit)] = {
-    if (
-      in.name().endsWith(".zip") ||
-      in.name().endsWith(".jar") ||
-      in.name().endsWith(".aar") ||
-      in.name().endsWith(".war")
-    ) {
-      try {
-        import scala.collection.JavaConverters.asScalaIteratorConverter
-        val theFile = in match {
-          case FileWrapper(f, _) => f
-          case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
-        }
-        val zipFile = ZipFile(theFile)
-        val it: Iterator[() => (GitOID, ArtifactWrapper)] = zipFile
-          .stream()
-          .iterator()
-          .asScala
-          .filter(v => {
-            !v.isDirectory()
-          })
-          .map(v =>
-            () => {
-              val name = v.getName()
-
-              val wrapper =
-                if (
-                  v.getSize() > (512L * 1024L * 1024L) ||
-                    name.endsWith(".zip") || name.endsWith(".jar") || name
-                    .endsWith(".aar") || name
-                    .endsWith(".war")
-                ) {
-                  FileWrapper.fromFile(
-                    Helpers
-                      .tempFileFromStream(
-                        zipFile.getInputStream(v),
-                        false,
-                        name
-                      ),
-                    true
-                  )
-                } else {
-                  ByteWrapper(
-                    Helpers.slurpInput(zipFile.getInputStream(v)),
-                    name
-                  )
-                }
-
-              (
-                name,
-                wrapper
-              )
-            }
-          )
-        return Some((it -> (() => {
-          zipFile.close();
-          ()
-        })))
-      } catch {
-        case e: Exception => {} // fall through
+    try {
+      import scala.collection.JavaConverters.asScalaIteratorConverter
+      val theFile = in match {
+        case FileWrapper(f, _) =>
+          logger.info(s"FileWrapper($f, _)")
+          f
+        case _ =>
+          val x = Helpers.tempFileFromStream(in.asStream(), true, in.name())
+          logger.info(s"TempFileFromStream: $x")
+          x
       }
+      val zipFile = ZipFile(theFile)
+      val it: Iterator[() => (GitOID, ArtifactWrapper)] = zipFile
+        .stream()
+        .iterator()
+        .asScala
+        .filter(v => {
+          !v.isDirectory()
+        })
+        .map(v =>
+          () => {
+            val name = v.getName()
+
+            val wrapper =
+              if (
+                v.getSize() > (512L * 1024L * 1024L) ||
+                  name.endsWith(".zip") || name.endsWith(".jar") || name
+                  .endsWith(".aar") || name
+                  .endsWith(".war")
+              ) {
+                FileWrapper.fromFile(
+                  Helpers
+                    .tempFileFromStream(
+                      zipFile.getInputStream(v),
+                      false,
+                      name
+                    ),
+                  true
+                )
+              } else {
+                ByteWrapper(
+                  Helpers.slurpInput(zipFile.getInputStream(v)),
+                  name
+                )
+              }
+
+            (
+              name,
+              wrapper
+            )
+          }
+        )
+      Some((it -> (() => {
+        zipFile.close();
+        ()
+      })))
+    } catch {
+      case e: Exception =>
+        logger.error(s"Got an error processing Zip File: ${e}")
+        None // fall through
     }
-    None
   }
 
   /** Process a file and subfiles (if the file is an archive)
