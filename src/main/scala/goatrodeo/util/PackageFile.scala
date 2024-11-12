@@ -29,6 +29,7 @@ enum PackageFileType {
   case WINZIP
   case RPM
   case XZ
+  case ISO
 }
 
 object PackageFileType {

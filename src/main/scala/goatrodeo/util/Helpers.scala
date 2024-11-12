@@ -843,7 +843,7 @@ object GitOIDUtils {
 }
 
 enum PackageProtocol {
-  case Maven, NPM, Docker, Deb, Gem
+  case Maven, NPM, Docker, Deb, Gem, ISO
 
   def name: String = {
     this match {
@@ -852,6 +852,7 @@ enum PackageProtocol {
       case Docker => "docker"
       case Deb    => "deb"
       case Gem    => "gem"
+      case ISO    => "iso"
     }
   }
 }
@@ -863,7 +864,7 @@ object PackageIdentifier {
     if (name.endsWith(".deb")) {
       var lines: Vector[String] = Vector()
       FileWalker.processFileAndSubfiles(
-        FileWrapper(f, false),
+        FileWrapper.fromFile(f, false),
         f.getName(),
         None,
         42,

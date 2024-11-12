@@ -234,6 +234,12 @@ class MySuite extends munit.FunSuite {
         .streamForArchive(FileWrapper(File("test_data/nested.tar"), false))
         .isDefined
     )
+
+    assert(
+      FileWalker
+        .streamForArchive(FileWrapper(File("test_data/small_only_udf_260.iso"), false))
+        .isDefined
+    )
   }
 
   test("Walk a tar file") {
