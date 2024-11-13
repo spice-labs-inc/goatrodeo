@@ -488,4 +488,21 @@ class MySuite extends munit.FunSuite {
     }
   }
 
+  test("Walk an iso file") {
+    var cnt = 0
+    val (inputStream, _) =
+      FileWalker
+        .streamForArchive(ISOFileWrapper.fromFile(File("test_data/small_only_udf_260.iso"), false).get) // quick and dirty get without expanding the Try, for now…
+        .get
+    for {
+      e <- inputStream
+      (name, file) = e()
+    } {
+      cnt += 1
+      file.delete()
+    }
+
+    assert(cnt > 2)
+  }
+
 }

@@ -10,6 +10,7 @@ import java.io.File
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.ByteArrayInputStream
+import scala.annotation.tailrec
 
 trait ArtifactWrapper {
   def asStream(): InputStream
@@ -172,8 +173,8 @@ case class ISOFileWrapper(f: File, isoReader: IsoFileReader, deleteOnFinalize: B
         case Some(files) =>
           files.toVector
             .filter(!_.getFileName().startsWith("."))
-            .flatMap(x => x.getChildren.toVector)
             .map(InternalISOFileWrapper(_, isoReader))
+            .flatMap(_.listFiles())
         case None => Vector.empty
       }
   }
@@ -239,15 +240,20 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
    *
    */
   override def listFiles(): Vector[InternalISOFileWrapper] = {
+    logger.info("List Files")
     Option(f.getChildren()) match {
       case Some(files) =>
         files.toVector
           .filter(!_.getFileName().startsWith("."))
-          .flatMap(x => x.getChildren.toVector)
-          .map(InternalISOFileWrapper(_, isoReader))
+          .flatMap(entry =>  {
+            val x = InternalISOFileWrapper.getISOSubfileTree(InternalISOFileWrapper(entry, isoReader), Vector.empty)
+            logger.info(s"Entry: ${entry.getFileName}, children: $x")
+            x
+          })
       case None => Vector.empty
     }
   }
+
 
   override def getCanonicalPath(): String = f.getFullFileName('/')
 
@@ -265,5 +271,27 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
     logger.debug(s"File Extension for '$path': '$ext'")
     Some(ext)
   }
+
+}
+
+object InternalISOFileWrapper {
+  private val logger = Logger("InternalISOFileWrapper")
+
+  // TODO - make tail recursive
+  def getISOSubfileTree(entry: InternalISOFileWrapper, files: Vector[InternalISOFileWrapper]): Vector[InternalISOFileWrapper] = {
+    val children = entry.f.getChildren()
+    if (children.isEmpty) {
+      return files
+    }
+
+    val eB = Vector.newBuilder[InternalISOFileWrapper]
+    for (child <- children) {
+      logger.info(s"Subfiles: ${child.getFileName}")
+      eB ++= getISOSubfileTree(InternalISOFileWrapper(child, entry.isoReader), files :+ InternalISOFileWrapper(child, entry.isoReader))
+    }
+
+    eB.result()
+  }
+
 }
 
