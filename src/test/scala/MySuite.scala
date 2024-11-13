@@ -288,7 +288,7 @@ class MySuite extends munit.FunSuite {
     assertEquals(purl.get.artifactId, "tk8.6")
     assert(
       purl.get.extra.get("maintainer").get.size > 0,
-      "Should have a mainter"
+      "Should have a maintainer"
     )
   }
 

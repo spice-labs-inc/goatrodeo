@@ -164,8 +164,6 @@ case class ISOFileWrapper(f: File, isoReader: IsoFileReader, deleteOnFinalize: B
 
   override def isDirectory(): Boolean = f.isDirectory()
 
-  // TODO: Check that "isRealFile" denotes the right thing
-  // it isn't called anywhere, and i'm not sure if the actual .iso is "real" or the files inside of it are "Real"…
   override def isRealFile(): Boolean = true
 
   override def listFiles(): Vector[InternalISOFileWrapper] = {
@@ -231,8 +229,7 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
 
   override def isDirectory(): Boolean = f.isDirectory
 
-  // TODO: Check that "isRealFile" denotes the right thing
-  override def isRealFile(): Boolean = true
+  override def isRealFile(): Boolean = false
 
   /**
    * an `InternalISOFileWrapper` is a concrete file (or directory) inside an actual .iso;
