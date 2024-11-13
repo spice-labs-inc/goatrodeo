@@ -12,14 +12,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils, Helpers, ISOFileWrapper, PackageIdentifier, PackageProtocol}
+
 import java.util.regex.Pattern
-import io.spicelabs.goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
 import io.spicelabs.goatrodeo.envelopes.MD5
 import io.spicelabs.goatrodeo.envelopes.Position
 import io.spicelabs.goatrodeo.envelopes.MultifilePosition
 import io.bullet.borer.Cbor
+
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -29,15 +30,12 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.GraphManager
-import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.PackageProtocol
+
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import io.spicelabs.goatrodeo.util.FileWalker
-import io.spicelabs.goatrodeo.util.FileWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -238,7 +236,7 @@ class MySuite extends munit.FunSuite {
 
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/small_only_udf_260.iso"), false))
+        .streamForArchive(ISOFileWrapper.fromFile(File("test_data/small_only_udf_260.iso"), false).get) // quick and dirty get without expanding the Try, for now…
         .isDefined
     )
   }

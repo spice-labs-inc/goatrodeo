@@ -321,7 +321,7 @@ object Helpers {
     * @return
     *   an iterator
     */
-  def iteratorFor(
+  def archiveIteratorFor(
       archive: ArchiveInputStream[ArchiveEntry]
   ): Iterator[ArchiveEntry] = {
     new Iterator[ArchiveEntry] {
@@ -864,7 +864,7 @@ object PackageIdentifier {
     if (name.endsWith(".deb")) {
       var lines: Vector[String] = Vector()
       FileWalker.processFileAndSubfiles(
-        FileWrapper.fromFile(f, false),
+        FileWrapper(f, false),
         f.getName(),
         None,
         42,

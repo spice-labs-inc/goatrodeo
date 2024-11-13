@@ -1,10 +1,10 @@
 package io.spicelabs.goatrodeo.util
 
 import com.palantir.isofilereader.isofilereader.{GenericInternalIsoFile, IsoFileReader}
+import com.typesafe.scalalogging.Logger
 
 import scala.util.{Failure, Success, Try}
 import scala.jdk.CollectionConverters.*
-
 import java.io.InputStream
 import java.io.File
 import java.io.BufferedInputStream
@@ -23,28 +23,39 @@ trait ArtifactWrapper {
   def getParentDirectoryPath(): String
   def delete(): Boolean
   def exists(): Boolean
+  def fileExtension(): Option[String]
 }
 
-/**
- * While initially "FileWrapper" has handled all object types, we need this to also be a generic
- * constructor that can choose its ArtifactWrapper type based on the file extension…
- */
-object FileWrapper {
+object ArtifactWrapper {
+  private val logger = Logger("ArtifactWrapper")
+
+  // todo - return a Try[ArtifactWrapper]?
   def fromFile(f: File, deleteOnFinalize: Boolean): ArtifactWrapper = {
-    if (f.getPath().endsWith(".iso")) {
-      // todo - logging library
-      println(s"Found a .iso file: ${f.getPath()}")
-      ISOFileWrapper.fromFile(f, deleteOnFinalize) match {
-        case Success(wrapper) => wrapper
-        case Failure(e) =>
-          sys.error(s"Exception creating an ISOFileWrapper: ${e.getMessage}")
-          throw e
-      }
-    } else FileWrapper(f, deleteOnFinalize)
+    val path = f.getPath()
+    val ext = path.slice(path.lastIndexWhere(_ == '.') + 1, path.length)
+    logger.info(s"File Extension: $ext")
+    ext match {
+      case "iso" =>
+        logger.info(s"Found a '.iso' file: $path / $ext")
+        ISOFileWrapper.fromFile(f, deleteOnFinalize) match {
+          case Success(wrapper) => wrapper
+          case Failure(e) =>
+            logger.error(s"Exception creating an ISOFileWrapper: ${e.getMessage}")
+            throw e
+        }
+      case _ =>
+        logger.info(s"Found a '.$ext' file; defaulting to `FileWrapper`")
+        FileWrapper(f, deleteOnFinalize)
+    }
+  }
+  def fileExtension(path: String): String = {
+    path.slice(path.lastIndexWhere(_ == '.') + 1, path.length)
   }
 }
+
 case class FileWrapper(f: File, deleteOnFinalize: Boolean)
     extends ArtifactWrapper {
+  private val logger = Logger("FileWrapper")
 
   override protected def finalize(): Unit = {
     if (deleteOnFinalize) {
@@ -59,10 +70,16 @@ case class FileWrapper(f: File, deleteOnFinalize: Boolean)
 
   override def isFile(): Boolean = f.isFile()
 
-  // todo - the javadocs for `listFiles` says that if it is not a directory, it returns `null`…
-  // we need to guard against that
-  override def listFiles(): Vector[ArtifactWrapper] =
-    f.listFiles().toVector.filter(!_.getName().startsWith(".")).map(FileWrapper.fromFile(_, false))
+  override def listFiles(): Vector[ArtifactWrapper] = {
+    // the javadocs for `listFiles` says that if it is not a directory, it returns `null`… we need to guard against that
+    Option(f.listFiles()) match {
+      case Some(files) =>
+        files.toVector
+          .filter(!_.getName().startsWith("."))
+          .map(FileWrapper(_, false))
+      case None => Vector.empty
+    }
+  }
 
   override def getParentDirectoryPath(): String =
     f.getAbsoluteFile().getParentFile().getCanonicalPath()
@@ -76,10 +93,19 @@ case class FileWrapper(f: File, deleteOnFinalize: Boolean)
   override def name(): String = f.getName()
 
   override def size(): Long = f.length()
+
+  override def fileExtension(): Option[String] = {
+    val path = f.getPath()
+    val ext = path.slice(path.lastIndexWhere(_ == '.') + 1, path.length)
+    logger.debug(s"File Extension for '$path': '$ext'")
+    Some(ext)
+  }
+
 }
 
 case class ByteWrapper(bytes: Array[Byte], fileName: String)
     extends ArtifactWrapper {
+  private val logger = Logger("")
 
   def exists(): Boolean = true
 
@@ -102,10 +128,18 @@ case class ByteWrapper(bytes: Array[Byte], fileName: String)
   override def name(): String = fileName
 
   override def size(): Long = bytes.length
+
+  override def fileExtension(): Option[String] = {
+    logger.debug(s"File Extension against ByteWrapper, returning None")
+    None
+  }
 }
 
 case class ISOFileWrapper(f: File, isoReader: IsoFileReader, deleteOnFinalize: Boolean)
   extends ArtifactWrapper {
+
+  private val logger = Logger("ISOFileWrapper")
+
 
   override protected def finalize(): Unit = {
     if (deleteOnFinalize) {
@@ -133,11 +167,16 @@ case class ISOFileWrapper(f: File, isoReader: IsoFileReader, deleteOnFinalize: B
   // it isn't called anywhere, and i'm not sure if the actual .iso is "real" or the files inside of it are "Real"…
   override def isRealFile(): Boolean = true
 
-  override def listFiles(): Vector[InternalISOFileWrapper] =
-    isoReader.getAllFiles()
-      .toVector
-      .filter(!_.getFileName().startsWith("."))
-      .map(InternalISOFileWrapper(_, isoReader))
+  override def listFiles(): Vector[InternalISOFileWrapper] = {
+      Option(isoReader.getAllFiles) match {
+        case Some(files) =>
+          files.toVector
+            .filter(!_.getFileName().startsWith("."))
+            .flatMap(x => x.getChildren.toVector)
+            .map(InternalISOFileWrapper(_, isoReader))
+        case None => Vector.empty
+      }
+  }
 
   override def getCanonicalPath(): String = f.getCanonicalPath()
 
@@ -146,6 +185,11 @@ case class ISOFileWrapper(f: File, isoReader: IsoFileReader, deleteOnFinalize: B
   override def delete(): Boolean = f.delete()
 
   override def exists(): Boolean = f.exists()
+
+  override def fileExtension(): Option[String] = {
+    logger.debug("File Extension requested for 'ISO' - Returning static '.iso' result")
+    Some("iso")
+  }
 }
 
 /**
@@ -173,6 +217,8 @@ object ISOFileWrapper {
 case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileReader)
   extends ArtifactWrapper {
 
+  private val logger = Logger("InternalISOFileWrapper")
+
   override def asStream(): InputStream = isoReader.getFileStream(f)
 
   override def name(): String = f.getFileName()
@@ -191,14 +237,17 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
    * an `InternalISOFileWrapper` is a concrete file (or directory) inside an actual .iso;
    * as such it can have children
    *
-   * At this time, `FileWalker` has an outer control guard for whether this is a directory or file
-   * TODO: Update this interface to better handle someone calling "listFiles()" when it's not a directory…
    */
-  override def listFiles(): Vector[ArtifactWrapper] =
-    f.getChildren()
-      .toVector
-      .filter(!_.getFileName().startsWith(".")) // TODO - check what other filters we may need for ISO
-      .map(InternalISOFileWrapper(_, isoReader))
+  override def listFiles(): Vector[InternalISOFileWrapper] = {
+    Option(f.getChildren()) match {
+      case Some(files) =>
+        files.toVector
+          .filter(!_.getFileName().startsWith("."))
+          .flatMap(x => x.getChildren.toVector)
+          .map(InternalISOFileWrapper(_, isoReader))
+      case None => Vector.empty
+    }
+  }
 
   override def getCanonicalPath(): String = f.getFullFileName('/')
 
@@ -209,5 +258,12 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
 
   // TODO - there is no "exists" on the `GenericInternalIsoFile` so we'll just assume it exists for now
   override def exists(): Boolean = true
+
+  override def fileExtension(): Option[String] = {
+    val path = f.getFileName()
+    val ext = ArtifactWrapper.fileExtension(path)
+    logger.debug(s"File Extension for '$path': '$ext'")
+    Some(ext)
+  }
 }
 

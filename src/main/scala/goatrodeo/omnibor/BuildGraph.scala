@@ -2,12 +2,10 @@ package io.spicelabs.goatrodeo.omnibor
 
 import java.io.File
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.{ArtifactWrapper, FileType, FileWalker, FileWrapper, GitOID, GitOIDUtils, Helpers, PackageIdentifier}
+
 import java.io.BufferedWriter
 import java.io.FileWriter
-import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
-import io.spicelabs.goatrodeo.util.FileType
 import scala.collection.immutable.TreeSet
 import scala.collection.immutable.TreeSet
 
@@ -121,7 +119,7 @@ object BuildGraph {
     var rootGitoid: String = ""
 
     FileWalker.processFileAndSubfiles[Vector[FileAndGitoid]](
-      FileWrapper.fromFile(root, false),
+      ArtifactWrapper.fromFile(root, false),
       name,
       None,
       Vector.empty,
