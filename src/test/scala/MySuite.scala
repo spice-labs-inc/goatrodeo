@@ -502,7 +502,8 @@ class MySuite extends munit.FunSuite {
       file.delete()
     }
 
-    assert(cnt > 2)
+    // there are exactly 8 files in the iso
+    assert(cnt == 8)
   }
 
 }

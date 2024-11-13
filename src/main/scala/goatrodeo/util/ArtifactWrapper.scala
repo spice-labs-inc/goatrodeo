@@ -222,7 +222,7 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
 
   override def asStream(): InputStream = isoReader.getFileStream(f)
 
-  override def name(): String = f.getFileName()
+  override def name(): String = f.getFullFileName('/')
 
   override def size(): Long = f.getSize()
 
