@@ -34,7 +34,7 @@ object ArtifactWrapper {
   def fromFile(f: File, deleteOnFinalize: Boolean): ArtifactWrapper = {
     val path = f.getPath()
     val ext = path.slice(path.lastIndexWhere(_ == '.') + 1, path.length)
-    logger.info(s"File Extension: $ext")
+    logger.debug(s"File Extension: $ext")
     ext match {
       case "iso" =>
         logger.info(s"Found a '.iso' file: $path / $ext")
@@ -150,11 +150,10 @@ case class ISOFileWrapper(f: File, isoReader: IsoFileReader, deleteOnFinalize: B
 
   /**
    * ISOFileWrapper is an "outer" wrapper for the ISO file itself; all the actual internal files
-   * are of type `InternalISOFileWrapper`; here for now we'll return an empty stream
-   * TODO - figure out better pathing
+   * are of type `InternalISOFileWrapper`; this is the java.io.File stream
    */
   override def asStream(): InputStream =
-    InputStream.nullInputStream()
+    BufferedInputStream(FileInputStream(f))
 
   override def name(): String = f.getName()
 
@@ -237,14 +236,14 @@ case class InternalISOFileWrapper(f: GenericInternalIsoFile, isoReader: IsoFileR
    *
    */
   override def listFiles(): Vector[InternalISOFileWrapper] = {
-    logger.info("List Files")
+    logger.debug("List Files")
     Option(f.getChildren()) match {
       case Some(files) =>
         files.toVector
           .filter(!_.getFileName().startsWith("."))
           .flatMap(entry =>  {
             val x = InternalISOFileWrapper.getISOSubfileTree(InternalISOFileWrapper(entry, isoReader), Vector.empty)
-            logger.info(s"Entry: ${entry.getFileName}, children: $x")
+            logger.debug(s"Entry: ${entry.getFileName}, children: $x")
             x
           })
       case None => Vector.empty
@@ -283,7 +282,7 @@ object InternalISOFileWrapper {
 
     val eB = Vector.newBuilder[InternalISOFileWrapper]
     for (child <- children) {
-      logger.info(s"Subfiles: ${child.getFileName}")
+      logger.debug(s"Subfiles: ${child.getFileName}")
       eB ++= getISOSubfileTree(InternalISOFileWrapper(child, entry.isoReader), files :+ InternalISOFileWrapper(child, entry.isoReader))
     }
 

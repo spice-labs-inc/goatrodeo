@@ -83,10 +83,10 @@ object FileWalker {
             logger.info(s"Found a Zipped Archive '${in.name()}'…")
             streamForZippedArchive(in) match {
               case Some(toReturn) =>
-                logger.info(s"Got a result from Zipped Archive process: $toReturn")
+                logger.debug(s"Got a result from Zipped Archive process: $toReturn")
                 Some(toReturn)
               case None =>
-                logger.info(s"Got nothing from streamForZippedArchive, falling through to generic (non-zip) Compressed Archive")
+                logger.debug(s"Got nothing from streamForZippedArchive, falling through to generic (non-zip) Compressed Archive")
                 streamForCompressedArchive(in)
             }
           case default =>
@@ -103,12 +103,12 @@ object FileWalker {
    */
   private def streamForISOFileWrapper(in: ISOFileWrapper): Option[(Iterator[() => (String, InternalISOFileWrapper)], () => Unit)] = {
     import scala.collection.JavaConverters.asScalaIteratorConverter
-    logger.info(s"Streaming an ISOFileWrapper ${in.name()} into an Iterator of InternalISOFileWrappers")
+    logger.debug(s"Streaming an ISOFileWrapper ${in.name()} into an Iterator of InternalISOFileWrappers")
     val files = in.listFiles()
     if (!files.isEmpty) {
       val it = files
         .map(f =>
-          logger.info(s"[ISOFileWrapper] Internal ISO File Entry: ${f.name()} -> $f")
+          logger.debug(s"[ISOFileWrapper] Internal ISO File Entry: ${f.name()} -> $f")
           f.name() -> f
         )
         .iterator
@@ -132,12 +132,12 @@ object FileWalker {
    */
   private def streamForInternalISOFileWrapper(in: InternalISOFileWrapper): Option[(Iterator[() => (String, InternalISOFileWrapper)], () => Unit)] = {
     import scala.collection.JavaConverters.asScalaIteratorConverter
-    logger.info(s"Streaming an InternalISOFileWrapper '${in.name()}' into an Iterator")
+    logger.debug(s"Streaming an InternalISOFileWrapper '${in.name()}' into an Iterator")
     val files = in.listFiles()
     if (!files.isEmpty) {
       val it = files
         .map(f =>
-          logger.info(s"[ISOInternalFileWrapper] Internal ISO File Entry: ${f.name()} -> $f")
+          logger.debug(s"[ISOInternalFileWrapper] Internal ISO File Entry: ${f.name()} -> $f")
           f.name() -> f
         )
         .iterator
@@ -258,11 +258,11 @@ object FileWalker {
       import scala.collection.JavaConverters.asScalaIteratorConverter
       val theFile = in match {
         case FileWrapper(f, _) =>
-          logger.info(s"FileWrapper($f, _)")
+          logger.debug(s"FileWrapper($f, _)")
           f
         case _ =>
           val x = Helpers.tempFileFromStream(in.asStream(), true, in.name())
-          logger.info(s"TempFileFromStream: $x")
+          logger.debug(s"TempFileFromStream: $x")
           x
       }
       val zipFile = ZipFile(theFile)
