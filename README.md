@@ -3,7 +3,7 @@
 ![Build Status](https://github.com/spice-labs-inc/goatrodeo/actions/workflows/scala_ci.yml/badge.svg)
 
 Using Inherent Identifiers (e.g., cryptographic hashes) to describe nodes in
-[Artifact Dependency Graphs](https://omnibor.io/glossary/artifact_dependency_graph/) is the same
+[Artifact Dependency Graphs](https://omnibor.io/glossary/#artifact-dependency-graph) is the same
 technique [Git](https://git-scm.com/) uses to identify branches, tags, etc.
 
 Goat Rodeo builds an Artifact Dependency Graph of "things that contain other things". For example,
