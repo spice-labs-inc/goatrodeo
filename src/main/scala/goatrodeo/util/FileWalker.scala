@@ -123,7 +123,8 @@ object FileWalker {
             () => {
               val name = v.getName()
 
-              val wrapper = buildWrapper(name, v.getSize(), () => zipFile.getInputStream(v))
+              val wrapper =
+                buildWrapper(name, v.getSize(), () => zipFile.getInputStream(v))
               (name, wrapper)
             }
           )
@@ -134,13 +135,16 @@ object FileWalker {
     } else None
   }
 
-  /**
-    * Build an appropriate wrapper
+  /** Build an appropriate wrapper
     *
-    * @param name the name of the stream
-    * @param size the size of the stream
-    * @param asStream a function that builds the stream
-    * @return the appropriate ArtifactWrapper
+    * @param name
+    *   the name of the stream
+    * @param size
+    *   the size of the stream
+    * @param asStream
+    *   a function that builds the stream
+    * @return
+    *   the appropriate ArtifactWrapper
     */
   private def buildWrapper(
       name: String,
@@ -170,41 +174,48 @@ object FileWalker {
     * @return
     */
   private def asISOWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
-    try {
-      import scala.collection.JavaConverters.asScalaIteratorConverter
-      val theFile = in match {
-        case FileWrapper(f, _) => f
-        case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
-      }
-      val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
-
+    if (isoSuffixs.contains(in.suffix)) {
       try {
+        import scala.collection.JavaConverters.asScalaIteratorConverter
+        val theFile = in match {
+          case FileWrapper(f, _) => f
+          case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
+        }
+        val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
 
-        val files = isoFileReader.getAllFiles()
-        
-        val flatList =
-          isoFileReader.convertTreeFilesToFlatList(files).iterator.asScala
-        Some(
-          for (cycleFile <- flatList if !cycleFile.isDirectory()) yield { () =>
-            {
-              val name = cycleFile.getFileName()
+        try {
 
-              val ret = buildWrapper(name, cycleFile.getSize(), () => isoFileReader.getFileStream(cycleFile))
+          val files = isoFileReader.getAllFiles()
 
-              name -> ret
-            }
-          },
-          () => (isoFileReader.close())
-        )
+          val flatList =
+            isoFileReader.convertTreeFilesToFlatList(files).iterator.asScala
+          Some(
+            for (cycleFile <- flatList if !cycleFile.isDirectory())
+              yield { () =>
+                {
+                  val name = cycleFile.getFileName()
 
+                  val ret = buildWrapper(
+                    name,
+                    cycleFile.getSize(),
+                    () => isoFileReader.getFileStream(cycleFile)
+                  )
+
+                  name -> ret
+                }
+              },
+            () => (isoFileReader.close())
+          )
+
+        } catch {
+          case _: Exception =>
+            isoFileReader.close()
+            None
+        }
       } catch {
-        case _: Exception =>
-          isoFileReader.close()
-          None
+        case _: Exception => None
       }
-    } catch {
-      case _: Exception => None
-    }
+    } else None
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
@@ -235,7 +246,7 @@ object FileWalker {
                 val name = ae.getName()
 
                 val wrapper = buildWrapper(name, ae.getSize(), () => input)
-                
+
                 (name, wrapper)
               }
             )
@@ -257,8 +268,8 @@ object FileWalker {
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
     asZipContainer(in) orElse
-    /* asISOWrapper(in) orElse FIXME -- figure out why this is causing the tests to not finish*/ 
-     asApacheCommonsWrapper(in)
+      asISOWrapper(in) orElse
+      asApacheCommonsWrapper(in)
   }
 
   /** A stream of ArtifactWrappers... maybe
