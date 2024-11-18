@@ -22,6 +22,7 @@ lazy val root = project
     libraryDependencies += "commons-io" % "commons-io" % "2.16.1",
     libraryDependencies += "io.bullet" %% "borer-core" % "1.14.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
+    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
 
     // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",

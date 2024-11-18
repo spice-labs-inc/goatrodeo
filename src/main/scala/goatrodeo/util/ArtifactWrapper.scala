@@ -6,22 +6,92 @@ import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.ByteArrayInputStream
 
-trait ArtifactWrapper {
+/** In OmniBOR, everything is seen as a byte stream.
+  *
+  * `ArtifactWrapper` provides a wrapper around artifacts... byte streams.
+  *
+  * `ArtifactWrapper` is somewhat modeled on the JVM `java.io.File` class so
+  * that it can represent both files on a filesystem with directories and
+  * virtual files contained in a Zip or TAR or other container file.
+  *
+  * Those byte streams may be in-memory or they may be on disk.
+  */
+sealed trait ArtifactWrapper {
+
+  /** Convert the Artifact to a stream of bytes. Note that this is mostly used
+    * for Hashing which is a block operation. No need for any buffering because
+    * all the operations will be pulling large blocks of bytes.
+    *
+    * @return
+    */
   def asStream(): InputStream
+
+  /** The name of the Artifact. This corresponds to the name of a `File` on disk
+    *
+    * @return
+    */
   def name(): String
+
+  /** The number of bytes in the artifact. This is
+    *
+    * @return
+    */
   def size(): Long
+
+  /** Corresponds to `File.isFile()`
+    *
+    * @return
+    */
   def isFile(): Boolean
+
+  /** Corresponds to `File.isDirectory()`
+    *
+    * @return
+    */
   def isDirectory(): Boolean
-  def isRealFile(): Boolean
-  // def asFile(): (File, Boolean)
-  def listFiles(): Vector[ArtifactWrapper]
+
+  /** Get all the `ArtifactWrappers` for the entities in a directory. This will
+    * only return something if the ArtifactWrapper is a wrapper around `File`
+    * and the entity being traversed is a real filesystem.
+    *
+    * For "container" file types (e.g., a TAR), see
+    * `FileWalker.streamForArchive`
+    *
+    * @return
+    */
+  def listFiles(): Iterator[ArtifactWrapper]
+
   def getCanonicalPath(): String
   def getParentDirectory(): File
   def delete(): Boolean
+
+  /** Does the entity exist. Corresponds to `File.exists`
+    *
+    * A `ByteWrapper` will always exist.
+    *
+    * @return
+    */
   def exists(): Boolean
+
+  lazy val suffix = ArtifactWrapper.suffix(name())
 }
 
-case class FileWrapper(f: File, deleteOnFinalize: Boolean)
+object ArtifactWrapper {
+
+  /** What's the suffix for the name
+    *
+    * @param name
+    *   the file name
+    * @return
+    *   the optional suffix to lower case
+    */
+  def suffix(name: String): Option[String] = {
+    val lastDot = name.lastIndexOf(".")
+    if (lastDot >= 0) Some(name.substring(lastDot)) else None
+  }
+}
+
+final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
     extends ArtifactWrapper {
 
   override protected def finalize(): Unit = {
@@ -31,14 +101,13 @@ case class FileWrapper(f: File, deleteOnFinalize: Boolean)
   }
 
   def exists(): Boolean = f.exists()
-  override def isRealFile(): Boolean = true
 
   override def delete(): Boolean = f.delete()
 
   override def isFile(): Boolean = f.isFile()
 
-  override def listFiles(): Vector[ArtifactWrapper] =
-    f.listFiles().toVector.filter(!_.getName().startsWith(".")).map(FileWrapper(_, false))
+  def listFiles(): Iterator[ArtifactWrapper] =
+    f.listFiles().iterator.map(FileWrapper(_, false))
 
   override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
 
@@ -46,36 +115,33 @@ case class FileWrapper(f: File, deleteOnFinalize: Boolean)
 
   // override def asFile(): (File, Boolean) = (f, false)
 
-  override def isDirectory(): Boolean = f.isDirectory()
+  def isDirectory(): Boolean = f.isDirectory()
 
   override def asStream(): InputStream = BufferedInputStream(FileInputStream(f))
 
   override def name(): String = f.getName()
 
   override def size(): Long = f.length()
+
+
 }
 
-case class ByteWrapper(bytes: Array[Byte], fileName: String)
+final case class ByteWrapper(bytes: Array[Byte], fileName: String)
     extends ArtifactWrapper {
 
   def exists(): Boolean = true
 
-  override def isRealFile(): Boolean = false
-
   override def delete(): Boolean = true
 
-  override def isFile(): Boolean = true
+  def isFile(): Boolean = true
 
-  override def listFiles(): Vector[ArtifactWrapper] = Vector()
+  def listFiles(): Iterator[ArtifactWrapper] = Iterator.empty
 
   override def getParentDirectory(): File = File("/")
 
   override def getCanonicalPath(): String = "/"
 
-  // override def asFile(): (File, Boolean) =
-  //   (Helpers.tempFileFromStream(asStream(), true, ".goat"), true)
-
-  override def isDirectory(): Boolean = false
+  def isDirectory(): Boolean = false
 
   override def asStream(): InputStream = ByteArrayInputStream(bytes)
 
@@ -83,4 +149,3 @@ case class ByteWrapper(bytes: Array[Byte], fileName: String)
 
   override def size(): Long = bytes.length
 }
-
