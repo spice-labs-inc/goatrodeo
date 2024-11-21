@@ -48,7 +48,7 @@ ThisBuild / assemblyMergeStrategy := {
   case _                                   => MergeStrategy.last
 }
 
-// Fetch test data from r2
+// Fetch test data from r2 before running tests
 Test / testOptions += Tests.Setup(() => {
   val log = streams.value.log
   log.info("Downloading and caching test data…")
@@ -69,11 +69,26 @@ Test / testOptions += Tests.Setup(() => {
     url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
   } catch {
     case e: Throwable =>
-      log.error(s"Exception fetching iso test files: ${e.getMessage}")
-      throw e
+      val err = s"Exception fetching iso test files: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
   }
   log.info("Test data caching complete.")
 })
+
+// Verify that git LFS is installed and files are correct before running tests
+Test / testOptions += Tests.Setup(() => {
+  val log = streams.value.log
+  log.info("Testing for git LFS…")
+  if ("git lfs status".! == 0) {
+    log.info("git lfs found, proceeding…")
+  } else {
+    val err = "git lfs not found. Please review the README.md for setup instructions!"
+    log.error(err)
+    throw new MessageOnlyException(err)
+  }
+})
+
 
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
