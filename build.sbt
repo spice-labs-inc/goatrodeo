@@ -78,7 +78,7 @@ Test / testOptions += Tests.Setup(() => {
 
 // Verify that git LFS is installed and files are correct before running tests
 Test / testOptions += Tests.Setup(() => {
-  val log = streams.value.log
+  val log = (streams.value: @sbtUnchecked).log
   log.info("Testing for git LFS…")
   if ("git lfs status".! == 0) {
     log.info("git lfs found, proceeding…")
