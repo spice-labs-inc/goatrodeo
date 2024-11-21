@@ -50,7 +50,7 @@ ThisBuild / assemblyMergeStrategy := {
 
 // Fetch test data from r2 before running tests
 Test / testOptions += Tests.Setup(() => {
-  val log = streams.value.log
+  val log = (streams.value: @sbtUnchecked).log
   log.info("Downloading and caching test data…")
   try {
     log.info("\t* Creating test_data/iso_tests if it doesn't already exist…")
