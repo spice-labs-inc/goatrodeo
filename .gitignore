@@ -61,3 +61,6 @@ Sessionx.vim
 tags
 # VIM Persistent undo
 [._]*.un~
+
+# Test files that are cached by sbt
+test_data/iso_tests/*

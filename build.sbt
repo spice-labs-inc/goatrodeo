@@ -1,3 +1,6 @@
+import java.nio.file.{FileAlreadyExistsException, Files, Paths}
+import scala.sys.process._
+
 val projectName = "goatrodeo"
 val projectVersion = "0.5.0-SNAPSHOT"
 val scala3Version = "3.3.3"
@@ -32,7 +35,7 @@ lazy val root = project
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
 
-      // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
+    // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
@@ -44,6 +47,34 @@ ThisBuild / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
   case _                                   => MergeStrategy.last
 }
+
+// Fetch test data from r2
+Test / testOptions += Tests.Setup(() => {
+  val log = streams.value.log
+  log.info("Downloading and caching test data…")
+  try {
+    log.info("\t* Creating test_data/iso_tests if it doesn't already exist…")
+    Files.createDirectory(Paths.get("test_data/iso_tests"))
+  } catch {
+    case fE: FileAlreadyExistsException =>
+      log.info("\t! iso_tests directory already exists.")
+    case e: Throwable =>
+      log.error(s"Exception setting up iso_tests directory: ${e.getMessage}")
+      throw e // todo - can we call something for sbt to do a clean exit?
+  }
+
+  try {
+    log.info("\t* Fetching test ISOs…")
+    url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file("./test_data/iso_tests/iso_of_archives.iso") ! log
+    url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
+    log.info("Test data caching complete.")
+  } catch {
+    case e: Throwable =>
+      log.error(s"Exception fetching iso test files: ${e.getMessage}")
+      throw e
+  }
+  ()
+})
 
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
