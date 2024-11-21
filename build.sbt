@@ -88,6 +88,16 @@ Test / testOptions += Tests.Setup(() => {
     log.error(err)
     throw new MessageOnlyException(err)
   }
+  try {
+    log.info("Running a `git lfs pull`…")
+    if ("git lfs pull".! == 0) {
+      log.info("git lfs files should all be synced now.")
+    } else {
+      val err = "`git lfs pull` failed!"
+      log.error(err)
+      throw new MessageOnlyException(err)
+    }
+  }
 })
 
 
