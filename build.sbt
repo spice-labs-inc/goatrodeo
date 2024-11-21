@@ -59,8 +59,9 @@ Test / testOptions += Tests.Setup(() => {
     case fE: FileAlreadyExistsException =>
       log.info("\t! iso_tests directory already exists.")
     case e: Throwable =>
-      log.error(s"Exception setting up iso_tests directory: ${e.getMessage}")
-      throw e // todo - can we call something for sbt to do a clean exit?
+      val err = s"Exception setting up iso_tests directory: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
   }
 
   try {
