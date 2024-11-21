@@ -67,13 +67,12 @@ Test / testOptions += Tests.Setup(() => {
     log.info("\t* Fetching test ISOs…")
     url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file("./test_data/iso_tests/iso_of_archives.iso") ! log
     url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
-    log.info("Test data caching complete.")
   } catch {
     case e: Throwable =>
       log.error(s"Exception fetching iso test files: ${e.getMessage}")
       throw e
   }
-  ()
+  log.info("Test data caching complete.")
 })
 
 enablePlugins(JavaAppPackaging)
