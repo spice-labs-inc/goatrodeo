@@ -3,21 +3,25 @@ package io.spicelabs.goatrodeo.util
 import java.io.File
 import scala.util.Try
 import org.apache.commons.compress.compressors.CompressorStreamFactory
+
 import java.io.InputStream
 import java.util.zip.ZipFile
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
+
 import java.io.FileInputStream
 import java.io.BufferedInputStream
 import java.io.IOException
 import com.palantir.isofilereader.isofilereader.IsoFileReader
+import com.typesafe.scalalogging.Logger
 
 enum FileAction {
   case SkipDive
   case End
 }
 object FileWalker {
+  val logger = Logger("FileWalker")
 
   /** Look at a File. If it's compressed, read the full stream into a new file
     * and return that file
@@ -181,8 +185,10 @@ object FileWalker {
           case FileWrapper(f, _) => f
           case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
         }
-        val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
 
+        logger.trace(s"TheFile: $theFile")
+        val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
+        logger.trace(s"isoFileReader: ${isoFileReader}")
         try {
 
           val files = isoFileReader.getAllFiles()
@@ -208,12 +214,15 @@ object FileWalker {
           )
 
         } catch {
-          case _: Exception =>
+          case e: Exception =>
+            logger.error(s"Try getAllFiles failed: ${e.getMessage}", e)
             isoFileReader.close()
             None
         }
       } catch {
-        case _: Exception => None
+        case e: Exception =>
+          logger.error(s"Whole ISO Fetch process failed… ${e.getMessage}", e)
+          None
       }
     } else None
   }
@@ -290,7 +299,12 @@ object FileWalker {
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
 
+    logger.trace(s"streamForArchive($in)")
+
     val ret = tryToConstructArchiveStream(in)
+
+    logger.trace(s"ret: $ret")
+
 
     // if we've got it, yay.
     ret match {
