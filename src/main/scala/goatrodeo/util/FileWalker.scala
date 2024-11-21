@@ -57,7 +57,7 @@ object FileWalker {
   /** If any of these file extensions are encountered, they must be turned into
     * a real file
     */
-  lazy val forceToFileSuffix: Set[Option[String]] = zipSuffixs ++ isoSuffixs
+  lazy val forceToFileSuffix: Set[Option[String]] = zipSuffixes ++ isoSuffixes
 
   /** If the file size is greater than 16MB, then always make it a file, don't
     * keep the bytes in memory
@@ -96,12 +96,12 @@ object FileWalker {
 
   /** Suffixes for Zip/JAR/etc. files
     */
-  private lazy val zipSuffixs: Set[Option[String]] =
+  private lazy val zipSuffixes: Set[Option[String]] =
     Set(Some(".zip"), Some(".jar"), Some(".aar"), Some(".war"))
 
   /** Suffixes for ISO files
     */
-  private lazy val isoSuffixs: Set[Option[String]] = Set(Some(".iso"))
+  private lazy val isoSuffixes: Set[Option[String]] = Set(Some(".iso"))
 
   /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
     *
@@ -110,7 +110,7 @@ object FileWalker {
     * @return
     */
   private def asZipContainer(in: ArtifactWrapper): OptionalArchiveStream = {
-    if (zipSuffixs.contains(in.suffix)) {
+    if (zipSuffixes.contains(in.suffix)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
         val theFile = in match {
@@ -178,7 +178,8 @@ object FileWalker {
     * @return
     */
   private def asISOWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
-    if (isoSuffixs.contains(in.suffix)) {
+    logger.trace(s"suffix: ${in.suffix} suffixes: ${isoSuffixes} contains? ${isoSuffixes.contains(in.suffix)}")
+    if (isoSuffixes.contains(in.suffix)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
         val theFile = in match {
