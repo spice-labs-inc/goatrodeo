@@ -29,8 +29,10 @@ lazy val root = project
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
+    libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
 
-    // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
+      // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
