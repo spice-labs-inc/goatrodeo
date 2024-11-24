@@ -64,3 +64,5 @@ tags
 
 # Test files that are cached by sbt
 test_data/iso_tests/*
+test_data/gem_tests/*
+
