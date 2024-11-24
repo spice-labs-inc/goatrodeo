@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.6.1-SNAPSHOT"
+val projectVersion = "0.6.2-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -34,7 +34,8 @@ lazy val root = project
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
-
+    // https://mvnrepository.com/artifact/org.redline-rpm/redline
+    libraryDependencies += "org.redline-rpm" % "redline" % "1.2.10",
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
