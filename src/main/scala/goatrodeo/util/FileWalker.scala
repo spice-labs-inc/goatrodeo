@@ -323,46 +323,6 @@ object FileWalker {
     * @param in
     * @return
     */
-  def tryToConstructArchiveStream(
-      in: ArtifactWrapper
-  ): OptionalArchiveStream = {
-    asZipContainer(in) orElse
-      asISOWrapper(in) orElse
-      asApacheCommonsWrapper(in)
-  }
-
-  /** A stream of ArtifactWrappers... maybe
-    */
-  type OptionalArchiveStream =
-    Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)]
-
-  /** Given a file that might be an archive (Zip, cpio, tar, etc.) or might be a
-    * compressed archive (e.g. tar.Z), return a stream of `ArchiveEntry` so the
-    * archive can be walked.
-    *
-    * @param in
-    *   the file to test
-    * @return
-    *   an `ArchiveStream` if the file is an archive
-    */
-  def streamForArchive(
-      in: ArtifactWrapper
-  ): OptionalArchiveStream = {
-
-    logger.trace(s"streamForArchive($in)")
-
-    val ret = tryToConstructArchiveStream(in)
-
-
-  }
-
-
-  /** Try a series of strategies (except for uncompressing a file) for creating
-    * an archive stream
-    *
-    * @param in
-    * @return
-    */
   private def tryToConstructArchiveStream(
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
