@@ -103,9 +103,14 @@ object FileWalker {
     */
   private lazy val isoSuffixes: Set[Option[String]] = Set(Some(".iso"))
 
-  /** Suffixes for Ruby GEM Files
+  /** Suffixes for Ruby GEM Packages
    * */
   private lazy val gemSuffixes: Set[Option[String]] = Set(Some(".gem"))
+
+  /** Suffixes for RPM Packages
+   * */
+  private lazy val rpmSuffixes: Set[Option[String]] =
+    Set(Some(".rpm"), Some(".srpm"))
 
   /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
     *
@@ -312,6 +317,16 @@ object FileWalker {
         }
       }
     }.toOption.flatten
+
+  }
+
+  /**
+   * Process RPM binary (`.rpm`) and source (`.srpm`) packages
+   *
+   * @param in the file to try to construct the stream from
+   * @return OptionalArchiveStream
+   * */
+  private def asRPMWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
 
   }
 
