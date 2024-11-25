@@ -1,3 +1,6 @@
+import java.nio.file.{FileAlreadyExistsException, Files, Paths}
+import scala.sys.process._
+
 val projectName = "goatrodeo"
 val projectVersion = "0.5.0-SNAPSHOT"
 val scala3Version = "3.3.3"
@@ -22,12 +25,15 @@ lazy val root = project
     libraryDependencies += "commons-io" % "commons-io" % "2.16.1",
     libraryDependencies += "io.bullet" %% "borer-core" % "1.14.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
+    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
 
     // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
+    libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
 
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
@@ -41,6 +47,59 @@ ThisBuild / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
   case _                                   => MergeStrategy.last
 }
+
+// Fetch test data from r2 before running tests
+Test / testOptions += Tests.Setup(() => {
+  val log = (streams.value: @sbtUnchecked).log
+  log.info("Downloading and caching test data…")
+  try {
+    log.info("\t* Creating test_data/iso_tests if it doesn't already exist…")
+    Files.createDirectory(Paths.get("test_data/iso_tests"))
+  } catch {
+    case fE: FileAlreadyExistsException =>
+      log.info("\t! iso_tests directory already exists.")
+    case e: Throwable =>
+      val err = s"Exception setting up iso_tests directory: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
+  }
+
+  try {
+    log.info("\t* Fetching test ISOs…")
+    url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file("./test_data/iso_tests/iso_of_archives.iso") ! log
+    url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
+  } catch {
+    case e: Throwable =>
+      val err = s"Exception fetching iso test files: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
+  }
+  log.info("Test data caching complete.")
+})
+
+// Verify that git LFS is installed and files are correct before running tests
+Test / testOptions += Tests.Setup(() => {
+  val log = (streams.value: @sbtUnchecked).log
+  log.info("Testing for git LFS…")
+  if ("git lfs status".! == 0) {
+    log.info("git lfs found, proceeding…")
+  } else {
+    val err = "git lfs not found. Please review the README.md for setup instructions!"
+    log.error(err)
+    throw new MessageOnlyException(err)
+  }
+  try {
+    log.info("Running a `git lfs pull`…")
+    if ("git lfs pull".! == 0) {
+      log.info("git lfs files should all be synced now.")
+    } else {
+      val err = "`git lfs pull` failed!"
+      log.error(err)
+      throw new MessageOnlyException(err)
+    }
+  }
+})
+
 
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
