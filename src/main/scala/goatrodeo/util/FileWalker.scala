@@ -103,9 +103,11 @@ object FileWalker {
     */
   private lazy val isoSuffixes: Set[Option[String]] = Set(Some(".iso"))
 
+
   /** Suffixes for Ruby GEM Files
    * */
   private lazy val gemSuffixes: Set[Option[String]] = Set(Some(".gem"))
+
 
   /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
     *
@@ -286,6 +288,7 @@ object FileWalker {
   private def asGemWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
     val factory = (new ArchiveStreamFactory())
     Try {
+
       {
         val fis = in.asStream()
 
@@ -312,6 +315,44 @@ object FileWalker {
         }
       }
     }.toOption.flatten
+  }
+
+  /** Try a series of strategies (except for uncompressing a file) for creating
+    * an archive stream
+    *
+    * @param in
+    * @return
+    */
+  def tryToConstructArchiveStream(
+      in: ArtifactWrapper
+  ): OptionalArchiveStream = {
+    asZipContainer(in) orElse
+      asISOWrapper(in) orElse
+      asApacheCommonsWrapper(in)
+  }
+
+  /** A stream of ArtifactWrappers... maybe
+    */
+  type OptionalArchiveStream =
+    Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)]
+
+  /** Given a file that might be an archive (Zip, cpio, tar, etc.) or might be a
+    * compressed archive (e.g. tar.Z), return a stream of `ArchiveEntry` so the
+    * archive can be walked.
+    *
+    * @param in
+    *   the file to test
+    * @return
+    *   an `ArchiveStream` if the file is an archive
+    */
+  def streamForArchive(
+      in: ArtifactWrapper
+  ): OptionalArchiveStream = {
+
+    logger.trace(s"streamForArchive($in)")
+
+    val ret = tryToConstructArchiveStream(in)
+
 
   }
 
@@ -352,6 +393,7 @@ object FileWalker {
     logger.trace(s"streamForArchive($in)")
 
     val ret = tryToConstructArchiveStream(in)
+
 
     logger.trace(s"ret: $ret")
 

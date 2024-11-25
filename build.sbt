@@ -63,6 +63,7 @@ Test / testOptions += Tests.Setup(() => {
       log.error(err)
       throw new MessageOnlyException(err)
   }
+
   try {
     log.info("\t* Creating test_data/gem_tests if it doesn't already exist…")
     Files.createDirectory(Paths.get("test_data/gem_tests"))
@@ -74,6 +75,7 @@ Test / testOptions += Tests.Setup(() => {
       log.error(err)
       throw new MessageOnlyException(err)
   }
+
 
   try {
     log.info("\t* Fetching test ISOs…")
