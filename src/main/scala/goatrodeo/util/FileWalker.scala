@@ -1,8 +1,8 @@
 package io.spicelabs.goatrodeo.util
 
 import java.io.File
-import scala.util.Try
-import org.apache.commons.compress.compressors.CompressorStreamFactory
+import scala.util.{Failure, Success, Try}
+import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
 
 import java.io.InputStream
 import java.util.zip.ZipFile
@@ -237,11 +237,15 @@ object FileWalker {
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
     * read most archive files" format
     *
+    * Note this only reads *archives* – that is to say, something like a `.tar.gz` with many files
+    * It will *not* work on simple single compressed files in a gzip wrapper, which needs the `CompressorStreamFactory`
+    * rather than the `ArchiveStreamFactory`
+    *
     * @param in
     *   the file to try to construct the stream from
     * @return
     */
-  private def asApacheCommonsWrapper(
+  private def asApacheCommonsArchiveWrapper(
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
     val factory = (new ArchiveStreamFactory())
@@ -274,13 +278,71 @@ object FileWalker {
     }.toOption.flatten
   }
 
+  /** Try to construct an `OptionalArchiveStream` using the Apache Commons "Compressed file" support;
+   *
+   * Note this only reads *simple compressed files* – that is to say, something like a `.gz`  around a single file
+   * It will *not* work on archive files such as `.tar.gz`, which needs the `ArchiveStreamFactory`
+   * rather than the `ArchiveStreamFactory`
+   *
+   * @param in
+   *   the file to try to construct the stream from
+   * @return
+   */
+  private def asApacheCommonsCompressedWrapper(
+    in: ArtifactWrapper
+  ): OptionalArchiveStream = {
+    val factory = new CompressorStreamFactory()
+    Try {
+      val fis = in.asStream()
+
+      try {
+        val input: CompressorInputStream = factory.createCompressorInputStream(fis)
+        val compressedIter = new Iterator[() => (String, ArtifactWrapper)] {
+          private var x = 0 // count accesses for hasNext // todo should this be an atomic?
+
+          override def hasNext: Boolean = {
+            x == 0
+          }
+
+          override def next(): () => (String, ArtifactWrapper) = {
+            x += 1
+            // todo - expand me for other possible single file compresseds
+            if (in.name().endsWith(".gz")) {
+              val name = in.name().substring(0, in.name().length - 3)
+              val wrapper = buildWrapper(name, in.size(), () => input)
+
+              val result = () => (name, wrapper)
+              logger.trace(s"Result for CompressedWrapper: ${result()}")
+              result
+            } else throw IllegalArgumentException(s"Unknown compressed file extension on ${in.name()}") // todo - non-exception control
+          }
+
+        }
+
+        val theIterator = compressedIter.filter(!_()._2.isDirectory())
+        Some(theIterator -> (() => input.close()))
+      } catch {
+        case e: Throwable => fis.close(); None
+      }
+    } match {
+      case Success(Some(iter)) =>
+        Some(iter)
+      case Success(None) =>
+        logger.trace("Success(None) ??")
+        None
+      case Failure(e) =>
+        logger.trace(s"Failed to get an Apache Commons Compressed Wrapper: ${e.getMessage}")
+        None
+    }
+  }
+
   /**
    * Process Ruby Gem dependency files. These archives are suffixed `.gem`, but are tarballs with 3 files:
    * - metadata.gz - a gzipped file containing the metadata (dependency info, etc) and Gem Spec
    * - checksums.yaml.gz - a gzipped YAML file with the checksums for the archive
    * - data.tar.gz - a tarball containing the actual ruby dependency code
    *
-   * This is a separate method from `asApacheCommonsWrapper`, to allow us to do anything extra
+   * This is a separate method from `asApacheCommonsArchiveWrapper`, to allow us to do anything extra
    * with checksums or metadata or such
    * @param in the file to try to construct the stream from
    * @return OptionalArchiveStream
@@ -329,7 +391,8 @@ object FileWalker {
     asZipContainer(in) orElse
       asISOWrapper(in) orElse
       asGemWrapper(in) orElse
-      asApacheCommonsWrapper(in)
+      asApacheCommonsArchiveWrapper(in) orElse
+      asApacheCommonsCompressedWrapper(in)
   }
 
   /** A stream of ArtifactWrappers... maybe
@@ -360,7 +423,9 @@ object FileWalker {
 
     // if we've got it, yay.
     ret match {
-      case Some(archive) => Some(archive)
+      case Some(archive) =>
+        logger.trace(s"for $in got archive stream $archive")
+        Some(archive)
 
       // if not, then try to treat the file as a compressed file, decompress, and try again
       case None => {
