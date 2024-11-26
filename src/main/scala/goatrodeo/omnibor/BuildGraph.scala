@@ -1,19 +1,24 @@
 package io.spicelabs.goatrodeo.omnibor
 
+import com.typesafe.scalalogging.Logger
+
 import java.io.File
 import scala.util.Try
 import io.spicelabs.goatrodeo.util.Helpers
+
 import java.io.BufferedWriter
 import java.io.FileWriter
 import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.{GitOID, FileWalker, FileWrapper, GitOIDUtils}
+import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
 import io.spicelabs.goatrodeo.util.FileType
+
 import scala.collection.immutable.TreeSet
 import scala.collection.immutable.TreeSet
 
 /** Tools for opening files including containing files and building graphs
   */
 object BuildGraph {
+  val logger = Logger("BuildGraph")
   def graphForToProcess(
       item: ToProcess,
       store: Storage,
@@ -153,6 +158,8 @@ object BuildGraph {
         val aliases = foundAliases ++ packageIds
 
         val fileType = FileType.theType(name, Some(file), associatedFiles)
+
+        logger.info(s"File Name: $name Type: $fileType")
 
         val computedConnections: TreeSet[Edge] =
           // built from a source file

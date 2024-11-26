@@ -33,6 +33,7 @@ object FileWalker {
     */
   def fileForCompressed(in: InputStream): Option[File] = {
     val ret = Try {
+      logger.trace(s"fileForCompressed($in)")
       val fis = in
       try {
         new CompressorStreamFactory()
@@ -41,6 +42,7 @@ object FileWalker {
           )
       } catch {
         case e: Exception => {
+          logger.trace(s"fileForCompressed on $in failed: ${e.getMessage}")
           fis.close()
           throw e
         }
@@ -116,6 +118,7 @@ object FileWalker {
     * @return
     */
   private def asZipContainer(in: ArtifactWrapper): OptionalArchiveStream = {
+    logger.trace(s"asZipContainer($in)")
     if (zipSuffixes.contains(in.suffix)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
@@ -184,7 +187,7 @@ object FileWalker {
     * @return
     */
   private def asISOWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
-    logger.trace(s"suffix: ${in.suffix} suffixes: ${isoSuffixes} contains? ${isoSuffixes.contains(in.suffix)}")
+    logger.trace(s"asIsoWrapper suffix: ${in.suffix} suffixes: ${isoSuffixes} contains? ${isoSuffixes.contains(in.suffix)}")
     if (isoSuffixes.contains(in.suffix)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
@@ -248,6 +251,7 @@ object FileWalker {
   private def asApacheCommonsArchiveWrapper(
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
+    logger.trace(s"asApacheCommonsArchiveWrapper($in)")
     val factory = (new ArchiveStreamFactory())
     Try {
       {
@@ -348,6 +352,7 @@ object FileWalker {
    * @return OptionalArchiveStream
    * */
   private def asGemWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
+    logger.trace(s"asGemWrapper($in)")
     val factory = (new ArchiveStreamFactory())
     Try {
 
@@ -418,7 +423,7 @@ object FileWalker {
     val ret = tryToConstructArchiveStream(in)
 
 
-    logger.trace(s"ret: $ret")
+    logger.trace(s"ret for $in: $ret")
 
 
     // if we've got it, yay.
@@ -429,8 +434,10 @@ object FileWalker {
 
       // if not, then try to treat the file as a compressed file, decompress, and try again
       case None => {
+        logger.trace(s"not able to get archive stream from $in")
         for {
           uncompressedFile <- fileForCompressed(in.asStream())
+          _ = logger.trace(s"for $in unCompressed file: ${uncompressedFile}")
           uncompressedArchive = FileWrapper(uncompressedFile, true)
           ret <- tryToConstructArchiveStream(uncompressedArchive)
         } yield ret
