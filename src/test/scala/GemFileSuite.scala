@@ -40,7 +40,7 @@ class GemFileSuite extends munit.FunSuite {
       e <- inputStream
       (name, file) = e()
     } {
-      logger.debug(s"name: $name file: $file")
+      logger.trace(s"name: $name file: $file")
       cnt += 1
       file.delete()
     }
@@ -65,11 +65,11 @@ class GemFileSuite extends munit.FunSuite {
         logger.trace(s" name: $name parent: $parent x: $x")
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        // println(f"hash for ${name} is ${main} parent ${parent}")
+        logger.trace(f"hash for ${name} is ${main} parent ${parent}")
         (main, false, None, x)
       }
     )
-    assert(cnt == 27, f"expected 27, got ${cnt}")
+    assert(cnt == 30, f"expected 30, got ${cnt}")
   }
 
   test("Build a graph") {

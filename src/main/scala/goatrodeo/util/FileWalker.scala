@@ -301,30 +301,32 @@ object FileWalker {
 
       try {
         val input: CompressorInputStream = factory.createCompressorInputStream(fis)
-        val compressedIter = new Iterator[() => (String, ArtifactWrapper)] {
-          private var x = 0 // count accesses for hasNext // todo should this be an atomic?
 
-          override def hasNext: Boolean = {
-            x == 0
-          }
+        // todo - expand me for other possible single file compresseds
+        if (in.name().endsWith(".gz")) {
+          val compressedIter = new Iterator[() => (String, ArtifactWrapper)] {
+            private var x = 0 // count accesses for hasNext // todo should this be an atomic?
 
-          override def next(): () => (String, ArtifactWrapper) = {
-            x += 1
-            // todo - expand me for other possible single file compresseds
-            if (in.name().endsWith(".gz")) {
+            override def hasNext: Boolean = {
+              x == 0
+            }
+
+            override def next(): () => (String, ArtifactWrapper) = {
+              x += 1
               val name = in.name().substring(0, in.name().length - 3)
               val wrapper = buildWrapper(name, in.size(), () => input)
 
               val result = () => (name, wrapper)
               logger.trace(s"Result for CompressedWrapper: ${result()}")
               result
-            } else throw IllegalArgumentException(s"Unknown compressed file extension on ${in.name()}") // todo - non-exception control
+              //else throw IllegalArgumentException(s"Unknown compressed file extension on ${in.name()}") // todo - non-exception control
+            }
+
           }
 
-        }
-
-        val theIterator = compressedIter.filter(!_()._2.isDirectory())
-        Some(theIterator -> (() => input.close()))
+          val theIterator = compressedIter.filter(!_()._2.isDirectory())
+          Some(theIterator -> (() => input.close()))
+        } else None
       } catch {
         case e: Throwable => fis.close(); None
       }

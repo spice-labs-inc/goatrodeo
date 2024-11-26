@@ -159,7 +159,7 @@ object BuildGraph {
 
         val fileType = FileType.theType(name, Some(file), associatedFiles)
 
-        logger.info(s"File Name: $name Type: $fileType")
+        logger.trace(s"File Name: $name Type: $fileType")
 
         val computedConnections: TreeSet[Edge] =
           // built from a source file
