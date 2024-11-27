@@ -1,8 +1,8 @@
 package io.spicelabs.goatrodeo.util
 
 import java.io.File
-import scala.util.Try
-import org.apache.commons.compress.compressors.CompressorStreamFactory
+import scala.util.{Failure, Success, Try}
+import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
 
 import java.io.InputStream
 import java.util.zip.ZipFile
@@ -33,6 +33,7 @@ object FileWalker {
     */
   def fileForCompressed(in: InputStream): Option[File] = {
     val ret = Try {
+      logger.trace(s"fileForCompressed($in)")
       val fis = in
       try {
         new CompressorStreamFactory()
@@ -41,6 +42,7 @@ object FileWalker {
           )
       } catch {
         case e: Exception => {
+          logger.trace(s"fileForCompressed on $in failed: ${e.getMessage}")
           fis.close()
           throw e
         }
@@ -103,6 +105,12 @@ object FileWalker {
     */
   private lazy val isoSuffixes: Set[Option[String]] = Set(Some(".iso"))
 
+
+  /** Suffixes for Ruby GEM Files
+   * */
+  private lazy val gemSuffixes: Set[Option[String]] = Set(Some(".gem"))
+
+
   /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
     *
     * @param in
@@ -110,6 +118,7 @@ object FileWalker {
     * @return
     */
   private def asZipContainer(in: ArtifactWrapper): OptionalArchiveStream = {
+    logger.trace(s"asZipContainer($in)")
     if (zipSuffixes.contains(in.suffix)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
@@ -178,7 +187,7 @@ object FileWalker {
     * @return
     */
   private def asISOWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
-    logger.trace(s"suffix: ${in.suffix} suffixes: ${isoSuffixes} contains? ${isoSuffixes.contains(in.suffix)}")
+    logger.trace(s"asIsoWrapper suffix: ${in.suffix} suffixes: ${isoSuffixes} contains? ${isoSuffixes.contains(in.suffix)}")
     if (isoSuffixes.contains(in.suffix)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
@@ -231,15 +240,124 @@ object FileWalker {
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
     * read most archive files" format
     *
+    * Note this only reads *archives* – that is to say, something like a `.tar.gz` with many files
+    * It will *not* work on simple single compressed files in a gzip wrapper, which needs the `CompressorStreamFactory`
+    * rather than the `ArchiveStreamFactory`
+    *
     * @param in
     *   the file to try to construct the stream from
     * @return
     */
-  private def asApacheCommonsWrapper(
+  private def asApacheCommonsArchiveWrapper(
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
+    logger.trace(s"asApacheCommonsArchiveWrapper($in)")
     val factory = (new ArchiveStreamFactory())
     Try {
+      {
+        val fis = in.asStream()
+
+        try {
+          val input: ArchiveInputStream[ArchiveEntry] = factory
+            .createArchiveInputStream(
+              fis
+            )
+          val theIterator = Helpers
+            .iteratorFor(input)
+            .filter(!_.isDirectory())
+            .map(ae =>
+              () => {
+                val name = ae.getName()
+
+                val wrapper = buildWrapper(name, ae.getSize(), () => input)
+
+                (name, wrapper)
+              }
+            )
+          Some(theIterator -> (() => input.close()))
+        } catch {
+          case e: Throwable => fis.close(); None
+        }
+      }
+    }.toOption.flatten
+  }
+
+  /** Try to construct an `OptionalArchiveStream` using the Apache Commons "Compressed file" support;
+   *
+   * Note this only reads *simple compressed files* – that is to say, something like a `.gz`  around a single file
+   * It will *not* work on archive files such as `.tar.gz`, which needs the `ArchiveStreamFactory`
+   * rather than the `ArchiveStreamFactory`
+   *
+   * @param in
+   *   the file to try to construct the stream from
+   * @return
+   */
+  private def asApacheCommonsCompressedWrapper(
+    in: ArtifactWrapper
+  ): OptionalArchiveStream = {
+    val factory = new CompressorStreamFactory()
+    Try {
+      val fis = in.asStream()
+
+      try {
+        val input: CompressorInputStream = factory.createCompressorInputStream(fis)
+
+        // todo - expand me for other possible single file compresseds
+        if (in.name().endsWith(".gz")) {
+          val compressedIter = new Iterator[() => (String, ArtifactWrapper)] {
+            private var x = 0 // count accesses for hasNext // todo should this be an atomic?
+
+            override def hasNext: Boolean = {
+              x == 0
+            }
+
+            override def next(): () => (String, ArtifactWrapper) = {
+              x += 1
+              val name = in.name().substring(0, in.name().length - 3)
+              val wrapper = buildWrapper(name, in.size(), () => input)
+
+              val result = () => (name, wrapper)
+              logger.trace(s"Result for CompressedWrapper: ${result()}")
+              result
+              //else throw IllegalArgumentException(s"Unknown compressed file extension on ${in.name()}") // todo - non-exception control
+            }
+
+          }
+
+          val theIterator = compressedIter.filter(!_()._2.isDirectory())
+          Some(theIterator -> (() => input.close()))
+        } else None
+      } catch {
+        case e: Throwable => fis.close(); None
+      }
+    } match {
+      case Success(Some(iter)) =>
+        Some(iter)
+      case Success(None) =>
+        logger.trace("Success(None) ??")
+        None
+      case Failure(e) =>
+        logger.trace(s"Failed to get an Apache Commons Compressed Wrapper: ${e.getMessage}")
+        None
+    }
+  }
+
+  /**
+   * Process Ruby Gem dependency files. These archives are suffixed `.gem`, but are tarballs with 3 files:
+   * - metadata.gz - a gzipped file containing the metadata (dependency info, etc) and Gem Spec
+   * - checksums.yaml.gz - a gzipped YAML file with the checksums for the archive
+   * - data.tar.gz - a tarball containing the actual ruby dependency code
+   *
+   * This is a separate method from `asApacheCommonsArchiveWrapper`, to allow us to do anything extra
+   * with checksums or metadata or such
+   * @param in the file to try to construct the stream from
+   * @return OptionalArchiveStream
+   * */
+  private def asGemWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
+    logger.trace(s"asGemWrapper($in)")
+    val factory = (new ArchiveStreamFactory())
+    Try {
+
       {
         val fis = in.asStream()
 
@@ -274,17 +392,19 @@ object FileWalker {
     * @param in
     * @return
     */
-  def tryToConstructArchiveStream(
+  private def tryToConstructArchiveStream(
       in: ArtifactWrapper
   ): OptionalArchiveStream = {
     asZipContainer(in) orElse
       asISOWrapper(in) orElse
-      asApacheCommonsWrapper(in)
+      asGemWrapper(in) orElse
+      asApacheCommonsArchiveWrapper(in) orElse
+      asApacheCommonsCompressedWrapper(in)
   }
 
   /** A stream of ArtifactWrappers... maybe
     */
-  type OptionalArchiveStream =
+  private type OptionalArchiveStream =
     Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)]
 
   /** Given a file that might be an archive (Zip, cpio, tar, etc.) or might be a
@@ -304,17 +424,22 @@ object FileWalker {
 
     val ret = tryToConstructArchiveStream(in)
 
-    logger.trace(s"ret: $ret")
+
+    logger.trace(s"ret for $in: $ret")
 
 
     // if we've got it, yay.
     ret match {
-      case Some(archive) => Some(archive)
+      case Some(archive) =>
+        logger.trace(s"for $in got archive stream $archive")
+        Some(archive)
 
       // if not, then try to treat the file as a compressed file, decompress, and try again
       case None => {
+        logger.trace(s"not able to get archive stream from $in")
         for {
           uncompressedFile <- fileForCompressed(in.asStream())
+          _ = logger.trace(s"for $in unCompressed file: ${uncompressedFile}")
           uncompressedArchive = FileWrapper(uncompressedFile, true)
           ret <- tryToConstructArchiveStream(uncompressedArchive)
         } yield ret

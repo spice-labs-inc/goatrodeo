@@ -37,10 +37,13 @@ import scala.util.Failure
 import scala.util.Success
 import org.apache.bcel.classfile.ClassParser
 import io.bullet.borer.Cbor
+
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
+import org.apache.commons.compress.compressors.CompressorInputStream
+
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import scala.collection.immutable.TreeMap
@@ -335,6 +338,7 @@ object Helpers {
 
     }
   }
+
 
   @inline def hexChar(b: Byte): Char = {
     b match {
@@ -1030,7 +1034,7 @@ enum FileType {
       case ObjectFile(Some(subtype), _) => Some(f"object: ${subtype}")
       case ObjectFile(_, _)             => Some("object")
       case SourceFile(Some(language))   => Some(f"source: ${language}")
-      case SourceFile(language)         => Some("source")
+      case SourceFile(_)                => Some("source")
       case MetaData(Some(subtype))      => Some(f"metadata: ${subtype}")
       case MetaData(_)                  => Some("metadata")
       case Package(Some(subtype))       => Some(f"package: ${subtype}")
@@ -1128,11 +1132,13 @@ object FileType {
 
         ObjectFile(Some("classfile"), sourceGitOID)
       }
+      case s if s.equals("metadata") => MetaData(Some("metadata")) // ruby gem metadata file at toplevel (in metadata.gz)
       case s if s.endsWith(".o")     => ObjectFile(Some("o"), None)
       case s if s.endsWith(".dll")   => ObjectFile(Some("dll"), None)
       case s if s.endsWith(".java")  => SourceFile(Some("java"))
       case s if s.endsWith(".scala") => SourceFile(Some("scala"))
       case s if s.endsWith(".clj")   => SourceFile(Some("clojure"))
+      case s if s.endsWith(".rb")    => SourceFile(Some("ruby"))
       case _                         => Other
     }
   }

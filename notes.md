@@ -1,0 +1,1 @@
+- Should we have more filetypes such as ConfigFile('java.properties) or such?

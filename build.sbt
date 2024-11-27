@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.5.0-SNAPSHOT"
+val projectVersion = "0.6.1-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -65,9 +65,24 @@ Test / testOptions += Tests.Setup(() => {
   }
 
   try {
+    log.info("\t* Creating test_data/gem_tests if it doesn't already exist…")
+    Files.createDirectory(Paths.get("test_data/gem_tests"))
+  } catch {
+    case fE: FileAlreadyExistsException =>
+      log.info("\t! gem_tests directory already exists.")
+    case e: Throwable =>
+      val err = s"Exception setting up gem_tests directory: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
+  }
+
+
+  try {
     log.info("\t* Fetching test ISOs…")
     url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file("./test_data/iso_tests/iso_of_archives.iso") ! log
     url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
+    log.info("\t * Fetching test Gems…")
+    url("https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem") #> file("./test_data/gem_tests/java-properties-0.3.0.gem") ! log
   } catch {
     case e: Throwable =>
       val err = s"Exception fetching iso test files: ${e.getMessage}"
