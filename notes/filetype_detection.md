@@ -8,7 +8,15 @@ actual mimetype such as `application/java-archive`)
 I looked at both Apache Commons Compress, which at the time of writing we are already using in Goat Rodeo to decompress files, and Apache Tika, which has a large slate of file types it is able to detect & parse metadata from…
 
 ### How Goat Rodeo currently works
-
+1. Attempt to unzip the archive
+    1. check that it has a suffix in the list of zip file suffixes
+    2. Attempt the unzip; if it fails return and fallthrough to next phase
+2. Attempt to treat the archive as a .iso file
+    1. check that it has a suffix in the list of iso file suffixes
+    2. Attept to pass it to the ISOFileReader; if it fails return and fallthrough to next phase
+3. Attempt to treat the archive as a Ruby Gem
+4. Attempt to treat the archive as a Apache Commons compatible Archive Stream
+5. Attempt to treat the archive as an Apache commons compatible Compressor Stream
 
 ### Apache Commons Compress
 
