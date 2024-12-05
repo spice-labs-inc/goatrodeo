@@ -1,6 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
+import goatrodeo.model.FileWrapper
 
 import java.io.File
 import scala.util.Try
@@ -9,7 +10,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 import java.io.BufferedWriter
 import java.io.FileWriter
 import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
+import io.spicelabs.goatrodeo.util.{FileWalker, GitOID, GitOIDUtils}
 import io.spicelabs.goatrodeo.util.FileType
 
 import scala.collection.immutable.TreeSet

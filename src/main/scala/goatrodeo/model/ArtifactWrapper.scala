@@ -1,10 +1,8 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.model
 
-import java.io.InputStream
-import java.io.File
-import java.io.BufferedInputStream
-import java.io.FileInputStream
-import java.io.ByteArrayInputStream
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+
+import java.io.*
 
 /** In OmniBOR, everything is seen as a byte stream.
   *

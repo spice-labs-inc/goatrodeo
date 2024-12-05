@@ -14,6 +14,8 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
+import goatrodeo.model.{ArtifactWrapper, FileWrapper}
+
 import java.io.File
 import java.io.FileOutputStream
 import java.io.ByteArrayOutputStream
