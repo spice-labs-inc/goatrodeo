@@ -38,7 +38,7 @@ There are two core concepts to Apache Tika:
 
 #### Detectors
 
-https://tika.apache.org/3.0.0/detection.html
+[Runthrough of Detection Behavior](https://tika.apache.org/3.0.0/detection.html)
 
 The `DefaultDetector` in Tika runs through a registry of Detectors, in order. By default the first detector it runs is the `MagicDetector`, which uses the magic bytes at the header of files to determine their Mime Type. Other `Detectors` are run (including just matching filename) custom user written ones until it finds one that matches.
 
@@ -69,9 +69,11 @@ Its also possible to add a "weight" to custom types, for where they fall in the 
   </mime-type>
 ```
 
-Can customize the mime type detection XML; https://tika.apache.org/3.0.0/parser_guide.html#Add_your_MIME-Type
+You can customize the mime type detection XML; https://tika.apache.org/3.0.0/parser_guide.html#Add_your_MIME-Type
 
 Default mime type detection…
 "By default, the mime type detection in Tika is provided by `org.apache.tika.mime.MimeTypes`. This detector makes use of `tika-mimetypes.xml` to power magic based and filename based detection."
+
+After Mime Type detection, the "Resource Name" based detection runs: this tries to match the file by extension to a known type, using the custom mimetypes definitions such as "a zip file named *.jar is a Java archive"…
 
 … It looks like, with a `Parser`, we could do a custom parse that pulls out a metadata block. e.g. for RPM we'd extract the binary metadata into a file that the `Parser` returns (instead of the actual full content); for say, Ruby, we could extract the metadata file in the Gem and either return that in full, or parse it into some common intermediary format (we'll probably need the i/f)
