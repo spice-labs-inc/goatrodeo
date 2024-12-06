@@ -8,7 +8,7 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
     true mustBe true
   }
 
-  it must "extract the ZIP Metadta (if any)" in {
+  it must "extract the ZIP Metadata (if any)" in {
 
   }
 
@@ -30,7 +30,7 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
 
   "An .ear file" must "be detected as such" in {
 
-  }
+}
 
   it must "extract the EAR Metadata" in {
 
