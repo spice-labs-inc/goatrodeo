@@ -122,3 +122,25 @@ e.g.:
 ./usr/bin/
 ./usr/bin/hello
  ```
+
+### ISO 9660 / UDF `.iso` Files
+References used:
+- [Docs for Palantir's `isofilereader` Java Library](https://github.com/palantir/isofilereader)
+
+### Java JAR Format `.jar`
+`.jar` is a zip file containing code and some optional metadata.
+### Java WAR Format `.war`
+WAR is for deploying Java webapps on e.g. tomcat or jetty. 
+`.war` is a zip file containing code and metadata.
+### Java EAR Format `.ear`
+EAR is for deploying Java Enterprise applications, e.g. EJBs. 
+`.ear` is a zip file containing code and metadata.
+
+### RPM `.rpm` Packages
+References Used
+- [jRPM - RPM Specs](https://jrpm.sourceforge.net/rpmspec/index.html)
+- [RPM.org V4 Package Format](https://rpm-software-management.github.io/rpm/manual/format_v4.html)
+### Android APK `.apk` Packages
+References Used
+- [Wikipedia `.apk` File Format](https://en.wikipedia.org/wiki/Apk_(file_format))
+- [Structure of an Android App Binary (.apk)](https://www.appdome.com/how-to/devsecops-automation-mobile-cicd/appdome-basics/structure-of-an-android-app-binary-apk/)
