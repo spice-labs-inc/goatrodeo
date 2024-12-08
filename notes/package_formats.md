@@ -52,3 +52,73 @@ SHA512:
 
 #### Ruby Gem Data
 The `data.tar.gz` tarball contains the actual Ruby code that the Gem package represents.
+
+### Debian `.deb` Packages
+References Used:
+- [Debian package structure](https://wiki.freepascal.org/Debian_package_structure)
+- [Basics of the Debian package management system](https://www.debian.org/doc/manuals/debian-faq/pkg-basics.en.html)
+- [Anatomy of a deb Package](https://radagast.ca/linux/anatomy_of_a_deb_file.html)
+
+Debian `.deb` packages are an `ar` (note this is `ar` and not `tar`) package containing three subfiles:
+- `control.tar.gz` contains a Debian 'control' file which contains metadata about the package
+- `debian-binary` which is a text file containing the version of the Debian system
+- `data.tar.gz` contains the actual package files - source code or binaries
+
+#### Debian Package Metadata
+The `contro.tar.gz` file is a tarball containing a single `control` file. This file contains metadata about the package.
+
+Sample: 
+
+```
+Package: hello
+Version: 2.2-2
+Section: devel
+Priority: optional
+Architecture: i386
+Depends: libc6 (>= 2.5-0ubuntu1)
+Installed-Size: 584
+Maintainer: Ubuntu Core Developers 
+Original-Maintainer: Santiago Vila 
+Description: The classic greeting, and a good example
+ The GNU hello program produces a familiar, friendly greeting.  It
+ allows non-programmers to use a classic computer science tool which
+ would otherwise be unavailable to them.
+ .
+ Seriously, though: this is an example of how to do a Debian package.
+ It is the Debian version of the GNU Project's `hello world' program
+ (which is itself an example for the GNU Project).
+ ```
+
+ ##### Metadata Fields
+ - `Package` - the name of the package
+ - `Version` - the version of the package
+ - `Section` - the category of the package
+ - `Priority` - the priority of the package
+ - `Architecture` - the CPU architecture used by this package
+ - `Depends` - other packages upon which this package depends
+ - `Installed-Size` - the size, in kilobytes (kb), that the package takes up when decompressed and installed
+ - `Description` - a long description of the package
+ - `Maintainer` - 
+ - `Original-Maintainer` - 
+
+ #### Debian Package Data
+ The data tarball, `data.tar.gz`, contains the actual files that will be installed with the package. 
+
+e.g.:
+ ```
+ bash$ tar -xzvf data.tar.gz 
+./
+./usr/
+./usr/share/
+./usr/share/doc/
+./usr/share/doc/hello/
+./usr/share/doc/hello/NEWS
+./usr/share/doc/hello/copyright
+./usr/share/doc/hello/changelog.gz
+./usr/share/doc/hello/changelog.Debian.gz
+./usr/share/man/
+./usr/share/man/man1/
+./usr/share/man/man1/hello.1.gz
+./usr/bin/
+./usr/bin/hello
+ ```
