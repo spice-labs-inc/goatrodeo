@@ -13,7 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
+import goatrodeo.model.FileWrapper
+import io.spicelabs.goatrodeo.util.{FileWalker, GitOIDUtils}
 
 import java.io.File
 

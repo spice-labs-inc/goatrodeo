@@ -14,6 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+import goatrodeo.model.PackageProtocol
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.io.FileOutputStream
@@ -27,7 +28,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import io.spicelabs.goatrodeo.util.Helpers
 import scala.util.Try
 import java.io.FileInputStream
-import io.spicelabs.goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
+import io.spicelabs.goatrodeo.util.{GitOID, FileType, GitOIDUtils}
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration

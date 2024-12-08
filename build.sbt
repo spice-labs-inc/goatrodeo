@@ -34,6 +34,8 @@ lazy val root = project
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
+    libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.19",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % "test",
 
     // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
     // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
