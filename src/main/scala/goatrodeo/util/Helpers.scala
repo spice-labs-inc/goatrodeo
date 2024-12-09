@@ -874,7 +874,7 @@ object PackageIdentifier {
         true,
         (wrapper, name, thing, _) => {
           import scala.jdk.CollectionConverters.*
-          if (name == "./control") {
+          if (name == "./control") { // todo - ensure we support multiline stuff in control, per spec
             val lr = BufferedReader(InputStreamReader(wrapper.asStream()))
             lines = lr.lines().iterator().asScala.toVector
             ("na", false, Some(FileAction.End), 42)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns:tika="https://tika.apache.org/">
+    <mime-type type="application/x-ruby-gem-package">
+        <_comment>Ruby Gem Package</_comment>
+        <tika:link>https://www.codemancers.com/blog/2020-08-17-understanding-gem-packaging/</tika:link>
+        <sub-class-of type="application/x-tar"/>
+        <glob pattern="*.gem"/>
+    </mime-type>
+</mime-info>
