@@ -14,8 +14,6 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
-import goatrodeo.model.{ArtifactWrapper, FileWrapper, PackageProtocol}
-
 import java.io.File
 import java.io.FileOutputStream
 import java.io.ByteArrayOutputStream
@@ -848,7 +846,19 @@ object GitOIDUtils {
   }
 }
 
+enum PackageProtocol {
+  case Maven, NPM, Docker, Deb, Gem
 
+  def name: String = {
+    this match {
+      case Maven  => "maven"
+      case NPM    => "npm"
+      case Docker => "docker"
+      case Deb    => "deb"
+      case Gem    => "gem"
+    }
+  }
+}
 
 object PackageIdentifier {
   def computePurl(f: File): Option[PackageIdentifier] = {

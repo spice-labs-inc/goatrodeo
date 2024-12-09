@@ -15,7 +15,6 @@ import java.io.BufferedInputStream
 import java.io.IOException
 import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
-import goatrodeo.model.{ArtifactWrapper, ByteWrapper, FileWrapper}
 
 enum FileAction {
   case SkipDive

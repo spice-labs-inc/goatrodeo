@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.model.{FileWrapper, PackageProtocol}
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
 import io.spicelabs.goatrodeo.util.Helpers
@@ -31,12 +30,14 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.util.PackageIdentifier
+import io.spicelabs.goatrodeo.util.PackageProtocol
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 import io.spicelabs.goatrodeo.util.FileWalker
+import io.spicelabs.goatrodeo.util.FileWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
