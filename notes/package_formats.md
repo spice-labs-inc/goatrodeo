@@ -140,6 +140,12 @@ EAR is for deploying Java Enterprise applications, e.g. EJBs.
 References Used
 - [jRPM - RPM Specs](https://jrpm.sourceforge.net/rpmspec/index.html)
 - [RPM.org V4 Package Format](https://rpm-software-management.github.io/rpm/manual/format_v4.html)
+- [RPM.org RPM File Format](http://ftp.rpm.org/max-rpm/s1-rpm-file-format-rpm-file-format.html)
+
+RPMs are a binary format, constructed of 4 distinct pieces:
+- The Lead: this section is the first part of the file and helps identify the package as an RPM file; other previous uses of the lead have been deprecated and abandoned
+- The Signature: This section follows the lead in the file, and can be used to verify the integrity and optionally the authenticity of the package
+- The Header: this section "contains all available information about the package". This includes name, version, and file lists.
 ### Android APK `.apk` Packages
 References Used
 - [Wikipedia `.apk` File Format](https://en.wikipedia.org/wiki/Apk_(file_format))
