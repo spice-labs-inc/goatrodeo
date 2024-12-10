@@ -6,25 +6,18 @@ import org.apache.tika.metadata.TikaCoreProperties
 import org.apache.tika.mime.MediaType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+import io.spicelabs.goatrodeo.util.filetypes.*
+import org.apache.tika.parser.ParseContext
+import org.apache.tika.sax.BodyContentHandler
 
-import java.io.File
+import java.io.{File, FileInputStream}
 
 class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
+  import MIMETypeMappings._
+
   val tika = new TikaConfig()
   val logger = Logger("FiletypeDetectionAndMetadataSuite")
 
-  val MIME_ZIP = "application/zip"
-  val MIME_JAR = "application/java-archive"
-  val MIME_WAR = "application/x-tika-java-web-archive"
-  val MIME_EAR = "application/x-tika-java-enterprise-archive"
-  val MIME_ISO = "application/x-iso9660-image"
-  val MIME_DEB = "application/x-debian-package"
-  val MIME_RPM = "application/x-rpm"
-  val MIME_GEM = "application/x-tar" // TODO - we should add a custom detecter to custom-types.xml for gems based on .gem
-//  val MIME_GEM = "application/x-ruby-gem-package" // Not working right now with the custom mime types, return later
-  val MIME_APK = "application/vnd.android.package-archive"
-  val MIME_TAR = "application/x-gtar"
-  val MIME_GZIP = "application/gzip"
 
   def detectFiletype(f: File): MediaType = {
     val metadata = new Metadata()
@@ -55,7 +48,6 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   }
 
   it must "extract the Jar metadata" in {
-    true mustBe true
   }
 
   "A .war file" must "be detected as such" in {
@@ -95,7 +87,14 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   }
 
   it must "extract the DEB Metadata" in {
-
+    // this is still rough / experimental we probably want to use the AutoDetect parser stuff at some point…
+    val f = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
+    val parser = new DebianPackageParser()
+    val handler = new BodyContentHandler();
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, f.getName())
+    val ctx = new ParseContext()
+    parser.parse(new FileInputStream(f), handler, metadata, ctx)
   }
 
   "An .rpm file" must "be detected as such" in {

@@ -33,6 +33,7 @@ lazy val root = project
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
+    libraryDependencies += "ch.qos.logback" % "logback-core" % "1.2.10",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.19",
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19",
@@ -94,6 +95,17 @@ Test / testOptions += Tests.Setup(() => {
       throw new MessageOnlyException(err)
   }
 
+  try {
+    log.info("\t* Creating test_data/deb_tests if it doesn't already exist…")
+    Files.createDirectory(Paths.get("test_data/deb_tests"))
+  } catch {
+    case fE: FileAlreadyExistsException =>
+      log.info("\t! deb_tests directory already exists.")
+    case e: Throwable =>
+      val err = s"Exception setting up deb_tests directory: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
+  }
 
   try {
     log.info("\t* Fetching test ISOs…")
@@ -107,6 +119,8 @@ Test / testOptions += Tests.Setup(() => {
     url("https://public-test-data.spice-labs.dev/EnterpriseHelloWorld.ear") #> file("./test_data/EnterpriseHelloWorld.ear") ! log
     log.info("\t * Fetching test Android APKs…")
     url("https://public-test-data.spice-labs.dev/bitbar-sample-app.apk") #> file("./test_data/apk_tests/bitbar-sample-app.apk") ! log
+    log.info("\t * Fetching test Debian Packages…")
+    url("https://public-test-data.spice-labs.dev/hello_2.10-3_arm64.deb") #> file("./test_data/deb_tests/hello_2.10-3_arm64.deb") ! log
     log.info("\t ! Test Data Fetches complete…")
   } catch {
     case e: Throwable =>
