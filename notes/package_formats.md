@@ -65,7 +65,7 @@ Debian `.deb` packages are an `ar` (note this is `ar` and not `tar`) package con
 - `data.tar.gz` contains the actual package files - source code or binaries
 
 #### Debian Package Metadata
-The `contro.tar.gz` file is a tarball containing a single `control` file. This file contains metadata about the package.
+The `control.tar.gz` file is a tarball containing a single `control` file. This file contains metadata about the package.
 
 Sample: 
 
@@ -127,12 +127,14 @@ e.g.:
 References used:
 - [Docs for Palantir's `isofilereader` Java Library](https://github.com/palantir/isofilereader)
 
-### Java JAR Format `.jar`
+### Java Archives (`.jar` and related)
+#### Java JAR (Java Archive) Format `.jar`
+- [JAR Manifest Files](https://docs.oracle.com/javase/tutorial/deployment/jar/manifestindex.html)
 `.jar` is a zip file containing code and some optional metadata.
-### Java WAR Format `.war`
+#### Java WAR (Web Archive) Format `.war`
 WAR is for deploying Java webapps on e.g. tomcat or jetty. 
 `.war` is a zip file containing code and metadata.
-### Java EAR Format `.ear`
+#### Java EAR (Enterprise Archive) Format `.ear`
 EAR is for deploying Java Enterprise applications, e.g. EJBs. 
 `.ear` is a zip file containing code and metadata.
 

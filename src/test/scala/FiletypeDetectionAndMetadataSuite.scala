@@ -21,6 +21,7 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   val MIME_DEB = "application/x-debian-package"
   val MIME_RPM = "application/x-rpm"
   val MIME_GEM = "application/x-tar" // TODO - we should add a custom detecter to custom-types.xml for gems based on .gem
+//  val MIME_GEM = "application/x-ruby-gem-package" // Not working right now with the custom mime types, return later
   val MIME_APK = "application/vnd.android.package-archive"
   val MIME_TAR = "application/x-gtar"
   val MIME_GZIP = "application/gzip"
