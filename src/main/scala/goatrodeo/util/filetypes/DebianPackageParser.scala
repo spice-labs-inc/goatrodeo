@@ -72,13 +72,21 @@ class DebianPackageParser extends Parser  {
         val ctrlStream: CompressorInputStream =
           compressorFactory.createCompressorInputStream(new ByteArrayInputStream(ctrlData))
         // ctrlStream is the tar file that was held inside the compressed container e.g. control.tar.zst
-        println(new String(ctrlStream.readAllBytes()))
+        val innerTarStream: ArchiveInputStream[ArchiveEntry] =
+          archFactory.createArchiveInputStream(new ByteArrayInputStream(ctrlStream.readAllBytes()))
+
+        val innerIter = Helpers
+          .iteratorFor(innerTarStream)
+          .filter(!_.isDirectory)
+
+        for (f <- innerIter if f.getName.equals("./control")) {
+          val innerCtrlData = new Array[Byte](f.getSize.toInt) /* unless somethings' really weird the deb file shouldn't contain anything that needs long to describe its size */
+          IOUtils.readFully(innerTarStream, innerCtrlData)
+          println(s"*** ${new String(innerCtrlData)}")
+        }
 
 
       }
-      /**
-       * So, we need to actually detect what the type is here…
-       **/
     }
 /*
     val foundCtrl = Helpers
