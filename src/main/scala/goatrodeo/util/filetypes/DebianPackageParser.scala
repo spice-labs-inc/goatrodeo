@@ -78,32 +78,43 @@ class DebianPackageParser extends Parser  {
         val innerIter = Helpers
           .iteratorFor(innerTarStream)
           .filter(!_.isDirectory)
-
+        // we don't do a filter against filename here because we need to stop iterating as soon as we
+        // find control, or the InputStream won't be pointign at that files data once
+        // we iterate past it
         for (f <- innerIter if f.getName.equals("./control")) {
           val innerCtrlData = new Array[Byte](f.getSize.toInt) /* unless somethings' really weird the deb file shouldn't contain anything that needs long to describe its size */
           IOUtils.readFully(innerTarStream, innerCtrlData)
           println(s"*** ${new String(innerCtrlData)}")
+          val attrs = parseControlFile(new String(innerCtrlData))
         }
+        // parse the contents of the control file…
 
 
       }
     }
-/*
-    val foundCtrl = Helpers
-      .iteratorFor(tarStream)
-      .filter(!_.isDirectory)
-      // there are actually several compressed formats + file extensions that I've seen in debs,
-      // so we won't assume it's .tar.gz
-      .find(_.getName.startsWith("control.tar"))
+  }
 
-    foundCtrl match {
-      case Some(ctrlF) =>
-        println(s"Found a (compressed) control file: ${ctrlF.getName}")
-      case None =>
-        // todo - is this an exception? A quiet noop? something we warn users about (corrupt / incomplete debs?)
-        sys.error("Did not find control file in top of .deb file")
+  // Partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
+  private def parseControlFile(data: String): Map[String, String] = {
+    val split_regex   = raw"^[A-Za-z-]+:\s".r
+    val b = Map.newBuilder[String, String]
+
+    for (k <- split_regex.findAllIn(data)) {
+      logger.debug(s"K: $k")
+      val sb = new StringBuilder()
+      val tail = split_regex.split(data)(1) // this ends up being the tail: everything after the key declaration
+      for (x <- tail.split("\n")) {
+        // now to determine if the line we are processing is a continuation of a multiline, or a new field
+        if (split_regex.matches(x)) {
+          logger.debug(s"Found a new key field… ${sb.result()}")
+        } else {
+          // multiline
+          sb.append(x)
+          logger.debug(s"must've been multiline: $x")
+        }
+      }
     }
-*/
+    b.result()
   }
 
 }
