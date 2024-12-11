@@ -32,8 +32,8 @@ lazy val root = project
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
-    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
-    libraryDependencies += "ch.qos.logback" % "logback-core" % "1.2.10",
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.12",
+    libraryDependencies += "ch.qos.logback" % "logback-core" % "1.5.12",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.19",
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19",
