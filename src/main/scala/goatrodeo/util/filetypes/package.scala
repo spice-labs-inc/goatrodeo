@@ -55,7 +55,7 @@ package object filetypes {
       val tika = new TikaConfig()
       val metadata = new Metadata() // tika metadata ; todo - maybe import alias this?
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, f.toString)
-      if (f.getName.endsWith(".gem"))  // temporary hack until we get custom-mimetypes.xml working
+      if (f.getName.endsWith(".gem")) // temporary hack until we get custom-mimetypes.xml working
         MIMETypeMappings.MIME_GEM
       else {
         val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)
@@ -64,6 +64,7 @@ package object filetypes {
         refinedMimeType
       }
     }
+
     // todo - bytearray input
     def resolveMetadata(f: File): Try[Map[String, String]] = {
       val detected = detectMIMEType(f)
@@ -76,7 +77,6 @@ package object filetypes {
 
 
   }
-
 
 
   def parseDebMetadata(f: File): Try[Map[String, String]] = {
@@ -135,91 +135,28 @@ package object filetypes {
   private val compressorFactory = new CompressorStreamFactory()
 
   // Partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
-    def parseDebControlFile(data: String): Map[String, String] = {
-      val split_regex = raw"^[A-Za-z-]+:\s".r
+  // we get this as a string for now but we might want to change to take a file or inputstream later
+  def parseDebControlFile(data: String): Map[String, String] = {
+    val split_regex = """^([A-Za-z-]+):\s(.*)$""".r
 
-      type KVMapBuilder = mutable.Builder[(String, String), Map[String, String]]
+    type KVMapBuilder = mutable.Builder[(String, String), Map[String, String]]
 
-      // todo - this doesn't really need the mutable builders
-      @tailrec
-      def _findKV(lines: Array[String], kvBuffer: (Option[String], StringBuilder) = None -> new StringBuilder(),
-                  kvMapB: KVMapBuilder = Map.newBuilder[String, String]): Map[String, String] = {
-        logger.debug(s"~~~ Lines Size: ${lines.size} kvBuffer: $kvBuffer kvMapB: $kvMapB")
-        if (lines.size <= 0) {
-          logger.debug(s"!!! Hit last line, collapsing out our buffer")
-          kvBuffer match {
-            case Some(key) -> value =>
-              kvMapB += key -> value.result()
-            case None -> _ =>
-              logger.warn("Got to lines = 0 with nothing buffered? something might be hinky")
-          }
-          kvMapB.result()
-        } else {
-          val line = lines.head
-          logger.debug(s"!!! Line: $line")
-          val s = split_regex.findAllIn(line).toVector
-          logger.debug(s"S Size: ${s.size} KVBuffer: $kvBuffer S: $s")
-          if (s.size == 1) { // we found a key entry // todo - make me a little saner / cleaner
-            logger.debug(s"*** Split size: ${s.size}")
-            kvBuffer._1 match {
-              case Some(key) => // was there a key set, which means we were building a multiline
-                logger.debug(s"*** We are working on an existing key; key: $key")
-                val value = kvBuffer._2.result()
-                logger.debug(s"*** kvMapB += $key -> $value")
-                // close out the multiline
-                kvMapB += key -> value
-                val newKey = s(0).split(":")(0)
-                val newValue = split_regex.split(line)(1)
-                logger.debug(s"*** newKey: $newKey newValue: $newValue")
-                val b = new StringBuilder()
-                b.append(newValue)
-                _findKV(lines.tail, Some(newKey) -> b, kvMapB)
-              case None => // no key set, start a new one
-                val key = s(0).split(":")(0)
-                val value = split_regex.split(line)(1) // everything after ":"
-                logger.debug(s"*** Working on a new line K: $key V: $value")
-                val newB = new StringBuilder()
-                newB.append(value)
-                _findKV(lines.tail, Some(key) -> newB, kvMapB)
-            }
-          } else { // we seem to have only found a value entry, this appends
-            logger.info("*** Split 0")
-            kvBuffer._1 match {
-              case Some(key) =>
-                logger.debug(s"*** Some(key): $key Line: $line")
-                kvBuffer._2.append(line)
-                _findKV(lines.tail, Some(key) -> kvBuffer._2, kvMapB)
-              case None =>
-                logger.debug(s"*** Calculated K/V Map: ${kvMapB.result()}")
-                /*
-                 * this shouldn't happen, it means we got here where there was no Key regex on the line,
-                 * but we ALSO are not currently building another key / value pair?
-                 */
-                val err = s"State Confusion: Building a new key / value pair; found a line with a Key prefix but no Key set in recursor"
-                logger.error(err)
-                throw new IllegalStateException(err)
-            }
-
-          }
-
-        }
+    val map = data
+      .replaceAll("""[\r\n]+\s+""", " ")
+      .split("\n")
+      .map {
+        case split_regex(k, v) =>
+          (k -> v)
+        case xs =>
+          throw new Exception(s"Didn't parse deb control entry correctly: ${xs}")
       }
+      .toMap
 
-      val map = _findKV(data.split("\n"))
-      logger.debug(s"Calculated K/V Map: $map")
-      map
-    }
-
-    Success(Map("deb" -> "debian", "foo" -> "bar"))
+    logger.debug(s"Calculated K/V Map: $map")
+    map
   }
 
   def parseGemMetadata(f: File): Try[Map[String, String]] = {
     Success(Map("gem" -> "ruby", "spam" -> "eggs"))
   }
-
-  /*def getPackageMetadata(f: File): Try[Map[String, String]] = {
-  }*/
-
-  /*def getPackageMetadata(bytes: Array[Byte], fileName: String): Try[Map[String, String]] = ???*/
-
-
+}
