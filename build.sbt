@@ -43,6 +43,8 @@ lazy val root = project
     libraryDependencies += "org.apache.tika" % "tika-parsers" % "3.0.0" pomOnly(),
     // https://mvnrepository.com/artifact/org.apache.tika/tika-parsers-standard-package
     libraryDependencies += "org.apache.tika" % "tika-parsers-standard-package" % "3.0.0",
+    // https://mvnrepository.com/artifact/org.yaml/snakeyaml
+    libraryDependencies += "org.yaml" % "snakeyaml" % "2.3",
 
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala

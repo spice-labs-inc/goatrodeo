@@ -81,6 +81,9 @@ package object filetypes {
   }
 
 
+  private val archFactory = new ArchiveStreamFactory()
+  private val compressorFactory = new CompressorStreamFactory()
+
   def parseDebMetadata(f: File): Try[Map[String, String]] = {
     val tarStream: ArchiveInputStream[ArchiveEntry] =
       archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
@@ -103,9 +106,9 @@ package object filetypes {
       // there are actually several compressed formats + file extensions that I've seen in debs,
       // so we won't assume it's .tar.gz; I've seen zstd, gzip, pkzip, etc
       if (x.getName.startsWith("control.tar")) {
-        println(s"Found compressed control file: ${x.getName}")
+        logger.info(s"Found compressed control file: ${x.getName}")
         val ctrlData = new Array[Byte](x.getSize.toInt) /* unless somethings' really weird the deb file shouldn't contain anything that needs long to describe its size */
-        IOUtils.readFully(tarStream, ctrlData) // this should give us gzip bytes…
+        CompressIOUtils.readFully(tarStream, ctrlData) // this should give us gzip bytes…
         val ctrlStream: CompressorInputStream =
           compressorFactory.createCompressorInputStream(new ByteArrayInputStream(ctrlData))
 
@@ -122,9 +125,9 @@ package object filetypes {
         // we iterate past it
         for (f <- innerIter if f.getName.equals("./control")) {
           val innerCtrlData = new Array[Byte](f.getSize.toInt) /* unless somethings' really weird the deb file shouldn't contain anything that needs long to describe its size */
-          IOUtils.readFully(innerTarStream, innerCtrlData)
+          CompressIOUtils.readFully(innerTarStream, innerCtrlData)
           println(s"*** ${new String(innerCtrlData)}")
-          attrs = parseDebControlFile(new String(innerCtrlData))
+          attrs = processDebControlFile(new String(innerCtrlData))
         }
 
 
@@ -133,15 +136,29 @@ package object filetypes {
     Success(attrs)
   }
 
-  private val archFactory = new ArchiveStreamFactory()
-  private val compressorFactory = new CompressorStreamFactory()
+  def processGemMetadataFile(str: String): Map[String, String] = {
+    import scala.jdk.CollectionConverters._
+    val yamlOpts = new LoaderOptions()
+    val yaml = new Yaml(yamlOpts)
+    // the metadata file from ruby adds some Ruby identifiers to the YAML but in a way that it is now NOT valid YAML, but it's just a file start marker so we'll skip it
+    val re = raw"!ruby/object:.*\\s".r
+
+    def _replacer(m: Regex.Match) = {
+    }
+    val yamlStr = str.tail.replaceAll("!ruby/object:.*\\s", "\n").tail.tail
+    logger.debug(s"Yaml String: $yamlStr")
+
+    for (event <- yaml.parse(new StringReader(yamlStr)).asScala) {
+      logger.debug(s"Yaml Event: $event")
+    }
+
+    Map.empty
+  }
 
   // Partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
   // we get this as a string for now but we might want to change to take a file or inputstream later
-  def parseDebControlFile(data: String): Map[String, String] = {
+  def processDebControlFile(data: String): Map[String, String] = {
     val split_regex = """^([A-Za-z-]+):\s(.*)$""".r
-
-    type KVMapBuilder = mutable.Builder[(String, String), Map[String, String]]
 
     val map = data
       .replaceAll("""[\r\n]+\s+""", " ")
@@ -159,6 +176,45 @@ package object filetypes {
   }
 
   def parseGemMetadata(f: File): Try[Map[String, String]] = {
+    val tarStream: ArchiveInputStream[ArchiveEntry] =
+      archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
+
+    val tarIter = new Iterator[ArchiveEntry] {
+      var last: ArchiveEntry = null
+
+      override def hasNext: Boolean = {
+        last = tarStream.getNextEntry()
+        last != null
+      }
+
+      override def next(): ArchiveEntry = last
+    }
+
+    val metaGZ = tarIter
+      .filter(_.getName().endsWith("metadata.gz"))
+      .nextOption() match {
+        case Some(metaFile) => metaFile
+        case None =>
+          val err = s"Didn't find a `metadata.gz` file in the Gem; this is not a valid Gem file"
+          logger.error(err)
+          val e = new IllegalArgumentException() // todo - custom error / exception
+          return Failure(e)
+      }
+
+
+    logger.debug(s"Filtered: $metaGZ")
+    logger.info(s"Found compressed Ruby Gem metadata file: ${metaGZ} $metaGZ")
+    val gemMetaData = new Array[Byte](metaGZ.getSize.toInt) /* unless somethings' really weird the metadata file shouldn't contain anything that needs long to describe its size */
+    CompressIOUtils.readFully(tarStream, gemMetaData) // get the gzip bytes
+    val gemMetaStream: CompressorInputStream =
+      compressorFactory.createCompressorInputStream(new ByteArrayInputStream(gemMetaData))
+
+    val gemSpec = String(gemMetaStream.readAllBytes())
+
+    logger.trace(s" gemSpec: $gemSpec")
+
+    val metaMap = processGemMetadataFile(gemSpec)
+
     Success(Map("gem" -> "ruby", "spam" -> "eggs"))
   }
 }

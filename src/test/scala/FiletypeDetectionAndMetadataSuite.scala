@@ -77,7 +77,6 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   }
 
   it must "extract the DEB Metadata" in {
-    // this is still rough / experimental we probably want to use the AutoDetect parser stuff at some point…
     val f = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     val meta = MIMETypeMappings.resolveMetadata(f)
     meta.success.value mustBe Map("Architecture" -> "amd64", "Maintainer" -> "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>", "Description" -> "Tk toolkit for Tcl and X11 v8.6 - windowing shell Tk is a cross-platform graphical toolkit which provides the Motif look-and-feel and is implemented using the Tcl scripting language. This package contains the windowing Tcl/Tk shell (wish).", "Section" -> "interpreters", "Package" -> "tk8.6", "Priority" -> "optional", "Installed-Size" -> "41", "Homepage" -> "http://www.tcl.tk/", "Depends" -> "libc6 (>= 2.34), libtcl8.6 (>= 8.6.0), libtk8.6 (>= 8.6.0)", "Conflicts" -> "libtk-img (<< 1.2.5), tk40 (<= 4.0p3-2)", "Version" -> "8.6.14-1build1", "Multi-Arch" -> "foreign", "Original-Maintainer" -> "Debian Tcl/Tk Packagers <pkg-tcltk-devel@lists.alioth.debian.org>")
@@ -99,7 +98,9 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   }
 
   it must "extract the GEM Metadata" in {
-
+    val f = new File("test_data/gem_tests/java-properties-0.3.0.gem")
+    val meta = MIMETypeMappings.resolveMetadata(f)
+    meta.success.value mustBe Map("gem" -> "ruby", "spam" -> "eggs")
   }
 
   "An android .apk archive" must "be detected as such" in {
