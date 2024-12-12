@@ -195,6 +195,70 @@ package object filetypes {
     Success(attrs)
   }
 
+  /**
+   * Extract and Parse the Metadata ("metadata" file) for .gem Ruby Packages
+   * These are represented as "quasi" YAML (ruby adds a bunch of crap to the file that most yaml parsers seem to choke on)
+   *
+   * @param f a `java.io.File` representing the ruby gem package file to extract from
+   * @return A `Try[Map[String, String]]` where, if success, contains the extracted Metadata from the Ruby Gem
+   */
+  def parseGemMetadata(f: File): Try[Map[String, String]] = {
+    // Open a stream against the .gem file, which is archived as a tar
+    val tarStream: ArchiveInputStream[ArchiveEntry] =
+      archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
+
+    val tarIter = new Iterator[ArchiveEntry] {
+      var last: ArchiveEntry = null
+
+      override def hasNext: Boolean = {
+        last = tarStream.getNextEntry()
+        last != null
+      }
+
+      override def next(): ArchiveEntry = last
+    }
+
+    // Grab the `metadata.gz` archive which contains the metadata YAML file
+    val metaGZ = tarIter
+      .filter(_.getName().endsWith("metadata.gz"))
+      .nextOption() match {
+      case Some(metaFile) => metaFile
+      case None =>
+        val err = s"Didn't find a `metadata.gz` file in the Gem; this is not a valid Gem file"
+        logger.error(err)
+        val e = new IllegalArgumentException() // todo - custom error / exception
+        return Failure(e)
+    }
+
+
+    logger.debug(s"Filtered: $metaGZ")
+    logger.info(s"Found compressed Ruby Gem metadata file: $metaGZ")
+    val gemMetaData = new Array[Byte](metaGZ.getSize.toInt) /* unless somethings' really weird the metadata file shouldn't contain anything that needs long to describe its size */
+    CompressIOUtils.readFully(tarStream, gemMetaData) // get the gzip bytes
+    // decompress the YAML file from .gz
+    val gemMetaStream: CompressorInputStream =
+      compressorFactory.createCompressorInputStream(new ByteArrayInputStream(gemMetaData))
+
+    val gemSpec = String(gemMetaStream.readAllBytes())
+
+    logger.trace(s" gemSpec: $gemSpec")
+
+    // Generate the map of
+    val metaMap = processGemMetadataFile(gemSpec)
+
+    logger.debug(s"Meta Map from Ruby Gems: $metaMap")
+
+    Success(metaMap) // todo - not hardcode succes…
+  }
+
+  /**
+   * TODO - make this other types besides string
+   *
+   * Given a `String` containing the contents of a Ruby Gem `metadata` file, parse
+   * the metadata into a `Map[String, String]` representing the key / value pairs from the YAML
+   * @param str A `String` containing a YAML file representing the Ruby Gem Metadata
+   * @return A `Map[String, String]` containing the parsed key/value pairs from the Ruby Gem Metadata file
+   */
   def processGemMetadataFile(str: String): Map[String, String] = {
     import scala.jdk.CollectionConverters._
     val yamlOpts = new LoaderOptions()
@@ -243,46 +307,4 @@ package object filetypes {
     map
   }
 
-  def parseGemMetadata(f: File): Try[Map[String, String]] = {
-    val tarStream: ArchiveInputStream[ArchiveEntry] =
-      archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
-
-    val tarIter = new Iterator[ArchiveEntry] {
-      var last: ArchiveEntry = null
-
-      override def hasNext: Boolean = {
-        last = tarStream.getNextEntry()
-        last != null
-      }
-
-      override def next(): ArchiveEntry = last
-    }
-
-    val metaGZ = tarIter
-      .filter(_.getName().endsWith("metadata.gz"))
-      .nextOption() match {
-        case Some(metaFile) => metaFile
-        case None =>
-          val err = s"Didn't find a `metadata.gz` file in the Gem; this is not a valid Gem file"
-          logger.error(err)
-          val e = new IllegalArgumentException() // todo - custom error / exception
-          return Failure(e)
-      }
-
-
-    logger.debug(s"Filtered: $metaGZ")
-    logger.info(s"Found compressed Ruby Gem metadata file: ${metaGZ} $metaGZ")
-    val gemMetaData = new Array[Byte](metaGZ.getSize.toInt) /* unless somethings' really weird the metadata file shouldn't contain anything that needs long to describe its size */
-    CompressIOUtils.readFully(tarStream, gemMetaData) // get the gzip bytes
-    val gemMetaStream: CompressorInputStream =
-      compressorFactory.createCompressorInputStream(new ByteArrayInputStream(gemMetaData))
-
-    val gemSpec = String(gemMetaStream.readAllBytes())
-
-    logger.trace(s" gemSpec: $gemSpec")
-
-    val metaMap = processGemMetadataFile(gemSpec)
-
-    Success(Map("gem" -> "ruby", "spam" -> "eggs"))
-  }
 }
