@@ -37,7 +37,7 @@ package object filetypes {
       Success(Map.empty)
     }
 
-    val mediaTypeLookup: Map[MediaType, File => Try[Map[String, String]]] = Map(
+    val mimeTypeLookup: Map[MediaType, File => Try[Map[String, String]]] = Map(
       MIME_DEB -> parseDebMetadata _,
       MIME_GEM -> parseGemMetadata _,
       MIME_ZIP -> metadataNoop _,
@@ -51,16 +51,26 @@ package object filetypes {
       MIME_GZIP -> metadataNoop _
     )
 
-    // todo - bytearray input
-    def resolveMetadata(f: File): Try[Map[String, String]] = {
+    def detectMIMEType(f: File): MediaType = {
       val tika = new TikaConfig()
       val metadata = new Metadata() // tika metadata ; todo - maybe import alias this?
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, f.toString)
-      val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)
-      logger.debug(s"Detected filetype for ${f.toString} media type: $detected Main Type: ${detected.getType} Subtype: ${detected.getSubtype}")
-      val lookup = MIMETypeMappings.mediaTypeLookup(detected)
-      logger.debug(s"Retrieved Package Metadata lookup for type $detected : $lookup")
+      if (f.getName.endsWith(".gem"))  // temporary hack until we get custom-mimetypes.xml working
+        MIMETypeMappings.MIME_GEM
+      else {
+        val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)
+        val refinedMimeType = if (detected.equals(MIME_TAR) && f.getName.endsWith(".gem")) MIMETypeMappings.MIME_GEM else detected
+        logger.debug(s"Detected filetype for ${f.toString} media type: $refinedMimeType Type: ${refinedMimeType.getType} Subtype: ${refinedMimeType.getSubtype}")
+        refinedMimeType
+      }
+    }
+    // todo - bytearray input
+    def resolveMetadata(f: File): Try[Map[String, String]] = {
+      val detected = detectMIMEType(f)
+      val lookup = MIMETypeMappings.mimeTypeLookup(detected)
+      logger.debug(s"Retrieved Package Metadata lookup function for type $detected : $lookup")
       val packageMeta = lookup(f)
+      logger.debug(s"*** Retrieved Package Metadata: $packageMeta")
       packageMeta
     }
 
