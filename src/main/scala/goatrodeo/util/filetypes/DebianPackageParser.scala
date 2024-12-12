@@ -106,8 +106,17 @@ class DebianPackageParser extends Parser  {
     //@tailrec
     def _findKV(lines: Array[String], kvBuffer: (Option[String], StringBuilder) = None -> new StringBuilder(),
                 kvMapB: KVMapBuilder = Map.newBuilder[String, String]): Map[String, String] = {
-      if (lines.size <= 0) kvMapB.result()
-      else {
+      logger.debug(s"~~~ Lines Size: ${lines.size} kvBuffer: $kvBuffer kvMapB: $kvMapB")
+      if (lines.size <= 0) {
+        logger.debug(s"!!! Hit last line, collapsing out our buffer")
+        kvBuffer match {
+          case Some(key) -> value =>
+            kvMapB += key -> value.result()
+          case None -> _ =>
+            logger.warn("Got to lines = 0 with nothing buffered? something might be hinky")
+        }
+        kvMapB.result()
+      } else {
         val line = lines.head
         logger.debug(s"!!! Line: $line")
         val s = split_regex.findAllIn(line).toVector
@@ -118,10 +127,12 @@ class DebianPackageParser extends Parser  {
             case Some(key) => // was there a key set, which means we were building a multiline
               logger.debug(s"*** We are working on an existing key; key: $key")
               val value = kvBuffer._2.result()
+              logger.debug(s"*** kvMapB += $key -> $value")
               // close out the multiline
               kvMapB += key -> value
               val newKey = s(0).split(":")(0)
               val newValue = split_regex.split(line)(1)
+              logger.debug(s"*** newKey: $newKey newValue: $newValue")
               val b = new StringBuilder()
               b.append(newValue)
               _findKV(lines.tail, Some(newKey) -> b, kvMapB)
