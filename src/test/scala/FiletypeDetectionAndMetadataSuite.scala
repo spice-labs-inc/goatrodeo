@@ -94,7 +94,8 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
     val f = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     val meta = MIMETypeMappings.resolveMetadata(f)
     logger.info(s"Got metadata: $meta")
-    meta.success.value mustBe Map("deb" -> "debian", "foo" -> "bar")
+    meta.success.value mustBe Map("Architecture" -> "amd64", "Maintainer" -> "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>", "Description" -> "Tk toolkit for Tcl and X11 v8.6 - windowing shell Tk is a cross-platform graphical toolkit which provides the Motif look-and-feel and is implemented using the Tcl scripting language. This package contains the windowing Tcl/Tk shell (wish).", "Section" -> "interpreters", "Package" -> "tk8.6", "Priority" -> "optional", "Installed-Size" -> "41", "Homepage" -> "http://www.tcl.tk/", "Depends" -> "libc6 (>= 2.34), libtcl8.6 (>= 8.6.0), libtk8.6 (>= 8.6.0)", "Conflicts" -> "libtk-img (<< 1.2.5), tk40 (<= 4.0p3-2)", "Version" -> "8.6.14-1build1", "Multi-Arch" -> "foreign", "Original-Maintainer" -> "Debian Tcl/Tk Packagers <pkg-tcltk-devel@lists.alioth.debian.org>")
+
   }
 
   "An .rpm file" must "be detected as such" in {

@@ -46,16 +46,15 @@ class DebianPackageParser extends Parser  {
     val tarStream: ArchiveInputStream[ArchiveEntry] =
       archFactory.createArchiveInputStream(new BufferedInputStream(in))
 
-    val tarIter =
-      new Iterator[ArchiveEntry] {
-        var last: ArchiveEntry = null
-        override def hasNext: Boolean = {
-          last = tarStream.getNextEntry()
-          last != null
-        }
-
-        override def next(): ArchiveEntry = last
+    val tarIter = new Iterator[ArchiveEntry] {
+      var last: ArchiveEntry = null
+      override def hasNext: Boolean = {
+        last = tarStream.getNextEntry()
+        last != null
       }
+
+      override def next(): ArchiveEntry = last
+    }
 
     for (x <- tarIter) {
       // there are actually several compressed formats + file extensions that I've seen in debs,
