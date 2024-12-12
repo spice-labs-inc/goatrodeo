@@ -12,8 +12,7 @@ import org.apache.tika.mime.MediaType
 import org.yaml.snakeyaml.events.Event
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 
-import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, StringReader}
-import scala.util.matching.Regex
+import java.io.{BufferedInputStream, ByteArrayInputStream, File, FileInputStream, StringReader}
 import scala.util.{Failure, Success, Try}
 
 package object filetypes {
@@ -44,7 +43,7 @@ package object filetypes {
      * @return This method returns a static `Success(Map.empty)` to represent no metadata
      */
     private def metadataNoop(f: File): Try[Map[String, String]] = {
-      logger.info(s"metadataNoop file: $f")
+      logger.debug(s"metadataNoop file: $f")
       // todo - is this a failure or a empty success?
       Success(Map.empty)
     }
@@ -85,11 +84,11 @@ package object filetypes {
        * basically, by default tika detects gem files as `application/x-tar` which
        * is technically correct as a Gem is a tar… but we want to treat it as a gem
        * with its own distinct mime type. The *correct* way to do this is
-       * by defining a custom time in `custom-mimetypes.xml` but at this time
+       * by defining a custom type in `custom-mimetypes.xml` but at this time
        * we can't seem to get that functionality working, so for now we just
        * manually override the detection
        */
-      if (f.getName.endsWith(".gem"))
+      if (f.getName.endsWith(".gem")) // todo - should we check also that it was detected as a Tar, or is short circuit ok?
         MIMETypeMappings.MIME_GEM
       else {
         val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)
@@ -222,18 +221,18 @@ package object filetypes {
     val metaGZ = tarIter
       .filter(_.getName().endsWith("metadata.gz"))
       .nextOption() match {
-      case Some(metaFile) => metaFile
-      case None =>
-        val err = s"Didn't find a `metadata.gz` file in the Gem; this is not a valid Gem file"
-        logger.error(err)
-        val e = new IllegalArgumentException() // todo - custom error / exception
-        return Failure(e)
-    }
+        case Some(metaFile) => metaFile
+        case None =>
+          val err = s"Didn't find a `metadata.gz` file in the Gem; this is not a valid Gem file"
+          logger.error(err)
+          val e = new IllegalArgumentException() // todo - custom error / exception
+          return Failure(e)
+      }
 
 
     logger.debug(s"Filtered: $metaGZ")
     logger.info(s"Found compressed Ruby Gem metadata file: $metaGZ")
-    val gemMetaData = new Array[Byte](metaGZ.getSize.toInt) /* unless somethings' really weird the metadata file shouldn't contain anything that needs long to describe its size */
+    val gemMetaData = new Array[Byte](metaGZ.getSize.toInt) /* unless something's really weird the metadata file shouldn't contain anything that needs long to describe its size */
     CompressIOUtils.readFully(tarStream, gemMetaData) // get the gzip bytes
     // decompress the YAML file from .gz
     val gemMetaStream: CompressorInputStream =
@@ -243,7 +242,7 @@ package object filetypes {
 
     logger.trace(s" gemSpec: $gemSpec")
 
-    // Generate the map of
+    // Generate the map of Metadata entries…
     val metaMap = processGemMetadataFile(gemSpec)
 
     logger.debug(s"Meta Map from Ruby Gems: $metaMap")

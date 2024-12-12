@@ -8,7 +8,7 @@ import scala.jdk.CollectionConverters.*
 /**
  * An event handler for processing Snake YAML Parser Events into a Map[String, String] for metadata handling
  */
-class YamlEventHandler(rawYaml: String) {
+class YamlEventHandler {
   val logger = Logger("YamlEventHandler")
 
 }
