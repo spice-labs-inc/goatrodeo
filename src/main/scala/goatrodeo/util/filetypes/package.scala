@@ -19,6 +19,9 @@ import scala.util.{Failure, Success, Try}
 package object filetypes {
   val logger = Logger("filetypes$")
 
+  /**
+   * Some constants that we can reference to represent different known / expected MIME Types
+   */
   object MIMETypeMappings {
     val MIME_ZIP = MediaType.application("zip")
     val MIME_JAR = MediaType.application("java-archive")
@@ -33,6 +36,13 @@ package object filetypes {
     val MIME_TAR = MediaType.application("x-gtar")
     val MIME_GZIP = MediaType.application("gzip")
 
+    /**
+     * Fallback method to point at if we don't have a metadata extractor implementation
+     * for a given mime type; this mapping is in `mimeTypeLookup`
+     * This is a noop - it returns a successful empty map
+     * @param f a java.io.File
+     * @return This method returns a static `Success(Map.empty)` to represent no metadata
+     */
     private def metadataNoop(f: File): Try[Map[String, String]] = {
       logger.info(s"metadataNoop file: $f")
       // todo - is this a failure or a empty success?
@@ -58,6 +68,13 @@ package object filetypes {
       MIME_GZIP -> metadataNoop _
     )
 
+    /**
+     * Given a `java.io.File`, return a MIME Type (Tika `MediaType`) representing
+     * the correct mime type of the given file.
+     * e.g. "foobar-1.23.deb" should detect as `application/x-debian-package`
+     * @param f a `java.io.File` to detect `MediaType` from
+     * @return The detected MIME Type (`MediaType)` of the given file
+     */
     def detectMIMEType(f: File): MediaType = {
       val tika = new TikaConfig()
       val metadata = new TikaMetadata() // tika metadata
@@ -76,17 +93,31 @@ package object filetypes {
         MIMETypeMappings.MIME_GEM
       else {
         val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)
-        val refinedMimeType = if (detected.equals(MIME_TAR) && f.getName.endsWith(".gem")) MIMETypeMappings.MIME_GEM else detected
-        logger.debug(s"Detected filetype for ${f.toString} media type: $refinedMimeType Type: ${refinedMimeType.getType} Subtype: ${refinedMimeType.getSubtype}")
-        refinedMimeType
+        logger.debug(s"Detected filetype for ${f.toString} media type: $detected" +
+          s"Type: ${detected.getType} Subtype: ${detected.getSubtype}")
+        detected
       }
     }
 
-    // todo - bytearray input
+
+    /**
+     * Resolve the metadata associated with a given `java.io.File`
+     * e.g. "foobar-1.23.deb" should detect as `application/x-debian-package`,
+     * and we should extract metadata as a `Map[String, String]` from the deb package
+     * control file
+     * todo - bytearray input
+     * @param f `java.io.File` to extract metadata from
+     * @return A `Try[Map[String, String]]`, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package
+     */
     def resolveMetadata(f: File): Try[Map[String, String]] = {
       val detected = detectMIMEType(f)
+
+      // Fetch the metadata lookup method for the given MIME Type
       val lookup = MIMETypeMappings.mimeTypeLookup(detected)
       logger.debug(s"Retrieved Package Metadata lookup function for type $detected : $lookup")
+
+      // execute the lookup, which will hopefully return a success
+      // todo - handle the Success / Failure for at least some local logging
       val packageMeta = lookup(f)
       logger.debug(s"*** Retrieved Package Metadata: $packageMeta")
       packageMeta
@@ -96,10 +127,18 @@ package object filetypes {
   }
 
 
+  /** Apache Commons Compress factories */
   private val archFactory = new ArchiveStreamFactory()
   private val compressorFactory = new CompressorStreamFactory()
 
+  /**
+   * Extract and Parse the Metadata ("control" file) for .deb Debian Packages
+   *
+   * @param f a `java.io.File` representing the debian package file to extract from
+   * @return A `Try[Map[String, String]]` where, if success, contains the extracted Metadata from the Debian Package
+   */
   def parseDebMetadata(f: File): Try[Map[String, String]] = {
+    // Open a stream against the .deb file, which is archived as a tar
     val tarStream: ArchiveInputStream[ArchiveEntry] =
       archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
 
@@ -118,16 +157,21 @@ package object filetypes {
     // instead of the Tika approach of using a callback
     var attrs = Map.empty[String, String]
     for (x <- tarIter) {
-      // there are actually several compressed formats + file extensions that I've seen in debs,
-      // so we won't assume it's .tar.gz; I've seen zstd, gzip, pkzip, etc
+      // there are actually several compressed formats + file extensions that I've seen in debs for compressing `control`,
+      // so we won't assume it's .tar.gz; I've seen zstd, gzip, and pkzip so far…
       if (x.getName.startsWith("control.tar")) {
         logger.info(s"Found compressed control file: ${x.getName}")
         val ctrlData = new Array[Byte](x.getSize.toInt) /* unless somethings' really weird the deb file shouldn't contain anything that needs long to describe its size */
         CompressIOUtils.readFully(tarStream, ctrlData) // this should give us gzip bytes…
+        // Ok, so now we have `control.tar.<some compression extension>`, and we need to uncompress it
         val ctrlStream: CompressorInputStream =
           compressorFactory.createCompressorInputStream(new ByteArrayInputStream(ctrlData))
 
-        // ctrlStream is the tar file that was held inside the compressed container e.g. control.tar.zst
+        /**
+         * The Matryoshka of compressed and archived files continues; `control.tar.<compression extension>` is a
+         * compressed tar…
+         * `ctrlStream` is the tar file that was held inside the compressed container e.g. `control.tar.zst`
+         */
         val innerTarStream: ArchiveInputStream[ArchiveEntry] =
           archFactory.createArchiveInputStream(new ByteArrayInputStream(ctrlStream.readAllBytes()))
 
@@ -168,11 +212,22 @@ package object filetypes {
     Map.empty
   }
 
-  // Partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
-  // we get this as a string for now but we might want to change to take a file or inputstream later
+  /**
+   * Given a `String` containing the contents of a Debian package's `control` metadata file, parse
+   * the metadata into a `Map[String, String]` representing the key / value pairs from the YAML
+   *
+   * This code is partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
+   * todo - we get this as a string for now but we might want to change to take a file or inputstream later
+   *
+   * @param str A `String` containing a YAML file representing the Debian Package's `control` file
+   * @return A `Map[String, String]` containing the parsed key/value pairs from the Debian Package `control` file
+   */
   def processDebControlFile(data: String): Map[String, String] = {
     val split_regex = """^([A-Za-z-]+):\s(.*)$""".r
 
+    /**
+     * Parse out the key/value pairs, handling multiline fields
+     */
     val map = data
       .replaceAll("""[\r\n]+\s+""", " ")
       .split("\n")
