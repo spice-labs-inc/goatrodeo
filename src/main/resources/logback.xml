@@ -13,9 +13,11 @@
         </encoder>
     </appender>
 
+    <logger name="org.apache.tika" level="info"/>
     <root level="debug">
         <appender-ref ref="console"/>
         <appender-ref ref="file"/>
     </root>
+
 
 </configuration>
