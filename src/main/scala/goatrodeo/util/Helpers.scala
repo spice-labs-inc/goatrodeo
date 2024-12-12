@@ -19,16 +19,11 @@ import java.io.FileOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.io.InputStream
-import java.net.URL
 import java.net.URLEncoder
-import java.net.HttpURLConnection
 import java.security.MessageDigest
-import javax.net.ssl.HttpsURLConnection
 import java.util.concurrent.atomic.AtomicReference
 import java.text.NumberFormat
 import java.security.SecureRandom
-import java.io.OutputStream
-import java.io.ObjectOutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.io.ByteArrayInputStream
@@ -38,13 +33,8 @@ import scala.util.Success
 import org.apache.bcel.classfile.ClassParser
 import io.bullet.borer.Cbor
 
-import java.util.concurrent.atomic.AtomicInteger
-import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
-import org.apache.commons.compress.compressors.CompressorInputStream
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
 
 import java.io.BufferedReader
 import java.io.InputStreamReader

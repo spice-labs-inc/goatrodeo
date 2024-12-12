@@ -3,15 +3,17 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveInputStream, ArchiveStreamFactory}
 import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
-import org.apache.commons.compress.utils.IOUtils
+import org.apache.commons.io.IOUtils as CommonsIOUtils
+import org.apache.commons.compress.utils.IOUtils as CompressIOUtils
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
 import org.apache.tika.mime.MediaType
+import org.yaml.snakeyaml.events.Event
+import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 
-import java.io.{BufferedInputStream, File, FileInputStream, ByteArrayInputStream}
-import scala.annotation.tailrec
-import scala.collection.mutable
+import java.io.{BufferedInputStream, BufferedReader, ByteArrayInputStream, File, FileInputStream, StringReader}
+import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 package object filetypes {
