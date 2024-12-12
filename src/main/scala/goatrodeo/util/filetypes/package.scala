@@ -39,6 +39,11 @@ package object filetypes {
       Success(Map.empty)
     }
 
+    /**
+     * A mapping of Tika `MediaType` to a function that takes a `java.io.File` and returns
+     * a `Try[Map[String, String]]` which, if successful, should contain the metadata
+     * found by the selected parser
+     */
     val mimeTypeLookup: Map[MediaType, File => Try[Map[String, String]]] = Map(
       MIME_DEB -> parseDebMetadata _,
       MIME_GEM -> parseGemMetadata _,
@@ -57,7 +62,16 @@ package object filetypes {
       val tika = new TikaConfig()
       val metadata = new Metadata() // tika metadata ; todo - maybe import alias this?
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, f.toString)
-      if (f.getName.endsWith(".gem")) // temporary hack until we get custom-mimetypes.xml working
+      /**
+       * temporary hack until we get custom-mimetypes.xml working
+       * basically, by default tika detects gem files as `application/x-tar` which
+       * is technically correct as a Gem is a tar… but we want to treat it as a gem
+       * with its own distinct mime type. The *correct* way to do this is
+       * by defining a custom time in `custom-mimetypes.xml` but at this time
+       * we can't seem to get that functionality working, so for now we just
+       * manually override the detection
+       */
+      if (f.getName.endsWith(".gem"))
         MIMETypeMappings.MIME_GEM
       else {
         val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)

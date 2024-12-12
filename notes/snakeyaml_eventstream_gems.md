@@ -2,6 +2,138 @@ Some notes on parsing the Ruby Gem Metadata file with Snake YAML.
 
 Using the "convert me directly to an object or map" code doesn't seem to work with the weird annotated semi-minified syntax of the metadata, but it seems to work ok, with the event library.
 
+Here's the `java-properties.gem` metadata file sample:
+```
+--- !ruby/object:Gem::Specification
+name: java-properties
+version: !ruby/object:Gem::Version
+  version: 0.3.0
+platform: ruby
+authors:
+- Jonas Thiel
+autorequire:
+bindir: bin
+cert_chain: []
+date: 2021-02-26 00:00:00.000000000 Z
+dependencies:
+- !ruby/object:Gem::Dependency
+  name: rake
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '13.0'
+  type: :development
+  prerelease: false
+  version_requirements: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '13.0'
+- !ruby/object:Gem::Dependency
+  name: inch
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '0.8'
+  type: :development
+  prerelease: false
+  version_requirements: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '0.8'
+- !ruby/object:Gem::Dependency
+  name: minitest
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '5.14'
+  type: :development
+  prerelease: false
+  version_requirements: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '5.14'
+- !ruby/object:Gem::Dependency
+  name: coveralls
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '0.8'
+  type: :development
+  prerelease: false
+  version_requirements: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '0.8'
+description: Tool for loading and writing Java properties files
+email:
+- jonas@thiel.io
+executables: []
+extensions: []
+extra_rdoc_files: []
+files:
+- LICENSE
+- README.md
+- Rakefile
+- java-properties.gemspec
+- lib/java-properties.rb
+- lib/java-properties/encoding.rb
+- lib/java-properties/encoding/separators.rb
+- lib/java-properties/encoding/special_chars.rb
+- lib/java-properties/encoding/unicode.rb
+- lib/java-properties/generating.rb
+- lib/java-properties/generating/generator.rb
+- lib/java-properties/parsing.rb
+- lib/java-properties/parsing/normalizer.rb
+- lib/java-properties/parsing/parser.rb
+- lib/java-properties/properties.rb
+- lib/java-properties/version.rb
+- spec/fixtures/bom.properties
+- spec/fixtures/test.properties
+- spec/fixtures/test_normalized.properties
+- spec/fixtures/test_out.properties
+- spec/fixtures/test_out_skip_separators.properties
+- spec/fixtures/test_out_skip_special_chars.properties
+- spec/fixtures/test_out_skip_unicode.properties
+homepage: https://github.com/jnbt/java-properties
+licenses:
+- MIT
+metadata: {}
+post_install_message:
+rdoc_options: []
+require_paths:
+- lib
+required_ruby_version: !ruby/object:Gem::Requirement
+  requirements:
+  - - ">="
+    - !ruby/object:Gem::Version
+      version: 2.0.0
+required_rubygems_version: !ruby/object:Gem::Requirement
+  requirements:
+  - - ">="
+    - !ruby/object:Gem::Version
+      version: 1.3.5
+requirements: []
+rubygems_version: 3.2.3
+signing_key:
+specification_version: 4
+summary: Loader and writer for *.properties files
+test_files:
+- spec/fixtures/bom.properties
+- spec/fixtures/test.properties
+- spec/fixtures/test_normalized.properties
+- spec/fixtures/test_out.properties
+- spec/fixtures/test_out_skip_separators.properties
+- spec/fixtures/test_out_skip_special_chars.properties
+- spec/fixtures/test_out_skip_unicode.properties
+```
 Here's a stream of events for `java-properties.gem`'s metadata file
 
 ```
