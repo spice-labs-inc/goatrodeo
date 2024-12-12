@@ -1,9 +1,10 @@
 import com.typesafe.scalalogging.Logger
+import goatrodeo.util.filetypes.MetadataString
 import io.spicelabs.goatrodeo.util.filetypes
 import io.spicelabs.goatrodeo.util.filetypes.*
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.mime.MediaType
-import org.scalatest.TryValues._
+import org.scalatest.TryValues.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 
@@ -14,7 +15,6 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
 
   val tika = new TikaConfig()
   val logger = Logger("FiletypeDetectionAndMetadataSuite")
-
 
   // File formats that are packaged in zip (jar, war, ear, apk, etc.)
   "A plain old .zip file" must "be detected" in {
@@ -79,7 +79,22 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   it must "extract the DEB Metadata" in {
     val f = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     val meta = MIMETypeMappings.resolveMetadata(f)
-    meta.success.value mustBe Map("Architecture" -> "amd64", "Maintainer" -> "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>", "Description" -> "Tk toolkit for Tcl and X11 v8.6 - windowing shell Tk is a cross-platform graphical toolkit which provides the Motif look-and-feel and is implemented using the Tcl scripting language. This package contains the windowing Tcl/Tk shell (wish).", "Section" -> "interpreters", "Package" -> "tk8.6", "Priority" -> "optional", "Installed-Size" -> "41", "Homepage" -> "http://www.tcl.tk/", "Depends" -> "libc6 (>= 2.34), libtcl8.6 (>= 8.6.0), libtk8.6 (>= 8.6.0)", "Conflicts" -> "libtk-img (<< 1.2.5), tk40 (<= 4.0p3-2)", "Version" -> "8.6.14-1build1", "Multi-Arch" -> "foreign", "Original-Maintainer" -> "Debian Tcl/Tk Packagers <pkg-tcltk-devel@lists.alioth.debian.org>")
+    meta.success.value mustBe Map(
+      "Architecture" -> MetadataString("amd64"),
+      "Maintainer" -> MetadataString("Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>"),
+      "Description" -> MetadataString("Tk toolkit for Tcl and X11 v8.6 - windowing shell Tk is a cross-platform graphical toolkit which provides the Motif look-and-feel and is implemented using the Tcl scripting language. This package contains the windowing Tcl/Tk shell (wish)."),
+      "Section" -> MetadataString("interpreters"),
+      "Package" -> MetadataString("tk8.6"),
+      "Priority" -> MetadataString("optional"),
+      "Installed-Size" -> MetadataString("41"),
+      "Homepage" -> MetadataString("http://www.tcl.tk/"),
+      // todo - break the deb dependency  and Conflict lists out as a MetadataList?
+      "Depends" -> MetadataString("libc6 (>= 2.34), libtcl8.6 (>= 8.6.0), libtk8.6 (>= 8.6.0)"),
+      "Conflicts" -> MetadataString("libtk-img (<< 1.2.5), tk40 (<= 4.0p3-2)"),
+      "Version" -> MetadataString("8.6.14-1build1"),
+      "Multi-Arch" -> MetadataString("foreign"),
+      "Original-Maintainer" -> MetadataString("Debian Tcl/Tk Packagers <pkg-tcltk-devel@lists.alioth.debian.org>")
+    )
   }
 
   "An .rpm file" must "be detected as such" in {
@@ -100,7 +115,7 @@ class FiletypeDetectionAndMetadataSuite extends AnyFlatSpec with Matchers {
   it must "extract the GEM Metadata" in {
     val f = new File("test_data/gem_tests/java-properties-0.3.0.gem")
     val meta = MIMETypeMappings.resolveMetadata(f)
-    meta.success.value mustBe Map("gem" -> "ruby", "spam" -> "eggs")
+    meta.success.value mustBe Map("gem" -> MetadataString("ruby"), "spam" -> MetadataString("eggs"))
   }
 
   "An android .apk archive" must "be detected as such" in {

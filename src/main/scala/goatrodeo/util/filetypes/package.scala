@@ -1,13 +1,14 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
+import goatrodeo.util.filetypes.{MetadataValue, MetadataList, MetadataMap, MetadataString}
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveInputStream, ArchiveStreamFactory}
 import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
 import org.apache.commons.io.IOUtils as CommonsIOUtils
 import org.apache.commons.compress.utils.IOUtils as CompressIOUtils
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.{Metadata => TikaMetadata, TikaCoreProperties}
+import org.apache.tika.metadata.{TikaCoreProperties, Metadata as TikaMetadata}
 import org.apache.tika.mime.MediaType
 import org.yaml.snakeyaml.events.Event
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
@@ -42,7 +43,7 @@ package object filetypes {
      * @param f a java.io.File
      * @return This method returns a static `Success(Map.empty)` to represent no metadata
      */
-    private def metadataNoop(f: File): Try[Map[String, String]] = {
+    private def metadataNoop(f: File): Try[Map[String, MetadataValue]] = {
       logger.debug(s"metadataNoop file: $f")
       // todo - is this a failure or a empty success?
       Success(Map.empty)
@@ -50,10 +51,10 @@ package object filetypes {
 
     /**
      * A mapping of Tika `MediaType` to a function that takes a `java.io.File` and returns
-     * a `Try[Map[String, String]]` which, if successful, should contain the metadata
+     * a `Try[Map[String, MetadataValue]]` which, if successful, should contain the metadata
      * found by the selected parser
      */
-    val mimeTypeLookup: Map[MediaType, File => Try[Map[String, String]]] = Map(
+    val mimeTypeLookup: Map[MediaType, File => Try[Map[String, MetadataValue]]] = Map(
       MIME_DEB -> parseDebMetadata _,
       MIME_GEM -> parseGemMetadata _,
       MIME_ZIP -> metadataNoop _,
@@ -102,13 +103,13 @@ package object filetypes {
     /**
      * Resolve the metadata associated with a given `java.io.File`
      * e.g. "foobar-1.23.deb" should detect as `application/x-debian-package`,
-     * and we should extract metadata as a `Map[String, String]` from the deb package
+     * and we should extract metadata as a `Map[String, MetadataValue]` from the deb package
      * control file
      * todo - bytearray input
      * @param f `java.io.File` to extract metadata from
-     * @return A `Try[Map[String, String]]`, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package
+     * @return A `Try[Map[String, MetadataValue]]`, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package, which, if `Success` contains the extracted metadata from the package
      */
-    def resolveMetadata(f: File): Try[Map[String, String]] = {
+    def resolveMetadata(f: File): Try[Map[String, MetadataValue]] = {
       val detected = detectMIMEType(f)
 
       // Fetch the metadata lookup method for the given MIME Type
@@ -134,9 +135,9 @@ package object filetypes {
    * Extract and Parse the Metadata ("control" file) for .deb Debian Packages
    *
    * @param f a `java.io.File` representing the debian package file to extract from
-   * @return A `Try[Map[String, String]]` where, if success, contains the extracted Metadata from the Debian Package
+   * @return A `Try[Map[String, MetadataValue]]` where, if success, contains the extracted Metadata from the Debian Package
    */
-  def parseDebMetadata(f: File): Try[Map[String, String]] = {
+  def parseDebMetadata(f: File): Try[Map[String, MetadataValue]] = {
     // Open a stream against the .deb file, which is archived as a tar
     val tarStream: ArchiveInputStream[ArchiveEntry] =
       archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
@@ -154,7 +155,7 @@ package object filetypes {
 
     // todo - this is a temporary thing while i refactor the method to return values directly
     // instead of the Tika approach of using a callback
-    var attrs = Map.empty[String, String]
+    var attrs = Map.empty[String, MetadataValue]
     for (x <- tarIter) {
       // there are actually several compressed formats + file extensions that I've seen in debs for compressing `control`,
       // so we won't assume it's .tar.gz; I've seen zstd, gzip, and pkzip so far…
@@ -199,9 +200,9 @@ package object filetypes {
    * These are represented as "quasi" YAML (ruby adds a bunch of crap to the file that most yaml parsers seem to choke on)
    *
    * @param f a `java.io.File` representing the ruby gem package file to extract from
-   * @return A `Try[Map[String, String]]` where, if success, contains the extracted Metadata from the Ruby Gem
+   * @return A `Try[Map[String, MetadataValue]]` where, if success, contains the extracted Metadata from the Ruby Gem
    */
-  def parseGemMetadata(f: File): Try[Map[String, String]] = {
+  def parseGemMetadata(f: File): Try[Map[String, MetadataValue]] = {
     // Open a stream against the .gem file, which is archived as a tar
     val tarStream: ArchiveInputStream[ArchiveEntry] =
       archFactory.createArchiveInputStream(new BufferedInputStream(FileInputStream(f)))
@@ -254,11 +255,11 @@ package object filetypes {
    * TODO - make this other types besides string
    *
    * Given a `String` containing the contents of a Ruby Gem `metadata` file, parse
-   * the metadata into a `Map[String, String]` representing the key / value pairs from the YAML
+   * the metadata into a `Map[String, MetadataValue]` representing the key / value pairs from the YAML
    * @param str A `String` containing a YAML file representing the Ruby Gem Metadata
-   * @return A `Map[String, String]` containing the parsed key/value pairs from the Ruby Gem Metadata file
+   * @return A `Map[String, MetadataValue]` containing the parsed key/value pairs from the Ruby Gem Metadata file
    */
-  def processGemMetadataFile(str: String): Map[String, String] = {
+  def processGemMetadataFile(str: String): Map[String, MetadataValue] = {
     import scala.jdk.CollectionConverters._
     val yamlOpts = new LoaderOptions()
     val yaml = new Yaml(yamlOpts)
@@ -277,15 +278,15 @@ package object filetypes {
 
   /**
    * Given a `String` containing the contents of a Debian package's `control` metadata file, parse
-   * the metadata into a `Map[String, String]` representing the key / value pairs from the YAML
+   * the metadata into a `Map[String, MetadataValue]` representing the key / value pairs from the YAML
    *
    * This code is partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
    * todo - we get this as a string for now but we might want to change to take a file or inputstream later
    *
    * @param str A `String` containing a YAML file representing the Debian Package's `control` file
-   * @return A `Map[String, String]` containing the parsed key/value pairs from the Debian Package `control` file
+   * @return A `Map[String, MetadataValue]` containing the parsed key/value pairs from the Debian Package `control` file
    */
-  def processDebControlFile(data: String): Map[String, String] = {
+  def processDebControlFile(data: String): Map[String, MetadataValue] = {
     val split_regex = """^([A-Za-z-]+):\s(.*)$""".r
 
     /**
@@ -296,7 +297,7 @@ package object filetypes {
       .split("\n")
       .map {
         case split_regex(k, v) =>
-          (k -> v)
+          k -> MetadataString(v)
         case xs =>
           throw new Exception(s"Didn't parse deb control entry correctly: ${xs}")
       }
@@ -306,4 +307,15 @@ package object filetypes {
     map
   }
 
+  implicit def stringToMetadataString(value: String): MetadataString =
+    MetadataString(value)
+
+  implicit def metadataStringtoString(value: MetadataString): String =
+    value.value
+
+  implicit def metadataMapToMap(value: MetadataMap): Map[String, String] =
+    value.value
+
+  implicit def metadataListToList(value: MetadataList): List[String] =
+    value.value
 }
