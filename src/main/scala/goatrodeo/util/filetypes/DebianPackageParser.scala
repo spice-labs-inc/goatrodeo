@@ -103,7 +103,7 @@ class DebianPackageParser extends Parser  {
     type KVMapBuilder = mutable.Builder[(String, String), Map[String, String]]
 
     // todo - this doesn't really need the mutable builders
-    //@tailrec
+    @tailrec
     def _findKV(lines: Array[String], kvBuffer: (Option[String], StringBuilder) = None -> new StringBuilder(),
                 kvMapB: KVMapBuilder = Map.newBuilder[String, String]): Map[String, String] = {
       logger.debug(s"~~~ Lines Size: ${lines.size} kvBuffer: $kvBuffer kvMapB: $kvMapB")
