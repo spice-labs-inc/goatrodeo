@@ -7,7 +7,7 @@ import org.apache.commons.io.IOUtils as CommonsIOUtils
 import org.apache.commons.compress.utils.IOUtils as CompressIOUtils
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
+import org.apache.tika.metadata.{Metadata => TikaMetadata, TikaCoreProperties}
 import org.apache.tika.mime.MediaType
 import org.yaml.snakeyaml.events.Event
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
@@ -60,7 +60,8 @@ package object filetypes {
 
     def detectMIMEType(f: File): MediaType = {
       val tika = new TikaConfig()
-      val metadata = new Metadata() // tika metadata ; todo - maybe import alias this?
+      val metadata = new TikaMetadata() // tika metadata
+      // set the filename for Tika… some of the detectors in the stack fall back on filename to decide
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, f.toString)
       /**
        * temporary hack until we get custom-mimetypes.xml working
@@ -157,10 +158,8 @@ package object filetypes {
     // the metadata file from ruby adds some Ruby identifiers to the YAML but in a way that it is now NOT valid YAML, but it's just a file start marker so we'll skip it
     val re = raw"!ruby/object:.*\\s".r
 
-    def _replacer(m: Regex.Match) = {
-    }
     val yamlStr = str.tail.replaceAll("!ruby/object:.*\\s", "\n").tail.tail
-    logger.debug(s"Yaml String: $yamlStr")
+    logger.trace(s"Yaml String: $yamlStr")
 
     for (event <- yaml.parse(new StringReader(yamlStr)).asScala) {
       logger.debug(s"Yaml Event: $event")
