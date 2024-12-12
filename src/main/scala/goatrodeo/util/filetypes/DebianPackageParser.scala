@@ -15,6 +15,8 @@ import scala.jdk.CollectionConverters.*
 import java.io.{BufferedInputStream, ByteArrayInputStream, File, InputStream}
 import java.util
 import java.util.concurrent.atomic.AtomicInteger
+import scala.annotation.tailrec
+import scala.collection.mutable
 
 /**
  * A Tika Parser interface for Debian packages
@@ -97,24 +99,66 @@ class DebianPackageParser extends Parser  {
   // Partly based on the python library "deb-parse" - https://github.com/aihaddad/deb-parse
   private def parseControlFile(data: String): Map[String, String] = {
     val split_regex   = raw"^[A-Za-z-]+:\s".r
-    val b = Map.newBuilder[String, String]
 
-    for (k <- split_regex.findAllIn(data)) {
-      logger.debug(s"K: $k")
-      val sb = new StringBuilder()
-      val tail = split_regex.split(data)(1) // this ends up being the tail: everything after the key declaration
-      for (x <- tail.split("\n")) {
-        // now to determine if the line we are processing is a continuation of a multiline, or a new field
-        if (split_regex.matches(x)) {
-          logger.debug(s"Found a new key field… ${sb.result()}")
-        } else {
-          // multiline
-          sb.append(x)
-          logger.debug(s"must've been multiline: $x")
+    type KVMapBuilder = mutable.Builder[(String, String), Map[String, String]]
+
+    // todo - this doesn't really need the mutable builders
+    //@tailrec
+    def _findKV(lines: Array[String], kvBuffer: (Option[String], StringBuilder) = None -> new StringBuilder(),
+                kvMapB: KVMapBuilder = Map.newBuilder[String, String]): Map[String, String] = {
+      if (lines.size <= 0) kvMapB.result()
+      else {
+        val line = lines.head
+        logger.debug(s"!!! Line: $line")
+        val s = split_regex.findAllIn(line).toVector
+        logger.debug(s"S Size: ${s.size} KVBuffer: $kvBuffer S: $s")
+        if (s.size == 1) { // we found a key entry // todo - make me a little saner / cleaner
+          logger.debug(s"*** Split size: ${s.size}")
+          kvBuffer._1 match {
+            case Some(key) => // was there a key set, which means we were building a multiline
+              logger.debug(s"*** We are working on an existing key; key: $key")
+              val value = kvBuffer._2.result()
+              // close out the multiline
+              kvMapB += key -> value
+              val newKey = s(0).split(":")(0)
+              val newValue = split_regex.split(line)(1)
+              val b = new StringBuilder()
+              b.append(newValue)
+              _findKV(lines.tail, Some(newKey) -> b, kvMapB)
+            case None => // no key set, start a new one
+              val key = s(0).split(":")(0)
+              val value = split_regex.split(line)(1) // everything after ":"
+              logger.debug(s"*** Working on a new line K: $key V: $value")
+              val newB = new StringBuilder()
+              newB.append(value)
+              _findKV(lines.tail, Some(key) -> newB, kvMapB)
+          }
+        } else { // we seem to have only found a value entry, this appends
+          logger.info("*** Split 0")
+          kvBuffer._1 match {
+            case Some(key) =>
+              logger.debug(s"*** Some(key): $key Line: $line")
+              kvBuffer._2.append(line)
+              _findKV(lines.tail, Some(key) -> kvBuffer._2, kvMapB)
+            case None =>
+              logger.debug(s"*** Calculated K/V Map: ${kvMapB.result()}")
+              /*
+               * this shouldn't happen, it means we got here where there was no Key regex on the line,
+               * but we ALSO are not currently building another key / value pair?
+               */
+              val err = s"State Confusion: Building a new key / value pair; found a line with a Key prefix but no Key set in recursor"
+              logger.error(err)
+              throw new IllegalStateException(err)
+          }
+
         }
+
       }
     }
-    b.result()
+
+    val map = _findKV(data.split("\n"))
+    logger.debug(s"Calculated K/V Map: $map")
+    map
   }
 
 }
