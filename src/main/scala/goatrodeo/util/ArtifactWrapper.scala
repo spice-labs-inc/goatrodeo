@@ -73,7 +73,9 @@ sealed trait ArtifactWrapper {
     */
   def exists(): Boolean
 
+
   lazy val suffix = ArtifactWrapper.suffix(name())
+
 }
 
 object ArtifactWrapper {
@@ -148,4 +150,5 @@ final case class ByteWrapper(bytes: Array[Byte], fileName: String)
   override def name(): String = fileName
 
   override def size(): Long = bytes.length
+
 }

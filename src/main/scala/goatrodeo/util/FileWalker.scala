@@ -343,7 +343,7 @@ object FileWalker {
   }
 
   /**
-   * Process Ruby Gem dependency files. These archives are suffixed `.gem`, but are tarballs with 3 files:
+   * Process Ruby Gem package files. These archives are suffixed `.gem`, but are tarballs with 3 files:
    * - metadata.gz - a gzipped file containing the metadata (dependency info, etc) and Gem Spec
    * - checksums.yaml.gz - a gzipped YAML file with the checksums for the archive
    * - data.tar.gz - a tarball containing the actual ruby dependency code

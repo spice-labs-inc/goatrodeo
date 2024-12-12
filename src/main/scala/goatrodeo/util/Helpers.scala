@@ -43,6 +43,8 @@ import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.compressors.CompressorInputStream
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
 
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -656,6 +658,7 @@ object Helpers {
     val bytes = ByteBuffer.allocate(8).putLong(num).flip()
     writer.write(bytes)
   }
+
 }
 
 /** A set of helpers to manage GitOIDs
