@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.filetypes.{MetadataList, MetadataMap, MetadataString, MetadataValue, YamlEventHandler}
+import goatrodeo.util.filetypes.{MetadataList, MetadataMap, MetadataString, MetadataValue }
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveInputStream, ArchiveStreamFactory}
 import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
 import org.apache.commons.io.IOUtils as CommonsIOUtils
@@ -14,8 +14,9 @@ import org.yaml.snakeyaml.events.Event
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 
 import java.io.{BufferedInputStream, ByteArrayInputStream, File, FileInputStream, StringReader}
+import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-
+import scala.jdk.CollectionConverters.*
 package object filetypes {
   val logger = Logger("filetypes$")
 
@@ -269,10 +270,21 @@ package object filetypes {
     val yamlStr = str.tail.replaceAll("!ruby/object:.*\\s", "\n").tail.tail
     logger.trace(s"Yaml String: $yamlStr")
 
-    val handler = YamlEventHandler(yamlStr)
-    val result = handler.result()
-    logger.debug(s"YamlEventHandler result: ${result}")
-    result
+    val data: Map[String, Object] = (yaml.load(ByteArrayInputStream(yamlStr.getBytes())): java.util.Map[String, Object]).asScala.toMap
+
+    logger.debug(s"Yaml Data Loaded: $data")
+
+    val mapped: Map[String, MetadataValue] = data map { (k, v) => v match {
+      case s: String => k -> MetadataString(s)
+      case m: Map[String, Object] => k -> MetadataMap.toMetadataMap(m)
+      case l: List[Object] => k -> MetadataList.toMetadataList(l)
+      case other =>
+        // for now make it a string
+        if (other == null) { // there are null values in valid gem metadatas, e.g. empty yaml value. map to empty string for now
+          k -> MetadataString("")
+        } else k -> MetadataString(other.toString)
+    }}
+    mapped
   }
 
   /**
