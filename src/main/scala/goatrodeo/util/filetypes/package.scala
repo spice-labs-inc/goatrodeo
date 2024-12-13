@@ -10,15 +10,16 @@ import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.{TikaCoreProperties, Metadata as TikaMetadata}
 import org.apache.tika.mime.MediaType
-import org.yaml.snakeyaml.events.Event
 import org.yaml.snakeyaml.{LoaderOptions, Yaml}
 
-import java.io.{BufferedInputStream, ByteArrayInputStream, File, FileInputStream, StringReader}
-import scala.collection.mutable
+import java.io.{BufferedInputStream, ByteArrayInputStream, File, FileInputStream}
 import scala.util.{Failure, Success, Try}
 import scala.jdk.CollectionConverters.*
+
 package object filetypes {
-  val logger = Logger("filetypes$")
+  private val logger = Logger("filetypes$")
+
+  private val tika = new TikaConfig()
 
   /**
    * Some constants that we can reference to represent different known / expected MIME Types
@@ -77,7 +78,6 @@ package object filetypes {
      * @return The detected MIME Type (`MediaType)` of the given file
      */
     def detectMIMEType(f: File): MediaType = {
-      val tika = new TikaConfig()
       val metadata = new TikaMetadata() // tika metadata
       // set the filename for Tika… some of the detectors in the stack fall back on filename to decide
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, f.toString)
@@ -93,7 +93,9 @@ package object filetypes {
       if (f.getName.endsWith(".gem")) // todo - should we check also that it was detected as a Tar, or is short circuit ok?
         MIMETypeMappings.MIME_GEM
       else {
-        val detected = tika.getDetector.detect(TikaInputStream.get(f), metadata)
+        val detected = Timing.time(s"detectMimeType: $f") {
+          tika.getDetector().detect(TikaInputStream.get(f), metadata)
+        }
         logger.debug(s"Detected filetype for ${f.toString} media type: $detected" +
           s"Type: ${detected.getType} Subtype: ${detected.getSubtype}")
         detected
