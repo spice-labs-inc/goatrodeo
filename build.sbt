@@ -44,7 +44,7 @@ lazy val root = project
     // https://mvnrepository.com/artifact/org.apache.tika/tika-parsers-standard-package
     libraryDependencies += "org.apache.tika" % "tika-parsers-standard-package" % "3.0.0",
 
-    assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
+    assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
   )
 

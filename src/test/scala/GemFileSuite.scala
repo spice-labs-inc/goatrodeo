@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.goatrodeo.omnibor.{BuildGraph, EdgeType, MemStorage}
-import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
+import goatrodeo.omnibor.{BuildGraph, EdgeType, MemStorage}
+import goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
 
 import java.io.{BufferedWriter, File, FileWriter}
 

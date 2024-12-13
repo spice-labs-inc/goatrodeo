@@ -1,92 +1,94 @@
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
 
 import java.io.File
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 
 import java.io.BufferedWriter
 import java.io.FileWriter
-import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
-import io.spicelabs.goatrodeo.util.FileType
+import goatrodeo.strategies.Strategy
+import goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
+import goatrodeo.util.FileType
 
 import scala.collection.immutable.TreeSet
 import scala.collection.immutable.TreeSet
+import goatrodeo.util.ArtifactWrapper
 
 /** Tools for opening files including containing files and building graphs
   */
 object BuildGraph {
   val logger = Logger("BuildGraph")
   def graphForToProcess(
-      item: ToProcess,
+      item: Strategy,
       store: Storage,
       purlOut: BufferedWriter
   ): Unit = {
     
-    item match {
-      case ToProcess(pom, main, Some(source), pomFile) => {
-        // process the POM file
-        pomFile.foreach(pf =>
-          buildItemsFor(
-            pf,
-            pf.getName(),
-            store,
-            Vector(),
-            None,
-            Map(),
-            purlOut,
-            false
-          )
-        )
+    // item match {
+    //   case ToProcess(pom, main, Some(source), pomFile) => {
+    //     // process the POM file
+    //     pomFile.foreach(pf =>
+    //       buildItemsFor(
+    //         pf,
+    //         pf.getName(),
+    //         store,
+    //         Vector(),
+    //         None,
+    //         Map(),
+    //         purlOut,
+    //         false
+    //       )
+    //     )
 
-        // process the sources
-        val sourceBuilt = buildItemsFor(
-          source,
-          pom
-            .flatMap(_.purl().headOption.map(_ + "?packaging=sources"))
-            .getOrElse(main.getName()),
-          store,
-          Vector(),
-          pom,
-          Map(),
-          purlOut,
-          true
-        )
+    //     // process the sources
+    //     val sourceBuilt = buildItemsFor(
+    //       source,
+    //       pom
+    //         .flatMap(_.purl().headOption.map(_ + "?packaging=sources"))
+    //         .getOrElse(main.getName()),
+    //       store,
+    //       Vector(),
+    //       pom,
+    //       Map(),
+    //       purlOut,
+    //       true
+    //     )
 
-        pom.toVector
-          .flatMap(_.purl().map(_ + "?packaging=sources"))
-          .foreach(pid => purlOut.write(f"${pid}\n"))
+    //     pom.toVector
+    //       .flatMap(_.purl().map(_ + "?packaging=sources"))
+    //       .foreach(pid => purlOut.write(f"${pid}\n"))
 
-        // process the main class file
-        buildItemsFor(
-          main,
-          pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
-          store,
-          Vector(),
-          pom,
-          sourceBuilt.nameToGitOID,
-          purlOut,
-          false
-        )
-        pom.toVector
-          .flatMap(_.purl())
-          .foreach(pid => purlOut.write(f"${pid}\n"))
-      }
+    //     // process the main class file
+    //     buildItemsFor(
+    //       main,
+    //       pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
+    //       store,
+    //       Vector(),
+    //       pom,
+    //       sourceBuilt.nameToGitOID,
+    //       purlOut,
+    //       false
+    //     )
+    //     pom.toVector
+    //       .flatMap(_.purl())
+    //       .foreach(pid => purlOut.write(f"${pid}\n"))
+    //   }
 
-      case ToProcess(pom, main, _, _) =>
-        buildItemsFor(
-          main,
-          pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
-          store,
-          Vector(),
-          pom,
-          Map(),
-          purlOut = purlOut,
-          false
-        )
-    }
+    //   case ToProcess(pom, main, _, _) =>
+    //     buildItemsFor(
+    //       main,
+    //       pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
+    //       store,
+    //       Vector(),
+    //       pom,
+    //       Map(),
+    //       purlOut = purlOut,
+    //       false
+    //     )
+    // }
+    ??? //FIXME process
 
   }
 
@@ -112,8 +114,7 @@ object BuildGraph {
     * @return a tuple of (Map[file-name, gitoid-sha256], Map[Vector[filenames-for-embedded-artifacts], gitoid-sha256])
     */
   def buildItemsFor(
-      root: File,
-      name: String,
+      root: ArtifactWrapper,
       store: Storage,
       topConnections: Vector[Edge],
       topPackageIdentifier: Option[PackageIdentifier],
@@ -126,8 +127,7 @@ object BuildGraph {
     var rootGitoid: String = ""
 
     FileWalker.processFileAndSubfiles[Vector[FileAndGitoid]](
-      FileWrapper(root, false),
-      name,
+      root,
       None,
       Vector(),
       dontSkipFound,

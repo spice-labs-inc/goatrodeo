@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 import java.io.File
 import scala.util.{Failure, Success, Try}
@@ -402,10 +402,13 @@ object FileWalker {
       asApacheCommonsCompressedWrapper(in)
   }
 
+
+  type ArchiveStream = (Seq[() => (String, ArtifactWrapper)], () => Unit)
+
   /** A stream of ArtifactWrappers... maybe
     */
-  private type OptionalArchiveStream =
-    Option[(Iterator[() => (String, ArtifactWrapper)], () => Unit)]
+  type OptionalArchiveStream =
+    Option[ArchiveStream]
 
   /** Given a file that might be an archive (Zip, cpio, tar, etc.) or might be a
     * compressed archive (e.g. tar.Z), return a stream of `ArchiveEntry` so the
@@ -464,7 +467,6 @@ object FileWalker {
     */
   def processFileAndSubfiles[T](
       root: ArtifactWrapper,
-      name: String,
       parentId: Option[String],
       specific: T,
       dontSkipFound: Boolean,

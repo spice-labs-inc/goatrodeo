@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 /* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
@@ -14,8 +14,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.GitOID
+import goatrodeo.util.Helpers
 import scala.util.Try
 import io.bullet.borer.Json
 import io.bullet.borer.Codec
@@ -24,10 +24,10 @@ import io.bullet.borer.Decoder
 import io.bullet.borer.Cbor
 import io.bullet.borer.derivation.key
 import java.time.Instant
-import io.spicelabs.goatrodeo.util.FileType
-import io.spicelabs.goatrodeo.util.PackageIdentifier
+import goatrodeo.util.FileType
+import goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
-import io.spicelabs.goatrodeo.util.Helpers.filesForParent
+import goatrodeo.util.Helpers.filesForParent
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -61,8 +61,7 @@ type Edge = (EdgeType, String)
 
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
-    @key("file_type") fileType: TreeSet[String],
-    @key("file_sub_type") fileSubType: TreeSet[String],
+    @key("mime_type") mimeType: TreeSet[String],
     @key("file_size") fileSize: Long,
     extra: TreeMap[String, TreeSet[String]]
 ) {
@@ -71,8 +70,7 @@ case class ItemMetaData(
   def merge(other: ItemMetaData): ItemMetaData = {
     ItemMetaData(
       fileNames = this.fileNames ++ other.fileNames,
-      fileType = this.fileType ++ other.fileType,
-      fileSubType = this.fileSubType ++ other.fileSubType,
+      mimeType = this.mimeType ++ other.mimeType,
       fileSize = this.fileSize,
       extra = {
         var ret = this.extra;
@@ -93,7 +91,7 @@ case class ItemMetaData(
 object ItemMetaData {
   def from(
       fileName: String,
-      fileType: FileType,
+      mimeType: String,
       packageIdentifier: Option[PackageIdentifier],
       fileSize: Long
   ): ItemMetaData = {
@@ -103,20 +101,17 @@ object ItemMetaData {
           ) =>
         ItemMetaData(
           fileNames = TreeSet(fileName),
-          fileType = TreeSet("package"),
-          fileSubType = TreeSet(pid.protocol.name),
+          mimeType = TreeSet(mimeType),
           fileSize = fileSize,
-          extra = fileType.toStringMap() ++
-            TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
+          extra = TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
             pid.toStringMap()
         )
       case None =>
         ItemMetaData(
           fileNames = TreeSet(fileName),
-          fileType = fileType.typeName().map(TreeSet(_)).getOrElse(TreeSet()),
-          fileSubType = fileType.subType().map(TreeSet(_)).getOrElse(TreeSet()),
+          mimeType = TreeSet(mimeType),
           fileSize = fileSize,
-          extra = fileType.toStringMap()
+          extra = TreeMap.empty
         )
     }
 

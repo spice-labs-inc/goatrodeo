@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 package object filetypes {
 

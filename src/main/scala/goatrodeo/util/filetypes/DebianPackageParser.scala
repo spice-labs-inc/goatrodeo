@@ -1,7 +1,7 @@
-package io.spicelabs.goatrodeo.util.filetypes
+package goatrodeo.util.filetypes
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveInputStream, ArchiveStreamFactory}
 import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
 import org.apache.commons.compress.utils.IOUtils

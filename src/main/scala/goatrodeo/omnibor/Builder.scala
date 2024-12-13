@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
@@ -22,12 +22,12 @@ import java.io.OutputStreamWriter
 import java.io.BufferedWriter
 import java.math.BigInteger
 import scala.xml.Elem
-import io.spicelabs.goatrodeo.util.PackageIdentifier
+import goatrodeo.util.PackageIdentifier
 import java.util.concurrent.ConcurrentLinkedQueue
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import scala.util.Try
 import java.io.FileInputStream
-import io.spicelabs.goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
+import goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration
@@ -37,6 +37,8 @@ import java.io.IOException
 import scala.annotation.tailrec
 import java.io.FileWriter
 import scala.collection.immutable.TreeSet
+import goatrodeo.util.ArtifactWrapper
+  import goatrodeo.strategies.Strategy
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -92,7 +94,7 @@ object Builder {
         () => {
 
           @tailrec
-          def doPoll(): ToProcess = {
+          def doPoll(): Strategy = {
             val tried = queue.poll()
             if (tried != null || !stillWorking.get()) {
               tried
@@ -107,7 +109,7 @@ object Builder {
           // if the channel is closed/empty, `None` will be
           // returned, handle it gracefully
 
-          var toProcess: ToProcess = null
+          var toProcess: Strategy = null
           while (
             !dead_? && {
               toProcess = doPoll();
@@ -254,12 +256,12 @@ object Builder {
   }
 }
 
-case class ToProcess(
-    pom: Option[PackageIdentifier],
-    main: File,
-    source: Option[File],
-    pomFile: Option[File]
-)
+// case class ToProcess(
+//     pom: Option[PackageIdentifier],
+//     main: ArtifactWrapper,
+//     source: Option[ArtifactWrapper],
+//     pomFile: Option[ArtifactWrapper]
+// )
 
 object ToProcess {
 
@@ -294,7 +296,9 @@ object ToProcess {
     }
   }
 
-  def buildQueueAsVec(root: File): Vector[ToProcess] = {
+
+
+  def buildQueueAsVec(root: File): Vector[Strategy] = {
     val cnt = AtomicInteger(0)
     val (queue, stillWorking) = buildQueue(root, cnt)
 
@@ -318,22 +322,23 @@ object ToProcess {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
     val buildIt: Runnable = () => {
-      var fileSet = TreeSet(
+      var fileSet = Set(
         Helpers
           .findFiles(root, _ => true)
-          .map(_.getAbsoluteFile()): _*
+          : _*
       )
-
-      val pomLike = buildQueueForPOMS(
-        root,
-        queue,
-        found => {
-          count.incrementAndGet()
-          fileSet -= found.main.getAbsoluteFile()
-          found.pomFile.foreach(f => fileSet -= f.getAbsoluteFile())
-          found.source.foreach(f => fileSet -= f.getAbsoluteFile())
-        }
-      )
+???
+// FIXME
+      // val pomLike = buildQueueForPOMS(
+      //   root,
+      //   queue,
+      //   found => {
+      //     count.incrementAndGet()
+      //     fileSet -= found.main.getAbsoluteFile()
+      //     found.pomFile.foreach(f => fileSet -= f.getAbsoluteFile())
+      //     found.source.foreach(f => fileSet -= f.getAbsoluteFile())
+      //   }
+      // )
 
       fileSet.foreach(f => {
         count.incrementAndGet()

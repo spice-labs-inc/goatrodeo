@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 import java.io.InputStream
 import java.io.File
@@ -24,7 +24,7 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def asStream(): InputStream
+  def asStream(): BufferedInputStream
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
     *
@@ -42,13 +42,13 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def isFile(): Boolean
+  //def isFile(): Boolean
 
   /** Corresponds to `File.isDirectory()`
     *
     * @return
     */
-  def isDirectory(): Boolean
+  //def isDirectory(): Boolean
 
   /** Get all the `ArtifactWrappers` for the entities in a directory. This will
     * only return something if the ArtifactWrapper is a wrapper around `File`
@@ -59,11 +59,18 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def listFiles(): Iterator[ArtifactWrapper]
+  def children(): FileWalker.ArchiveStream = FileWalker.streamForArchive(this).getOrElse(Seq.empty.asInstanceOf[FileWalker.ArchiveStream])
 
   def getCanonicalPath(): String
-  def getParentDirectory(): File
-  def delete(): Boolean
+  // def getParentDirectory(): File
+  //def delete(): Boolean
+
+  /**
+    * The mime type of the artifact if it's a File
+    *
+    * @return
+    */
+  def mimeType: String
 
   /** Does the entity exist. Corresponds to `File.exists`
     *
@@ -91,7 +98,7 @@ object ArtifactWrapper {
   }
 }
 
-final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
+final case class FileWrapper(f: File, mimeType: String, deleteOnFinalize: Boolean)
     extends ArtifactWrapper {
 
   override protected def finalize(): Unit = {
@@ -102,22 +109,22 @@ final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
 
   def exists(): Boolean = f.exists()
 
-  override def delete(): Boolean = f.delete()
+  //override def delete(): Boolean = f.delete()
 
-  override def isFile(): Boolean = f.isFile()
+ // override def isFile(): Boolean = f.isFile()
 
-  def listFiles(): Iterator[ArtifactWrapper] =
-    f.listFiles().iterator.map(FileWrapper(_, false))
+  // def listFiles(): Iterator[ArtifactWrapper] =
+  //   f.listFiles().iterator.map(FileWrapper(_, false))
 
-  override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
+  //override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
 
   override def getCanonicalPath(): String = f.getCanonicalPath()
 
   // override def asFile(): (File, Boolean) = (f, false)
 
-  def isDirectory(): Boolean = f.isDirectory()
+  //def isDirectory(): Boolean = f.isDirectory()
 
-  override def asStream(): InputStream = BufferedInputStream(FileInputStream(f))
+  override def asStream(): BufferedInputStream = BufferedInputStream(FileInputStream(f))
 
   override def name(): String = f.getName()
 
@@ -126,24 +133,24 @@ final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
 
 }
 
-final case class ByteWrapper(bytes: Array[Byte], fileName: String)
+final case class ByteWrapper(bytes: Array[Byte], mimeType: String, path: String, fileName: String)
     extends ArtifactWrapper {
 
   def exists(): Boolean = true
 
-  override def delete(): Boolean = true
+  //override def delete(): Boolean = true
 
   def isFile(): Boolean = true
 
   def listFiles(): Iterator[ArtifactWrapper] = Iterator.empty
 
-  override def getParentDirectory(): File = File("/")
+  //override def getParentDirectory(): File = File("/")
 
-  override def getCanonicalPath(): String = "/"
+  override def getCanonicalPath(): String = f"/${fileName}"
 
   def isDirectory(): Boolean = false
 
-  override def asStream(): InputStream = ByteArrayInputStream(bytes)
+  override def asStream(): BufferedInputStream = new BufferedInputStream(ByteArrayInputStream(bytes))
 
   override def name(): String = fileName
 

@@ -40,7 +40,7 @@ of the initial directory hierarchy.
 
 There will be separate strategies for:
 
-* NodeJS project to capture pre and post minified artifacts
+* NodeJS project to capture pre- and post minified artifacts
 * Ruby/Rails
 * Python
 
@@ -70,4 +70,4 @@ consumption/processing by separate threads.
 
 ## Processing each `GoatRodeoStrategy`
 
-
+The Strategies will be put on a queue... and pulled off by separate processing threads.

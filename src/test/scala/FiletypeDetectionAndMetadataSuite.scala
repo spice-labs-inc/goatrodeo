@@ -6,7 +6,7 @@ import org.apache.tika.metadata.TikaCoreProperties
 import org.apache.tika.mime.MediaType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import io.spicelabs.goatrodeo.util.filetypes.*
+import goatrodeo.util.filetypes.*
 import org.apache.tika.parser.ParseContext
 import org.apache.tika.sax.BodyContentHandler
 
