@@ -14,10 +14,10 @@ final case class MetadataString(value: String) extends MetadataValue {
   type T = String
 }
 
-final case class MetadataList(value: List[String]) extends MetadataValue {
-  type T = List[String]
+final case class MetadataList(value: List[MetadataValue]) extends MetadataValue {
+  type T = List[MetadataValue]
 }
 
-final case class MetadataMap(value: Map[String, String]) extends MetadataValue {
-  type T = Map[String, String]
+final case class MetadataMap(value: Map[String, MetadataValue]) extends MetadataValue {
+  type T = Map[String, MetadataValue]
 }

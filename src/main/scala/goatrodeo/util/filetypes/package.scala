@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.filetypes.{MetadataValue, MetadataList, MetadataMap, MetadataString}
+import goatrodeo.util.filetypes.{MetadataList, MetadataMap, MetadataString, MetadataValue, YamlEventHandler}
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveInputStream, ArchiveStreamFactory}
 import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
 import org.apache.commons.io.IOUtils as CommonsIOUtils
@@ -269,11 +269,10 @@ package object filetypes {
     val yamlStr = str.tail.replaceAll("!ruby/object:.*\\s", "\n").tail.tail
     logger.trace(s"Yaml String: $yamlStr")
 
-    for (event <- yaml.parse(new StringReader(yamlStr)).asScala) {
-      logger.debug(s"Yaml Event: $event")
-    }
-
-    Map.empty
+    val handler = YamlEventHandler(yamlStr)
+    val result = handler.result()
+    logger.debug(s"YamlEventHandler result: ${result}")
+    result
   }
 
   /**
@@ -313,9 +312,9 @@ package object filetypes {
   implicit def metadataStringtoString(value: MetadataString): String =
     value.value
 
-  implicit def metadataMapToMap(value: MetadataMap): Map[String, String] =
+  implicit def metadataMapToMap(value: MetadataMap): Map[String, MetadataValue] =
     value.value
 
-  implicit def metadataListToList(value: MetadataList): List[String] =
+  implicit def metadataListToList(value: MetadataList): List[MetadataValue] =
     value.value
 }
