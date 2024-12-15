@@ -101,6 +101,37 @@ package object filetypes {
       }
     }
 
+    /**
+     * Given a `Array[Byte]` and a filename `String`, return a MIME Type (Tika `MediaType`) representing
+     * the correct mime type of the given file.
+     * e.g. "foobar-1.23.deb" should detect as `application/x-debian-package`
+     * @param f a `java.io.File` to detect `MediaType` from
+     * @return The detected MIME Type (`MediaType)` of the given file
+     */
+    def detectMIMEType(bytes: Array[Byte], filename: String): MediaType = {
+      val metadata = new TikaMetadata() // tika metadata
+      // set the filename for Tika… some of the detectors in the stack fall back on filename to decide
+      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, filename)
+      /**
+       * temporary hack until we get custom-mimetypes.xml working
+       * basically, by default tika detects gem files as `application/x-tar` which
+       * is technically correct as a Gem is a tar… but we want to treat it as a gem
+       * with its own distinct mime type. The *correct* way to do this is
+       * by defining a custom type in `custom-mimetypes.xml` but at this time
+       * we can't seem to get that functionality working, so for now we just
+       * manually override the detection
+       */
+      if (filename.endsWith(".gem")) // todo - should we check also that it was detected as a Tar, or is short circuit ok?
+        MIMETypeMappings.MIME_GEM
+      else {
+        val detected = Timing.time("detectMimeType", s"$filename") {
+          tika.getDetector().detect(TikaInputStream.get(bytes), metadata)
+        }
+        logger.trace(s"Detected filetype for ${filename} media type: $detected" +
+          s"Type: ${detected.getType} Subtype: ${detected.getSubtype}")
+        detected
+      }
+    }
 
     /**
      * Resolve the metadata associated with a given `java.io.File`
