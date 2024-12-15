@@ -13,24 +13,25 @@ object Timing {
   /**
    * wrapper for timing the execution of a function block
    * @param caller some string to identify the calling program
+   * @param callerInfo additional info for the calling program such as calling arguments (`caller` should be just the fn name)
    * @param f the function block to run
    * @tparam T the return type of `f`
    * @return The result of executing `f`
    */
-  def time[T](caller: String)(f: => T): T = {
+  def time[T](caller: String, callerInfo: String)(f: => T): T = {
     val start = System.nanoTime()
     val result = f
     val end = System.nanoTime()
     val nanoTiming = end - start
     val msTiming = nanoTiming / 1_000_000
-    logger.info(s"Took ${msTiming}ms to run '$caller'")
-    timingInstance.logTime(caller, nanoTiming)
+    logger.trace(s"Took ${msTiming}ms to run '$caller'")
+    timingInstance.logTime(caller, callerInfo, nanoTiming)
     result
   }
 
 }
 
-protected case class TimingEvent(caller: String, timeInNanos: Long)
+protected case class TimingEvent(caller: String, callerInfo: String, timeInNanos: Long)
 /**
  * Class for storing a list of the calls we've made
  */
@@ -59,8 +60,8 @@ private class Timing {
    * @param caller
    * @param timing
    */
-  def logTime(caller: String, timeInNanos: Long): Unit = {
-    val event = TimingEvent(caller, timeInNanos)
+  def logTime(caller: String, callerInfo: String, timeInNanos: Long): Unit = {
+    val event = TimingEvent(caller, callerInfo, timeInNanos)
     timerQ.add(event)
   }
 

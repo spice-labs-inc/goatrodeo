@@ -92,10 +92,10 @@ package object filetypes {
       if (f.getName.endsWith(".gem")) // todo - should we check also that it was detected as a Tar, or is short circuit ok?
         MIMETypeMappings.MIME_GEM
       else {
-        val detected = Timing.time(s"detectMimeType: $f") {
+        val detected = Timing.time("detectMimeType", s"$f") {
           tika.getDetector().detect(TikaInputStream.get(f), metadata)
         }
-        logger.debug(s"Detected filetype for ${f.toString} media type: $detected" +
+        logger.trace(s"Detected filetype for ${f.toString} media type: $detected" +
           s"Type: ${detected.getType} Subtype: ${detected.getSubtype}")
         detected
       }
