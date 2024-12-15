@@ -65,7 +65,7 @@ private class Timing {
       for ((subGroup, subTimings) <- infoGrouped if subGroup.isDefined) {
         val subGroupAvg = subTimings.map(_.timeInNanos).sum / subTimings.size
         val subGroupAvgMs = subGroupAvg / 1_000_000
-        println(s"\t\t ~~~ Average timing for ${subGroup.get} averages: ${subGroupAvg} / ${subGroupAvgMs}ms")
+        println(s"\t\t ~~~ Average timing for ${subGroup.get} - ${subTimings.size} entries, averages: ${subGroupAvg}ns / ${subGroupAvgMs}ms")
       }
     }
   }
