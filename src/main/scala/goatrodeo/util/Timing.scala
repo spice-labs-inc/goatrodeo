@@ -52,7 +52,22 @@ private class Timing {
     val numEntries = timerQ.size
     val avgTiming = timerQ.asScala.map(_.timeInNanos).sum / numEntries
     val avgMsTiming = avgTiming / 1_000_000
-    println(s"Average Timing for $numEntries timing entries: ${avgTiming}ns / ${avgMsTiming}ms")
+    println(s"! Average Timing for $numEntries timing entries: ${avgTiming}ns / ${avgMsTiming}ms")
+
+    // some further summaries
+    val groupedCallers = timerQ.asScala.groupBy(_.caller)
+    for ((group, timings) <- groupedCallers) {
+      val groupAvg = timings.map(_.timeInNanos).sum / timings.size
+      val groupAvgMs = groupAvg / 1_000_000
+      println(s"*** Average timing for caller ${group}: ${timings.size} averages: ${groupAvg}ns / ${groupAvgMs}ms")
+      // some explicit sorting / grouping by file extension, somewhat hard coding something that was generic
+      val infoGrouped = timings.groupBy(x => ArtifactWrapper.suffix(x.callerInfo))
+      for ((subGroup, subTimings) <- infoGrouped if subGroup.isDefined) {
+        val subGroupAvg = subTimings.map(_.timeInNanos).sum / subTimings.size
+        val subGroupAvgMs = subGroupAvg / 1_000_000
+        println(s"\t\t ~~~ Average timing for ${subGroup.get} averages: ${subGroupAvg} / ${subGroupAvgMs}ms")
+      }
+    }
   }
 
   /**
