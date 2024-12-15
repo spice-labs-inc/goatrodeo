@@ -1,4 +1,4 @@
-package goatrodeo.util.filetypes
+package io.spicelabs.goatrodeo.util
 
 /**
  * Trait representing the base of an ADT for Metadata values, e.g. from Ruby Gem metadata or Debian .deb control

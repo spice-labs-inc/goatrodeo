@@ -1,6 +1,5 @@
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.filetypes.MetadataString
-import io.spicelabs.goatrodeo.util.filetypes
+import io.spicelabs.goatrodeo.util.{MetadataString, filetypes}
 import io.spicelabs.goatrodeo.util.filetypes.*
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.mime.MediaType
