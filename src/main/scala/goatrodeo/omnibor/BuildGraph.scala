@@ -25,70 +25,32 @@ object BuildGraph {
       store: Storage,
       purlOut: BufferedWriter
   ): Unit = {
-    
-    // item match {
-    //   case ToProcess(pom, main, Some(source), pomFile) => {
-    //     // process the POM file
-    //     pomFile.foreach(pf =>
-    //       buildItemsFor(
-    //         pf,
-    //         pf.getName(),
-    //         store,
-    //         Vector(),
-    //         None,
-    //         Map(),
-    //         purlOut,
-    //         false
-    //       )
-    //     )
+    val processGroup = item.processGroup()
 
-    //     // process the sources
-    //     val sourceBuilt = buildItemsFor(
-    //       source,
-    //       pom
-    //         .flatMap(_.purl().headOption.map(_ + "?packaging=sources"))
-    //         .getOrElse(main.getName()),
-    //       store,
-    //       Vector(),
-    //       pom,
-    //       Map(),
-    //       purlOut,
-    //       true
-    //     )
-
-    //     pom.toVector
-    //       .flatMap(_.purl().map(_ + "?packaging=sources"))
-    //       .foreach(pid => purlOut.write(f"${pid}\n"))
-
-    //     // process the main class file
-    //     buildItemsFor(
-    //       main,
-    //       pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
-    //       store,
-    //       Vector(),
-    //       pom,
-    //       sourceBuilt.nameToGitOID,
-    //       purlOut,
-    //       false
-    //     )
-    //     pom.toVector
-    //       .flatMap(_.purl())
-    //       .foreach(pid => purlOut.write(f"${pid}\n"))
-    //   }
-
-    //   case ToProcess(pom, main, _, _) =>
-    //     buildItemsFor(
-    //       main,
-    //       pom.flatMap(_.purl().headOption).getOrElse(main.getName()),
-    //       store,
-    //       Vector(),
-    //       pom,
-    //       Map(),
-    //       purlOut = purlOut,
-    //       false
-    //     )
-    // }
-    ??? //FIXME process
+    var clean = false
+    try {
+      // get the items to process
+      val items = processGroup.artifacts
+      val res = items.foldLeft(Vector[(ArtifactWrapper, BuiltItemResult)]())((state, next) => {
+        val main = next()
+        val res =  buildItemsFor(
+          main,
+          store,
+          Vector(),
+          None,
+          state,
+          purlOut = purlOut,
+          false
+        )
+        state :+ (main, res)
+      })
+        processGroup.cleanUp(res, store, purlOut)
+        clean = true
+    } finally {
+      // do the cleanup even if the other stuff didn't work
+      processGroup.cleanUp(Vector(), store, purlOut)
+      
+    }
 
   }
 
@@ -103,7 +65,6 @@ object BuildGraph {
     * Build a graph of identifiers for a given File
     *
     * @param root the root file to test
-    * @param name the name of the file
     * @param store the backing store to load/save/inspect for the graph
     * @param topConnections the back-reference for connections/aliases
     * @param topPackageIdentifier the top level package identifier
@@ -118,7 +79,8 @@ object BuildGraph {
       store: Storage,
       topConnections: Vector[Edge],
       topPackageIdentifier: Option[PackageIdentifier],
-      associatedFiles: Map[String, GitOID],
+      associatedFiles: Vector[(ArtifactWrapper, BuiltItemResult)],
+     // customConnections: () => TreeSet[Edge],
       purlOut: BufferedWriter,
       dontSkipFound: Boolean
   ): BuiltItemResult = {

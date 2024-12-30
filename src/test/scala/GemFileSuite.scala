@@ -89,7 +89,7 @@ class GemFileSuite extends munit.FunSuite {
       store,
       Vector(),
       None,
-      Map(), {
+      Vector(), {
         val file = File.createTempFile("goat_rodeo_purls", "_out")
         file.delete()
         file.mkdirs()

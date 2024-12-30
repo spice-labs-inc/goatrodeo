@@ -40,10 +40,9 @@ lazy val root = project
     // https://mvnrepository.com/artifact/org.apache.tika/tika-core
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
     // https://mvnrepository.com/artifact/org.apache.tika/tika-parsers
-    libraryDependencies += "org.apache.tika" % "tika-parsers" % "3.0.0" pomOnly(),
+    libraryDependencies += "org.apache.tika" % "tika-parsers" % "3.0.0" pomOnly (),
     // https://mvnrepository.com/artifact/org.apache.tika/tika-parsers-standard-package
     libraryDependencies += "org.apache.tika" % "tika-parsers-standard-package" % "3.0.0",
-
     assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
   )
@@ -60,8 +59,7 @@ Test / testOptions += Tests.Setup(() => {
   val log = (streams.value: @sbtUnchecked).log
   log.info("Downloading and caching test data…")
   try {
-    log.info("\t* Creating test_data/iso_tests if it doesn't already exist…")
-    Files.createDirectory(Paths.get("test_data/iso_tests"))
+    Files.createDirectories(Paths.get("test_data/download/iso_tests"))
   } catch {
     case fE: FileAlreadyExistsException =>
       log.info("\t! iso_tests directory already exists.")
@@ -72,11 +70,10 @@ Test / testOptions += Tests.Setup(() => {
   }
 
   try {
-    log.info("\t* Creating test_data/gem_tests if it doesn't already exist…")
-    Files.createDirectory(Paths.get("test_data/gem_tests"))
+    Files.createDirectories(Paths.get("test_data/download/gem_tests"))
   } catch {
     case fE: FileAlreadyExistsException =>
-      log.info("\t! gem_tests directory already exists.")
+    // log.info("\t! gem_tests directory already exists.")
     case e: Throwable =>
       val err = s"Exception setting up gem_tests directory: ${e.getMessage}"
       log.error(err)
@@ -84,11 +81,11 @@ Test / testOptions += Tests.Setup(() => {
   }
 
   try {
-    log.info("\t* Creating test_data/apk_tests if it doesn't already exist…")
-    Files.createDirectory(Paths.get("test_data/apk_tests"))
+
+    Files.createDirectories(Paths.get("test_data/download/apk_tests"))
   } catch {
     case fE: FileAlreadyExistsException =>
-      log.info("\t! apk_tests directory already exists.")
+    // log.info("\t! apk_tests directory already exists.")
     case e: Throwable =>
       val err = s"Exception setting up apk_tests directory: ${e.getMessage}"
       log.error(err)
@@ -96,8 +93,8 @@ Test / testOptions += Tests.Setup(() => {
   }
 
   try {
-    log.info("\t* Creating test_data/deb_tests if it doesn't already exist…")
-    Files.createDirectory(Paths.get("test_data/deb_tests"))
+
+    Files.createDirectories(Paths.get("test_data/download/deb_tests"))
   } catch {
     case fE: FileAlreadyExistsException =>
       log.info("\t! deb_tests directory already exists.")
@@ -108,20 +105,66 @@ Test / testOptions += Tests.Setup(() => {
   }
 
   try {
-    log.info("\t* Fetching test ISOs…")
-    url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file("./test_data/iso_tests/iso_of_archives.iso") ! log
-    url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
-    log.info("\t * Fetching test Gems…")
-    url("https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem") #> file("./test_data/gem_tests/java-properties-0.3.0.gem") ! log
-    log.info("\t * Fetching test WARs…")
-    url("https://public-test-data.spice-labs.dev/sample-tomcat-6.war") #> file("./test_data/sample-tomcat-6.war") ! log
-    log.info("\t * Fetching test EARs…")
-    url("https://public-test-data.spice-labs.dev/EnterpriseHelloWorld.ear") #> file("./test_data/EnterpriseHelloWorld.ear") ! log
-    log.info("\t * Fetching test Android APKs…")
-    url("https://public-test-data.spice-labs.dev/bitbar-sample-app.apk") #> file("./test_data/apk_tests/bitbar-sample-app.apk") ! log
-    log.info("\t * Fetching test Debian Packages…")
-    url("https://public-test-data.spice-labs.dev/hello_2.10-3_arm64.deb") #> file("./test_data/deb_tests/hello_2.10-3_arm64.deb") ! log
-    log.info("\t ! Test Data Fetches complete…")
+    {
+      val f = new File("./test_data/download/iso_tests/iso_of_archives.iso")
+      if (!f.exists()) {
+        log.info("\t* Fetching test ISOs…")
+        url(
+          "https://public-test-data.spice-labs.dev/iso_of_archives.iso"
+        ) #> f ! log
+      }
+    }
+    {
+      val f = file("./test_data/download/iso_tests/simple.iso")
+      if (!f.exists()) {
+        url("https://public-test-data.spice-labs.dev/simple.iso") #> f ! log
+      }
+    }
+    {
+      val f = file("./test_data/download/gem_tests/java-properties-0.3.0.gem")
+      if (!f.exists()) {
+        log.info("\t * Fetching test Gems…")
+        url(
+          "https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem"
+        ) #> f ! log
+      }
+    }
+    {
+      val f = file("./test_data/download/sample-tomcat-6.war")
+      if (!f.exists()) {
+        log.info("\t * Fetching test WARs…")
+        url(
+          "https://public-test-data.spice-labs.dev/sample-tomcat-6.war"
+        ) #> f ! log
+      }
+    }
+    {
+      val f = file("./test_data/download/EnterpriseHelloWorld.ear")
+      if (!f.exists()) {
+        log.info("\t * Fetching test EARs…")
+        url(
+          "https://public-test-data.spice-labs.dev/EnterpriseHelloWorld.ear"
+        ) #> f ! log
+      }
+    }
+    {
+      val f = file("./test_data/download/apk_tests/bitbar-sample-app.apk")
+      if (!f.exists()) {
+        log.info("\t * Fetching test Android APKs…")
+        url(
+          "https://public-test-data.spice-labs.dev/bitbar-sample-app.apk"
+        ) #> f ! log
+      }
+    }
+    {
+      val f = file("./test_data/download/deb_tests/hello_2.10-3_arm64.deb")
+      if (!f.exists()) {
+        log.info("\t * Fetching test Debian Packages…")
+        url(
+          "https://public-test-data.spice-labs.dev/hello_2.10-3_arm64.deb"
+        ) #> f ! log
+      }
+    }
   } catch {
     case e: Throwable =>
       val err = s"Exception fetching test files: ${e.getMessage}"
@@ -139,7 +182,8 @@ Test / testOptions += Tests.Setup(() => {
   if ("git lfs status".! == 0) {
     log.info("git lfs found, proceeding…")
   } else {
-    val err = "git lfs not found. Please review the README.md for setup instructions!"
+    val err =
+      "git lfs not found. Please review the README.md for setup instructions!"
     log.error(err)
     throw new MessageOnlyException(err)
   }
@@ -157,7 +201,6 @@ Test / testOptions += Tests.Setup(() => {
   }
 })
 
-
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
 
@@ -166,6 +209,6 @@ Docker / packageName := projectName
 Docker / version := projectVersion
 Docker / maintainer := "ext-engineering@spicelabs.io"
 
-dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal" 
+dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal"
 dockerLabels := Map.empty
 dockerExposedPorts := Seq.empty
