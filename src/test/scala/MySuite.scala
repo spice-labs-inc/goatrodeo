@@ -38,6 +38,7 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 import goatrodeo.util.FileWalker
 import goatrodeo.util.FileWrapper
+import goatrodeo.util.FileWalker.ArchiveStream
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -187,51 +188,51 @@ class MySuite extends munit.FunSuite {
     assert(
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/HP1973-Source.zip"), false)
+          FileWrapper.from(File("test_data/HP1973-Source.zip"))
         )
         .isDefined
     )
     assert(
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/log4j-core-2.22.1.jar"), false)
+          FileWrapper.from(File("test_data/log4j-core-2.22.1.jar"))
         )
         .isDefined
     )
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .streamForArchive(FileWrapper.from(File("test_data/empty.tgz")))
         .isDefined
     )
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz"), false))
+        .streamForArchive(FileWrapper.from(File("test_data/toml-rs.tgz")))
         .isDefined
     )
     assert(
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+          FileWrapper.from(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
         )
         .isDefined
     )
     assert(
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/tk-8.6.13-r2.apk"), false)
+          FileWrapper.from(File("test_data/tk-8.6.13-r2.apk"))
         )
         .isDefined
     )
 
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/ics_test.tar"), false))
+        .streamForArchive(FileWrapper.from(File("test_data/ics_test.tar")))
         .isDefined
     )
 
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/nested.tar"), false))
+        .streamForArchive(FileWrapper.from(File("test_data/nested.tar")))
         .isDefined
     )
 
@@ -239,34 +240,32 @@ class MySuite extends munit.FunSuite {
 
   test("Walk a tar file") {
     var cnt = 0
-    val (inputStream, _) =
+    val ArchiveStream(inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .streamForArchive(FileWrapper.from(File("test_data/empty.tgz")))
         .get
     for {
       e <- inputStream
-      (name, file) = e()
+      file = e()
     } {
       cnt += 1
-      file.delete()
+      file.cleanUp()
     }
 
     assert(cnt > 2)
   }
 
   test("deal with nesting") {
-    val nested = FileWrapper(File("test_data/nested.tar"), false)
-    assert(nested.isFile() && nested.exists())
+    val nested = FileWrapper.from(File("test_data/nested.tar"))
 
     var cnt = 0
 
     FileWalker.processFileAndSubfiles(
       nested,
-      "nested",
       None,
       Vector[String](),
       false,
-      (file, name, parent, x) => {
+      (file, parent, x) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
         // println(f"hash for ${name} is ${main} parent ${parent}")
@@ -277,34 +276,33 @@ class MySuite extends munit.FunSuite {
   }
 
   test("Compute pURL for .deb") {
-    val purl = PackageIdentifier.computePurl(
-      File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
-    )
-    assert(purl.isDefined, "Should compute a purl")
-    assertEquals(purl.get.artifactId, "tk8.6")
-    assert(
-      purl.get.extra.get("maintainer").get.size > 0,
-      "Should have a mainter"
-    )
+    ??? // FIXME -- deal with package URLs
+
+    // val purl = PackageIdentifier.computePurl(
+    //   File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
+    // )
+    // assert(purl.isDefined, "Should compute a purl")
+    // assertEquals(purl.get.artifactId, "tk8.6")
+    // assert(
+    //   purl.get.extra.get("maintainer").get.size > 0,
+    //   "Should have a mainter"
+    // )
   }
 
   test("deal with .deb and zst") {
     val nested =
-      FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
-    assert(nested.isFile() && nested.exists())
+      FileWrapper.from(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"))
 
     var cnt = 0
 
     FileWalker.processFileAndSubfiles(
       nested,
-      "nested",
       None,
       Vector[String](),
       false,
-      (file, name, parent, x) => {
+      (file,  parent, x) => {
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        // println(f"hash for ${name} is ${main} parent ${parent}")
         (main, false, None, x)
       }
     )
@@ -313,10 +311,9 @@ class MySuite extends munit.FunSuite {
 
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
-    val nested = File("test_data/nested.tar")
+    val nested = FileWrapper.from(File("test_data/nested.tar"))
     val built = BuildGraph.buildItemsFor(
       nested,
-      nested.getName(),
       store,
       Vector(),
       None,
@@ -417,11 +414,10 @@ class MySuite extends munit.FunSuite {
           "alpine-executable-war-1.2.2.jar"
         )
       } {
-        val bad = File(source, toTry)
+        val bad = FileWrapper.from(File(source, toTry))
         val store = MemStorage.getStorage(None)
         BuildGraph.buildItemsFor(
           bad,
-          "bad",
           store,
           Vector(),
           Some(

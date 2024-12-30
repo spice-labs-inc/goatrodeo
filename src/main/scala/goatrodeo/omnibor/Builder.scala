@@ -38,7 +38,7 @@ import scala.annotation.tailrec
 import java.io.FileWriter
 import scala.collection.immutable.TreeSet
 import goatrodeo.util.ArtifactWrapper
-  import goatrodeo.strategies.Strategy
+  import goatrodeo.strategies.{Strategy, SingleArtifactStrategy}
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -132,7 +132,7 @@ object Builder {
               if (theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0) {
                 println(
                   f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
-                      .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${String
+                      .between(start, Instant.now())} thread ${threadNum}. took ${theDuration} vertices ${String
                       .format("%,d", storage.size())}"
                 )
               }
@@ -151,10 +151,10 @@ object Builder {
                   throw ioe
 
                 }
-                println(f"Failed ${toProcess.main} ${ioe}")
+                println(f"Failed ${toProcess} ${ioe}")
               }
               case e: Exception => {
-                println(f"Failed ${toProcess.main} ${e}")
+                println(f"Failed ${toProcess} ${e}")
                 // Helpers.bailFail()
               }
 
@@ -318,16 +318,16 @@ object ToProcess {
   def buildQueue(
       root: File,
       count: AtomicInteger
-  ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
+  ): (ConcurrentLinkedQueue[Strategy], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
-    val queue = ConcurrentLinkedQueue[ToProcess]()
+    val queue = ConcurrentLinkedQueue[Strategy]()
     val buildIt: Runnable = () => {
       var fileSet = Set(
         Helpers
           .findFiles(root, _ => true)
           : _*
       )
-???
+
 // FIXME
       // val pomLike = buildQueueForPOMS(
       //   root,
@@ -342,7 +342,7 @@ object ToProcess {
 
       fileSet.foreach(f => {
         count.incrementAndGet()
-        queue.add(ToProcess(PackageIdentifier.computePurl(f), f, None, None))
+        queue.add(SingleArtifactStrategy(f))
       })
 
       stillWorking.set(false)
@@ -354,139 +354,139 @@ object ToProcess {
     (queue, stillWorking)
   }
 
-  def buildQueueForPOMS(
-      root: File,
-      queue: ConcurrentLinkedQueue[ToProcess],
-      found: ToProcess => Unit
-  ): Unit = {
-    val start = Instant.now()
-    val poms = Helpers.findFiles(
-      root,
-      f => f.getName().endsWith(".pom")
-    )
-    println(f"Finding all pom files got ${poms.length} in ${Duration
-        .between(start, Instant.now())}")
+  // def buildQueueForPOMS(
+  //     root: File,
+  //     queue: ConcurrentLinkedQueue[Strategy],
+  //     found: Strategy => Unit
+  // ): Unit = {
+  //   val start = Instant.now()
+  //   val poms = Helpers.findFiles(
+  //     root,
+  //     f => f.getName().endsWith(".pom")
+  //   )
+  //   println(f"Finding all pom files got ${poms.length} in ${Duration
+  //       .between(start, Instant.now())}")
 
-    val possibleSize = poms.length
-    var cnt = 0
+  //   val possibleSize = poms.length
+  //   var cnt = 0
 
-    for {
-      f <- poms
+  //   for {
+  //     f <- poms
 
-      xml <- Try {
-        scala.xml.XML.load({
-          val bytes = Helpers.slurpInput(f)
-          new ByteArrayInputStream(bytes)
-        })
-      }.toOption
-      item <- {
-        val grp = findTag(xml, "groupId")
-        val art = findTag(xml, "artifactId")
-        val ver = tryToFixVersion(findTag(xml, "version"), f.getName())
-        (grp, art, ver) match {
-          case (Some(g), Some(a), Some(v))
-              if !g.startsWith("$") && !a
-                .startsWith("$") && !v.startsWith("$") &&
-                f.getName() == f"${a}-${v}.pom" =>
-            val name = f.getName()
-            val jar = new File(
-              f.getAbsoluteFile().getParent(),
-              f"${name.substring(0, name.length() - 4)}.jar"
-            )
-            if (jar.exists()) {
-              Some(
-                ToProcess(
-                  Some(
-                    PackageIdentifier(
-                      PackageProtocol.Maven,
-                      g,
-                      a,
-                      v,
-                      None,
-                      None,
-                      Map()
-                    )
-                  ),
-                  jar,
-                  Helpers.findSrcFile(f),
-                  Some(f)
-                )
-              )
-            } else if ({
-              val jar = new File(
-                f.getAbsoluteFile().getParent(),
-                f"${name.substring(0, name.length() - 4)}.war"
-              )
-              jar.exists()
-            }) {
-              Some(
-                ToProcess(
-                  Some(
-                    PackageIdentifier(
-                      PackageProtocol.Maven,
-                      g,
-                      a,
-                      v,
-                      None,
-                      None,
-                      Map()
-                    )
-                  ),
-                  new File(
-                    f.getAbsoluteFile().getParent(),
-                    f"${name.substring(0, name.length() - 4)}.war"
-                  ),
-                  Helpers.findSrcFile(f),
-                  Some(f)
-                )
-              )
+  //     xml <- Try {
+  //       scala.xml.XML.load({
+  //         val bytes = Helpers.slurpInput(f)
+  //         new ByteArrayInputStream(bytes)
+  //       })
+  //     }.toOption
+  //     item <- {
+  //       val grp = findTag(xml, "groupId")
+  //       val art = findTag(xml, "artifactId")
+  //       val ver = tryToFixVersion(findTag(xml, "version"), f.getName())
+  //       (grp, art, ver) match {
+  //         case (Some(g), Some(a), Some(v))
+  //             if !g.startsWith("$") && !a
+  //               .startsWith("$") && !v.startsWith("$") &&
+  //               f.getName() == f"${a}-${v}.pom" =>
+  //           val name = f.getName()
+  //           val jar = new File(
+  //             f.getAbsoluteFile().getParent(),
+  //             f"${name.substring(0, name.length() - 4)}.jar"
+  //           )
+  //           if (jar.exists()) {
+  //             Some(
+  //               ToProcess(
+  //                 Some(
+  //                   PackageIdentifier(
+  //                     PackageProtocol.Maven,
+  //                     g,
+  //                     a,
+  //                     v,
+  //                     None,
+  //                     None,
+  //                     Map()
+  //                   )
+  //                 ),
+  //                 jar,
+  //                 Helpers.findSrcFile(f),
+  //                 Some(f)
+  //               )
+  //             )
+  //           } else if ({
+  //             val jar = new File(
+  //               f.getAbsoluteFile().getParent(),
+  //               f"${name.substring(0, name.length() - 4)}.war"
+  //             )
+  //             jar.exists()
+  //           }) {
+  //             Some(
+  //               ToProcess(
+  //                 Some(
+  //                   PackageIdentifier(
+  //                     PackageProtocol.Maven,
+  //                     g,
+  //                     a,
+  //                     v,
+  //                     None,
+  //                     None,
+  //                     Map()
+  //                   )
+  //                 ),
+  //                 new File(
+  //                   f.getAbsoluteFile().getParent(),
+  //                   f"${name.substring(0, name.length() - 4)}.war"
+  //                 ),
+  //                 Helpers.findSrcFile(f),
+  //                 Some(f)
+  //               )
+  //             )
 
-            } else if ({
-              val jar = new File(
-                f.getAbsoluteFile().getParent(),
-                f"${name.substring(0, name.length() - 4)}.aar"
-              )
-              jar.exists()
-            }) {
-              Some(
-                ToProcess(
-                  Some(
-                    PackageIdentifier(
-                      PackageProtocol.Maven,
-                      g,
-                      a,
-                      v,
-                      None,
-                      None,
-                      Map()
-                    )
-                  ),
-                  new File(
-                    f.getAbsoluteFile().getParent(),
-                    f"${name.substring(0, name.length() - 4)}.aar"
-                  ),
-                  Helpers.findSrcFile(f),
-                  Some(f)
-                )
-              )
+  //           } else if ({
+  //             val jar = new File(
+  //               f.getAbsoluteFile().getParent(),
+  //               f"${name.substring(0, name.length() - 4)}.aar"
+  //             )
+  //             jar.exists()
+  //           }) {
+  //             Some(
+  //               ToProcess(
+  //                 Some(
+  //                   PackageIdentifier(
+  //                     PackageProtocol.Maven,
+  //                     g,
+  //                     a,
+  //                     v,
+  //                     None,
+  //                     None,
+  //                     Map()
+  //                   )
+  //                 ),
+  //                 new File(
+  //                   f.getAbsoluteFile().getParent(),
+  //                   f"${name.substring(0, name.length() - 4)}.aar"
+  //                 ),
+  //                 Helpers.findSrcFile(f),
+  //                 Some(f)
+  //               )
+  //             )
 
-            } else None
+  //           } else None
 
-          case _ =>
-            None
-        }
+  //         case _ =>
+  //           None
+  //       }
 
-      }
-    } {
-      cnt += 1
-      if (cnt % 5000 == 0) {
-        println(f"pom loading ${cnt} of ${possibleSize} at ${Duration
-            .between(start, Instant.now())}")
-      }
+  //     }
+  //   } {
+  //     cnt += 1
+  //     if (cnt % 5000 == 0) {
+  //       println(f"pom loading ${cnt} of ${possibleSize} at ${Duration
+  //           .between(start, Instant.now())}")
+  //     }
 
-      queue.add(item)
-      found(item)
-    }
-  }
+  //     queue.add(item)
+  //     found(item)
+  //   }
+  // }
 
 }

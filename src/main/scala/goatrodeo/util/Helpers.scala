@@ -108,18 +108,20 @@ object Helpers {
   }
 
   private val tika = new TikaConfig()
-  /**
-   * Given an input stream and a filename, get the mime type
-   * 
-   * @param data -- the input stream
-   * @param fileName -- the name of the file
-   */
+
+  /** Given an input stream and a filename, get the mime type
+    *
+    * @param data
+    *   -- the input stream
+    * @param fileName
+    *   -- the name of the file
+    */
   def mimeTypeFor(data: InputStream, fileName: String): String = {
-  
+
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
     val detected = tika.getDetector.detect(data, metadata)
-    
+
     detected.toString()
   }
 
@@ -149,19 +151,23 @@ object Helpers {
     } else Vector()
   }
 
-  /**
-    * Given a file, create an ArtifactWrapper for the file
+  /** Given a file, create an ArtifactWrapper for the file
     *
-    * @param f the File
+    * @param f
+    *   the File
     */
   def fileWrapperFor(f: File): ArtifactWrapper = {
-    FileWrapper(f, mimeTypeFor(new BufferedInputStream(new FileInputStream(f)), f.getName()), false)
+    FileWrapper(
+      f,
+      mimeTypeFor(new BufferedInputStream(new FileInputStream(f)), f.getName()),
+      false
+    )
   }
 
   def artifactWrapper(bytes: Array[Byte], path: String): ArtifactWrapper = {
-    val f = new File(path)
-    val mimeType = mimeTypeFor(new ByteArrayInputStream(bytes), f.getName())
-    ByteWrapper(bytes, mimeType, path, f.getName())
+
+    val mimeType = mimeTypeFor(new ByteArrayInputStream(bytes), path)
+    ByteWrapper(bytes, mimeType, path)
   }
 
   /** Write data over a file
@@ -373,7 +379,6 @@ object Helpers {
 
     }
   }
-
 
   @inline def hexChar(b: Byte): Char = {
     b match {
@@ -597,7 +602,7 @@ object Helpers {
     slurpInput(fis)
   }
 
-    /** Slurp the contents of a File
+  /** Slurp the contents of a File
     *
     * @param what
     *   the File
@@ -605,7 +610,7 @@ object Helpers {
     *   the bytes contained in the File
     */
   def slurpInput(what: ArtifactWrapper): Array[Byte] = {
-    
+
     slurpInput(what.asStream())
   }
 
@@ -705,366 +710,178 @@ object Helpers {
   }
 }
 
-/** A set of helpers to manage GitOIDs
-  */
-object GitOIDUtils {
+enum PackageProtocol {
+  case Maven, NPM, Docker, Deb, Gem
 
-  /** Given a full OmniBOR URI, parse into a triple of first 3 hex chars of
-    * hash, second 3 hex chars of hash, rest of the hex chars of hash
-    *
-    * @param uri
-    *   the OmniBOR URI
-    * @return
-    *   the split filename
-    */
-  def urlToFileName(uri: String): (String, String, String) = {
-    val idx = uri.lastIndexOf(":")
-    val str = if (idx >= 0) {
-      uri.substring(idx + 1)
-    } else uri
-    (str.substring(0, 3), str.substring(3, 6), str.substring(6))
-  }
-
-  /** The object type
-    */
-  enum ObjectType {
-    case Blob, Tree, Commit, Tag
-
-    /** Get the canonical name for the Object Type
-      *
-      * @return
-      *   the canonical name for the object type
-      */
-    def gitoidName(): String = {
-      this match {
-        case Blob   => "blob"
-        case Tree   => "tree"
-        case Commit => "commit"
-        case Tag    => "tag"
-      }
+  def name: String = {
+    this match {
+      case Maven  => "maven"
+      case NPM    => "npm"
+      case Docker => "docker"
+      case Deb    => "deb"
+      case Gem    => "gem"
     }
-  }
-
-  /** The hash type
-    */
-  enum HashType {
-    case SHA1, SHA256
-
-    /** Based on the hash type, get the MessageDigest
-      *
-      * @return
-      *   the MessageDigest for the type
-      */
-    def getDigest(): MessageDigest = {
-      this match {
-        case SHA1   => MessageDigest.getInstance("SHA-1")
-        case SHA256 => MessageDigest.getInstance("SHA-256")
-      }
-    }
-
-    /** Get the canonical name for the hash type
-      *
-      * @return
-      *   the canonical name
-      */
-    def hashTypeName(): String = {
-      this match {
-        case SHA1   => "sha1"
-        case SHA256 => "sha256"
-      }
-    }
-  }
-
-  /** Given an object type, a pile of bytes, and a hash type, compute the GitOID
-    *
-    * @param hashType
-    *   the hash type
-    * @param type
-    *   the type of object
-    * @param bytes
-    *   the bytes to compute the gitoid for
-    * @return
-    *   the gitoid
-    */
-  def computeGitOID(
-      bytes: InputStream,
-      len: Long,
-      hashType: HashType = HashType.SHA256,
-      tpe: ObjectType = ObjectType.Blob
-  ): Array[Byte] = {
-    // get the prefix bytes in local encoding... which should be okay given that
-    // the string should be ASCII
-    val prefix =
-      String.format("%s %d\u0000", tpe.gitoidName(), len).getBytes();
-    val md = hashType.getDigest();
-    md.update(prefix);
-
-    val buf = new Array[Byte](4096)
-    var keepRunning = true
-    while (keepRunning) {
-      val read = bytes.read(buf)
-      if (read <= 0) {
-        bytes.close()
-        keepRunning = false
-      } else {
-        md.update(buf, 0, read)
-      }
-    }
-
-    md.digest()
-  }
-
-  /** Take bytes, compute the GitOID and return the hexadecimal bytes
-    * representing the GitOID
-    *
-    * @param bytes
-    *   the bytes to compute gitoid for
-    * @param hashType
-    *   the hash type... default SHA256
-    * @param tpe
-    *   the object type... default Blob
-    * @return
-    *   the hex representation of the GitOID
-    */
-  def hashAsHex(
-      bytes: InputStream,
-      len: Long,
-      hashType: HashType = HashType.SHA256,
-      tpe: ObjectType = ObjectType.Blob
-  ): String = {
-    Helpers.toHex(
-      computeGitOID(bytes, len, hashType, tpe)
-    )
-  }
-
-  /** A `gitoid` URL. See
-    * https://www.iana.org/assignments/uri-schemes/prov/gitoid
-    *
-    * @return
-    *   the `gitoid` URL
-    */
-  def url(
-      inputStream: InputStream,
-      len: Long,
-      hashType: HashType,
-      tpe: ObjectType = ObjectType.Blob,
-      swhid: Boolean
-  ): String = {
-    if (swhid) {
-      String.format(
-        "swh:1:cnt:%s",
-        hashAsHex(inputStream, len, HashType.SHA1, ObjectType.Blob)
-      );
-    } else {
-      String.format(
-        "gitoid:%s:%s:%s",
-        tpe.gitoidName(),
-        hashType.hashTypeName(),
-        hashAsHex(inputStream, len, hashType, tpe)
-      );
-    }
-  }
-
-  def computeAllHashes(
-      theFile: ArtifactWrapper,
-      continue_? : String => Boolean
-  ): (String, Vector[String]) = {
-    def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256, swhid = false)
-
-    if (continue_?(gitoidSha256)) {
-      (
-        gitoidSha256,
-        Vector(
-          url(is(), theFile.size(), HashType.SHA1, swhid = false),
-          url(is(), theFile.size(), HashType.SHA1, swhid = true),
-          String
-            .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is())))
-            .intern(),
-          String
-            .format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is())))
-            .intern(),
-          String
-            .format("md5:%s", Helpers.toHex(Helpers.computeMD5(is())))
-            .intern()
-        )
-      )
-    } else (gitoidSha256, Vector())
   }
 }
 
-// enum PackageProtocol {
-//   case Maven, NPM, Docker, Deb, Gem
+object PackageIdentifier {
+  // def computePurl(f: File): Option[PackageIdentifier] = {
+  //   val name = f.getName()
 
-//   def name: String = {
-//     this match {
-//       case Maven  => "maven"
-//       case NPM    => "npm"
-//       case Docker => "docker"
-//       case Deb    => "deb"
-//       case Gem    => "gem"
-//     }
-//   }
-// }
+  //   if (name.endsWith(".deb")) {
+  //     var lines: Vector[String] = Vector()
+  //     FileWalker.processFileAndSubfiles(
+  //       FileWrapper(f, false),
+  //       f.getName(),
+  //       None,
+  //       42,
+  //       true,
+  //       (wrapper, name, thing, _) => {
+  //         import scala.jdk.CollectionConverters.*
+  //         if (name == "./control") { // todo - ensure we support multiline stuff in control, per spec
+  //           val lr = BufferedReader(InputStreamReader(wrapper.asStream()))
+  //           lines = lr.lines().iterator().asScala.toVector
+  //           ("na", false, Some(FileAction.End), 42)
+  //         } else if (name.startsWith("data.tar")) {
+  //           ("na", false, Some(FileAction.SkipDive), 42)
+  //         } else
+  //           ("na", false, None, 42)
+  //       }
+  //     )
+  //     val attrs = Map(lines.flatMap(s => {
+  //       s.split(":").toList match {
+  //         case a :: b :: _ => Vector((a.trim().toLowerCase(), b.trim()))
+  //         case _           => Vector()
+  //       }
+  //     }): _*)
 
-// object PackageIdentifier {
-//   def computePurl(f: File): Option[PackageIdentifier] = {
-//     val name = f.getName()
+  //     val pkg = attrs.get("package")
+  //     val version = attrs.get("version")
+  //     val arch = attrs.get("architecture")
 
-//     if (name.endsWith(".deb")) {
-//       var lines: Vector[String] = Vector()
-//       FileWalker.processFileAndSubfiles(
-//         FileWrapper(f, false),
-//         f.getName(),
-//         None,
-//         42,
-//         true,
-//         (wrapper, name, thing, _) => {
-//           import scala.jdk.CollectionConverters.*
-//           if (name == "./control") { // todo - ensure we support multiline stuff in control, per spec
-//             val lr = BufferedReader(InputStreamReader(wrapper.asStream()))
-//             lines = lr.lines().iterator().asScala.toVector
-//             ("na", false, Some(FileAction.End), 42)
-//           } else if (name.startsWith("data.tar")) {
-//             ("na", false, Some(FileAction.SkipDive), 42)
-//           } else
-//             ("na", false, None, 42)
-//         }
-//       )
-//       val attrs = Map(lines.flatMap(s => {
-//         s.split(":").toList match {
-//           case a :: b :: _ => Vector((a.trim().toLowerCase(), b.trim()))
-//           case _           => Vector()
-//         }
-//       }): _*)
+  //     (pkg, version) match {
+  //       case (Some(thePkg), Some(theVersion)) =>
+  //         Some(
+  //           PackageIdentifier(
+  //             protocol = PackageProtocol.Deb,
+  //             groupId =
+  //               if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
+  //               else "debian",
+  //             artifactId = thePkg,
+  //             version = theVersion,
+  //             arch = arch,
+  //             distro = None,
+  //             attrs.map((k, v) => k -> TreeSet(v))
+  //           )
+  //         )
+  //       case _ => {
 
-//       val pkg = attrs.get("package")
-//       val version = attrs.get("version")
-//       val arch = attrs.get("architecture")
+  //         val n2 = name.substring(0, name.length() - 4) // lop off the '.deb'
+  //         val slubs = n2.split("_").toList
+  //         slubs match {
+  //           case pkg :: version :: arch :: _ =>
+  //             Some(
+  //               PackageIdentifier(
+  //                 PackageProtocol.Deb,
+  //                 groupId =
+  //                   if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
+  //                   else "debian",
+  //                 artifactId = pkg,
+  //                 arch = Some(arch),
+  //                 distro = None,
+  //                 version = version,
+  //                 Map()
+  //               )
+  //             )
+  //           case _ => None
+  //         }
 
-//       (pkg, version) match {
-//         case (Some(thePkg), Some(theVersion)) =>
-//           Some(
-//             PackageIdentifier(
-//               protocol = PackageProtocol.Deb,
-//               groupId =
-//                 if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
-//                 else "debian",
-//               artifactId = thePkg,
-//               version = theVersion,
-//               arch = arch,
-//               distro = None,
-//               attrs.map((k, v) => k -> TreeSet(v))
-//             )
-//           )
-//         case _ => {
+  //       }
+  //     }
+  //   } else { None }
+  // }
+}
 
-//           val n2 = name.substring(0, name.length() - 4) // lop off the '.deb'
-//           val slubs = n2.split("_").toList
-//           slubs match {
-//             case pkg :: version :: arch :: _ =>
-//               Some(
-//                 PackageIdentifier(
-//                   PackageProtocol.Deb,
-//                   groupId =
-//                     if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
-//                     else "debian",
-//                   artifactId = pkg,
-//                   arch = Some(arch),
-//                   distro = None,
-//                   version = version,
-//                   Map()
-//                 )
-//               )
-//             case _ => None
-//           }
+case class PackageIdentifier(
+    protocol: PackageProtocol,
+    groupId: String,
+    artifactId: String,
+    version: String,
+    arch: Option[String],
+    distro: Option[String],
+    extra: Map[String, TreeSet[String]]
+) {
 
-//         }
-//       }
-//     } else { None }
-//   }
-// }
+  def toStringMap(): Map[String, TreeSet[String]] = {
+    val info = Vector(
+      "package_protocol" -> TreeSet(protocol.name),
+      "group_id" -> TreeSet(groupId),
+      "artifact_id" -> TreeSet(artifactId),
+      "version" -> TreeSet(version)
+    ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
+      d => "distro" -> TreeSet(d)
+    )
+    Map(info: _*) ++ this.extra
+  }
 
-// case class PackageIdentifier(
-//     protocol: PackageProtocol,
-//     groupId: String,
-//     artifactId: String,
-//     version: String,
-//     arch: Option[String],
-//     distro: Option[String],
-//     extra: Map[String, TreeSet[String]]
-// ) {
+  def purl(): Vector[String] = {
+    val ret: Vector[String] = protocol match {
+      case PackageProtocol.Deb =>
+        Vector(f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+            .encode(artifactId, "UTF-8")}@${URLEncoder
+            .encode(version, "UTF-8")}") ++
+          arch.toVector.map(arch =>
+            f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+                .encode(artifactId, "UTF-8")}@${URLEncoder
+                .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch, "UTF-8")}"
+          ) ++
+          distro.toVector.map(distro =>
+            f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+                .encode(artifactId, "UTF-8")}@${URLEncoder
+                .encode(version, "UTF-8")}?distro=${URLEncoder
+                .encode(distro, "UTF-8")}"
+          ) ++
+          arch.toVector.flatMap(arch =>
+            distro.toVector.map(distro =>
+              f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+                  .encode(artifactId, "UTF-8")}@${URLEncoder
+                  .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch, "UTF-8")}&distro=${URLEncoder
+                  .encode(distro, "UTF-8")}"
+            )
+          )
 
-//   def toStringMap(): Map[String, TreeSet[String]] = {
-//     val info = Vector(
-//       "package_protocol" -> TreeSet(protocol.name),
-//       "group_id" -> TreeSet(groupId),
-//       "artifact_id" -> TreeSet(artifactId),
-//       "version" -> TreeSet(version)
-//     ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
-//       d => "distro" -> TreeSet(d)
-//     )
-//     Map(info: _*) ++ this.extra
-//   }
+      case _ =>
+        Vector(f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
+            .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}")
+    }
+    ret
+  }
 
-//   def purl(): Vector[String] = {
-//     val ret: Vector[String] = protocol match {
-//       case PackageProtocol.Deb =>
-//         Vector(f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-//             .encode(artifactId, "UTF-8")}@${URLEncoder
-//             .encode(version, "UTF-8")}") ++
-//           arch.toVector.map(arch =>
-//             f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-//                 .encode(artifactId, "UTF-8")}@${URLEncoder
-//                 .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch, "UTF-8")}"
-//           ) ++
-//           distro.toVector.map(distro =>
-//             f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-//                 .encode(artifactId, "UTF-8")}@${URLEncoder
-//                 .encode(version, "UTF-8")}?distro=${URLEncoder
-//                 .encode(distro, "UTF-8")}"
-//           ) ++
-//           arch.toVector.flatMap(arch =>
-//             distro.toVector.map(distro =>
-//               f"pkg:deb/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-//                   .encode(artifactId, "UTF-8")}@${URLEncoder
-//                   .encode(version, "UTF-8")}?arch=${URLEncoder.encode(arch, "UTF-8")}&distro=${URLEncoder
-//                   .encode(distro, "UTF-8")}"
-//             )
-//           )
+  def getOSV(): Try[ujson.Value] = {
+    val body: Try[(Int, String)] = Try {
+      val purl = this.purl()
+      import sttp.client4.quick.*
+      import sttp.client4.Response
+      val response = quickRequest
+        .post(uri"https://api.osv.dev/v1/query")
+        .body(f"""{"package": {"purl": "${purl}"}}""")
+        .contentType("application/json")
+        .send()
 
-//       case _ =>
-//         Vector(f"pkg:${protocol.name}/${URLEncoder.encode(groupId, "UTF-8")}/${URLEncoder
-//             .encode(artifactId, "UTF-8")}@${URLEncoder.encode(version, "UTF-8")}")
-//     }
-//     ret
-//   }
+      (response.code.code, response.body)
+    }
 
-//   def getOSV(): Try[ujson.Value] = {
-//     val body: Try[(Int, String)] = Try {
-//       val purl = this.purl()
-//       import sttp.client4.quick.*
-//       import sttp.client4.Response
-//       val response = quickRequest
-//         .post(uri"https://api.osv.dev/v1/query")
-//         .body(f"""{"package": {"purl": "${purl}"}}""")
-//         .contentType("application/json")
-//         .send()
-
-//       (response.code.code, response.body)
-//     }
-
-//     body match {
-//       case Failure(exception) => Failure(exception)
-//       case Success((code, body)) if code / 100 == 2 && body.length() > 2 =>
-//         Try {
-//           ujson.read(body)
-//         }
-//       case Success((code, body)) =>
-//         Failure(new Exception(f"HTTP Response ${code}, body ${body}"))
-//     }
-//   }
-// }
+    body match {
+      case Failure(exception) => Failure(exception)
+      case Success((code, body)) if code / 100 == 2 && body.length() > 2 =>
+        Try {
+          ujson.read(body)
+        }
+      case Success((code, body)) =>
+        Failure(new Exception(f"HTTP Response ${code}, body ${body}"))
+    }
+  }
+}
 
 enum FileType {
   case ObjectFile(
@@ -1179,7 +996,10 @@ object FileType {
 
         ObjectFile(Some("classfile"), sourceGitOID)
       }
-      case s if s.equals("metadata") => MetaData(Some("metadata")) // ruby gem metadata file at toplevel (in metadata.gz)
+      case s if s.equals("metadata") =>
+        MetaData(
+          Some("metadata")
+        ) // ruby gem metadata file at toplevel (in metadata.gz)
       case s if s.endsWith(".o")     => ObjectFile(Some("o"), None)
       case s if s.endsWith(".dll")   => ObjectFile(Some("dll"), None)
       case s if s.endsWith(".java")  => SourceFile(Some("java"))
@@ -1189,4 +1009,40 @@ object FileType {
       case _                         => Other
     }
   }
+}
+
+case class PrefixedIterator[T](v: T, rest: Iterator[T]) extends Iterator[T] {
+  private var n: Option[T] = None
+  private var servedFirst = false
+
+  def hasNext: Boolean = if (!servedFirst) {
+    n = Some(v)
+    servedFirst = true
+    true
+  } else {
+    if (rest.hasNext) {
+      n = Some(rest.next())
+      true
+    } else {
+      n = None
+      false
+    }
+  }
+
+  /** Return the next element and advance the iterator.
+    *
+    * @throws NoSuchElementException
+    *   if there is no next element.
+    * @return
+    *   the next element.
+    * @note
+    *   Reuse: Advances the iterator, which may exhaust the elements. It is
+    *   valid to make additional calls on the iterator.
+    */
+  @throws[NoSuchElementException]
+  def next(): T = n match {
+    case Some(v) => v
+    case None    => throw new NoSuchElementException()
+  }
+
 }

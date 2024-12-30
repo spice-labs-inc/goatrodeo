@@ -5,6 +5,7 @@ import java.io.File
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.ByteArrayInputStream
+import goatrodeo.util.Helpers.artifactWrapper
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -24,31 +25,19 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def asStream(): BufferedInputStream
+  def asStream(): InputStream
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
     *
     * @return
     */
-  def name(): String
+  // def name(): String
 
   /** The number of bytes in the artifact. This is
     *
     * @return
     */
   def size(): Long
-
-  /** Corresponds to `File.isFile()`
-    *
-    * @return
-    */
-  //def isFile(): Boolean
-
-  /** Corresponds to `File.isDirectory()`
-    *
-    * @return
-    */
-  //def isDirectory(): Boolean
 
   /** Get all the `ArtifactWrappers` for the entities in a directory. This will
     * only return something if the ArtifactWrapper is a wrapper around `File`
@@ -59,14 +48,12 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def children(): FileWalker.ArchiveStream = FileWalker.streamForArchive(this).getOrElse(Seq.empty.asInstanceOf[FileWalker.ArchiveStream])
+  def children(): FileWalker.OptionalArchiveStream = FileWalker
+    .streamForArchive(this)
 
-  def getCanonicalPath(): String
-  // def getParentDirectory(): File
-  //def delete(): Boolean
+  def getPath(): String
 
-  /**
-    * The mime type of the artifact if it's a File
+  /** The mime type of the artifact if it's a File
     *
     * @return
     */
@@ -80,7 +67,11 @@ sealed trait ArtifactWrapper {
     */
   def exists(): Boolean
 
-  lazy val suffix = ArtifactWrapper.suffix(name())
+  /** If the ArtifactWrapper is a temporarily created file, deleted it
+    */
+  def cleanUp(): Unit
+
+  // lazy val suffix = ArtifactWrapper.suffix(name())
 }
 
 object ArtifactWrapper {
@@ -96,10 +87,55 @@ object ArtifactWrapper {
     val lastDot = name.lastIndexOf(".")
     if (lastDot >= 0) Some(name.substring(lastDot)) else None
   }
+
+  /** Get the mime type for a `File`
+    *
+    * @param f
+    *   File
+    * @return
+    *   mime type
+    */
+  def mimeType(f: File): String = {
+    Helpers.mimeTypeFor(new BufferedInputStream(new FileInputStream(f)), f.getName())
+  }
+
+  /** Get the mime type for an array of bytes
+    *
+    * @param b
+    *   the `Array[Byte]`
+    * @param name
+    *   the name
+    * @return
+    *   mime type
+    */
+  def mimeType(b: Array[Byte], name: String): String = {
+    Helpers.mimeTypeFor(new ByteArrayInputStream(b), name)
+  }
 }
 
-final case class FileWrapper(f: File, mimeType: String, deleteOnFinalize: Boolean)
-    extends ArtifactWrapper {
+object FileWrapper {
+
+  /** Create a file wrapper from a `File` instance
+    *
+    * @param f
+    *   the file
+    * @return
+    *   the FileWrapper
+    */
+  def from(f: File): FileWrapper =
+    FileWrapper(f, ArtifactWrapper.mimeType(f), false)
+
+  def fromTemp(f: File): FileWrapper =
+    FileWrapper(f, ArtifactWrapper.mimeType(f), true)
+}
+
+final case class FileWrapper(
+    f: File,
+    mimeType: String,
+    deleteOnFinalize: Boolean
+) extends ArtifactWrapper {
+
+  override def getPath(): String = f.getPath()
 
   override protected def finalize(): Unit = {
     if (deleteOnFinalize) {
@@ -107,52 +143,39 @@ final case class FileWrapper(f: File, mimeType: String, deleteOnFinalize: Boolea
     }
   }
 
+  def cleanUp(): Unit = if (deleteOnFinalize) f.delete()
+
   def exists(): Boolean = f.exists()
 
-  //override def delete(): Boolean = f.delete()
-
- // override def isFile(): Boolean = f.isFile()
-
-  // def listFiles(): Iterator[ArtifactWrapper] =
-  //   f.listFiles().iterator.map(FileWrapper(_, false))
-
-  //override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
-
-  override def getCanonicalPath(): String = f.getCanonicalPath()
-
-  // override def asFile(): (File, Boolean) = (f, false)
-
-  //def isDirectory(): Boolean = f.isDirectory()
-
-  override def asStream(): BufferedInputStream = BufferedInputStream(FileInputStream(f))
-
-  override def name(): String = f.getName()
+  override def asStream(): BufferedInputStream = BufferedInputStream(
+    FileInputStream(f)
+  )
 
   override def size(): Long = f.length()
 
-
 }
 
-final case class ByteWrapper(bytes: Array[Byte], mimeType: String, path: String, fileName: String)
-    extends ArtifactWrapper {
+final case class ByteWrapper(
+    bytes: Array[Byte],
+    mimeType: String,
+    fileName: String
+) extends ArtifactWrapper {
 
-  def exists(): Boolean = true
+  override def getPath(): String = fileName
 
-  //override def delete(): Boolean = true
+  override def exists(): Boolean = true
 
-  def isFile(): Boolean = true
+  private lazy val nameAsFile = new File(fileName)
 
-  def listFiles(): Iterator[ArtifactWrapper] = Iterator.empty
+  // override def getParentDirectory(): File = File("/")
 
-  //override def getParentDirectory(): File = File("/")
+  override def asStream(): BufferedInputStream = new BufferedInputStream(
+    ByteArrayInputStream(bytes)
+  )
 
-  override def getCanonicalPath(): String = f"/${fileName}"
-
-  def isDirectory(): Boolean = false
-
-  override def asStream(): BufferedInputStream = new BufferedInputStream(ByteArrayInputStream(bytes))
-
-  override def name(): String = fileName
+  /// override def name(): String = nameAsFile.getName()
 
   override def size(): Long = bytes.length
+
+  def cleanUp(): Unit = {}
 }

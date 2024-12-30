@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.util.GitOID
+import goatrodeo.util.{GitOID, PackageIdentifier}
 import goatrodeo.util.Helpers
 import scala.util.Try
 import io.bullet.borer.Json
@@ -25,7 +25,6 @@ import io.bullet.borer.Cbor
 import io.bullet.borer.derivation.key
 import java.time.Instant
 import goatrodeo.util.FileType
-import goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
 import goatrodeo.util.Helpers.filesForParent
 import scala.collection.immutable.TreeMap

@@ -16,6 +16,7 @@ import com.typesafe.scalalogging.Logger
 import goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
 
 import java.io.File
+import goatrodeo.util.FileWalker.ArchiveStream
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -27,23 +28,26 @@ class ISOFileSuite extends munit.FunSuite {
     // but this test is giving me a "Negative Seek Offset" error…
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/iso_tests/iso_of_archives.iso"), false))
+        .streamForArchive(
+          FileWrapper.from(File("test_data/iso_tests/iso_of_archives.iso"))
+        )
         .isDefined
     )
   }
   test("Walk an ISO file") {
     var cnt = 0
-    val (inputStream, _) =
+    val ArchiveStream(inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/iso_tests/iso_of_archives.iso"), false))
+        .streamForArchive(
+          FileWrapper.from(File("test_data/iso_tests/iso_of_archives.iso"))
+        )
         .get
     for {
       e <- inputStream
-      (name, file) = e()
+      file = e()
     } {
-      logger.debug(s"name: $name file: $file")
       cnt += 1
-      file.delete()
+      file.cleanUp()
     }
 
     assert(cnt == 9)
@@ -51,22 +55,20 @@ class ISOFileSuite extends munit.FunSuite {
   }
 
   test("deal with nesting archives inside an ISO") {
-    val nested = FileWrapper(File("test_data/iso_tests/iso_of_archives.iso"), false)
-    assert(nested.isFile() && nested.exists())
+    val nested =
+      FileWrapper.from(File("test_data/iso_tests/iso_of_archives.iso"))
 
     var cnt = 0
 
     FileWalker.processFileAndSubfiles(
       nested,
-      "nested",
       None,
       Vector[String](),
       false,
-      (file, name, parent, x) => {
-        logger.trace(s" name: $name parent: $parent x: $x")
+      (file, parent, x) => {
+        logger.trace(s" name: ${file.getPath()} parent: $parent x: $x")
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        // println(f"hash for ${name} is ${main} parent ${parent}")
         (main, false, None, x)
       }
     )

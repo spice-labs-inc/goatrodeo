@@ -11,7 +11,7 @@ import java.io.FileWriter
 import goatrodeo.strategies.Strategy
 import goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
 import goatrodeo.util.FileType
-
+import goatrodeo.util.PackageIdentifier
 import scala.collection.immutable.TreeSet
 import scala.collection.immutable.TreeSet
 import goatrodeo.util.ArtifactWrapper
@@ -131,11 +131,11 @@ object BuildGraph {
       None,
       Vector(),
       dontSkipFound,
-      (file, name, parent, lastParentStack) => {
+      (file, parent, lastParentStack) => {
         // Compute the gitoid-sha256 (main) and other hash aliases for the item
-        val (mainFileGitOID, foundAliases) =
-          GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
+        val (mainFileGitOID, foundAliases) =   GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
 
+        val name = file.getPath()
         val parentStack = lastParentStack :+ FileAndGitoid(name, mainFileGitOID)
         if (parent.isEmpty) {
           rootGitoid = mainFileGitOID
@@ -147,7 +147,7 @@ object BuildGraph {
               _ +
                 (if (
                    name.endsWith("?packaging=sources") ||
-                   file.name().indexOf("-sources.") >= 0 ||
+                   file.getPath().indexOf("-sources.") >= 0 ||
                    name.indexOf("-sources.") >= 0
                  ) { "?packaging=sources" }
                  else { "" })
@@ -157,17 +157,17 @@ object BuildGraph {
         packageIds.foreach(pid => purlOut.write(f"${pid}\n"))
         val aliases = foundAliases ++ packageIds
 
-        val fileType = FileType.theType(name, Some(file), associatedFiles)
+        val fileType = file.mimeType
 
-        logger.trace(s"File Name: $name Type: $fileType")
+        logger.trace(f"File Name: ${name} Type: ${fileType}")
 
-        val computedConnections: TreeSet[Edge] =
-          // built from a source file
-          (fileType.sourceGitOid() match {
-            case None => TreeSet[Edge]()
-            case Some(source) =>
-              TreeSet[Edge]((EdgeType.BuiltFrom, source))
-          })
+        val computedConnections: TreeSet[Edge] = TreeSet.empty
+          // built from a source file FIXME
+          // (fileType.sourceGitOid() match {
+          //   case None => TreeSet[Edge]()
+          //   case Some(source) =>
+          //     TreeSet[Edge]((EdgeType.BuiltFrom, source))
+          // })
           ++
           // include parent back-reference
           (parent match {

@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.6.1-SNAPSHOT"
+val projectVersion = "0.7.0-SNAPSHOT"
 val scala3Version = "3.3.3"
 val luceneVersion = "4.3.0"
 
@@ -153,7 +153,7 @@ Test / testOptions += Tests.Setup(() => {
       throw new MessageOnlyException(err)
     }
   } catch {
-    case e => throw e
+    case e: Throwable => throw e
   }
 })
 

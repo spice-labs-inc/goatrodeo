@@ -17,6 +17,8 @@ import goatrodeo.omnibor.{BuildGraph, EdgeType, MemStorage}
 import goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
 
 import java.io.{BufferedWriter, File, FileWriter}
+import goatrodeo.util.ArtifactWrapper
+import goatrodeo.util.FileWalker.ArchiveStream
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -26,23 +28,31 @@ class GemFileSuite extends munit.FunSuite {
   test("Simple file format parsing to ArtifactWrapper") {
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/gem_tests/java-properties-0.3.0.gem"), false))
+        .streamForArchive(
+          FileWrapper.from(
+            File("test_data/gem_tests/java-properties-0.3.0.gem")
+          )
+        )
         .isDefined
     )
   }
   test("Walk a Gem file") {
     var cnt = 0
-    val (inputStream, _) =
+    val ArchiveStream(inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/gem_tests/java-properties-0.3.0.gem"), false))
+        .streamForArchive(
+          FileWrapper.from(
+            File("test_data/gem_tests/java-properties-0.3.0.gem")
+          )
+        )
         .get
     for {
       e <- inputStream
-      (name, file) = e()
+      file = e()
     } {
-      logger.trace(s"name: $name file: $file")
+      logger.trace(s"name: ${file.getPath()} file: $file")
       cnt += 1
-      file.delete()
+      file.cleanUp()
     }
 
     assert(cnt == 3)
@@ -50,22 +60,21 @@ class GemFileSuite extends munit.FunSuite {
   }
 
   test("deal with nesting archives inside a Gem") {
-    val nested = FileWrapper(File("test_data/gem_tests/java-properties-0.3.0.gem"), false)
-    assert(nested.isFile() && nested.exists())
+    val nested =
+      FileWrapper.from(File("test_data/gem_tests/java-properties-0.3.0.gem"))
 
     var cnt = 0
 
     FileWalker.processFileAndSubfiles(
       nested,
-      "nested",
       None,
       Vector[String](),
       false,
-      (file, name, parent, x) => {
-        logger.trace(s" name: $name parent: $parent x: $x")
+      (file, parent, x) => {
+        logger.trace(s" name: ${file.getPath()} parent: $parent x: $x")
         cnt += 1
         val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        logger.trace(f"hash for ${name} is ${main} parent ${parent}")
+        logger.trace(f"hash for ${file.getPath()} is ${main} parent ${parent}")
         (main, false, None, x)
       }
     )
@@ -74,10 +83,9 @@ class GemFileSuite extends munit.FunSuite {
 
   test("Build a graph") {
     val store = MemStorage.getStorage(None)
-    val nested = File("test_data/gem_tests/java-properties-0.3.0.gem")
+    val nested = FileWrapper.from(File("test_data/gem_tests/java-properties-0.3.0.gem"))
     val built = BuildGraph.buildItemsFor(
       nested,
-      nested.getName(),
       store,
       Vector(),
       None,
@@ -90,33 +98,6 @@ class GemFileSuite extends munit.FunSuite {
       false
     )
 
-//    assert(built.nameToGitOID.size > 1200, f"Expection more than 1,200 items, got ${built.nameToGitOID.size}")
-//    assert(store.size() > 2200)
-//    val keys = store.keys()
-//    assert(!keys.filter(_.startsWith("sha256:")).isEmpty)
-//    assert(!keys.filter(_.startsWith("md5:")).isEmpty)
-//    assert(!keys.filter(_.startsWith("sha1:")).isEmpty)
-//    assert(keys.filter(_.startsWith("floof:")).isEmpty)
-//    val topAlias = store
-//      .read(
-//        "sha256:82ceabe5192a5c3803f8b73536e83cd59e219fb560d8ed9e0c165728b199c0d7"
-//      )
-//      .get
-//    val gitoid = topAlias.connections.head._2
-//    assert(gitoid.startsWith("gitoid:"))
-//    val top = store.read(gitoid).get
-//    store.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
-//    for { edge <- top.connections if edge._1 == EdgeType.Contains } {
-//      val contained = store.read(edge._2).get
-//    }
-//
-//    val log4j = store
-//      .read(
-//        "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
-//      )
-//      .get
-//    assert(
-//      log4j.connections.filter(_._1 == EdgeType.Contains).size > 1200
-//    )
+
   }
 }
