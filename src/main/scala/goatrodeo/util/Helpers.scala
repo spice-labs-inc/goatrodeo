@@ -37,7 +37,7 @@ import scala.util.Failure
 import scala.util.Success
 import org.apache.bcel.classfile.ClassParser
 import io.bullet.borer.Cbor
-
+import goatrodeo.omnibor.StringOrPair
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.ArchiveInputStream
@@ -809,17 +809,17 @@ case class PackageIdentifier(
     version: String,
     arch: Option[String],
     distro: Option[String],
-    extra: Map[String, TreeSet[String]]
+    extra: TreeMap[String, TreeSet[StringOrPair]]
 ) {
 
-  def toStringMap(): Map[String, TreeSet[String]] = {
-    val info = Vector(
-      "package_protocol" -> TreeSet(protocol.name),
+  def toStringMap(): Map[String, TreeSet[StringOrPair]] = {
+    val info = Vector[(String, TreeSet[StringOrPair])](
+      "package_protocol" -> TreeSet[StringOrPair](protocol.name),
       "group_id" -> TreeSet(groupId),
       "artifact_id" -> TreeSet(artifactId),
       "version" -> TreeSet(version)
-    ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
-      d => "distro" -> TreeSet(d)
+    ) ++ arch.toVector.map(a => "arch" -> TreeSet[StringOrPair](a)) ++ distro.toVector.map(
+      d => "distro" -> TreeSet[StringOrPair](d)
     )
     Map(info: _*) ++ this.extra
   }

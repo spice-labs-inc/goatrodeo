@@ -39,6 +39,7 @@ import java.io.OutputStreamWriter
 import goatrodeo.util.FileWalker
 import goatrodeo.util.FileWrapper
 import goatrodeo.util.FileWalker.ArchiveStream
+import scala.collection.immutable.TreeMap
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -435,7 +436,7 @@ class MySuite extends munit.FunSuite {
               "32",
               None,
               None,
-              Map()
+              TreeMap()
             )
           ),
           Vector(), {

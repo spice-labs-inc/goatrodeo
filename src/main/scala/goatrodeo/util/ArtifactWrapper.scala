@@ -6,6 +6,7 @@ import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.ByteArrayInputStream
 import goatrodeo.util.Helpers.artifactWrapper
+import java.util.UUID
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -18,7 +19,7 @@ import goatrodeo.util.Helpers.artifactWrapper
   * Those byte streams may be in-memory or they may be on disk.
   */
 sealed trait ArtifactWrapper {
-
+  val uuid: String = UUID.randomUUID().toString()
   /** Convert the Artifact to a stream of bytes. Note that this is mostly used
     * for Hashing which is a block operation. No need for any buffering because
     * all the operations will be pulling large blocks of bytes.
@@ -135,6 +136,10 @@ final case class FileWrapper(
     deleteOnFinalize: Boolean
 ) extends ArtifactWrapper {
 
+  override def equals(other: Any): Boolean = other match {
+    case af: ArtifactWrapper => af.uuid == this.uuid
+    case _ => false
+  }
   override def getPath(): String = f.getPath()
 
   override protected def finalize(): Unit = {
@@ -160,7 +165,11 @@ final case class ByteWrapper(
     mimeType: String,
     fileName: String
 ) extends ArtifactWrapper {
-
+  override def equals(other: Any): Boolean = other match {
+    case af: ArtifactWrapper => af.uuid == this.uuid
+    case _ => false
+  }
+  
   override def getPath(): String = fileName
 
   override def exists(): Boolean = true

@@ -58,11 +58,68 @@ object EdgeType {
 
 type Edge = (EdgeType, String)
 
+sealed trait StringOrPair {}
+
+
+final case class StringOf(s: String) extends StringOrPair {}
+
+object StringOf {
+  given Encoder[StringOf] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveEncoder[StringOf]
+  }
+
+  given Decoder[StringOf] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveDecoder[StringOf]
+  }
+}
+
+final case class PairOf(s1: String, s2: String) extends StringOrPair {}
+
+object PairOf {
+  given Encoder[PairOf] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveEncoder[PairOf]
+  }
+
+  given Decoder[PairOf] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveDecoder[PairOf]
+  }
+}
+
+object StringOrPair {
+  implicit def fromString(s: String): StringOrPair = StringOf(s)
+  implicit def fromPair(p: (String, String)): StringOrPair = PairOf(p._1, p._2)
+
+  implicit def yak[StringOrPair]: Ordering[StringOrPair] = {
+    val ord: Ordering[String] = implicitly
+    Ordering.by[StringOrPair, String](e =>
+      e match {
+        case StringOf(s) => s
+        case PairOf(s1, s2)   => f"${s1}${s2}"
+      }
+    )(ord)
+  }
+
+  given Encoder[StringOrPair] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveEncoder[StringOrPair]
+  }
+
+  given Decoder[StringOrPair] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveDecoder[StringOrPair]
+  }
+}
+
+
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
     @key("file_size") fileSize: Long,
-    extra: TreeMap[String, TreeSet[String]]
+    extra: TreeMap[String, TreeSet[StringOrPair]]
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
@@ -102,7 +159,9 @@ object ItemMetaData {
           fileNames = TreeSet(fileName),
           mimeType = TreeSet(mimeType),
           fileSize = fileSize,
-          extra = TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
+          extra = TreeMap[String, TreeSet[StringOrPair]](
+            "purl" -> TreeSet(pid.purl().map(a => StringOf(a)): _*)
+          ) ++
             pid.toStringMap()
         )
       case None =>

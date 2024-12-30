@@ -71,3 +71,17 @@ consumption/processing by separate threads.
 ## Processing each `GoatRodeoStrategy`
 
 The Strategies will be put on a queue... and pulled off by separate processing threads.
+
+FIXME -- stuff
+
+## Core functions of Goat Rodeo
+
+Goat Rodeo builds ADGs based on looking at collections of Artifacts.
+
+In addition to the hashes and the relationships, Goat Rodeo also finds/stores:
+
+* Metadata about each collection of files. For example, an RPM or a Debian package contains metadata which is
+  extracted and stored in the `extra` field of `ItemMetaData`
+* There are associations between files. For example the `.java` file that was compiled into a `.class` file will
+  be linked to the class file and vice versa.
+* Package URLs ([pURLs](https://github.com/package-url/purl-spec)) are computed for packages
