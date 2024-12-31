@@ -59,70 +59,60 @@ object EdgeType {
 type Edge = (EdgeType, String)
 
 sealed trait StringOrPair {}
-
-
 final case class StringOf(s: String) extends StringOrPair {}
-
-object StringOf {
-  given Encoder[StringOf] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveEncoder[StringOf]
-  }
-
-  given Decoder[StringOf] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveDecoder[StringOf]
-  }
-}
-
 final case class PairOf(s1: String, s2: String) extends StringOrPair {}
-
-object PairOf {
-  given Encoder[PairOf] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveEncoder[PairOf]
-  }
-
-  given Decoder[PairOf] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveDecoder[PairOf]
-  }
-}
 
 object StringOrPair {
   implicit def fromString(s: String): StringOrPair = StringOf(s)
   implicit def fromPair(p: (String, String)): StringOrPair = PairOf(p._1, p._2)
 
-  implicit def yak[StringOrPair]: Ordering[StringOrPair] = {
-    val ord: Ordering[String] = implicitly
+  given Ordering[StringOrPair] = {
     Ordering.by[StringOrPair, String](e =>
       e match {
-        case StringOf(s) => s
-        case PairOf(s1, s2)   => f"${s1}${s2}"
+        case StringOf(s)    => s
+        case PairOf(s1, s2) => f"${s1}${s2}"
       }
-    )(ord)
+    )
   }
 
-  given Encoder[StringOrPair] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveEncoder[StringOrPair]
+  given Encoder[StringOrPair] = { (writer, item) =>
+    item match {
+      case StringOf(s) => writer.writeString(s)
+      case PairOf(a, b) =>
+        writer
+          .writeArrayOpen(2)
+          .writeString(a)
+          .writeString(b)
+          .writeArrayClose()
+    }
+
   }
 
-  given Decoder[StringOrPair] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveDecoder[StringOrPair]
+  given Decoder[StringOrPair] = Decoder { reader =>
+    if (reader.hasArrayStart) {
+      val unbounded = reader.readArrayOpen(2)
+      val item = PairOf(
+        reader.readString(),
+        reader.readString()
+      )
+      reader.readArrayClose(unbounded, item)
+    } else if (reader.hasString) {
+      StringOf(reader.readString())
+    } else {
+      reader.unexpectedDataItem("Looking for 'String' or Array of String")
+    }
+
   }
 }
-
 
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
-    @key("file_size") fileSize: Long,
+    @key("file_size") fileSize: Option[Long],
     extra: TreeMap[String, TreeSet[StringOrPair]]
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
-
+  def encodeJSON(): String = Json.encode(this).toUtf8String
   def merge(other: ItemMetaData): ItemMetaData = {
     ItemMetaData(
       fileNames = this.fileNames ++ other.fileNames,
@@ -149,7 +139,7 @@ object ItemMetaData {
       fileName: String,
       mimeType: String,
       packageIdentifier: Option[PackageIdentifier],
-      fileSize: Long
+      fileSize: Option[Long]
   ): ItemMetaData = {
     packageIdentifier match {
       case Some(
@@ -174,13 +164,24 @@ object ItemMetaData {
     }
 
   }
+
+  def fromCBOR(in: Array[Byte]): Try[ItemMetaData] = {
+    Cbor.decode(in).to[ItemMetaData].valueTry
+  }
+
+  def fromJSON(in: String): Try[ItemMetaData] = {
+    Json.decode(in.getBytes("utf-8")).to[ItemMetaData].valueTry
+  }
+
   given Encoder[ItemMetaData] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
+    import io.bullet.borer.NullOptions.given
     deriveEncoder[ItemMetaData]
   }
 
   given Decoder[ItemMetaData] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
+    import io.bullet.borer.NullOptions.given
     deriveDecoder[ItemMetaData]
   }
 }

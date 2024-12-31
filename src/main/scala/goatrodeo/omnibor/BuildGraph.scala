@@ -153,7 +153,7 @@ object BuildGraph {
               name,
               fileType,
               if (parent.isEmpty) topPackageIdentifier else None,
-              fileSize = file.size(),
+              fileSize = Some(file.size()),
             )
           ),
           mergedFrom = TreeSet(),

@@ -40,6 +40,9 @@ import goatrodeo.util.FileWalker
 import goatrodeo.util.FileWrapper
 import goatrodeo.util.FileWalker.ArchiveStream
 import scala.collection.immutable.TreeMap
+import goatrodeo.omnibor.ItemMetaData
+import scala.collection.immutable.TreeSet
+import scala.util.Success
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -394,7 +397,7 @@ class MySuite extends munit.FunSuite {
     val fromSource = for {
       i <- items; c <- i.connections if c._1 == EdgeType.BuildsTo
     } yield c
-   // FIXME do after we recreate the edge types assert(sourceRef.length > 100)
+    // FIXME do after we recreate the edge types assert(sourceRef.length > 100)
 
     assert(fromSource.length == sourceRef.length)
 
@@ -402,7 +405,7 @@ class MySuite extends munit.FunSuite {
     val withPurl =
       items.filter(i => i.connections.filter(_._2.startsWith("pkg:")).size > 0)
 
-   // FIXME do after we recruite pURL assert(withPurl.length == 4)
+    // FIXME do after we recruite pURL assert(withPurl.length == 4)
 
     val withPurlSources = withPurl.filter(i =>
       i.connections.filter(_._2.endsWith("?packaging=sources")).size > 0
@@ -456,6 +459,24 @@ class MySuite extends munit.FunSuite {
       }
 
     }
+  }
+
+  test("Encode JSON") {
+    val it = ItemMetaData(
+      TreeSet("foo", "bar"),
+      mimeType = TreeSet("dog/cat", "moose/squirl"),
+      Some(33),
+      extra = TreeMap("foo" -> TreeSet("bar", ("fii" -> "me")), "woof" -> TreeSet("1", "2"))
+
+    )
+
+    val it2 = it.copy(fileSize = None)
+    println(it.encodeJSON())
+    println(it2.encodeJSON())
+
+    val roundIt = ItemMetaData.fromJSON(it.encodeJSON())
+    assertEquals(roundIt, Success(it), "Should round trip")
+    assertEquals(ItemMetaData.fromJSON(it2.encodeJSON()), Success(it2), "Should round trip")
   }
 
   test("Build lots of JARs") {
