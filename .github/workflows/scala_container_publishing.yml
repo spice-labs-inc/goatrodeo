@@ -50,6 +50,8 @@ jobs:
             java-version: '21'
             distribution: 'adopt-hotspot'
             cache: 'sbt'
+        - name: Set up sbt
+          uses: sbt/setup-sbt@v1
         - name: Declare some variables
           shell: bash
           run: |
