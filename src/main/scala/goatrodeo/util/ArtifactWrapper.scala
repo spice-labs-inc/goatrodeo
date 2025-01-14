@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.util
 
+import io.spicelabs.goatrodeo.util.filetypes
+import io.spicelabs.goatrodeo.util.filetypes._
 import java.io.InputStream
 import java.io.File
 import java.io.BufferedInputStream
@@ -73,7 +75,9 @@ sealed trait ArtifactWrapper {
     */
   def exists(): Boolean
 
+
   lazy val suffix = ArtifactWrapper.suffix(name())
+
 }
 
 object ArtifactWrapper {
@@ -93,6 +97,8 @@ object ArtifactWrapper {
 
 final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
     extends ArtifactWrapper {
+
+  MIMETypeMappings.detectMIMEType(f)
 
   override protected def finalize(): Unit = {
     if (deleteOnFinalize) {
@@ -129,6 +135,8 @@ final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
 final case class ByteWrapper(bytes: Array[Byte], fileName: String)
     extends ArtifactWrapper {
 
+  MIMETypeMappings.detectMIMEType(bytes, fileName)
+
   def exists(): Boolean = true
 
   override def delete(): Boolean = true
@@ -148,4 +156,5 @@ final case class ByteWrapper(bytes: Array[Byte], fileName: String)
   override def name(): String = fileName
 
   override def size(): Long = bytes.length
+
 }
