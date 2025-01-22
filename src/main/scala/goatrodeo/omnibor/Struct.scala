@@ -30,33 +30,47 @@ import goatrodeo.util.Helpers.filesForParent
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-enum EdgeType extends Comparable[EdgeType] {
-  case AliasTo
-  case AliasFrom
-  case Contains
-  case ContainedBy
-  case BuildsTo
-  case BuiltFrom
+// enum EdgeType extends Comparable[EdgeType] {
+//   case AliasTo
+//   case AliasFrom
+//   case Contains
+//   case ContainedBy
+//   case BuildsTo
+//   case BuiltFrom
 
-  override def compareTo(other: EdgeType): Int =
-    this.toString().compareTo(other.toString())
+//   override def compareTo(other: EdgeType): Int =
+//     this.toString().compareTo(other.toString())
 
-  def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
-}
+//   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
+// }
+
+// object EdgeType {
+//   given Encoder[EdgeType] = {
+//     import io.bullet.borer.derivation.MapBasedCodecs.*
+//     deriveEncoder[EdgeType]
+//   }
+
+//   given Decoder[EdgeType] = {
+//     import io.bullet.borer.derivation.MapBasedCodecs.*
+//     deriveDecoder[EdgeType]
+//   }
+// }
 
 object EdgeType {
-  given Encoder[EdgeType] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveEncoder[EdgeType]
-  }
+  val toRight = ":->"
+  val fromLeft = ":<-"
+  val containsDown = ":\\/"
+  val containedByUp = ":^"
 
-  given Decoder[EdgeType] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveDecoder[EdgeType]
-  }
+  val ContainedBy = "ContainedBy:^"
+  val Contains = "Contains:\\/"
+  val AliasTo = "AliasTo:->"
+  val AliasFrom = "AliasFrom:<-"
+  val BuiltFrom = "BuiltFrom:\\/"
+  val BuildsTo = "BuildsTo:^"
 }
 
-type Edge = (EdgeType, String)
+type Edge = (String, String)
 
 sealed trait StringOrPair {}
 final case class StringOf(s: String) extends StringOrPair {}
@@ -192,7 +206,8 @@ case class Item(
     identifier: String,
     reference: LocationReference,
     connections: TreeSet[Edge],
-    metadata: Option[ItemMetaData],
+    @key("body_mime_type") bodyMimeType: Option[String],
+    body: Option[ItemMetaData],
     @key("merged_from") mergedFrom: TreeSet[LocationReference]
 ) {
 
@@ -229,7 +244,8 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
-                  metadata = None,
+                  bodyMimeType = None,
+                  body = None,
                   mergedFrom = TreeSet()
                 )
               )
@@ -255,7 +271,8 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
-                  metadata = None,
+                  bodyMimeType = None,
+                  body = None,
                   mergedFrom = TreeSet()
                 )
               )
@@ -281,7 +298,8 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
-                  metadata = None,
+                  bodyMimeType = None,
+                  body = None,
                   mergedFrom = TreeSet()
                 )
               )
@@ -305,16 +323,20 @@ case class Item(
   }
 
   def merge(other: Item): Item = {
+
+    val (body, mimeType) = (this.body, other.body, this.bodyMimeType == other.bodyMimeType) match {
+        case (Some(a), Some(b), true) => Some(a.merge(b)) -> this.bodyMimeType
+        case (Some(a), _, _)       => Some(a) -> this.bodyMimeType
+        case (_, Some(b), _)       => Some(b) -> other.bodyMimeType
+        case _                  => None -> None
+      }
+
     Item(
       identifier = this.identifier,
       reference = this.reference,
       connections = this.connections ++ other.connections,
-      metadata = (this.metadata, other.metadata) match {
-        case (Some(a), Some(b)) => Some(a.merge(b))
-        case (Some(a), _)       => Some(a)
-        case (_, Some(b))       => Some(b)
-        case _                  => None
-      },
+      bodyMimeType = mimeType,
+      body = body,
       mergedFrom = this.mergedFrom ++ other.mergedFrom
     )
 

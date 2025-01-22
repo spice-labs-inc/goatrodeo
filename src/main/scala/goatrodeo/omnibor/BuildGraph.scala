@@ -147,8 +147,8 @@ object BuildGraph {
           identifier = mainFileGitOID,
           reference = Item.noopLocationReference,
           connections = computedConnections,
-          
-          metadata = Some(
+          bodyMimeType = Some("application/goatrodeo"),
+          body = Some(
             ItemMetaData.from(
               name,
               fileType,
