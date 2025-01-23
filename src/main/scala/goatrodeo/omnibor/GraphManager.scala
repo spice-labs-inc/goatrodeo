@@ -189,7 +189,7 @@ object GraphManager {
 
     def updateBiggest(item: Item): Unit = {
       val containedBy =
-        item.connections.filter(_._1 == EdgeType.ContainedBy).size
+        item.connections.filter(_._1 == EdgeType.containedBy).size
       if (biggest.length <= 50) {
         biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
       } else if (biggest.last._2 < containedBy) {
@@ -252,7 +252,7 @@ object GraphManager {
     if (false) {
       for { i <- biggest } {
         println(
-          f"Item ${i._1.identifier} ${i._1.metadata.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
+          f"Item ${i._1.identifier} ${i._1.body.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
         )
       }
     }

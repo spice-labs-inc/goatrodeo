@@ -163,15 +163,15 @@ object GoatRodeoCluster {
       val indexFiles = Map((for { indexFile <- env.indexFiles } yield {
 
         (indexFile -> IndexFile.open(theDir, indexFile))
-      }): _*)
+      })*)
 
       val dataFileHashes = TreeSet((for {
         idx <- indexFiles.values; dataFile <- idx.envelope.dataFiles
-      } yield dataFile).toSeq: _*)
+      } yield dataFile).toSeq*)
 
       val dataFiles = Map((for {
         dataFileHash <- dataFileHashes.toSeq
-      } yield (dataFileHash -> DataFile.open(theDir, dataFileHash))): _*)
+      } yield (dataFileHash -> DataFile.open(theDir, dataFileHash)))*)
 
       GoatRodeoCluster(
         envelope = env,

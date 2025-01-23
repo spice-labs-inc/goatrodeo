@@ -166,27 +166,27 @@ object BuildGraph {
           (fileType.sourceGitOid() match {
             case None => TreeSet[Edge]()
             case Some(source) =>
-              TreeSet[Edge]((EdgeType.BuiltFrom, source))
+              TreeSet[Edge]((EdgeType.builtFrom, source))
           })
           ++
           // include parent back-reference
           (parent match {
             case Some(parentId) =>
-              Vector[Edge]((EdgeType.ContainedBy, parentId))
+              Vector[Edge]((EdgeType.containedBy, parentId))
             case None => topConnections
           })
           ++
           // include aliases only if we aren't merging this item (if we're)
           // merging, then the aliases already exist and no point in regenerating them
-          (aliases.map(alias => (EdgeType.AliasFrom, alias))).toSet
+          (aliases.map(alias => (EdgeType.aliasFrom, alias))).toSet
 
 
         val item = Item(
           identifier = mainFileGitOID,
           reference = Item.noopLocationReference,
           connections = computedConnections,
-          
-          metadata = Some(
+          bodyMimeType = Some("application/goatrodeo"),
+          body = Some(
             ItemMetaData.from(
               name,
               fileType,
@@ -194,7 +194,6 @@ object BuildGraph {
               fileSize = file.size(),
             )
           ),
-          mergedFrom = TreeSet(),
         ).fixReferences(store)
         nameToGitOID = nameToGitOID + (name -> mainFileGitOID)
         parentStackToGitOID = parentStackToGitOID + (parentStack -> mainFileGitOID)

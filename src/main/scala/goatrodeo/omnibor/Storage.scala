@@ -286,7 +286,7 @@ object MemStorage {
     * @return
     *   the storage directory
     */
-  def getStorage(targetDir: Option[File]): Storage with ListFileNames = {
+  def getStorage(targetDir: Option[File]): Storage & ListFileNames = {
 
     MemStorage(targetDir)
   }

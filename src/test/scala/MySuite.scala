@@ -345,7 +345,7 @@ class MySuite extends munit.FunSuite {
     assert(gitoid.startsWith("gitoid:"))
     val top = store.read(gitoid).get
     store.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
-    for { edge <- top.connections if edge._1 == EdgeType.Contains } {
+    for { edge <- top.connections if edge._1 == EdgeType.contains } {
       val contained = store.read(edge._2).get
     }
 
@@ -355,7 +355,7 @@ class MySuite extends munit.FunSuite {
       )
       .get
     assert(
-      log4j.connections.filter(_._1 == EdgeType.Contains).size > 1200
+      log4j.connections.filter(_._1 == EdgeType.contains).size > 1200
     )
   }
 
@@ -384,10 +384,10 @@ class MySuite extends munit.FunSuite {
     assert(items.length > 1100)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => e._1 == EdgeType.BuiltFrom).size > 0
+      i.connections.filter(e => e._1 == EdgeType.builtFrom).size > 0
     )
     val fromSource = for {
-      i <- items; c <- i.connections if c._1 == EdgeType.BuildsTo
+      i <- items; c <- i.connections if c._1 == EdgeType.buildsTo
     } yield c
     assert(sourceRef.length > 100)
 

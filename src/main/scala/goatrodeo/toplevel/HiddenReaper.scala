@@ -93,8 +93,7 @@ object HiddenReaper {
       println(f"Joined ${name}")
     }
 
-    val bad =
-      Map(res: _*)
+    val bad = Map(res*)
 
     if (!bad.isEmpty) {
       import org.json4s.JsonDSL._
@@ -241,7 +240,7 @@ object HiddenReaper {
           artifactIdToFoundItem(
             subArtifact
           )
-        )): _*
+        ))*
       )
       // maybe some phantom markers were found... but eliminated,
       // so check again
@@ -268,7 +267,7 @@ object HiddenReaper {
     val artToContainer = Map((for {
       (k, vs) <- containerToArtifactList.toVector
       v <- vs
-    } yield v -> k): _*)
+    } yield v -> k)*)
 
     (artToContainer, containerToArtifactList, artToContainer.keySet)
   }

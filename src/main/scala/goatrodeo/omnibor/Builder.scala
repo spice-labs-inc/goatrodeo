@@ -182,7 +182,7 @@ object Builder {
     purlOut.close()
 
     val ret = storage match {
-      case lf: (ListFileNames with Storage) if !dead_? =>
+      case lf: (ListFileNames & Storage) if !dead_? =>
         writeGoatRodeoFiles(lf)
       case _ => println("Didn't write"); None
     }
@@ -192,7 +192,7 @@ object Builder {
     ret
   }
 
-  def writeGoatRodeoFiles(store: ListFileNames with Storage): Option[File] = {
+  def writeGoatRodeoFiles(store: ListFileNames & Storage): Option[File] = {
     store.target() match {
       case Some(target) => {
         println(f"In store with target ${target}")
@@ -321,7 +321,7 @@ object ToProcess {
       var fileSet = TreeSet(
         Helpers
           .findFiles(root, _ => true)
-          .map(_.getAbsoluteFile()): _*
+          .map(_.getAbsoluteFile())*
       )
 
       val pomLike = buildQueueForPOMS(
