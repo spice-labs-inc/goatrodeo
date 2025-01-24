@@ -30,11 +30,20 @@ lazy val root = project
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
-    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.12",
+    libraryDependencies += "ch.qos.logback" % "logback-core" % "1.5.12",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
+    libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.19",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19",
+    // https://mvnrepository.com/artifact/org.apache.tika/tika-core
+    libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
+    // https://mvnrepository.com/artifact/org.apache.tika/tika-parsers
+    libraryDependencies += "org.apache.tika" % "tika-parsers" % "3.0.0" pomOnly(),
+    // https://mvnrepository.com/artifact/org.apache.tika/tika-parsers-standard-package
+    libraryDependencies += "org.apache.tika" % "tika-parsers-standard-package" % "3.0.0",
+    // https://mvnrepository.com/artifact/org.yaml/snakeyaml
+    libraryDependencies += "org.yaml" % "snakeyaml" % "2.3",
 
-    // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
-    // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
   )
@@ -74,6 +83,29 @@ Test / testOptions += Tests.Setup(() => {
       throw new MessageOnlyException(err)
   }
 
+  try {
+    log.info("\t* Creating test_data/apk_tests if it doesn't already exist…")
+    Files.createDirectory(Paths.get("test_data/apk_tests"))
+  } catch {
+    case fE: FileAlreadyExistsException =>
+      log.info("\t! apk_tests directory already exists.")
+    case e: Throwable =>
+      val err = s"Exception setting up apk_tests directory: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
+  }
+
+  try {
+    log.info("\t* Creating test_data/deb_tests if it doesn't already exist…")
+    Files.createDirectory(Paths.get("test_data/deb_tests"))
+  } catch {
+    case fE: FileAlreadyExistsException =>
+      log.info("\t! deb_tests directory already exists.")
+    case e: Throwable =>
+      val err = s"Exception setting up deb_tests directory: ${e.getMessage}"
+      log.error(err)
+      throw new MessageOnlyException(err)
+  }
 
   try {
     log.info("\t* Fetching test ISOs…")
@@ -81,10 +113,20 @@ Test / testOptions += Tests.Setup(() => {
     url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
     log.info("\t * Fetching test Gems…")
     url("https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem") #> file("./test_data/gem_tests/java-properties-0.3.0.gem") ! log
+    log.info("\t * Fetching test WARs…")
+    url("https://public-test-data.spice-labs.dev/sample-tomcat-6.war") #> file("./test_data/sample-tomcat-6.war") ! log
+    log.info("\t * Fetching test EARs…")
+    url("https://public-test-data.spice-labs.dev/EnterpriseHelloWorld.ear") #> file("./test_data/EnterpriseHelloWorld.ear") ! log
+    log.info("\t * Fetching test Android APKs…")
+    url("https://public-test-data.spice-labs.dev/bitbar-sample-app.apk") #> file("./test_data/apk_tests/bitbar-sample-app.apk") ! log
+    log.info("\t * Fetching test Debian Packages…")
+    url("https://public-test-data.spice-labs.dev/hello_2.10-3_arm64.deb") #> file("./test_data/deb_tests/hello_2.10-3_arm64.deb") ! log
+    log.info("\t ! Test Data Fetches complete…")
   } catch {
     case e: Throwable =>
-      val err = s"Exception fetching iso test files: ${e.getMessage}"
+      val err = s"Exception fetching test files: ${e.getMessage}"
       log.error(err)
+      println(err)
       throw new MessageOnlyException(err)
   }
   log.info("Test data caching complete.")
@@ -110,6 +152,8 @@ Test / testOptions += Tests.Setup(() => {
       log.error(err)
       throw new MessageOnlyException(err)
     }
+  } catch {
+    case e => throw e
   }
 })
 
