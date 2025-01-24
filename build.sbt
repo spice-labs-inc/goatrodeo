@@ -2,9 +2,9 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.6.1-SNAPSHOT"
-val scala3Version = "3.3.3"
-val luceneVersion = "4.3.0"
+val projectVersion = "0.6.2-SNAPSHOT"
+val scala3Version = "3.6.3"
+// val luceneVersion = "4.3.0"
 
 fork := true
 

@@ -339,7 +339,6 @@ object Helpers {
     }
   }
 
-
   @inline def hexChar(b: Byte): Char = {
     b match {
       case 0  => '0'
@@ -889,7 +888,7 @@ object PackageIdentifier {
           case a :: b :: _ => Vector((a.trim().toLowerCase(), b.trim()))
           case _           => Vector()
         }
-      }): _*)
+      })*)
 
       val pkg = attrs.get("package")
       val version = attrs.get("version")
@@ -957,7 +956,7 @@ case class PackageIdentifier(
     ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
       d => "distro" -> TreeSet(d)
     )
-    Map(info: _*) ++ this.extra
+    Map(info*) ++ this.extra
   }
 
   def purl(): Vector[String] = {
@@ -1085,7 +1084,7 @@ enum FileType {
           subtype.map(st => "subtype" -> TreeSet(st))
         ).flatten
       case Other => Vector("type" -> TreeSet("other"))
-    }: _*)
+    }*)
   }
 
 }
@@ -1132,7 +1131,10 @@ object FileType {
 
         ObjectFile(Some("classfile"), sourceGitOID)
       }
-      case s if s.equals("metadata") => MetaData(Some("metadata")) // ruby gem metadata file at toplevel (in metadata.gz)
+      case s if s.equals("metadata") =>
+        MetaData(
+          Some("metadata")
+        ) // ruby gem metadata file at toplevel (in metadata.gz)
       case s if s.endsWith(".o")     => ObjectFile(Some("o"), None)
       case s if s.endsWith(".dll")   => ObjectFile(Some("dll"), None)
       case s if s.endsWith(".java")  => SourceFile(Some("java"))

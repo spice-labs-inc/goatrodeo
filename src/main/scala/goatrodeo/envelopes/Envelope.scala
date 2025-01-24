@@ -165,7 +165,7 @@ case class IndexFileEnvelope(
 object IndexFileEnvelope {
 
   def build(
-      version: Int = 1,
+      version: Int = 2,
       magic: Int = GraphManager.Consts.IndexFileMagicNumber,
       size: Int,
       dataFiles: Vector[Long],
@@ -197,7 +197,7 @@ case class ClusterFileEnvelope(
 
 object ClusterFileEnvelope {
   def build(
-      version: Int = 1,
+      version: Int = 2,
       magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],
