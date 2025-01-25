@@ -12,21 +12,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package io.spicelabs.goatrodeo
+package goatrodeo
 
-import io.spicelabs.goatrodeo.loader.{Loader, Analyzer}
+import goatrodeo.loader.{Loader, Analyzer}
 import scala.collection.JavaConverters._
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.io.BufferedReader
 import scopt.OParser
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import io.spicelabs.goatrodeo.omnibor.{Storage, ListFileNames, Builder}
+import goatrodeo.omnibor.{Storage, ListFileNames, Builder}
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.util.zip.GZIPOutputStream
@@ -34,8 +34,8 @@ import java.net.URL
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import java.io.FileFilter
 import java.nio.ByteBuffer
-import io.spicelabs.goatrodeo.util.Helpers.bailFail
-import io.spicelabs.goatrodeo.toplevel.HiddenReaper
+import goatrodeo.util.Helpers.bailFail
+import goatrodeo.toplevel.HiddenReaper
 
 /** The `main` class
   */

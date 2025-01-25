@@ -1,14 +1,14 @@
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import java.io.File
 import java.math.BigInteger
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import scala.util.Using
 import java.io.FileInputStream
-import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
-import io.spicelabs.goatrodeo.omnibor.GraphManager.DataAndIndexFiles
-import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
-import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
+import goatrodeo.envelopes.ClusterFileEnvelope
+import goatrodeo.omnibor.GraphManager.DataAndIndexFiles
+import goatrodeo.envelopes.IndexFileEnvelope
+import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.channels.FileChannel
 import scala.collection.immutable.TreeSet
 

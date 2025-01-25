@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 import java.io.File
 import scala.util.{Failure, Success, Try}
@@ -342,49 +342,49 @@ object FileWalker {
     }
   }
 
-  /**
-   * Process Ruby Gem dependency files. These archives are suffixed `.gem`, but are tarballs with 3 files:
-   * - metadata.gz - a gzipped file containing the metadata (dependency info, etc) and Gem Spec
-   * - checksums.yaml.gz - a gzipped YAML file with the checksums for the archive
-   * - data.tar.gz - a tarball containing the actual ruby dependency code
-   *
-   * This is a separate method from `asApacheCommonsArchiveWrapper`, to allow us to do anything extra
-   * with checksums or metadata or such
-   * @param in the file to try to construct the stream from
-   * @return OptionalArchiveStream
-   * */
-  private def asGemWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
-    logger.trace(s"asGemWrapper($in)")
-    val factory = (new ArchiveStreamFactory())
-    Try {
+  // /**
+  //  * Process Ruby Gem dependency files. These archives are suffixed `.gem`, but are tarballs with 3 files:
+  //  * - metadata.gz - a gzipped file containing the metadata (dependency info, etc) and Gem Spec
+  //  * - checksums.yaml.gz - a gzipped YAML file with the checksums for the archive
+  //  * - data.tar.gz - a tarball containing the actual ruby dependency code
+  //  *
+  //  * This is a separate method from `asApacheCommonsArchiveWrapper`, to allow us to do anything extra
+  //  * with checksums or metadata or such
+  //  * @param in the file to try to construct the stream from
+  //  * @return OptionalArchiveStream
+  //  * */
+  // private def asGemWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
+  //   logger.trace(s"asGemWrapper($in)")
+  //   val factory = (new ArchiveStreamFactory())
+  //   Try {
 
-      {
-        val fis = in.asStream()
+  //     {
+  //       val fis = in.asStream()
 
-        try {
-          val input: ArchiveInputStream[ArchiveEntry] = factory
-            .createArchiveInputStream(
-              fis
-            )
-          val theIterator = Helpers
-            .iteratorFor(input)
-            .filter(!_.isDirectory())
-            .map(ae =>
-              () => {
-                val name = ae.getName()
+  //       try {
+  //         val input: ArchiveInputStream[ArchiveEntry] = factory
+  //           .createArchiveInputStream(
+  //             fis
+  //           )
+  //         val theIterator = Helpers
+  //           .iteratorFor(input)
+  //           .filter(!_.isDirectory())
+  //           .map(ae =>
+  //             () => {
+  //               val name = ae.getName()
 
-                val wrapper = buildWrapper(name, ae.getSize(), () => input)
+  //               val wrapper = buildWrapper(name, ae.getSize(), () => input)
 
-                (name, wrapper)
-              }
-            )
-          Some(theIterator -> (() => input.close()))
-        } catch {
-          case e: Throwable => fis.close(); None
-        }
-      }
-    }.toOption.flatten
-  }
+  //               (name, wrapper)
+  //             }
+  //           )
+  //         Some(theIterator -> (() => input.close()))
+  //       } catch {
+  //         case e: Throwable => fis.close(); None
+  //       }
+  //     }
+  //   }.toOption.flatten
+  // }
 
   /** Try a series of strategies (except for uncompressing a file) for creating
     * an archive stream
@@ -397,7 +397,7 @@ object FileWalker {
   ): OptionalArchiveStream = {
     asZipContainer(in) orElse
       asISOWrapper(in) orElse
-      asGemWrapper(in) orElse
+      // asGemWrapper(in) orElse
       asApacheCommonsArchiveWrapper(in) orElse
       asApacheCommonsCompressedWrapper(in)
   }

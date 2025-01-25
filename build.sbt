@@ -30,14 +30,11 @@ lazy val root = project
     // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
-    // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.26.1",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
-
-    // https://mvnrepository.com/artifact/com.jguild.jrpm/jrpm
-    // libraryDependencies += "com.jguild.jrpm" % "jrpm" % "0.9",
-    assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
+    libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
+    assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala
   )
 
@@ -76,13 +73,18 @@ Test / testOptions += Tests.Setup(() => {
       throw new MessageOnlyException(err)
   }
 
-
   try {
     log.info("\t* Fetching test ISOs…")
-    url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file("./test_data/iso_tests/iso_of_archives.iso") ! log
-    url("https://public-test-data.spice-labs.dev/simple.iso") #> file("./test_data/iso_tests/simple.iso") ! log
+    url("https://public-test-data.spice-labs.dev/iso_of_archives.iso") #> file(
+      "./test_data/iso_tests/iso_of_archives.iso"
+    ) ! log
+    url("https://public-test-data.spice-labs.dev/simple.iso") #> file(
+      "./test_data/iso_tests/simple.iso"
+    ) ! log
     log.info("\t * Fetching test Gems…")
-    url("https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem") #> file("./test_data/gem_tests/java-properties-0.3.0.gem") ! log
+    url(
+      "https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem"
+    ) #> file("./test_data/gem_tests/java-properties-0.3.0.gem") ! log
   } catch {
     case e: Throwable =>
       val err = s"Exception fetching iso test files: ${e.getMessage}"
@@ -99,11 +101,12 @@ Test / testOptions += Tests.Setup(() => {
   if ("git lfs status".! == 0) {
     log.info("git lfs found, proceeding…")
   } else {
-    val err = "git lfs not found. Please review the README.md for setup instructions!"
+    val err =
+      "git lfs not found. Please review the README.md for setup instructions!"
     log.error(err)
     throw new MessageOnlyException(err)
   }
-  try {
+  {
     log.info("Running a `git lfs pull`…")
     if ("git lfs pull".! == 0) {
       log.info("git lfs files should all be synced now.")
@@ -112,9 +115,8 @@ Test / testOptions += Tests.Setup(() => {
       log.error(err)
       throw new MessageOnlyException(err)
     }
-  }
+  } 
 })
-
 
 enablePlugins(JavaAppPackaging)
 enablePlugins(DockerPlugin)
@@ -124,6 +126,6 @@ Docker / packageName := projectName
 Docker / version := projectVersion
 Docker / maintainer := "ext-engineering@spicelabs.io"
 
-dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal" 
+dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal"
 dockerLabels := Map.empty
 dockerExposedPorts := Seq.empty

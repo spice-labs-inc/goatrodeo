@@ -12,32 +12,33 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.GitOIDUtils
+import goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import io.spicelabs.goatrodeo.envelopes.MD5
-import io.spicelabs.goatrodeo.envelopes.Position
-import io.spicelabs.goatrodeo.envelopes.MultifilePosition
+import goatrodeo.envelopes.MD5
+import goatrodeo.envelopes.Position
+import goatrodeo.envelopes.MultifilePosition
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import io.spicelabs.goatrodeo.omnibor.BuildGraph
-import io.spicelabs.goatrodeo.omnibor.MemStorage
-import io.spicelabs.goatrodeo.omnibor.EdgeType
-import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.omnibor.Builder
-import io.spicelabs.goatrodeo.omnibor.GraphManager
-import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.PackageProtocol
+import goatrodeo.omnibor.BuildGraph
+import goatrodeo.omnibor.MemStorage
+import goatrodeo.omnibor.EdgeType
+import goatrodeo.omnibor.ToProcess
+import goatrodeo.omnibor.Builder
+import goatrodeo.omnibor.GraphManager
+import goatrodeo.util.PackageIdentifier
+import goatrodeo.util.PackageProtocol
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import io.spicelabs.goatrodeo.util.FileWalker
-import io.spicelabs.goatrodeo.util.FileWrapper
+import goatrodeo.util.FileWalker
+import goatrodeo.util.FileWrapper
+import java.io.BufferedInputStream
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -81,90 +82,6 @@ class MySuite extends munit.FunSuite {
       "181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b"
     )
   }
-
-  // test("EntryEnvelope Serialization from round trips") {
-
-  //   import io.bullet.borer.Dom.*
-
-  //   for { i <- 0 to 100 } {
-  //     val theFile = new File(f"test_data/data_b_${i}.cbor")
-  //     if (true) {
-  //       val env = EntryEnvelope
-  //     }
-  //     if (theFile.exists()) {
-  //       val cbor = new FileInputStream(theFile).readAllBytes()
-
-  //       val tmp = Cbor.decode(cbor).to[Element].value
-
-  //       val newBytes = Cbor.encode(tmp).toByteArray
-
-  //       assertEquals(cbor.toVector, newBytes.toVector)
-
-  //       val ee = EntryEnvelope.decodeCBOR(cbor).get
-
-  //       val ee2: ItemEnvelope =
-  //         EntryEnvelope.decodeCBOR(ee.encodeCBOR()).get
-  //       assertEquals(ee, ee2, f"Test run ${i}")
-
-  //       if (cbor.toVector != ee2.encodeCBOR().toVector) {
-  //         throw new Exception(
-  //           f"Not equal iteration ${i}\n${Cbor.decode(cbor).to[Element].value}\n${Cbor.decode(ee2.encodeCBOR()).to[Element].value}"
-  //         )
-  //       }
-
-  //       assertEquals(
-  //         cbor.toVector,
-  //         ee2.encodeCBOR().toVector,
-  //         "Round trip bytes equal"
-  //       )
-  //     }
-  //   }
-  // }
-
-  // test("read old write new") {
-  //   if (true) {
-  //     for {
-  //       compression <- Vector(PayloadCompression.NONE)
-  //       testFile = new File("test_data/info_repo_di.txt") if testFile.isFile()
-  //     } {
-  //       val start = Instant.now()
-  //       import io.bullet.borer.Dom.*
-  //       import scala.collection.JavaConverters.asScalaIteratorConverter
-  //       val lines = new BufferedReader(
-  //         new InputStreamReader(
-  //           new FileInputStream(testFile)
-  //         )
-  //       ).lines()
-  //         .iterator()
-  //         .asScala
-  //         .map(s => {
-  //           val id = s.indexOf("||,||")
-  //           val json = s.substring(id + 5)
-  //           upickle.default.read[Entry](json)
-  //         })
-
-  //       val dest = new File("frood_dir")
-  //       dest.mkdirs()
-  //       val res =
-  //         GraphManager.writeEntries(dest, lines, compression).get
-  //       println(
-  //         f"Run with ${compression} took ${Duration.between(start, Instant.now())}"
-  //       )
-
-  //       // for { item <- res } {
-  //       //   val start = Instant.now()
-  //       //   val walker = GRDWalker(
-  //       //     new FileInputStream(new File(f"frood_dir/${item}.grd")).getChannel()
-  //       //   )
-  //       //   walker.open().get
-  //       //   for { _ <- walker.items() } {}
-  //       //   println(
-  //       //     f"Reading ${compression} took ${Duration.between(start, Instant.now())}"
-  //       //   )
-  //       // }
-  //     }
-  //   }
-  // }
 
   test("long to hex and back again") {
     assertEquals(Helpers.toHex(0x1), "0000000000000001")
@@ -309,6 +226,15 @@ class MySuite extends munit.FunSuite {
       }
     )
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
+  }
+
+  test("calculate mime type for class file") {
+    val classFileName = "target/scala-3.6.3/classes/goatrodeo/Howdy.class"
+
+    val f = new File(classFileName)
+    val inputStream = new BufferedInputStream(new FileInputStream(f))
+    val mimeType = Helpers.mimeTypeFor(inputStream, classFileName)
+    assert(mimeType == "application/java-vm", f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}")
   }
 
   test("Build from nested") {

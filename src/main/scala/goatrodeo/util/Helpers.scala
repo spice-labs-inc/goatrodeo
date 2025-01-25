@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 import java.io.File
 import java.io.FileOutputStream
@@ -48,6 +48,10 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import org.apache.tika.config.TikaConfig
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
+import java.io.BufferedInputStream
 type GitOID = String
 
 /** A bunch of helpers/utilities
@@ -101,6 +105,81 @@ object Helpers {
       secRandom.nextBytes(ret)
       ret
     }
+  }
+
+  private val tika = new TikaConfig()
+
+  /** Given an input stream and a filename, get the mime type
+    *
+    * @param data
+    *   -- the input stream
+    * @param fileName
+    *   -- the name of the file
+    */
+  def mimeTypeFor(data: BufferedInputStream, fileName: String): String = {
+
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
+    val detected = tika.getDetector.detect(data, metadata)
+
+    detected.toString()
+  }
+
+  /**
+    * Mime types for Java class files
+    */
+  lazy val javaClassMimeTypes = Set(
+    "application/java-vm",
+    "application/java-byte-code",
+    "application/x-class-file",
+    "application/x-java-class",
+    "application/x-java-vm"
+  )
+
+  /** Given an input, see if the there is an associated source file.
+   * Currently works on JVM `.class` files.
+   * 
+   * @param file the file to test
+   * @param mimeType the mime type of the file
+   * @param associatedFiles the filename to gitoid relatationship for source or predicate files
+   * 
+   * @return a set of GitOIDs for the source files
+    */
+  def computeAssociatedSource(
+      file: ArtifactWrapper,
+      mimeType: String,
+      associatedFiles: Map[String, GitOID]
+  ): TreeSet[GitOID] = {
+    mimeType match {
+      case maybeClass if javaClassMimeTypes.contains(maybeClass) =>
+        val sourceName: Option[String] =
+          Try {
+            val is = file.asStream()
+            try {
+              val cp = new ClassParser(is, file.name())
+
+              val clz = cp.parse()
+              clz.getSourceFilePath()
+            } finally {
+              is.close()
+            }
+          }.toOption
+
+        val sourceGitOID = for {
+          sn <- sourceName
+          pf <- associatedFiles.get(sn)
+        } yield {
+          pf
+        }
+
+        sourceGitOID match {
+          case None => TreeSet()
+          case Some(s) => TreeSet(s)
+        }
+
+      case _ => TreeSet()
+    }
+
   }
 
   /** Given a file root and a filter function, return a channel that contains
@@ -947,7 +1026,7 @@ case class PackageIdentifier(
     extra: Map[String, TreeSet[String]]
 ) {
 
-  def toStringMap(): Map[String, TreeSet[String]] = {
+  def toStringMap(): TreeMap[String, TreeSet[String]] = {
     val info = Vector(
       "package_protocol" -> TreeSet(protocol.name),
       "group_id" -> TreeSet(groupId),
@@ -956,7 +1035,7 @@ case class PackageIdentifier(
     ) ++ arch.toVector.map(a => "arch" -> TreeSet(a)) ++ distro.toVector.map(
       d => "distro" -> TreeSet(d)
     )
-    Map(info*) ++ this.extra
+    TreeMap(info*) ++ this.extra
   }
 
   def purl(): Vector[String] = {
@@ -1018,130 +1097,130 @@ case class PackageIdentifier(
   }
 }
 
-enum FileType {
-  case ObjectFile(
-      subtype: Option[String],
-      source: Option[String]
-  )
-  case SourceFile(language: Option[String])
-  case MetaData(subtype: Option[String])
-  case Package(subtype: Option[String])
-  case Other
+// enum FileType {
+//   case ObjectFile(
+//       subtype: Option[String],
+//       source: Option[String]
+//   )
+//   case SourceFile(language: Option[String])
+//   case MetaData(subtype: Option[String])
+//   case Package(subtype: Option[String])
+//   case Other
 
-  def typeName(): Option[String] = {
-    this match {
-      case ObjectFile(Some(subtype), _) => Some(f"object: ${subtype}")
-      case ObjectFile(_, _)             => Some("object")
-      case SourceFile(Some(language))   => Some(f"source: ${language}")
-      case SourceFile(_)                => Some("source")
-      case MetaData(Some(subtype))      => Some(f"metadata: ${subtype}")
-      case MetaData(_)                  => Some("metadata")
-      case Package(Some(subtype))       => Some(f"package: ${subtype}")
-      case Package(_)                   => Some("package")
-      case Other                        => Some("other")
-    }
-  }
+//   def typeName(): Option[String] = {
+//     this match {
+//       case ObjectFile(Some(subtype), _) => Some(f"object: ${subtype}")
+//       case ObjectFile(_, _)             => Some("object")
+//       case SourceFile(Some(language))   => Some(f"source: ${language}")
+//       case SourceFile(_)                => Some("source")
+//       case MetaData(Some(subtype))      => Some(f"metadata: ${subtype}")
+//       case MetaData(_)                  => Some("metadata")
+//       case Package(Some(subtype))       => Some(f"package: ${subtype}")
+//       case Package(_)                   => Some("package")
+//       case Other                        => Some("other")
+//     }
+//   }
 
-  def subType(): Option[String] = {
-    this match {
-      case SourceFile(language)   => language
-      case ObjectFile(subtype, _) => subtype
-      case MetaData(subtype)      => subtype
-      case Package(subtype)       => subtype
-      case _                      => None
-    }
-  }
+//   def subType(): Option[String] = {
+//     this match {
+//       case SourceFile(language)   => language
+//       case ObjectFile(subtype, _) => subtype
+//       case MetaData(subtype)      => subtype
+//       case Package(subtype)       => subtype
+//       case _                      => None
+//     }
+//   }
 
-  def sourceGitOid(): Option[GitOID] = {
-    this match {
-      case ObjectFile(_, source) => source
-      case _                     => None
-    }
-  }
+//   def sourceGitOid(): Option[GitOID] = {
+//     this match {
+//       case ObjectFile(_, source) => source
+//       case _                     => None
+//     }
+//   }
 
-  def toStringMap(): TreeMap[String, TreeSet[String]] = {
-    TreeMap(this match {
-      case ObjectFile(subtype, source) =>
-        Vector(
-          Some("type" -> TreeSet("object")),
-          subtype.map(st => "subtype" -> TreeSet(st)),
-          source.map(sf => "source" -> TreeSet(sf))
-        ).flatten
+//   def toStringMap(): TreeMap[String, TreeSet[String]] = {
+//     TreeMap(this match {
+//       case ObjectFile(subtype, source) =>
+//         Vector(
+//           Some("type" -> TreeSet("object")),
+//           subtype.map(st => "subtype" -> TreeSet(st)),
+//           source.map(sf => "source" -> TreeSet(sf))
+//         ).flatten
 
-      case SourceFile(language) =>
-        Vector(
-          Some("type" -> TreeSet("source")),
-          language.map(st => "language" -> TreeSet(st))
-        ).flatten
-      case MetaData(subtype) =>
-        Vector(
-          Some("type" -> TreeSet("metadata")),
-          subtype.map(st => "subtype" -> TreeSet(st))
-        ).flatten
-      case Package(subtype) =>
-        Vector(
-          Some("type" -> TreeSet("package")),
-          subtype.map(st => "subtype" -> TreeSet(st))
-        ).flatten
-      case Other => Vector("type" -> TreeSet("other"))
-    }*)
-  }
+//       case SourceFile(language) =>
+//         Vector(
+//           Some("type" -> TreeSet("source")),
+//           language.map(st => "language" -> TreeSet(st))
+//         ).flatten
+//       case MetaData(subtype) =>
+//         Vector(
+//           Some("type" -> TreeSet("metadata")),
+//           subtype.map(st => "subtype" -> TreeSet(st))
+//         ).flatten
+//       case Package(subtype) =>
+//         Vector(
+//           Some("type" -> TreeSet("package")),
+//           subtype.map(st => "subtype" -> TreeSet(st))
+//         ).flatten
+//       case Other => Vector("type" -> TreeSet("other"))
+//     }*)
+//   }
 
-}
+// }
 
-object FileType {
+// object FileType {
 
-  def theType(
-      name: String,
-      contents: Option[ArtifactWrapper],
-      sourceMap: Map[String, GitOID]
-  ): FileType = {
-    name match {
-      case s
-          if s.startsWith("META-INF/maven/") &&
-            s.endsWith("/pom.properties") =>
-        MetaData(Some("pom.properties"))
-      case s
-          if s.startsWith("META-INF/maven/") &&
-            s.endsWith("/pom.xml") =>
-        MetaData(Some("pom.xml"))
-      case s if s.endsWith(".class") => {
-        val sourceName: Option[String] = contents
-          .map(theFile =>
-            Try {
-              val is = theFile.asStream()
-              try {
-                val cp = new ClassParser(is, name)
+//   def theType(
+//       name: String,
+//       contents: Option[ArtifactWrapper],
+//       sourceMap: Map[String, GitOID]
+//   ): FileType = {
+//     name match {
+//       case s
+//           if s.startsWith("META-INF/maven/") &&
+//             s.endsWith("/pom.properties") =>
+//         MetaData(Some("pom.properties"))
+//       case s
+//           if s.startsWith("META-INF/maven/") &&
+//             s.endsWith("/pom.xml") =>
+//         MetaData(Some("pom.xml"))
+//       case s if s.endsWith(".class") => {
+//         val sourceName: Option[String] = contents
+//           .map(theFile =>
+//             Try {
+//               val is = theFile.asStream()
+//               try {
+//                 val cp = new ClassParser(is, name)
 
-                val clz = cp.parse()
-                clz.getSourceFilePath()
-              } finally {
-                is.close()
-              }
-            }.toOption
-          )
-          .flatten
+//                 val clz = cp.parse()
+//                 clz.getSourceFilePath()
+//               } finally {
+//                 is.close()
+//               }
+//             }.toOption
+//           )
+//           .flatten
 
-        val sourceGitOID = for {
-          sn <- sourceName
-          pf <- sourceMap.get(sn)
-        } yield {
-          pf
-        }
+//         val sourceGitOID = for {
+//           sn <- sourceName
+//           pf <- sourceMap.get(sn)
+//         } yield {
+//           pf
+//         }
 
-        ObjectFile(Some("classfile"), sourceGitOID)
-      }
-      case s if s.equals("metadata") =>
-        MetaData(
-          Some("metadata")
-        ) // ruby gem metadata file at toplevel (in metadata.gz)
-      case s if s.endsWith(".o")     => ObjectFile(Some("o"), None)
-      case s if s.endsWith(".dll")   => ObjectFile(Some("dll"), None)
-      case s if s.endsWith(".java")  => SourceFile(Some("java"))
-      case s if s.endsWith(".scala") => SourceFile(Some("scala"))
-      case s if s.endsWith(".clj")   => SourceFile(Some("clojure"))
-      case s if s.endsWith(".rb")    => SourceFile(Some("ruby"))
-      case _                         => Other
-    }
-  }
-}
+//         ObjectFile(Some("classfile"), sourceGitOID)
+//       }
+//       case s if s.equals("metadata") =>
+//         MetaData(
+//           Some("metadata")
+//         ) // ruby gem metadata file at toplevel (in metadata.gz)
+//       case s if s.endsWith(".o")     => ObjectFile(Some("o"), None)
+//       case s if s.endsWith(".dll")   => ObjectFile(Some("dll"), None)
+//       case s if s.endsWith(".java")  => SourceFile(Some("java"))
+//       case s if s.endsWith(".scala") => SourceFile(Some("scala"))
+//       case s if s.endsWith(".clj")   => SourceFile(Some("clojure"))
+//       case s if s.endsWith(".rb")    => SourceFile(Some("ruby"))
+//       case _                         => Other
+//     }
+//   }
+// }

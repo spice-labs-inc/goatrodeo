@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 import java.io.InputStream
 import java.io.File
@@ -24,7 +24,7 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def asStream(): InputStream
+  def asStream(): BufferedInputStream
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
     *
@@ -117,7 +117,7 @@ final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
 
   def isDirectory(): Boolean = f.isDirectory()
 
-  override def asStream(): InputStream = BufferedInputStream(FileInputStream(f))
+  override def asStream(): BufferedInputStream = BufferedInputStream(FileInputStream(f))
 
   override def name(): String = f.getName()
 
@@ -143,7 +143,7 @@ final case class ByteWrapper(bytes: Array[Byte], fileName: String)
 
   def isDirectory(): Boolean = false
 
-  override def asStream(): InputStream = ByteArrayInputStream(bytes)
+  override def asStream(): BufferedInputStream = new BufferedInputStream(ByteArrayInputStream(bytes))
 
   override def name(): String = fileName
 

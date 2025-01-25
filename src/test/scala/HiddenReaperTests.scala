@@ -1,4 +1,4 @@
-import io.spicelabs.goatrodeo.toplevel.HiddenReaper
+import goatrodeo.toplevel.HiddenReaper
 import java.io.File
 class HiddenReaperTests extends munit.FunSuite {
   var (

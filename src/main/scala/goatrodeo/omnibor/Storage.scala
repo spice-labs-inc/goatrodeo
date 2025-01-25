@@ -12,17 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import java.io.File
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import scala.util.Try
 import java.util.concurrent.atomic.AtomicReference
 import java.sql.Blob
 import java.sql.PreparedStatement
 import java.net.URL
-import io.spicelabs.goatrodeo.util.GitOIDUtils
-import io.spicelabs.goatrodeo.util.GitOID
+import goatrodeo.util.GitOIDUtils
+import goatrodeo.util.GitOID
 import scala.util.Failure
 import scala.util.Success
 import scala.annotation.tailrec
@@ -34,14 +34,14 @@ import java.net.http.HttpResponse.BodyHandlers
 import java.io.ByteArrayInputStream
 import io.bullet.borer.Json
 import java.nio.file.Files
-import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
+import goatrodeo.envelopes.DataFileEnvelope
 import java.io.FileOutputStream
-import io.spicelabs.goatrodeo.envelopes.MD5
-import io.spicelabs.goatrodeo.envelopes.Position
-import io.spicelabs.goatrodeo.envelopes.MultifilePosition
+import goatrodeo.envelopes.MD5
+import goatrodeo.envelopes.Position
+import goatrodeo.envelopes.MultifilePosition
 import java.io.FileInputStream
 import io.bullet.borer.Cbor
-import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
+import goatrodeo.envelopes.IndexFileEnvelope
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
