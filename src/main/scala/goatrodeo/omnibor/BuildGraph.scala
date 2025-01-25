@@ -134,7 +134,7 @@ object BuildGraph {
     var rootGitoid: String = ""
 
     FileWalker.processFileAndSubfiles[Vector[FileAndGitoid]](
-      FileWrapper(root, false),
+      FileWrapper(root, root.getPath(), false),
       name,
       None,
       Vector(),
@@ -155,7 +155,7 @@ object BuildGraph {
               _ +
                 (if (
                    name.endsWith("?packaging=sources") ||
-                   file.name().indexOf("-sources.") >= 0 ||
+                   file.path().indexOf("-sources.") >= 0 ||
                    name.indexOf("-sources.") >= 0
                  ) { "?packaging=sources" }
                  else { "" })
@@ -165,7 +165,7 @@ object BuildGraph {
         packageIds.foreach(pid => purlOut.write(f"${pid}\n"))
         val aliases = foundAliases ++ packageIds
 
-        val mimeType = Helpers.mimeTypeFor(file.asStream(), name)
+        val mimeType = file.mimeType
         val associatedSource = Helpers.computeAssociatedSource(
           file,
           mimeType,

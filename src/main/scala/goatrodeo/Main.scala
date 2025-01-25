@@ -36,6 +36,7 @@ import java.io.FileFilter
 import java.nio.ByteBuffer
 import goatrodeo.util.Helpers.bailFail
 import goatrodeo.toplevel.HiddenReaper
+import goatrodeo.util.FileWrapper
 
 /** The `main` class
   */

@@ -37,6 +37,7 @@ import java.io.IOException
 import scala.annotation.tailrec
 import java.io.FileWriter
 import scala.collection.immutable.TreeSet
+import goatrodeo.util.FileWrapper
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -337,7 +338,7 @@ object ToProcess {
 
       fileSet.foreach(f => {
         count.incrementAndGet()
-        queue.add(ToProcess(PackageIdentifier.computePurl(f), f, None, None))
+        queue.add(ToProcess(PackageIdentifier.computePurl(FileWrapper(f, f.getPath(), false)), f, None, None))
       })
 
       stillWorking.set(false)

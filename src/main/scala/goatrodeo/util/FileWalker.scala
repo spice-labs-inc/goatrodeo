@@ -2,7 +2,10 @@ package goatrodeo.util
 
 import java.io.File
 import scala.util.{Failure, Success, Try}
-import org.apache.commons.compress.compressors.{CompressorInputStream, CompressorStreamFactory}
+import org.apache.commons.compress.compressors.{
+  CompressorInputStream,
+  CompressorStreamFactory
+}
 
 import java.io.InputStream
 import java.util.zip.ZipFile
@@ -56,15 +59,21 @@ object FileWalker {
     }
   }
 
-  /** If any of these file extensions are encountered, they must be turned into
-    * a real file
-    */
-  lazy val forceToFileSuffix: Set[Option[String]] = zipSuffixes ++ isoSuffixes
-
   /** If the file size is greater than 16MB, then always make it a file, don't
     * keep the bytes in memory
     */
   val forceToFileSize = (16L * 1024L * 1024L)
+
+  val forceToFileMimeTypes: Set[String] = Set(
+    "application/x-rpm",
+    "application/x-debian-package",
+    "application/x-iso9660-image",
+    "application/zlib",
+    "type application/x-gtar",
+    "application/zip",
+    "application/java-archive",
+    "application/gzip"
+  )
 
   /** Should the entity be turned into a real file or will an in-memory set of
     * bytes suffice?
@@ -76,7 +85,7 @@ object FileWalker {
     *   list"
     */
   def shouldForceToFile(wrapper: ArtifactWrapper): Boolean = {
-    shouldForceToFile(wrapper.size(), wrapper.name())
+    shouldForceToFile(wrapper.size(), wrapper.mimeType)
   }
 
   /** Should the entity be turned into a real file or will an in-memory set of
@@ -84,32 +93,23 @@ object FileWalker {
     *
     * @param size
     *   the size of the entity
-    * @param fileName
-    *   the name of the entity
+    * @param mimeType
+    *   Mime type of the entity
     * @return
     *   true if the file is large or it's on the "we care about these suffixes
     *   list"
     */
-  def shouldForceToFile(size: Long, fileName: String): Boolean = {
-    size >= forceToFileSize || forceToFileSuffix.contains(
-      ArtifactWrapper.suffix(fileName)
-    )
+  def shouldForceToFile(size: Long, mimeType: String): Boolean = {
+
+    size >= forceToFileSize || forceToFileMimeTypes.contains(mimeType)
   }
 
-  /** Suffixes for Zip/JAR/etc. files
-    */
-  private lazy val zipSuffixes: Set[Option[String]] =
-    Set(Some(".zip"), Some(".jar"), Some(".aar"), Some(".war"))
+  private lazy val zipMimeTypes: Set[String] =
+    Set("application/zip", "application/java-archive")
 
-  /** Suffixes for ISO files
-    */
-  private lazy val isoSuffixes: Set[Option[String]] = Set(Some(".iso"))
-
-
-  /** Suffixes for Ruby GEM Files
-   * */
-  private lazy val gemSuffixes: Set[Option[String]] = Set(Some(".gem"))
-
+  private lazy val isoMimeTypes: Set[String] = Set(
+    "application/x-iso9660-image"
+  )
 
   /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
     *
@@ -118,30 +118,39 @@ object FileWalker {
     * @return
     */
   private def asZipContainer(in: ArtifactWrapper): OptionalArchiveStream = {
-    logger.trace(s"asZipContainer($in)")
-    if (zipSuffixes.contains(in.suffix)) {
+    if (zipMimeTypes.contains(in.mimeType)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
-        val theFile = in match {
-          case FileWrapper(f, _) => f
-          case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
+        val (theFile, deleteIt) = in match {
+          case FileWrapper(f, _, _) => f -> false
+          case _ =>
+            Helpers.tempFileFromStream(in.asStream(), true, in.path()) -> true
         }
-        val zipFile = ZipFile(theFile)
-        val it: Iterator[() => (String, ArtifactWrapper)] = zipFile
-          .stream()
-          .iterator()
-          .asScala
-          .filter(v => { !v.isDirectory() })
-          .map(v =>
-            () => {
-              val name = v.getName()
+        try {
+          val zipFile = ZipFile(theFile)
+          val it: Iterator[() => (String, ArtifactWrapper)] = zipFile
+            .stream()
+            .iterator()
+            .asScala
+            .filter(v => { !v.isDirectory() })
+            .map(v =>
+              () => {
+                val name = v.getName()
 
-              val wrapper =
-                buildWrapper(name, v.getSize(), () => zipFile.getInputStream(v))
-              (name, wrapper)
-            }
-          )
-        Some(it -> (() => { zipFile.close(); () }))
+                val wrapper =
+                  buildWrapper(
+                    name,
+                    v.getSize(),
+                    () => zipFile.getInputStream(v)
+                  )
+                (name, wrapper)
+              }
+            )
+          Some(it -> (() => { zipFile.close(); () }))
+        } finally {
+          // delete the temporary file
+          if (deleteIt) theFile.delete()
+        }
       } catch {
         case e: Exception => None
       }
@@ -172,6 +181,7 @@ object FileWalker {
             false,
             name
           ),
+        name,
         true
       )
     } else
@@ -187,13 +197,13 @@ object FileWalker {
     * @return
     */
   private def asISOWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
-    logger.trace(s"asIsoWrapper suffix: ${in.suffix} suffixes: ${isoSuffixes} contains? ${isoSuffixes.contains(in.suffix)}")
-    if (isoSuffixes.contains(in.suffix)) {
+    if (isoMimeTypes.contains(in.mimeType)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
-        val theFile = in match {
-          case FileWrapper(f, _) => f
-          case _ => Helpers.tempFileFromStream(in.asStream(), true, in.name())
+        val (theFile, deleteIt) = in match {
+          case FileWrapper(f, _, _) => f -> false
+          case _ =>
+            Helpers.tempFileFromStream(in.asStream(), true, in.path()) -> true
         }
 
         logger.trace(s"TheFile: $theFile")
@@ -228,6 +238,9 @@ object FileWalker {
             logger.error(s"Try getAllFiles failed: ${e.getMessage}", e)
             isoFileReader.close()
             None
+        } finally {
+          // delete the temporary file
+          if (deleteIt) theFile.delete()
         }
       } catch {
         case e: Exception =>
@@ -240,9 +253,10 @@ object FileWalker {
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
     * read most archive files" format
     *
-    * Note this only reads *archives* – that is to say, something like a `.tar.gz` with many files
-    * It will *not* work on simple single compressed files in a gzip wrapper, which needs the `CompressorStreamFactory`
-    * rather than the `ArchiveStreamFactory`
+    * Note this only reads *archives* – that is to say, something like a
+    * `.tar.gz` with many files It will *not* work on simple single compressed
+    * files in a gzip wrapper, which needs the `CompressorStreamFactory` rather
+    * than the `ArchiveStreamFactory`
     *
     * @param in
     *   the file to try to construct the stream from
@@ -282,30 +296,34 @@ object FileWalker {
     }.toOption.flatten
   }
 
-  /** Try to construct an `OptionalArchiveStream` using the Apache Commons "Compressed file" support;
-   *
-   * Note this only reads *simple compressed files* – that is to say, something like a `.gz`  around a single file
-   * It will *not* work on archive files such as `.tar.gz`, which needs the `ArchiveStreamFactory`
-   * rather than the `ArchiveStreamFactory`
-   *
-   * @param in
-   *   the file to try to construct the stream from
-   * @return
-   */
+  /** Try to construct an `OptionalArchiveStream` using the Apache Commons
+    * "Compressed file" support;
+    *
+    * Note this only reads *simple compressed files* – that is to say, something
+    * like a `.gz` around a single file It will *not* work on archive files such
+    * as `.tar.gz`, which needs the `ArchiveStreamFactory` rather than the
+    * `ArchiveStreamFactory`
+    *
+    * @param in
+    *   the file to try to construct the stream from
+    * @return
+    */
   private def asApacheCommonsCompressedWrapper(
-    in: ArtifactWrapper
+      in: ArtifactWrapper
   ): OptionalArchiveStream = {
     val factory = new CompressorStreamFactory()
     Try {
       val fis = in.asStream()
 
       try {
-        val input: CompressorInputStream = factory.createCompressorInputStream(fis)
+        val input: CompressorInputStream =
+          factory.createCompressorInputStream(fis)
 
         // todo - expand me for other possible single file compresseds
-        if (in.name().endsWith(".gz")) {
+        if (in.path().endsWith(".gz")) {
           val compressedIter = new Iterator[() => (String, ArtifactWrapper)] {
-            private var x = 0 // count accesses for hasNext // todo should this be an atomic?
+            private var x =
+              0 // count accesses for hasNext // todo should this be an atomic?
 
             override def hasNext: Boolean = {
               x == 0
@@ -313,13 +331,13 @@ object FileWalker {
 
             override def next(): () => (String, ArtifactWrapper) = {
               x += 1
-              val name = in.name().substring(0, in.name().length - 3)
+              val name = in.path().substring(0, in.path().length - 3)
               val wrapper = buildWrapper(name, in.size(), () => input)
 
               val result = () => (name, wrapper)
               logger.trace(s"Result for CompressedWrapper: ${result()}")
               result
-              //else throw IllegalArgumentException(s"Unknown compressed file extension on ${in.name()}") // todo - non-exception control
+              // else throw IllegalArgumentException(s"Unknown compressed file extension on ${in.name()}") // todo - non-exception control
             }
 
           }
@@ -337,7 +355,9 @@ object FileWalker {
         logger.trace("Success(None) ??")
         None
       case Failure(e) =>
-        logger.trace(s"Failed to get an Apache Commons Compressed Wrapper: ${e.getMessage}")
+        logger.trace(
+          s"Failed to get an Apache Commons Compressed Wrapper: ${e.getMessage}"
+        )
         None
     }
   }
@@ -424,9 +444,7 @@ object FileWalker {
 
     val ret = tryToConstructArchiveStream(in)
 
-
     logger.trace(s"ret for $in: $ret")
-
 
     // if we've got it, yay.
     ret match {
@@ -440,7 +458,7 @@ object FileWalker {
         for {
           uncompressedFile <- fileForCompressed(in.asStream())
           _ = logger.trace(s"for $in unCompressed file: ${uncompressedFile}")
-          uncompressedArchive = FileWrapper(uncompressedFile, true)
+          uncompressedArchive = FileWrapper(uncompressedFile, in.path(), true)
           ret <- tryToConstructArchiveStream(uncompressedArchive)
         } yield ret
       }
@@ -487,9 +505,7 @@ object FileWalker {
           workOn,
           if (workOn == root) name
           else
-            workOn
-              .getCanonicalPath()
-              .substring(root.getParentDirectory().getCanonicalPath().length()),
+            workOn.path(),
           parentId,
           specific
         )

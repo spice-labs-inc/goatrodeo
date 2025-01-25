@@ -25,17 +25,20 @@ class ISOFileSuite extends munit.FunSuite {
   test("Simple file format parsing to ArtifactWrapper") {
     // todo - rerun this against 'simple.iso'; it mounts on macos fine and checks out as a proper iso file
     // but this test is giving me a "Negative Seek Offset" error…
+
+    val name = "test_data/iso_tests/iso_of_archives.iso"
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/iso_tests/iso_of_archives.iso"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
     )
   }
   test("Walk an ISO file") {
     var cnt = 0
+    val name = "test_data/iso_tests/iso_of_archives.iso"
     val (inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/iso_tests/iso_of_archives.iso"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .get
     for {
       e <- inputStream
@@ -51,7 +54,9 @@ class ISOFileSuite extends munit.FunSuite {
   }
 
   test("deal with nesting archives inside an ISO") {
-    val nested = FileWrapper(File("test_data/iso_tests/iso_of_archives.iso"), false)
+    val name = "test_data/iso_tests/iso_of_archives.iso"
+    val nested =
+      FileWrapper(File(name), name, false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0

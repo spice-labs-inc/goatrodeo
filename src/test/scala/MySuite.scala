@@ -39,6 +39,7 @@ import java.io.OutputStreamWriter
 import goatrodeo.util.FileWalker
 import goatrodeo.util.FileWrapper
 import java.io.BufferedInputStream
+import goatrodeo.util.ArtifactWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -101,64 +102,73 @@ class MySuite extends munit.FunSuite {
   }
 
   test("File Type Detection") {
-    assert(
+    assert({
+      val name = "test_data/HP1973-Source.zip"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/HP1973-Source.zip"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/log4j-core-2.22.1.jar"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/log4j-core-2.22.1.jar"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/empty.tgz"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/toml-rs.tgz"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/tk-8.6.13-r2.apk"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/tk-8.6.13-r2.apk"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
+    })
 
-    assert(
+    assert({
+      val name = "test_data/ics_test.tar"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/ics_test.tar"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
+    })
 
-    assert(
+    assert({
+      val name = "test_data/nested.tar"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/nested.tar"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
+    })
 
   }
 
   test("Walk a tar file") {
     var cnt = 0
+    val name = "test_data/empty.tgz"
     val (inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .get
     for {
       e <- inputStream
@@ -172,7 +182,8 @@ class MySuite extends munit.FunSuite {
   }
 
   test("deal with nesting") {
-    val nested = FileWrapper(File("test_data/nested.tar"), false)
+    val name = "test_data/nested.tar"
+    val nested = FileWrapper(File(name), name, false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -194,8 +205,9 @@ class MySuite extends munit.FunSuite {
   }
 
   test("Compute pURL for .deb") {
+    val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val purl = PackageIdentifier.computePurl(
-      File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
+      FileWrapper(File(name), name, false)
     )
     assert(purl.isDefined, "Should compute a purl")
     assertEquals(purl.get.artifactId, "tk8.6")
@@ -206,8 +218,9 @@ class MySuite extends munit.FunSuite {
   }
 
   test("deal with .deb and zst") {
+    val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val nested =
-      FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+      FileWrapper(File(name), name, false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -233,8 +246,11 @@ class MySuite extends munit.FunSuite {
 
     val f = new File(classFileName)
     val inputStream = new BufferedInputStream(new FileInputStream(f))
-    val mimeType = Helpers.mimeTypeFor(inputStream, classFileName)
-    assert(mimeType == "application/java-vm", f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}")
+    val mimeType = ArtifactWrapper.mimeTypeFor(inputStream, classFileName)
+    assert(
+      mimeType == "application/java-vm",
+      f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}"
+    )
   }
 
   test("Build from nested") {
@@ -255,7 +271,10 @@ class MySuite extends munit.FunSuite {
       false
     )
 
-    assert(built.nameToGitOID.size > 1200, f"Expection more than 1,200 items, got ${built.nameToGitOID.size}")
+    assert(
+      built.nameToGitOID.size > 1200,
+      f"Expection more than 1,200 items, got ${built.nameToGitOID.size}"
+    )
     assert(store.size() > 2200)
     val keys = store.keys()
     assert(!keys.filter(_.startsWith("sha256:")).isEmpty)

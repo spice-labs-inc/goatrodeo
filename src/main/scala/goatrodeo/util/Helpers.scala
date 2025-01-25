@@ -107,26 +107,7 @@ object Helpers {
     }
   }
 
-  private val tika = new TikaConfig()
-
-  /** Given an input stream and a filename, get the mime type
-    *
-    * @param data
-    *   -- the input stream
-    * @param fileName
-    *   -- the name of the file
-    */
-  def mimeTypeFor(data: BufferedInputStream, fileName: String): String = {
-
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
-    val detected = tika.getDetector.detect(data, metadata)
-
-    detected.toString()
-  }
-
-  /**
-    * Mime types for Java class files
+  /** Mime types for Java class files
     */
   lazy val javaClassMimeTypes = Set(
     "application/java-vm",
@@ -136,14 +117,18 @@ object Helpers {
     "application/x-java-vm"
   )
 
-  /** Given an input, see if the there is an associated source file.
-   * Currently works on JVM `.class` files.
-   * 
-   * @param file the file to test
-   * @param mimeType the mime type of the file
-   * @param associatedFiles the filename to gitoid relatationship for source or predicate files
-   * 
-   * @return a set of GitOIDs for the source files
+  /** Given an input, see if the there is an associated source file. Currently
+    * works on JVM `.class` files.
+    *
+    * @param file
+    *   the file to test
+    * @param mimeType
+    *   the mime type of the file
+    * @param associatedFiles
+    *   the filename to gitoid relatationship for source or predicate files
+    *
+    * @return
+    *   a set of GitOIDs for the source files
     */
   def computeAssociatedSource(
       file: ArtifactWrapper,
@@ -156,7 +141,7 @@ object Helpers {
           Try {
             val is = file.asStream()
             try {
-              val cp = new ClassParser(is, file.name())
+              val cp = new ClassParser(is, file.path())
 
               val clz = cp.parse()
               clz.getSourceFilePath()
@@ -173,7 +158,7 @@ object Helpers {
         }
 
         sourceGitOID match {
-          case None => TreeSet()
+          case None    => TreeSet()
           case Some(s) => TreeSet(s)
         }
 
@@ -939,14 +924,14 @@ enum PackageProtocol {
 }
 
 object PackageIdentifier {
-  def computePurl(f: File): Option[PackageIdentifier] = {
-    val name = f.getName()
+  def computePurl(f: ArtifactWrapper): Option[PackageIdentifier] = {
+    val name = f.path()
 
-    if (name.endsWith(".deb")) {
-      var lines: Vector[String] = Vector()
+    if (f.mimeType == "application/x-debian-package") {
+      var rawLines: Vector[String] = Vector()
       FileWalker.processFileAndSubfiles(
-        FileWrapper(f, false),
-        f.getName(),
+        f,
+        f.path(),
         None,
         42,
         true,
@@ -954,7 +939,7 @@ object PackageIdentifier {
           import scala.jdk.CollectionConverters.*
           if (name == "./control") {
             val lr = BufferedReader(InputStreamReader(wrapper.asStream()))
-            lines = lr.lines().iterator().asScala.toVector
+            rawLines = lr.lines().iterator().asScala.toVector
             ("na", false, Some(FileAction.End), 42)
           } else if (name.startsWith("data.tar")) {
             ("na", false, Some(FileAction.SkipDive), 42)
@@ -962,10 +947,28 @@ object PackageIdentifier {
             ("na", false, None, 42)
         }
       )
+
+      // squash the multi-line representations into a single line
+      val lines: Vector[String] = rawLines.foldLeft(Vector[String]()) {
+        case (cur, next) if cur.isEmpty => Vector(next)
+        case (cur, next) if next.startsWith(" ") =>
+          cur.dropRight(1) :+ f"${cur.last} ${next}"
+        case (cur, next) => cur :+ next
+      }
+
       val attrs = Map(lines.flatMap(s => {
         s.split(":").toList match {
-          case a :: b :: _ => Vector((a.trim().toLowerCase(), b.trim()))
-          case _           => Vector()
+          case a :: b =>
+            Vector(
+              (
+                a.trim().toLowerCase(),
+                b.foldLeft("") {
+                  case (a, b) if a.length() > 0 => a + ":" + b
+                  case (_, b)                   => b
+                }.trim()
+              )
+            )
+          case _ => Vector()
         }
       })*)
 
@@ -979,7 +982,7 @@ object PackageIdentifier {
             PackageIdentifier(
               protocol = PackageProtocol.Deb,
               groupId =
-                if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
+                if (f.path().contains("ubuntu")) "ubuntu"
                 else "debian",
               artifactId = thePkg,
               version = theVersion,
@@ -998,7 +1001,7 @@ object PackageIdentifier {
                 PackageIdentifier(
                   PackageProtocol.Deb,
                   groupId =
-                    if (f.getAbsolutePath().contains("ubuntu")) "ubuntu"
+                    if (f.path().contains("ubuntu")) "ubuntu"
                     else "debian",
                   artifactId = pkg,
                   arch = Some(arch),
