@@ -4,7 +4,6 @@ import scala.sys.process._
 val projectName = "goatrodeo"
 val projectVersion = "0.6.2-SNAPSHOT"
 val scala3Version = "3.6.3"
-// val luceneVersion = "4.3.0"
 
 fork := true
 
@@ -15,7 +14,6 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := projectName,
-    version := projectVersion,
     scalaVersion := scala3Version,
     libraryDependencies += "org.scala-lang" %% "toolkit" % "0.4.0",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
@@ -119,11 +117,11 @@ Test / testOptions += Tests.Setup(() => {
 })
 
 enablePlugins(JavaAppPackaging)
+enablePlugins(GitVersioningPlugin)
 enablePlugins(DockerPlugin)
 
 Universal / mappings += file("data/grim.json") -> "data/grim.json"
 Docker / packageName := projectName
-Docker / version := projectVersion
 Docker / maintainer := "ext-engineering@spicelabs.io"
 
 dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal"
