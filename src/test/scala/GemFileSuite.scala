@@ -90,7 +90,7 @@ class GemFileSuite extends munit.FunSuite {
         file.mkdirs()
         BufferedWriter(FileWriter(File(file, "purls.txt")))
       },
-      false
+      false, Set()
     )
 
 //    assert(built.nameToGitOID.size > 1200, f"Expection more than 1,200 items, got ${built.nameToGitOID.size}")
