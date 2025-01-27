@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 /* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
 
@@ -14,8 +14,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.GitOID
+import goatrodeo.util.Helpers
 import scala.util.Try
 import io.bullet.borer.Json
 import io.bullet.borer.Codec
@@ -24,45 +24,82 @@ import io.bullet.borer.Decoder
 import io.bullet.borer.Cbor
 import io.bullet.borer.derivation.key
 import java.time.Instant
-import io.spicelabs.goatrodeo.util.FileType
-import io.spicelabs.goatrodeo.util.PackageIdentifier
+import goatrodeo.util.PackageIdentifier
 import io.bullet.borer.Writer
-import io.spicelabs.goatrodeo.util.Helpers.filesForParent
+import goatrodeo.util.Helpers.filesForParent
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-enum EdgeType extends Comparable[EdgeType] {
-  case AliasTo
-  case AliasFrom
-  case Contains
-  case ContainedBy
-  case BuildsTo
-  case BuiltFrom
+// enum EdgeType extends Comparable[EdgeType] {
+//   case AliasTo
+//   case AliasFrom
+//   case Contains
+//   case ContainedBy
+//   case BuildsTo
+//   case BuiltFrom
 
-  override def compareTo(other: EdgeType): Int =
-    this.toString().compareTo(other.toString())
+//   override def compareTo(other: EdgeType): Int =
+//     this.toString().compareTo(other.toString())
 
-  def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
-}
+//   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
+// }
+
+// object EdgeType {
+//   given Encoder[EdgeType] = {
+//     import io.bullet.borer.derivation.MapBasedCodecs.*
+//     deriveEncoder[EdgeType]
+//   }
+
+//   given Decoder[EdgeType] = {
+//     import io.bullet.borer.derivation.MapBasedCodecs.*
+//     deriveDecoder[EdgeType]
+//   }
+// }
 
 object EdgeType {
-  given Encoder[EdgeType] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveEncoder[EdgeType]
+  def isAliasFrom(s: String): Boolean = {
+    s == aliasFrom
   }
 
-  given Decoder[EdgeType] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveDecoder[EdgeType]
+  def isAliasTo(s: String): Boolean = {
+    s == aliasTo
   }
+
+  def isFromLeft(s: String): Boolean = {
+    s.endsWith(fromLeft)
+  }
+
+  def isToRight(s: String): Boolean = {
+    s.endsWith(toRight)
+  }
+
+  def isContainsDown(s: String): Boolean = {
+    s.endsWith(containsDown)
+  }
+
+  def isContainedByUp(s: String): Boolean = {
+    s.endsWith(containedByUp)
+  }
+
+  val toRight = ":->";
+  val fromLeft = ":<-";
+  val containsDown = ":||";
+  val containedByUp = ":^";
+
+  val containedBy = "ContainedBy:^";
+  val contains = "Contains:||";
+  val aliasTo = "AliasTo:->";
+  val aliasFrom = "AliasFrom:<-";
+  val buildsTo = "BuildsTo:^"
+  val builtFrom = "BuiltFrom:||"
+
 }
 
-type Edge = (EdgeType, String)
+type Edge = (String, String)
 
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
-    @key("file_type") fileType: TreeSet[String],
-    @key("file_sub_type") fileSubType: TreeSet[String],
+    @key("mime_type") mimeType: TreeSet[String],
     @key("file_size") fileSize: Long,
     extra: TreeMap[String, TreeSet[String]]
 ) {
@@ -71,8 +108,7 @@ case class ItemMetaData(
   def merge(other: ItemMetaData): ItemMetaData = {
     ItemMetaData(
       fileNames = this.fileNames ++ other.fileNames,
-      fileType = this.fileType ++ other.fileType,
-      fileSubType = this.fileSubType ++ other.fileSubType,
+      mimeType = this.mimeType ++ other.mimeType,
       fileSize = this.fileSize,
       extra = {
         var ret = this.extra;
@@ -93,7 +129,8 @@ case class ItemMetaData(
 object ItemMetaData {
   def from(
       fileName: String,
-      fileType: FileType,
+      mimeType: String,
+      extra: TreeMap[String, TreeSet[String]],
       packageIdentifier: Option[PackageIdentifier],
       fileSize: Long
   ): ItemMetaData = {
@@ -103,20 +140,18 @@ object ItemMetaData {
           ) =>
         ItemMetaData(
           fileNames = TreeSet(fileName),
-          fileType = TreeSet("package"),
-          fileSubType = TreeSet(pid.protocol.name),
+          mimeType = TreeSet(mimeType),
           fileSize = fileSize,
-          extra = fileType.toStringMap() ++
-            TreeMap("purl" -> TreeSet(pid.purl(): _*)) ++
+          extra = extra ++
+            TreeMap("purl" -> TreeSet(pid.purl()*)) ++
             pid.toStringMap()
         )
       case None =>
         ItemMetaData(
           fileNames = TreeSet(fileName),
-          fileType = fileType.typeName().map(TreeSet(_)).getOrElse(TreeSet()),
-          fileSubType = fileType.subType().map(TreeSet(_)).getOrElse(TreeSet()),
+          mimeType = TreeSet(mimeType),
           fileSize = fileSize,
-          extra = fileType.toStringMap()
+          extra = extra
         )
     }
 
@@ -138,8 +173,8 @@ case class Item(
     identifier: String,
     reference: LocationReference,
     connections: TreeSet[Edge],
-    metadata: Option[ItemMetaData],
-    @key("merged_from") mergedFrom: TreeSet[LocationReference]
+    @key("body_mime_type") bodyMimeType: Option[String],
+    body: Option[ItemMetaData]
 ) {
 
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -147,8 +182,7 @@ case class Item(
   def fixReferencePosition(hash: Long, offset: Long): Item = {
     val hasCur = reference != Item.noopLocationReference
     this.copy(
-      reference = (hash, offset),
-      mergedFrom = (if (hasCur) TreeSet(this.reference) else TreeSet())
+      reference = (hash, offset)
     )
   }
 
@@ -165,7 +199,7 @@ case class Item(
   def fixReferences(store: Storage): Item = {
     for { edge <- this.connections } {
       edge match {
-        case Edge(EdgeType.AliasFrom, connection) => {
+        case Edge(EdgeType.aliasFrom, connection) => {
 
           store.write(
             connection,
@@ -175,11 +209,11 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
-                  metadata = None,
-                  mergedFrom = TreeSet()
+                  bodyMimeType = None,
+                  body = None
                 )
               )
-              val toAdd = (EdgeType.AliasTo, this.identifier)
+              val toAdd = (EdgeType.aliasTo, this.identifier)
               val updatedAlias =
                 if (alias.connections.contains(toAdd)) { alias }
                 else {
@@ -191,7 +225,7 @@ case class Item(
             }
           )
         }
-        case Edge(EdgeType.BuiltFrom, connection) => {
+        case Edge(EdgeType.builtFrom, connection) => {
 
           store.write(
             connection,
@@ -201,11 +235,11 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
-                  metadata = None,
-                  mergedFrom = TreeSet()
+                  bodyMimeType = None,
+                  body = None
                 )
               )
-              val toAdd = (EdgeType.BuildsTo, this.identifier)
+              val toAdd = (EdgeType.buildsTo, this.identifier)
               val updatedSource =
                 if (source.connections.contains(toAdd)) { source }
                 else {
@@ -217,7 +251,7 @@ case class Item(
             }
           )
         }
-        case Edge(EdgeType.ContainedBy, connection) => {
+        case Edge(EdgeType.containedBy, connection) => {
 
           store.write(
             connection,
@@ -227,11 +261,11 @@ case class Item(
                   identifier = connection,
                   reference = Item.noopLocationReference,
                   connections = TreeSet(),
-                  metadata = None,
-                  mergedFrom = TreeSet()
+                  bodyMimeType = None,
+                  body = None
                 )
               )
-              val toAdd = (EdgeType.Contains, this.identifier)
+              val toAdd = (EdgeType.contains, this.identifier)
               val updatedSource = if (container.connections.contains(toAdd)) {
                 container
               } else {
@@ -251,27 +285,27 @@ case class Item(
   }
 
   def merge(other: Item): Item = {
+
+    val (body, mime) =
+      (this.body, other.body, this.bodyMimeType == other.bodyMimeType) match {
+        case (Some(a), Some(b), true) => Some(a.merge(b)) -> this.bodyMimeType
+        case (Some(a), _, _)          => Some(a) -> this.bodyMimeType
+        case (_, Some(b), _)          => Some(b) -> other.bodyMimeType
+        case _                        => None -> None
+      }
+
     Item(
       identifier = this.identifier,
       reference = this.reference,
       connections = this.connections ++ other.connections,
-      metadata = (this.metadata, other.metadata) match {
-        case (Some(a), Some(b)) => Some(a.merge(b))
-        case (Some(a), _)       => Some(a)
-        case (_, Some(b))       => Some(b)
-        case _                  => None
-      },
-      mergedFrom = this.mergedFrom ++ other.mergedFrom
+      bodyMimeType = mime,
+      body = body
     )
 
   }
 }
 
 object Item {
-  // given itemCmp: java.util.Comparator[Item] = {
-
-  // }
-
   given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
     new Encoder.DefaultValueAware[Option[T]] {
 

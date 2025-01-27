@@ -12,32 +12,34 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.GitOIDUtils
+import goatrodeo.util.GitOIDUtils
 import java.util.regex.Pattern
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import io.spicelabs.goatrodeo.envelopes.MD5
-import io.spicelabs.goatrodeo.envelopes.Position
-import io.spicelabs.goatrodeo.envelopes.MultifilePosition
+import goatrodeo.envelopes.MD5
+import goatrodeo.envelopes.Position
+import goatrodeo.envelopes.MultifilePosition
 import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import io.spicelabs.goatrodeo.omnibor.BuildGraph
-import io.spicelabs.goatrodeo.omnibor.MemStorage
-import io.spicelabs.goatrodeo.omnibor.EdgeType
-import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.omnibor.Builder
-import io.spicelabs.goatrodeo.omnibor.GraphManager
-import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.PackageProtocol
+import goatrodeo.omnibor.BuildGraph
+import goatrodeo.omnibor.MemStorage
+import goatrodeo.omnibor.EdgeType
+import goatrodeo.omnibor.ToProcess
+import goatrodeo.omnibor.Builder
+import goatrodeo.omnibor.GraphManager
+import goatrodeo.util.PackageIdentifier
+import goatrodeo.util.PackageProtocol
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import io.spicelabs.goatrodeo.util.FileWalker
-import io.spicelabs.goatrodeo.util.FileWrapper
+import goatrodeo.util.FileWalker
+import goatrodeo.util.FileWrapper
+import java.io.BufferedInputStream
+import goatrodeo.util.ArtifactWrapper
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -82,90 +84,6 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  // test("EntryEnvelope Serialization from round trips") {
-
-  //   import io.bullet.borer.Dom.*
-
-  //   for { i <- 0 to 100 } {
-  //     val theFile = new File(f"test_data/data_b_${i}.cbor")
-  //     if (true) {
-  //       val env = EntryEnvelope
-  //     }
-  //     if (theFile.exists()) {
-  //       val cbor = new FileInputStream(theFile).readAllBytes()
-
-  //       val tmp = Cbor.decode(cbor).to[Element].value
-
-  //       val newBytes = Cbor.encode(tmp).toByteArray
-
-  //       assertEquals(cbor.toVector, newBytes.toVector)
-
-  //       val ee = EntryEnvelope.decodeCBOR(cbor).get
-
-  //       val ee2: ItemEnvelope =
-  //         EntryEnvelope.decodeCBOR(ee.encodeCBOR()).get
-  //       assertEquals(ee, ee2, f"Test run ${i}")
-
-  //       if (cbor.toVector != ee2.encodeCBOR().toVector) {
-  //         throw new Exception(
-  //           f"Not equal iteration ${i}\n${Cbor.decode(cbor).to[Element].value}\n${Cbor.decode(ee2.encodeCBOR()).to[Element].value}"
-  //         )
-  //       }
-
-  //       assertEquals(
-  //         cbor.toVector,
-  //         ee2.encodeCBOR().toVector,
-  //         "Round trip bytes equal"
-  //       )
-  //     }
-  //   }
-  // }
-
-  // test("read old write new") {
-  //   if (true) {
-  //     for {
-  //       compression <- Vector(PayloadCompression.NONE)
-  //       testFile = new File("test_data/info_repo_di.txt") if testFile.isFile()
-  //     } {
-  //       val start = Instant.now()
-  //       import io.bullet.borer.Dom.*
-  //       import scala.collection.JavaConverters.asScalaIteratorConverter
-  //       val lines = new BufferedReader(
-  //         new InputStreamReader(
-  //           new FileInputStream(testFile)
-  //         )
-  //       ).lines()
-  //         .iterator()
-  //         .asScala
-  //         .map(s => {
-  //           val id = s.indexOf("||,||")
-  //           val json = s.substring(id + 5)
-  //           upickle.default.read[Entry](json)
-  //         })
-
-  //       val dest = new File("frood_dir")
-  //       dest.mkdirs()
-  //       val res =
-  //         GraphManager.writeEntries(dest, lines, compression).get
-  //       println(
-  //         f"Run with ${compression} took ${Duration.between(start, Instant.now())}"
-  //       )
-
-  //       // for { item <- res } {
-  //       //   val start = Instant.now()
-  //       //   val walker = GRDWalker(
-  //       //     new FileInputStream(new File(f"frood_dir/${item}.grd")).getChannel()
-  //       //   )
-  //       //   walker.open().get
-  //       //   for { _ <- walker.items() } {}
-  //       //   println(
-  //       //     f"Reading ${compression} took ${Duration.between(start, Instant.now())}"
-  //       //   )
-  //       // }
-  //     }
-  //   }
-  // }
-
   test("long to hex and back again") {
     assertEquals(Helpers.toHex(0x1), "0000000000000001")
 
@@ -184,64 +102,73 @@ class MySuite extends munit.FunSuite {
   }
 
   test("File Type Detection") {
-    assert(
+    assert({
+      val name = "test_data/HP1973-Source.zip"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/HP1973-Source.zip"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/log4j-core-2.22.1.jar"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/log4j-core-2.22.1.jar"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/empty.tgz"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/toml-rs.tgz"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/toml-rs.tgz"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
-    assert(
+    })
+    assert({
+      val name = "test_data/tk-8.6.13-r2.apk"
       FileWalker
         .streamForArchive(
-          FileWrapper(File("test_data/tk-8.6.13-r2.apk"), false)
+          FileWrapper(File(name), name, false)
         )
         .isDefined
-    )
+    })
 
-    assert(
+    assert({
+      val name = "test_data/ics_test.tar"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/ics_test.tar"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
+    })
 
-    assert(
+    assert({
+      val name = "test_data/nested.tar"
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/nested.tar"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
-    )
+    })
 
   }
 
   test("Walk a tar file") {
     var cnt = 0
+    val name = "test_data/empty.tgz"
     val (inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/empty.tgz"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .get
     for {
       e <- inputStream
@@ -255,7 +182,8 @@ class MySuite extends munit.FunSuite {
   }
 
   test("deal with nesting") {
-    val nested = FileWrapper(File("test_data/nested.tar"), false)
+    val name = "test_data/nested.tar"
+    val nested = FileWrapper(File(name), name, false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -277,8 +205,9 @@ class MySuite extends munit.FunSuite {
   }
 
   test("Compute pURL for .deb") {
+    val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val purl = PackageIdentifier.computePurl(
-      File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
+      FileWrapper(File(name), name, false)
     )
     assert(purl.isDefined, "Should compute a purl")
     assertEquals(purl.get.artifactId, "tk8.6")
@@ -289,8 +218,9 @@ class MySuite extends munit.FunSuite {
   }
 
   test("deal with .deb and zst") {
+    val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val nested =
-      FileWrapper(File("test_data/tk8.6_8.6.14-1build1_amd64.deb"), false)
+      FileWrapper(File(name), name, false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0
@@ -311,6 +241,18 @@ class MySuite extends munit.FunSuite {
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
   }
 
+  test("calculate mime type for class file") {
+    val classFileName = "target/scala-3.6.3/classes/goatrodeo/Howdy.class"
+
+    val f = new File(classFileName)
+    val inputStream = new BufferedInputStream(new FileInputStream(f))
+    val mimeType = ArtifactWrapper.mimeTypeFor(inputStream, classFileName)
+    assert(
+      mimeType == "application/java-vm",
+      f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}"
+    )
+  }
+
   test("Build from nested") {
     val store = MemStorage.getStorage(None)
     val nested = File("test_data/nested.tar")
@@ -329,7 +271,10 @@ class MySuite extends munit.FunSuite {
       false
     )
 
-    assert(built.nameToGitOID.size > 1200, f"Expection more than 1,200 items, got ${built.nameToGitOID.size}")
+    assert(
+      built.nameToGitOID.size > 1200,
+      f"Expection more than 1,200 items, got ${built.nameToGitOID.size}"
+    )
     assert(store.size() > 2200)
     val keys = store.keys()
     assert(!keys.filter(_.startsWith("sha256:")).isEmpty)
@@ -345,7 +290,7 @@ class MySuite extends munit.FunSuite {
     assert(gitoid.startsWith("gitoid:"))
     val top = store.read(gitoid).get
     store.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
-    for { edge <- top.connections if edge._1 == EdgeType.Contains } {
+    for { edge <- top.connections if edge._1 == EdgeType.contains } {
       val contained = store.read(edge._2).get
     }
 
@@ -355,7 +300,7 @@ class MySuite extends munit.FunSuite {
       )
       .get
     assert(
-      log4j.connections.filter(_._1 == EdgeType.Contains).size > 1200
+      log4j.connections.filter(_._1 == EdgeType.contains).size > 1200
     )
   }
 
@@ -384,10 +329,10 @@ class MySuite extends munit.FunSuite {
     assert(items.length > 1100)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => e._1 == EdgeType.BuiltFrom).size > 0
+      i.connections.filter(e => e._1 == EdgeType.builtFrom).size > 0
     )
     val fromSource = for {
-      i <- items; c <- i.connections if c._1 == EdgeType.BuildsTo
+      i <- items; c <- i.connections if c._1 == EdgeType.buildsTo
     } yield c
     assert(sourceRef.length > 100)
 

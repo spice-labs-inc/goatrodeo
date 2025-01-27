@@ -1,19 +1,17 @@
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
 
 import java.io.File
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 
 import java.io.BufferedWriter
 import java.io.FileWriter
-import io.spicelabs.goatrodeo.util.PackageIdentifier
-import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
-import io.spicelabs.goatrodeo.util.FileType
-
+import goatrodeo.util.PackageIdentifier
+import goatrodeo.util.{FileWalker, FileWrapper, GitOID, GitOIDUtils}
 import scala.collection.immutable.TreeSet
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.TreeMap
 
 /** Tools for opening files including containing files and building graphs
   */
@@ -24,7 +22,7 @@ object BuildGraph {
       store: Storage,
       purlOut: BufferedWriter
   ): Unit = {
-    
+
     item match {
       case ToProcess(pom, main, Some(source), pomFile) => {
         // process the POM file
@@ -97,19 +95,29 @@ object BuildGraph {
     }
   }
 
-  /**
-    * Build a graph of identifiers for a given File
+  /** Build a graph of identifiers for a given File
     *
-    * @param root the root file to test
-    * @param name the name of the file
-    * @param store the backing store to load/save/inspect for the graph
-    * @param topConnections the back-reference for connections/aliases
-    * @param topPackageIdentifier the top level package identifier
-    * @param associatedFiles files associated with this artifact. Used to create graphs between source archives/jars and 
-    * compiled artifacts
-    * @param purlOut where to write pURLs
-    * @param dontSkipFound flag if true, even if the artifact was already found in the graph, process it again
-    * @return a tuple of (Map[file-name, gitoid-sha256], Map[Vector[filenames-for-embedded-artifacts], gitoid-sha256])
+    * @param root
+    *   the root file to test
+    * @param name
+    *   the name of the file
+    * @param store
+    *   the backing store to load/save/inspect for the graph
+    * @param topConnections
+    *   the back-reference for connections/aliases
+    * @param topPackageIdentifier
+    *   the top level package identifier
+    * @param associatedFiles
+    *   files associated with this artifact. Used to create graphs between
+    *   source archives/jars and compiled artifacts
+    * @param purlOut
+    *   where to write pURLs
+    * @param dontSkipFound
+    *   flag if true, even if the artifact was already found in the graph,
+    *   process it again
+    * @return
+    *   a tuple of (Map[file-name, gitoid-sha256],
+    *   Map[Vector[filenames-for-embedded-artifacts], gitoid-sha256])
     */
   def buildItemsFor(
       root: File,
@@ -126,7 +134,7 @@ object BuildGraph {
     var rootGitoid: String = ""
 
     FileWalker.processFileAndSubfiles[Vector[FileAndGitoid]](
-      FileWrapper(root, false),
+      FileWrapper(root, root.getPath(), false),
       name,
       None,
       Vector(),
@@ -147,7 +155,7 @@ object BuildGraph {
               _ +
                 (if (
                    name.endsWith("?packaging=sources") ||
-                   file.name().indexOf("-sources.") >= 0 ||
+                   file.path().indexOf("-sources.") >= 0 ||
                    name.indexOf("-sources.") >= 0
                  ) { "?packaging=sources" }
                  else { "" })
@@ -157,47 +165,54 @@ object BuildGraph {
         packageIds.foreach(pid => purlOut.write(f"${pid}\n"))
         val aliases = foundAliases ++ packageIds
 
-        val fileType = FileType.theType(name, Some(file), associatedFiles)
+        val mimeType = file.mimeType
+        val associatedSource = Helpers.computeAssociatedSource(
+          file,
+          mimeType,
+          associatedFiles
+        ) // FileType.theType(name, Some(file), associatedFiles)
 
-        logger.trace(s"File Name: $name Type: $fileType")
+        logger.trace(s"File Name: $name Type: $mimeType")
 
         val computedConnections: TreeSet[Edge] =
-          // built from a source file
-          (fileType.sourceGitOid() match {
-            case None => TreeSet[Edge]()
-            case Some(source) =>
-              TreeSet[Edge]((EdgeType.BuiltFrom, source))
-          })
+          // built from a source files
+          associatedSource.map(gitoid => (EdgeType.builtFrom, gitoid))
           ++
           // include parent back-reference
           (parent match {
             case Some(parentId) =>
-              Vector[Edge]((EdgeType.ContainedBy, parentId))
+              Vector[Edge]((EdgeType.containedBy, parentId))
             case None => topConnections
           })
           ++
           // include aliases only if we aren't merging this item (if we're)
           // merging, then the aliases already exist and no point in regenerating them
-          (aliases.map(alias => (EdgeType.AliasFrom, alias))).toSet
+          (aliases.map(alias => (EdgeType.aliasFrom, alias))).toSet
 
+        val thePackageIdentifier =
+          if (parent.isEmpty) topPackageIdentifier else None
 
         val item = Item(
           identifier = mainFileGitOID,
           reference = Item.noopLocationReference,
           connections = computedConnections,
-          
-          metadata = Some(
+          bodyMimeType = Some("application/vnd.cc.goatrodeo"),
+          body = Some(
             ItemMetaData.from(
               name,
-              fileType,
-              if (parent.isEmpty) topPackageIdentifier else None,
-              fileSize = file.size(),
+              mimeType,
+              thePackageIdentifier match {
+                case Some(pi) => pi.toStringMap()
+                case None     => TreeMap()
+              },
+              thePackageIdentifier,
+              fileSize = file.size()
             )
-          ),
-          mergedFrom = TreeSet(),
+          )
         ).fixReferences(store)
         nameToGitOID = nameToGitOID + (name -> mainFileGitOID)
-        parentStackToGitOID = parentStackToGitOID + (parentStack -> mainFileGitOID)
+        parentStackToGitOID =
+          parentStackToGitOID + (parentStack -> mainFileGitOID)
 
         store.write(
           mainFileGitOID,
@@ -215,13 +230,19 @@ object BuildGraph {
   }
 }
 
-/**
-  * The results of running `buildItemsFor`
+/** The results of running `buildItemsFor`
   *
-  * @param mainGitOID the GitOID SHA256 of the root file
-  * @param nameToGitOID the map of name to gitoid
-  * @param parentStackToGitOID the map of full path to gitoid
+  * @param mainGitOID
+  *   the GitOID SHA256 of the root file
+  * @param nameToGitOID
+  *   the map of name to gitoid
+  * @param parentStackToGitOID
+  *   the map of full path to gitoid
   */
-case class BuiltItemResult(mainGitOID: String, nameToGitOID: Map[String, String], parentStackToGitOID: Map[Vector[FileAndGitoid], String])
+case class BuiltItemResult(
+    mainGitOID: String,
+    nameToGitOID: Map[String, String],
+    parentStackToGitOID: Map[Vector[FileAndGitoid], String]
+)
 
 case class FileAndGitoid(file: String, gitoid: String)

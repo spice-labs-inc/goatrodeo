@@ -12,10 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package io.spicelabs.goatrodeo.loader
+package goatrodeo.loader
 
-import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.omnibor.Item
+import goatrodeo.omnibor.ToProcess
+import goatrodeo.omnibor.Item
 
 
 

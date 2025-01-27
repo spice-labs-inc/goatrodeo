@@ -1,18 +1,18 @@
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import java.io.File
 import java.nio.file.Files
 import java.io.FileOutputStream
-import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
+import goatrodeo.util.Helpers
+import goatrodeo.envelopes.DataFileEnvelope
 import java.nio.ByteBuffer
-import io.spicelabs.goatrodeo.envelopes.MD5
-import io.spicelabs.goatrodeo.envelopes.Position
-import io.spicelabs.goatrodeo.envelopes.MultifilePosition
+import goatrodeo.envelopes.MD5
+import goatrodeo.envelopes.Position
+import goatrodeo.envelopes.MultifilePosition
 import java.io.FileInputStream
-import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
+import goatrodeo.envelopes.IndexFileEnvelope
 import scala.util.Try
-import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
+import goatrodeo.envelopes.ClusterFileEnvelope
 import java.time.LocalDateTime
 import java.time.Instant
 import java.time.ZoneOffset
@@ -189,7 +189,7 @@ object GraphManager {
 
     def updateBiggest(item: Item): Unit = {
       val containedBy =
-        item.connections.filter(_._1 == EdgeType.ContainedBy).size
+        item.connections.filter(_._1 == EdgeType.containedBy).size
       if (biggest.length <= 50) {
         biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
       } else if (biggest.last._2 < containedBy) {
@@ -252,7 +252,7 @@ object GraphManager {
     if (false) {
       for { i <- biggest } {
         println(
-          f"Item ${i._1.identifier} ${i._1.metadata.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
+          f"Item ${i._1.identifier} ${i._1.body.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
         )
       }
     }

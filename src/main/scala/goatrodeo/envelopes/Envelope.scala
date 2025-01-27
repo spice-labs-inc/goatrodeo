@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.envelopes
+package goatrodeo.envelopes
 
 import scala.util.Try
 import java.io.DataOutputStream
@@ -11,7 +11,7 @@ import io.bullet.borer.derivation.key
 import scala.util.Success
 import scala.util.Failure
 import io.bullet.borer.Codec
-import io.spicelabs.goatrodeo.omnibor.GraphManager
+import goatrodeo.omnibor.GraphManager
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
 import java.io.OutputStream
@@ -19,7 +19,7 @@ import java.util.zip.GZIPOutputStream
 import java.util.zip.InflaterInputStream
 import java.util.zip.GZIPInputStream
 import java.io.InputStream
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 // import scala.collection.immutable.HashSet
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
@@ -165,7 +165,7 @@ case class IndexFileEnvelope(
 object IndexFileEnvelope {
 
   def build(
-      version: Int = 1,
+      version: Int = 2,
       magic: Int = GraphManager.Consts.IndexFileMagicNumber,
       size: Int,
       dataFiles: Vector[Long],
@@ -197,7 +197,7 @@ case class ClusterFileEnvelope(
 
 object ClusterFileEnvelope {
   def build(
-      version: Int = 1,
+      version: Int = 2,
       magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],

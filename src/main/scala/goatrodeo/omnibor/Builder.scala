@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package io.spicelabs.goatrodeo.omnibor
+package goatrodeo.omnibor
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
@@ -22,12 +22,12 @@ import java.io.OutputStreamWriter
 import java.io.BufferedWriter
 import java.math.BigInteger
 import scala.xml.Elem
-import io.spicelabs.goatrodeo.util.PackageIdentifier
+import goatrodeo.util.PackageIdentifier
 import java.util.concurrent.ConcurrentLinkedQueue
-import io.spicelabs.goatrodeo.util.Helpers
+import goatrodeo.util.Helpers
 import scala.util.Try
 import java.io.FileInputStream
-import io.spicelabs.goatrodeo.util.{GitOID, FileType, PackageProtocol, GitOIDUtils}
+import goatrodeo.util.{GitOID, PackageProtocol, GitOIDUtils}
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration
@@ -37,6 +37,7 @@ import java.io.IOException
 import scala.annotation.tailrec
 import java.io.FileWriter
 import scala.collection.immutable.TreeSet
+import goatrodeo.util.FileWrapper
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -182,7 +183,7 @@ object Builder {
     purlOut.close()
 
     val ret = storage match {
-      case lf: (ListFileNames with Storage) if !dead_? =>
+      case lf: (ListFileNames & Storage) if !dead_? =>
         writeGoatRodeoFiles(lf)
       case _ => println("Didn't write"); None
     }
@@ -192,7 +193,7 @@ object Builder {
     ret
   }
 
-  def writeGoatRodeoFiles(store: ListFileNames with Storage): Option[File] = {
+  def writeGoatRodeoFiles(store: ListFileNames & Storage): Option[File] = {
     store.target() match {
       case Some(target) => {
         println(f"In store with target ${target}")
@@ -321,7 +322,7 @@ object ToProcess {
       var fileSet = TreeSet(
         Helpers
           .findFiles(root, _ => true)
-          .map(_.getAbsoluteFile()): _*
+          .map(_.getAbsoluteFile())*
       )
 
       val pomLike = buildQueueForPOMS(
@@ -337,7 +338,7 @@ object ToProcess {
 
       fileSet.foreach(f => {
         count.incrementAndGet()
-        queue.add(ToProcess(PackageIdentifier.computePurl(f), f, None, None))
+        queue.add(ToProcess(PackageIdentifier.computePurl(FileWrapper(f, f.getPath(), false)), f, None, None))
       })
 
       stillWorking.set(false)

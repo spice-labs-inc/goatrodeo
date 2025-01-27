@@ -1,4 +1,4 @@
-package io.spicelabs.goatrodeo.toplevel
+package goatrodeo.toplevel
 
 import java.io.File
 import org.json4s._
@@ -6,15 +6,15 @@ import org.json4s.native.JsonMethods._
 import java.nio.file.Files
 import java.nio.charset.Charset
 import scala.collection.JavaConverters.asScalaIteratorConverter
-import io.spicelabs.goatrodeo.omnibor.BuildGraph
-import io.spicelabs.goatrodeo.omnibor.MemStorage
+import goatrodeo.omnibor.BuildGraph
+import goatrodeo.omnibor.MemStorage
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.io.ByteArrayOutputStream
 import java.util.Date
 import java.util.Calendar
 import java.util.GregorianCalendar
-import io.spicelabs.goatrodeo.omnibor.FileAndGitoid
+import goatrodeo.omnibor.FileAndGitoid
 import java.nio.file.Path
 
 /** Methods associated with discovering Hidden Reaper issues
@@ -93,8 +93,7 @@ object HiddenReaper {
       println(f"Joined ${name}")
     }
 
-    val bad =
-      Map(res: _*)
+    val bad = Map(res*)
 
     if (!bad.isEmpty) {
       import org.json4s.JsonDSL._
@@ -241,7 +240,7 @@ object HiddenReaper {
           artifactIdToFoundItem(
             subArtifact
           )
-        )): _*
+        ))*
       )
       // maybe some phantom markers were found... but eliminated,
       // so check again
@@ -268,7 +267,7 @@ object HiddenReaper {
     val artToContainer = Map((for {
       (k, vs) <- containerToArtifactList.toVector
       v <- vs
-    } yield v -> k): _*)
+    } yield v -> k)*)
 
     (artToContainer, containerToArtifactList, artToContainer.keySet)
   }

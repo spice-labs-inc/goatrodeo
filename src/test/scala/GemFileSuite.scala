@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.goatrodeo.omnibor.{BuildGraph, EdgeType, MemStorage}
-import io.spicelabs.goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
+import goatrodeo.omnibor.{BuildGraph, EdgeType, MemStorage}
+import goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
 
 import java.io.{BufferedWriter, File, FileWriter}
 
@@ -24,17 +24,19 @@ class GemFileSuite extends munit.FunSuite {
   val logger = Logger("GemFileSuite")
 
   test("Simple file format parsing to ArtifactWrapper") {
+    val name = "test_data/gem_tests/java-properties-0.3.0.gem"
     assert(
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/gem_tests/java-properties-0.3.0.gem"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .isDefined
     )
   }
   test("Walk a Gem file") {
     var cnt = 0
+    val name = "test_data/gem_tests/java-properties-0.3.0.gem"
     val (inputStream, _) =
       FileWalker
-        .streamForArchive(FileWrapper(File("test_data/gem_tests/java-properties-0.3.0.gem"), false))
+        .streamForArchive(FileWrapper(File(name), name, false))
         .get
     for {
       e <- inputStream
@@ -50,7 +52,8 @@ class GemFileSuite extends munit.FunSuite {
   }
 
   test("deal with nesting archives inside a Gem") {
-    val nested = FileWrapper(File("test_data/gem_tests/java-properties-0.3.0.gem"), false)
+    val name = "test_data/gem_tests/java-properties-0.3.0.gem"
+    val nested = FileWrapper(File(name), name, false)
     assert(nested.isFile() && nested.exists())
 
     var cnt = 0

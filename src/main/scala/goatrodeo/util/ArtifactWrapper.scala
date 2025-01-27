@@ -1,10 +1,13 @@
-package io.spicelabs.goatrodeo.util
+package goatrodeo.util
 
 import java.io.InputStream
 import java.io.File
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.ByteArrayInputStream
+import org.apache.tika.config.TikaConfig
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -24,13 +27,13 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def asStream(): InputStream
+  def asStream(): BufferedInputStream
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
     *
     * @return
     */
-  def name(): String
+  def path(): String
 
   /** The number of bytes in the artifact. This is
     *
@@ -61,8 +64,8 @@ sealed trait ArtifactWrapper {
     */
   def listFiles(): Iterator[ArtifactWrapper]
 
-  def getCanonicalPath(): String
-  def getParentDirectory(): File
+  //def getCanonicalPath(): String
+  //def getParentDirectory(): File
   def delete(): Boolean
 
   /** Does the entity exist. Corresponds to `File.exists`
@@ -73,10 +76,31 @@ sealed trait ArtifactWrapper {
     */
   def exists(): Boolean
 
-  lazy val suffix = ArtifactWrapper.suffix(name())
+  lazy val mimeType: String =
+    ArtifactWrapper.mimeTypeFor(this.asStream(), this.path())
+
+  // lazy val suffix = ArtifactWrapper.suffix(name())
 }
 
 object ArtifactWrapper {
+
+  private val tika = new TikaConfig()
+
+  /** Given an input stream and a filename, get the mime type
+    *
+    * @param data
+    *   -- the input stream
+    * @param fileName
+    *   -- the name of the file
+    */
+  def mimeTypeFor(data: BufferedInputStream, fileName: String): String = {
+
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
+    val detected = tika.getDetector.detect(data, metadata)
+
+    detected.toString()
+  }
 
   /** What's the suffix for the name
     *
@@ -91,7 +115,7 @@ object ArtifactWrapper {
   }
 }
 
-final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
+final case class FileWrapper(f: File, thePath: String, deleteOnFinalize: Boolean)
     extends ArtifactWrapper {
 
   override protected def finalize(): Unit = {
@@ -107,22 +131,23 @@ final case class FileWrapper(f: File, deleteOnFinalize: Boolean)
   override def isFile(): Boolean = f.isFile()
 
   def listFiles(): Iterator[ArtifactWrapper] =
-    f.listFiles().iterator.map(FileWrapper(_, false))
+    f.listFiles().iterator.map(FileWrapper(_, f.getPath(), false))
 
-  override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
+  // override def getParentDirectory(): File = f.getAbsoluteFile().getParentFile()
 
-  override def getCanonicalPath(): String = f.getCanonicalPath()
+  // override def getCanonicalPath(): String = f.getCanonicalPath()
 
   // override def asFile(): (File, Boolean) = (f, false)
 
   def isDirectory(): Boolean = f.isDirectory()
 
-  override def asStream(): InputStream = BufferedInputStream(FileInputStream(f))
+  override def asStream(): BufferedInputStream = BufferedInputStream(
+    FileInputStream(f)
+  )
 
-  override def name(): String = f.getName()
+  override def path(): String = thePath
 
   override def size(): Long = f.length()
-
 
 }
 
@@ -137,15 +162,14 @@ final case class ByteWrapper(bytes: Array[Byte], fileName: String)
 
   def listFiles(): Iterator[ArtifactWrapper] = Iterator.empty
 
-  override def getParentDirectory(): File = File("/")
-
-  override def getCanonicalPath(): String = "/"
 
   def isDirectory(): Boolean = false
 
-  override def asStream(): InputStream = ByteArrayInputStream(bytes)
+  override def asStream(): BufferedInputStream = new BufferedInputStream(
+    ByteArrayInputStream(bytes)
+  )
 
-  override def name(): String = fileName
+  override def path(): String = fileName
 
   override def size(): Long = bytes.length
 }
