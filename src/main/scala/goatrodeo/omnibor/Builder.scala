@@ -38,11 +38,13 @@ import scala.annotation.tailrec
 import java.io.FileWriter
 import scala.collection.immutable.TreeSet
 import goatrodeo.util.FileWrapper
+import com.typesafe.scalalogging.Logger
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
   */
 object Builder {
+  val logger = Logger("Builder")
 
   /** Build the OmniBOR GitOID Corpus from all the JAR files contained in the
     * directory and its subdirectories. Put the results in Storage.
@@ -129,7 +131,7 @@ object Builder {
               val theDuration = Duration
                 .between(localStart, Instant.now())
               if (theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0) {
-                println(
+                logger.info(
                   f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
                       .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${String
                       .format("%,d", storage.size())}"
@@ -150,10 +152,10 @@ object Builder {
                   throw ioe
 
                 }
-                println(f"Failed ${toProcess.main} ${ioe}")
+                logger.error(f"Failed ${toProcess.main} ${ioe}")
               }
               case e: Exception => {
-                println(f"Failed ${toProcess.main} ${e}")
+                logger.error(f"Failed ${toProcess.main} ${e}")
                 // Helpers.bailFail()
               }
 
@@ -176,7 +178,7 @@ object Builder {
       }
       t.join()
     }
-    println(f"Finished processing ${runningCnt.get()} at ${Duration
+    logger.info(f"Finished processing ${runningCnt.get()} at ${Duration
         .between(start, Instant.now())}")
 
     purlOut.flush()
@@ -184,19 +186,93 @@ object Builder {
 
     val ret = storage match {
       case lf: (ListFileNames & Storage) if !dead_? =>
+        fixMerkleTrees(lf)
         writeGoatRodeoFiles(lf)
-      case _ => println("Didn't write"); None
+      case _ => logger.error("Didn't write"); None
     }
 
-    println(f"Total build time ${Duration.between(totalStart, Instant.now())}")
+    logger.info(
+      f"Total build time ${Duration.between(totalStart, Instant.now())}"
+    )
 
     ret
+  }
+
+  /** Finds all the Items that "Contain" other items and generate a Merkle Tree
+    * alias
+    *
+    * @param data
+    *   the items
+    */
+  def fixMerkleTrees(data: ListFileNames & Storage): Unit = {
+    val keys = data.keys()
+
+    logger.info(f"Computing merkle trees for ${keys.length} items")
+    val merkleTrees = for {
+      k <- keys
+      item <- data.read(k)
+      if !item.connections.filter(a => EdgeType.isContainsDown(a._1)).isEmpty
+    } yield {
+      item.identifier -> GitOIDUtils.merkleTreeFromGitoids(
+        item.connections.toVector
+          .filter(a => EdgeType.isContainsDown(a._1))
+          .map(_._2)
+      )
+    }
+
+    logger.info(f"Computed ${merkleTrees.length} Merkle Trees")
+
+    // write the aliases
+    for { (itemId, tree) <- merkleTrees } {
+      // create the Merkle Tree Alias
+      data.write(
+        tree,
+        maybeAlias => {
+          val alias = maybeAlias.getOrElse(
+            Item(
+              identifier = tree,
+              reference = Item.noopLocationReference,
+              connections = TreeSet(),
+              bodyMimeType = None,
+              body = None
+            )
+          )
+          val toAdd = (EdgeType.aliasTo, itemId)
+          val updatedAlias =
+            if (alias.connections.contains(toAdd)) { alias }
+            else {
+              alias.copy(
+                connections = (alias.connections + toAdd)
+              )
+            }
+          updatedAlias
+        }
+      )
+      // and update the Item with the AliasFrom
+      data.write(
+        itemId,
+        originalItem =>
+          originalItem match {
+            case None =>
+              throw new Exception(
+                f"Should be able to find ${itemId}, but it's missing"
+              )
+            case Some(item) =>
+              val toAdd = (EdgeType.aliasFrom, tree)
+              if (item.connections.contains(toAdd)) item
+              else item.copy(connections = item.connections + toAdd)
+          }
+      )
+    }
+
+    logger.info(f"Wrote ${merkleTrees.length} Merkle Trees")
+
   }
 
   def writeGoatRodeoFiles(store: ListFileNames & Storage): Option[File] = {
     store.target() match {
       case Some(target) => {
-        println(f"In store with target ${target}")
+        logger.info(f"In store with target ${target}")
         val start = Instant.now()
         // make sure the destination exists
         target.getAbsoluteFile().mkdirs()
@@ -208,7 +284,7 @@ object Builder {
           allItems
         }
 
-        println(
+        logger.info(
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
         val cnt = sorted.length
@@ -218,7 +294,7 @@ object Builder {
           sorted.toIterator
         )
 
-        println(
+        logger.info(
           f"Wrote ${cnt} entries in ${Duration.between(start, Instant.now())}"
         )
 
@@ -263,7 +339,7 @@ case class ToProcess(
 )
 
 object ToProcess {
-
+  val logger = Logger("ToProcess")
   def findTag(in: Elem, name: String): Option[String] = {
     val topper = in \ name
     if (topper.length == 1) {
@@ -304,7 +380,7 @@ object ToProcess {
       Thread.sleep(5)
     }
 
-    println(f"Found ${cnt.get()} items to process")
+    logger.info(f"Found ${cnt.get()} items to process")
 
     import scala.collection.JavaConverters.collectionAsScalaIterableConverter
     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -338,7 +414,14 @@ object ToProcess {
 
       fileSet.foreach(f => {
         count.incrementAndGet()
-        queue.add(ToProcess(PackageIdentifier.computePurl(FileWrapper(f, f.getPath(), false)), f, None, None))
+        queue.add(
+          ToProcess(
+            PackageIdentifier.computePurl(FileWrapper(f, f.getPath(), false)),
+            f,
+            None,
+            None
+          )
+        )
       })
 
       stillWorking.set(false)
@@ -360,7 +443,7 @@ object ToProcess {
       root,
       f => f.getName().endsWith(".pom")
     )
-    println(f"Finding all pom files got ${poms.length} in ${Duration
+    logger.info(f"Finding all pom files got ${poms.length} in ${Duration
         .between(start, Instant.now())}")
 
     val possibleSize = poms.length
@@ -476,7 +559,7 @@ object ToProcess {
     } {
       cnt += 1
       if (cnt % 5000 == 0) {
-        println(f"pom loading ${cnt} of ${possibleSize} at ${Duration
+        logger.info(f"pom loading ${cnt} of ${possibleSize} at ${Duration
             .between(start, Instant.now())}")
       }
 

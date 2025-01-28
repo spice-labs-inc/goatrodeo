@@ -285,53 +285,67 @@ object Helpers {
     computeMD5(FileInputStream(in))
   }
 
-  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
-    * efficient than secure hashes. It's used to compute the hash of file
-    * paths/names for indexing.
+  /** Compute the SHA1 hash of an input stream.
     *
     * @param in
     *   the String to get the hash for
     * @return
-    *   the 16 bytes of the MD5 hash
+    *   the sha1 hash
     */
   def computeSHA1(in: String): Array[Byte] = {
     computeSHA1(stringToInputStream(in))
   }
 
-  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
-    * efficient than secure hashes. It's used to compute the hash of file
-    * paths/names for indexing.
+  /** Compute the SHA1 hash of an input stream.
     *
     * @param in
     *   the String to get the hash for
     * @return
-    *   the 16 bytes of the MD5 hash
+    *   the sha1 hash
     */
   def computeSHA1(in: File): Array[Byte] = {
     computeSHA1(FileInputStream(in))
   }
 
-  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
-    * efficient than secure hashes. It's used to compute the hash of file
-    * paths/names for indexing.
+  /** Compute the SHA256 hash of a String
     *
     * @param in
     *   the String to get the hash for
     * @return
-    *   the 16 bytes of the MD5 hash
+    *   the SHA256 hash
     */
   def computeSHA256(in: String): Array[Byte] = {
     computeSHA256(stringToInputStream(in))
   }
 
-  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
-    * efficient than secure hashes. It's used to compute the hash of file
-    * paths/names for indexing.
+  /** Compute the SHA512 hash of a file.
     *
     * @param in
     *   the String to get the hash for
     * @return
-    *   the 16 bytes of the MD5 hash
+    *   the sha512 hash
+    */
+  def computeSHA512(in: File): Array[Byte] = {
+    computeSHA512(FileInputStream(in))
+  }
+
+  /** Compute the SHA512 hash of a String
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the SHA512 hash
+    */
+  def computeSHA512(in: String): Array[Byte] = {
+    computeSHA512(stringToInputStream(in))
+  }
+
+  /** Compute the SHA256 hash of a file.
+    *
+    * @param in
+    *   the String to get the hash for
+    * @return
+    *   the sha256 hash
     */
   def computeSHA256(in: File): Array[Byte] = {
     computeSHA256(FileInputStream(in))
@@ -346,6 +360,28 @@ object Helpers {
     */
   def computeSHA1(in: InputStream): Array[Byte] = {
     val md = MessageDigest.getInstance("SHA1")
+    val ba = new Array[Byte](4096)
+    while (true) {
+      val len = in.read(ba)
+      if (len <= 0) {
+        in.close()
+        return md.digest()
+      }
+
+      md.update(ba, 0, len)
+    }
+    ???
+  }
+
+  /** Compute the sha512 of an input stream
+    *
+    * @param in
+    *   the input stream
+    * @return
+    *   the bytes of the sha256 hash
+    */
+  def computeSHA512(in: InputStream): Array[Byte] = {
+    val md = MessageDigest.getInstance("SHA512")
     val ba = new Array[Byte](4096)
     while (true) {
       val len = in.read(ba)
@@ -400,6 +436,57 @@ object Helpers {
 
       override def next(): ArchiveEntry = last
 
+    }
+  }
+
+  /** Takes a String. If the string contains a ':', the hex to binary conversion
+    * starts on the character after the last ':'. Treats the rest of the String
+    * a hex. For each hex pair, convert into a byte and append to `out`
+    *
+    * @param in
+    *   the String to convert to binary
+    * @param the
+    *   output stream to append the bytes to
+    */
+  def convertHexToBinaryAndAppendToStream(
+      in: String,
+      out: OutputStream
+  ): Unit = {
+    val len = in.length()
+    val lastPos = len - 2
+    var pos = in.lastIndexOf(":") match {
+      case -1 => 0
+      case x  => x + 1
+    }
+
+    while (pos <= lastPos) {
+      val hi = charToBin(in.charAt(pos))
+      val low = charToBin(in.charAt(pos + 1))
+      val byte = hi * 16 + low
+      out.write(byte)
+      pos += 2
+    }
+  }
+
+  @inline def charToBin(c: Char): Int = {
+    c match {
+      case '0'       => 0
+      case '1'       => 1
+      case '2'       => 2
+      case '3'       => 3
+      case '4'       => 4
+      case '5'       => 5
+      case '6'       => 6
+      case '7'       => 7
+      case '8'       => 8
+      case '9'       => 9
+      case 'a' | 'A' => 10
+      case 'b' | 'B' => 11
+      case 'c' | 'C' => 12
+      case 'd' | 'D' => 13
+      case 'e' | 'E' => 14
+      case 'f' | 'F' => 15
+      case _         => 0
     }
   }
 
@@ -761,6 +848,30 @@ object GitOIDUtils {
     }
   }
 
+  /** Takes a set of gitoids, sorts them, converts to binary, and generates the
+    * Gitoid tree
+    *
+    * @param gitoids
+    *   the gitoids to build the tree for
+    *
+    * @return
+    *   the computed tree
+    */
+  def merkleTreeFromGitoids(
+      gitoids: Vector[String],
+      hashType: HashType = HashType.SHA256
+  ): String = {
+    val sorted = gitoids.sorted
+    val out = new ByteArrayOutputStream()
+    for (gitoid <- sorted) {
+      Helpers.convertHexToBinaryAndAppendToStream(gitoid, out)
+    }
+    out.flush()
+    val ba = out.toByteArray()
+    val in = new ByteArrayInputStream(ba)
+    url(in, ba.length, hashType, ObjectType.Tree)
+  }
+
   /** The hash type
     */
   enum HashType {
@@ -864,21 +975,13 @@ object GitOIDUtils {
       len: Long,
       hashType: HashType,
       tpe: ObjectType = ObjectType.Blob,
-      swhid: Boolean
   ): String = {
-    if (swhid) {
-      String.format(
-        "swh:1:cnt:%s",
-        hashAsHex(inputStream, len, HashType.SHA1, ObjectType.Blob)
-      );
-    } else {
       String.format(
         "gitoid:%s:%s:%s",
         tpe.gitoidName(),
         hashType.hashTypeName(),
         hashAsHex(inputStream, len, hashType, tpe)
-      );
-    }
+      )
   }
 
   def computeAllHashes(
@@ -886,23 +989,21 @@ object GitOIDUtils {
       continue_? : String => Boolean
   ): (String, Vector[String]) = {
     def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256, swhid = false)
+    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256)
 
     if (continue_?(gitoidSha256)) {
       (
         gitoidSha256,
         Vector(
-          url(is(), theFile.size(), HashType.SHA1, swhid = false),
-          url(is(), theFile.size(), HashType.SHA1, swhid = true),
+          url(is(), theFile.size(), HashType.SHA1),
           String
-            .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is())))
-            .intern(),
+            .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is()))),
           String
-            .format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is())))
-            .intern(),
+            .format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is()))),
+          String
+            .format("sha512:%s", Helpers.toHex(Helpers.computeSHA512(is()))),
           String
             .format("md5:%s", Helpers.toHex(Helpers.computeMD5(is())))
-            .intern()
         )
       )
     } else (gitoidSha256, Vector())
