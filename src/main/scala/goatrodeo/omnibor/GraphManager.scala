@@ -19,6 +19,7 @@ import java.time.ZoneOffset
 import java.nio.channels.FileChannel
 import java.time.Duration
 import scala.math.Ordering.Implicits._
+import goatrodeo.omnibor.BuildGraph.logger
 
 /** Manage many parts of persisting/retrieving the graph information
   */
@@ -70,29 +71,13 @@ object GraphManager {
 
       val entryBytes = entry.encodeCBOR() // compression.compress(entry.encodeCBOR())
 
-      // (for { env <- walker.envelopes() } yield {
-      //   (Helpers.toHex(env.keyMd5.hash), env.keyMd5.hash, env.position)
-      // }).toVector.sortBy(_._1)
-
-      // val itemEnvelope: ItemEnvelope = ItemEnvelope(
-      //   keyMd5 = MD5(md5),
-      //   position = currentPosition,
-      //   backpointer = previousPosition,
-      //   dataLen = entryBytes.length,
-      //   dataType = PayloadType.ENTRY
-      // )
-
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
 
-     // val envelopeBytes = itemEnvelope.encodeCBOR()
 
       val toAlloc = 256 + /*(envelopeBytes.length) + */(entryBytes.length)
       val bb = ByteBuffer.allocate(toAlloc)
-      // println(f"Writing # ${loopCnt} ${orgEntry.identifier} eb ${envelopeBytes.length} entB ${entryBytes.length} tried ${backing.length} bb alloc ${bb.capacity()}")
 
-     //  bb.putShort((envelopeBytes.length & 0xffff).toShort)
       bb.putInt(entryBytes.length)
-      //bb.put(envelopeBytes)
       bb.put(entryBytes)
 
       bb.flip()
@@ -104,7 +89,7 @@ object GraphManager {
       afterWrite(entry)
       loopCnt += 1
       if (loopCnt % 1000000 == 0) {
-        println(
+        logger.info(
           f"Write loop ${loopCnt} at ${Duration.between(start, Instant.now())}"
         )
       }
@@ -118,7 +103,7 @@ object GraphManager {
     // compute SHA256 of the file
     writer.close()
 
-    println(f"Finished write loop at ${Duration.between(start, Instant.now())}")
+    logger.info(f"Finished write loop at ${Duration.between(start, Instant.now())}")
 
     // rename the file to <sha256>.grd
     val sha256Long = Helpers.byteArrayToLong63Bits(
@@ -130,7 +115,7 @@ object GraphManager {
 
     tempFile.toFile().renameTo(targetFileName)
 
-    println(f"Finished rename at ${Duration.between(start, Instant.now())}")
+    logger.info(f"Finished rename at ${Duration.between(start, Instant.now())}")
 
     val targetIndexName =
       new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.gri")
@@ -159,7 +144,7 @@ object GraphManager {
 
     indexWriter.close()
 
-    println(
+    logger.info(
       f"Finished index write at ${Duration.between(start, Instant.now())}"
     )
 
@@ -172,7 +157,7 @@ object GraphManager {
 
     targetIndexName.renameTo(indexTargetFileName)
 
-    println(
+    logger.info(
       f"Finished index rename at ${Duration.between(start, Instant.now())}"
     )
 
@@ -251,7 +236,7 @@ object GraphManager {
     tempFile.toFile().renameTo(targetFile)
     if (false) {
       for { i <- biggest } {
-        println(
+        logger.info(
           f"Item ${i._1.identifier} ${i._1.body.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
         )
       }
