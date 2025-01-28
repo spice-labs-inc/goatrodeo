@@ -77,8 +77,8 @@ object Builder {
         Try{
           import scala.jdk.CollectionConverters.CollectionHasAsScala
 
-          val lines = Files.readAllLines(file.toPath()).asScala.toVector
-          Set(lines*)
+          val lines = Files.readAllLines(file.toPath()).asScala.toSet
+          lines
         }.toOption match {
           case None => Set()
           case Some(s) => s
