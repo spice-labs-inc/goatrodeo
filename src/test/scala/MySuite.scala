@@ -268,8 +268,46 @@ class MySuite extends munit.FunSuite {
         file.mkdirs()
         BufferedWriter(FileWriter(File(file, "purls.txt")))
       },
-      false
+      false,
+      Set()
     )
+
+    val built2 = BuildGraph.buildItemsFor(
+      nested,
+      nested.getName(),
+      MemStorage.getStorage(None),
+      Vector(),
+      None,
+      Map(), {
+        val file = File.createTempFile("goat_rodeo_purls", "_out")
+        file.delete()
+        file.mkdirs()
+        BufferedWriter(FileWriter(File(file, "purls.txt")))
+      },
+      false,
+      Set(
+        "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
+      )
+    )
+
+    val built3 = BuildGraph.buildItemsFor(
+      nested,
+      nested.getName(),
+      MemStorage.getStorage(None),
+      Vector(),
+      None,
+      Map(), {
+        val file = File.createTempFile("goat_rodeo_purls", "_out")
+        file.delete()
+        file.mkdirs()
+        BufferedWriter(FileWriter(File(file, "purls.txt")))
+      },
+      false,
+      Set()
+    )
+
+    assertEquals(built3.nameToGitOID, built.nameToGitOID, "Builds are reproducable")
+    assertNotEquals(built2.nameToGitOID, built.nameToGitOID, "Block list should work")
 
     assert(
       built.nameToGitOID.size > 1200,
@@ -321,7 +359,7 @@ class MySuite extends munit.FunSuite {
     import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
     for { toProcess <- files } {
-      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut)
+      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut, Set())
     }
 
     val keys = store.keys()
@@ -386,7 +424,7 @@ class MySuite extends munit.FunSuite {
             file.mkdirs()
             BufferedWriter(FileWriter(File(file, "purls.txt")))
           },
-          false
+          false, Set()
         )
         // No pURL
         // val pkgIndex = store.read("pkg:maven").get
@@ -418,7 +456,7 @@ class MySuite extends munit.FunSuite {
       import scala.collection.JavaConverters.collectionAsScalaIterableConverter
       import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-      Builder.buildDB(source, store, 32)
+      Builder.buildDB(source, store, 32, None)
 
       // no pURL
       // val pkgIndex = store.read("pkg:maven").get

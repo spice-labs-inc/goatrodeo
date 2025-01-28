@@ -38,6 +38,7 @@ import scala.annotation.tailrec
 import java.io.FileWriter
 import scala.collection.immutable.TreeSet
 import goatrodeo.util.FileWrapper
+import java.nio.file.Files
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -59,7 +60,8 @@ object Builder {
   def buildDB(
       source: File,
       storage: Storage,
-      threadCnt: Int
+      threadCnt: Int,
+      blockList: Option[File]
   ): Option[File] = {
     val totalStart = Instant.now()
     val runningCnt = AtomicInteger(0)
@@ -67,6 +69,22 @@ object Builder {
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
+
+    // Get the gitoids to block
+    val blockGitoids: Set[String] = blockList match {
+      case None => Set()
+      case Some(file) => 
+        Try{
+          import scala.jdk.CollectionConverters.CollectionHasAsScala
+
+          val lines = Files.readAllLines(file.toPath()).asScala.toSet
+          lines
+        }.toOption match {
+          case None => Set()
+          case Some(s) => s
+        }
+      
+    }
 
     val destDir = storage
       .destDirectory()
@@ -123,7 +141,8 @@ object Builder {
               BuildGraph.graphForToProcess(
                 toProcess,
                 storage,
-                purlOut
+                purlOut,
+                blockGitoids
               )
               val updatedCnt = cnt.addAndGet(1)
               val theDuration = Duration

@@ -61,7 +61,8 @@ object Howdy {
       threads: Int = 4,
       fetchURL: URL = new URL("https://goatrodeo.org/omnibor"),
       hiddenNoMore: Boolean = false,
-      toAnalyzeDir: File = new File("/jars_to_test")
+      toAnalyzeDir: File = new File("/jars_to_test"),
+      blockList: Option[File] = None,
   )
 
   lazy val builder = OParser.builder[Config]
@@ -75,6 +76,7 @@ object Howdy {
           c.copy(analyze = Some(x).filter(f => f.exists() && f.isFile()))
         )
         .text("Analyze a JAR or WAR file"),
+      opt[File]("block").action((x,c) => c.copy(blockList = Some(x))),
       opt[URL]('f', "fetch")
         .text("Fetch OmniBOR ids from which URL")
         .action((u, c) => c.copy(fetchURL = u)),
@@ -138,32 +140,32 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(Config(None, outDir, None, threads, _, true, toAnalyzeDir)) =>
+      case Some(Config(None, outDir, None, threads, _, true, toAnalyzeDir, _)) =>
         HiddenReaper.deGrimmify(toAnalyzeDir, outDir.getOrElse(new File("/out")), threads)
 
-      case Some(Config(Some(_), _, Some(_), _, _, false, _)) =>
+      case Some(Config(Some(_), _, Some(_), _, _, false, _, _)) =>
         println("Cannot do both analysis and building...")
         println(OParser.usage(parser1))
         Helpers.bailFail()
 
-      case Some(Config(None, _, None, _, _, false, _)) =>
+      case Some(Config(None, _, None, _, _, false, _, _)) =>
         println("You must either build or analyze...");
         println(OParser.usage(parser1))
         Helpers.bailFail()
 
-      case Some(Config(Some(analyzeFile), _, _, _, fetch, false, _)) =>
+      case Some(Config(Some(analyzeFile), _, _, _, fetch, false, _, _)) =>
         Analyzer.analyze(analyzeFile, fetch)
 
-      case Some(Config(_, out, Some(buildFrom), threads, _, false, _))
+      case Some(Config(_, out, Some(buildFrom), threads, _, false, _, block))
           if out.isDefined =>
         Builder.buildDB(
           buildFrom,
           Storage.getStorage(out),
-          threads
+          threads, block, 
         )
 
       case Some(
-            Config(_, out, Some(buildFrom), threads, _, false, _)
+            Config(_, out, Some(buildFrom), threads, _, false, _, _)
           ) =>
         println(
           "`out`  must be defined... where does the build result go?"

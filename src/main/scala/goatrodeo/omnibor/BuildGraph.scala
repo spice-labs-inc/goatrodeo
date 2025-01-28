@@ -20,7 +20,8 @@ object BuildGraph {
   def graphForToProcess(
       item: ToProcess,
       store: Storage,
-      purlOut: BufferedWriter
+      purlOut: BufferedWriter,
+      blockGitoids: Set[String]
   ): Unit = {
 
     item match {
@@ -35,7 +36,8 @@ object BuildGraph {
             None,
             Map(),
             purlOut,
-            false
+            false,
+            blockGitoids
           )
         )
 
@@ -50,7 +52,8 @@ object BuildGraph {
           pom,
           Map(),
           purlOut,
-          true
+          true,
+          blockGitoids
         )
 
         pom.toVector
@@ -66,7 +69,8 @@ object BuildGraph {
           pom,
           sourceBuilt.nameToGitOID,
           purlOut,
-          false
+          false,
+          blockGitoids
         )
         pom.toVector
           .flatMap(_.purl())
@@ -82,7 +86,8 @@ object BuildGraph {
           pom,
           Map(),
           purlOut = purlOut,
-          false
+          false,
+          blockGitoids
         )
     }
 
@@ -127,7 +132,8 @@ object BuildGraph {
       topPackageIdentifier: Option[PackageIdentifier],
       associatedFiles: Map[String, GitOID],
       purlOut: BufferedWriter,
-      dontSkipFound: Boolean
+      dontSkipFound: Boolean,
+      blockGitoids: Set[String]
   ): BuiltItemResult = {
     var nameToGitOID: Map[String, String] = Map()
     var parentStackToGitOID: Map[Vector[FileAndGitoid], String] = Map()
@@ -144,86 +150,92 @@ object BuildGraph {
         val (mainFileGitOID, foundAliases) =
           GitOIDUtils.computeAllHashes(file, s => !store.exists(s))
 
-        val parentStack = lastParentStack :+ FileAndGitoid(name, mainFileGitOID)
-        if (parent.isEmpty) {
-          rootGitoid = mainFileGitOID
-        }
-        val foundGitOID = store.exists(mainFileGitOID)
-        val packageIds: Vector[String] = topPackageIdentifier.toVector
-          .flatMap(
-            _.purl().map(
-              _ +
-                (if (
-                   name.endsWith("?packaging=sources") ||
-                   file.path().indexOf("-sources.") >= 0 ||
-                   name.indexOf("-sources.") >= 0
-                 ) { "?packaging=sources" }
-                 else { "" })
-            )
-          )
-          .filter(_ => parent.isEmpty)
-        packageIds.foreach(pid => purlOut.write(f"${pid}\n"))
-        val aliases = foundAliases ++ packageIds
+        if (!blockGitoids.contains(mainFileGitOID)) {
 
-        val mimeType = file.mimeType
-        val associatedSource = Helpers.computeAssociatedSource(
-          file,
-          mimeType,
-          associatedFiles
-        ) // FileType.theType(name, Some(file), associatedFiles)
-
-        logger.trace(s"File Name: $name Type: $mimeType")
-
-        val computedConnections: TreeSet[Edge] =
-          // built from a source files
-          associatedSource.map(gitoid => (EdgeType.builtFrom, gitoid))
-          ++
-          // include parent back-reference
-          (parent match {
-            case Some(parentId) =>
-              Vector[Edge]((EdgeType.containedBy, parentId))
-            case None => topConnections
-          })
-          ++
-          // include aliases only if we aren't merging this item (if we're)
-          // merging, then the aliases already exist and no point in regenerating them
-          (aliases.map(alias => (EdgeType.aliasFrom, alias))).toSet
-
-        val thePackageIdentifier =
-          if (parent.isEmpty) topPackageIdentifier else None
-
-        val item = Item(
-          identifier = mainFileGitOID,
-          reference = Item.noopLocationReference,
-          connections = computedConnections,
-          bodyMimeType = Some("application/vnd.cc.goatrodeo"),
-          body = Some(
-            ItemMetaData.from(
-              name,
-              mimeType,
-              thePackageIdentifier match {
-                case Some(pi) => pi.toStringMap()
-                case None     => TreeMap()
-              },
-              thePackageIdentifier,
-              fileSize = file.size()
-            )
-          )
-        ).fixReferences(store)
-        nameToGitOID = nameToGitOID + (name -> mainFileGitOID)
-        parentStackToGitOID =
-          parentStackToGitOID + (parentStack -> mainFileGitOID)
-
-        store.write(
-          mainFileGitOID,
-          current => {
-            current match {
-              case None        => item
-              case Some(other) => other.merge(item)
-            }
+          val parentStack =
+            lastParentStack :+ FileAndGitoid(name, mainFileGitOID)
+          if (parent.isEmpty) {
+            rootGitoid = mainFileGitOID
           }
-        )
-        (mainFileGitOID, foundGitOID, None, parentStack)
+          val foundGitOID = store.exists(mainFileGitOID)
+          val packageIds: Vector[String] = topPackageIdentifier.toVector
+            .flatMap(
+              _.purl().map(
+                _ +
+                  (if (
+                     name.endsWith("?packaging=sources") ||
+                     file.path().indexOf("-sources.") >= 0 ||
+                     name.indexOf("-sources.") >= 0
+                   ) { "?packaging=sources" }
+                   else { "" })
+              )
+            )
+            .filter(_ => parent.isEmpty)
+          packageIds.foreach(pid => purlOut.write(f"${pid}\n"))
+          val aliases = foundAliases ++ packageIds
+
+          val mimeType = file.mimeType
+          val associatedSource = Helpers.computeAssociatedSource(
+            file,
+            mimeType,
+            associatedFiles
+          ) // FileType.theType(name, Some(file), associatedFiles)
+
+          logger.trace(s"File Name: $name Type: $mimeType")
+
+          val computedConnections: TreeSet[Edge] =
+            // built from a source files
+            associatedSource.map(gitoid => (EdgeType.builtFrom, gitoid))
+            ++
+            // include parent back-reference
+            (parent match {
+              case Some(parentId) =>
+                Vector[Edge]((EdgeType.containedBy, parentId))
+              case None => topConnections
+            })
+            ++
+            // include aliases only if we aren't merging this item (if we're)
+            // merging, then the aliases already exist and no point in regenerating them
+            (aliases.map(alias => (EdgeType.aliasFrom, alias))).toSet
+
+          val thePackageIdentifier =
+            if (parent.isEmpty) topPackageIdentifier else None
+
+          val item = Item(
+            identifier = mainFileGitOID,
+            reference = Item.noopLocationReference,
+            connections = computedConnections,
+            bodyMimeType = Some("application/vnd.cc.goatrodeo"),
+            body = Some(
+              ItemMetaData.from(
+                name,
+                mimeType,
+                thePackageIdentifier match {
+                  case Some(pi) => pi.toStringMap()
+                  case None     => TreeMap()
+                },
+                thePackageIdentifier,
+                fileSize = file.size()
+              )
+            )
+          ).fixReferences(store)
+          nameToGitOID = nameToGitOID + (name -> mainFileGitOID)
+          parentStackToGitOID =
+            parentStackToGitOID + (parentStack -> mainFileGitOID)
+
+          store.write(
+            mainFileGitOID,
+            current => {
+              current match {
+                case None        => item
+                case Some(other) => other.merge(item)
+              }
+            }
+          )
+          (mainFileGitOID, foundGitOID, None, parentStack)
+        } else {
+          (mainFileGitOID, false, None, lastParentStack)
+        }
       }
     )
     BuiltItemResult(rootGitoid, nameToGitOID, parentStackToGitOID)

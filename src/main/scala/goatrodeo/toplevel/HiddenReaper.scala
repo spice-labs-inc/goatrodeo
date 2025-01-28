@@ -178,7 +178,8 @@ object HiddenReaper {
           new BufferedWriter(
             new OutputStreamWriter(new ByteArrayOutputStream())
           ),
-          false
+          false,
+          Set()
         )
       } catch {
         case e: Exception =>
