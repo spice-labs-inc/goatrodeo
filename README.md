@@ -33,8 +33,6 @@ Maven Central. Goat Rodeo can be used to "unmask" the Hidden Reapers in any JAR 
 
 **Goat Rodeo _requires_ [Git LFS](https://git-lfs.com/) to build**
 
-Install [large file support for Git](https://git-lfs.com/).
-
 Install [sbt](https://www.scala-sbt.org/) to build and run Goat Rodeo.
 
 To create an "assembly" (a stand-alone executable JAR file): `sbt assembly`
