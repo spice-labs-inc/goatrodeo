@@ -14,7 +14,6 @@ limitations under the License. */
 
 package goatrodeo
 
-import goatrodeo.loader.{Loader, Analyzer}
 import scala.collection.JavaConverters._
 import java.io.File
 import java.io.FileInputStream
@@ -35,13 +34,13 @@ import org.apache.commons.io.filefilter.WildcardFileFilter
 import java.io.FileFilter
 import java.nio.ByteBuffer
 import goatrodeo.util.Helpers.bailFail
-import goatrodeo.toplevel.HiddenReaper
 import goatrodeo.util.FileWrapper
+import com.typesafe.scalalogging.Logger
 
 /** The `main` class
   */
 object Howdy {
-
+  val logger = Logger(getClass())
   /** Command Line Configuration
     *
     * @param analyze
@@ -55,13 +54,9 @@ object Howdy {
     *   number of physical CPUs
     */
   case class Config(
-      analyze: Option[File] = None,
       out: Option[File] = None,
       build: Option[File] = None,
       threads: Int = 4,
-      fetchURL: URL = new URL("https://goatrodeo.org/omnibor"),
-      hiddenNoMore: Boolean = false,
-      toAnalyzeDir: File = new File("/jars_to_test"),
       blockList: Option[File] = None,
   )
 
@@ -70,16 +65,8 @@ object Howdy {
     import builder._
     OParser.sequence(
       programName("goatrodeo"),
-      head("goatrodeo", "0.4.6"),
-      opt[File]('a', "analyze")
-        .action((x, c) =>
-          c.copy(analyze = Some(x).filter(f => f.exists() && f.isFile()))
-        )
-        .text("Analyze a JAR or WAR file"),
+      head("goatrodeo", "0.6.2"),
       opt[File]("block").action((x,c) => c.copy(blockList = Some(x))),
-      opt[URL]('f', "fetch")
-        .text("Fetch OmniBOR ids from which URL")
-        .action((u, c) => c.copy(fetchURL = u)),
       opt[File]('b', "build")
         .text("Build gitoid database from jar files in a directory")
         .action((x, c) =>
@@ -88,12 +75,6 @@ object Howdy {
       opt[File]('o', "out")
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
-      opt[File]("toanalyzedir")
-        .text("The directory to scan for Hidden Reaper items")
-        .action((x, c) => c.copy(toAnalyzeDir = x)),
-      opt[Unit]("unmask")
-        .text("Test artifacts against the grim list and unmask Hidden Reapers")
-        .action((_, c) => c.copy(hiddenNoMore = true)),
       opt[Int]('t', "threads")
         .text(
           "How many threads to run (default 4). Should be 2x-3x number of cores"
@@ -140,23 +121,10 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(Config(None, outDir, None, threads, _, true, toAnalyzeDir, _)) =>
-        HiddenReaper.deGrimmify(toAnalyzeDir, outDir.getOrElse(new File("/out")), threads)
 
-      case Some(Config(Some(_), _, Some(_), _, _, false, _, _)) =>
-        println("Cannot do both analysis and building...")
-        println(OParser.usage(parser1))
-        Helpers.bailFail()
 
-      case Some(Config(None, _, None, _, _, false, _, _)) =>
-        println("You must either build or analyze...");
-        println(OParser.usage(parser1))
-        Helpers.bailFail()
 
-      case Some(Config(Some(analyzeFile), _, _, _, fetch, false, _, _)) =>
-        Analyzer.analyze(analyzeFile, fetch)
-
-      case Some(Config(_, out, Some(buildFrom), threads, _, false, _, block))
+      case Some(Config(out, Some(buildFrom), threads, block))
           if out.isDefined =>
         Builder.buildDB(
           buildFrom,
@@ -165,9 +133,9 @@ object Howdy {
         )
 
       case Some(
-            Config(_, out, Some(buildFrom), threads, _, false, _, _)
+            Config(out, Some(buildFrom), threads, _)
           ) =>
-        println(
+        logger.error(
           "`out`  must be defined... where does the build result go?"
         )
         println(OParser.usage(parser1))

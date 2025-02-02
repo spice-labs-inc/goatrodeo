@@ -16,34 +16,7 @@ case class IndexFile(
     envelope: IndexFileEnvelope,
     file: File,
     dataOffset: Long
-) {
-  def readIndex(): Vector[ItemOffset] = {
-    ??? // FIXME write readIndex
-    // let mut last = [0u8; 16];
-    // let mut not_sorted = false;
-    // let mut my_file = self
-    //     .file
-    //     .lock()
-    //     .map_err(|e| anyhow!("Failed to lock {:?}", e))?;
-    // let fp: &mut File = &mut my_file;
-    // fp.seek(SeekFrom::Start(self.data_offset))?;
-
-    // for _ in 0..self.envelope.size {
-    //     let eo = EntryOffset::read(fp)?;
-    //     if eo.hash < last {
-    //         not_sorted = true;
-    //     }
-    //     last = eo.hash;
-    //     ret.push(eo);
-    // }
-
-    // if not_sorted {
-    //     ret.sort_by(|a, b| a.hash.cmp(&b.hash))
-    // }
-
-    // Ok(ret)
-  }
-}
+)
 
 object IndexFile {
   def open(dir: File, hash: Long): IndexFile = {

@@ -83,7 +83,7 @@ trait Storage {
     * @param data
     *   the data to write
     */
-  def write(path: String, opr: Option[Item] => Item): Unit
+  def write(path: String, opr: Option[Item] => Item): Item
 
   /** Write data to the path
     *
@@ -111,48 +111,33 @@ trait Storage {
     *
     * @return
     */
-  def keys(): Vector[String]
+  def keys(): Set[String]
+
+  def contains(identifier: String): Boolean
+
+  /**
+    * return only the keys that start with "gitoid:blob:sha256:"
+    *
+    * @return
+    */
+  def gitoidKeys(): Set[GitOID] = keys().filter(_.startsWith("gitoid:blob:sha256:"))
 
   def destDirectory(): Option[File]
 }
 
-trait StorageReader {
-  def read(path: GitOID): Option[String]
-}
+// trait StorageReader {
+//   def read(path: GitOID): Option[String]
+// }
 
-trait BulkStorageReader {
-  def bulkRead(
-      paths: Set[GitOID],
-      known: Map[GitOID, Option[Item]],
-      totalBytes: Long = 0
-  ): Map[GitOID, Option[Item]]
-}
+// trait BulkStorageReader {
+//   def bulkRead(
+//       paths: Set[GitOID],
+//       known: Map[GitOID, Option[Item]],
+//       totalBytes: Long = 0
+//   ): Map[GitOID, Option[Item]]
+// }
 
-class FileStorageReader(base: String) extends StorageReader {
-  private val baseFile = new File(base)
 
-  def read(path: String): Option[String] = {
-    val stuff = GitOIDUtils.urlToFileName(path)
-    val theFile =
-      new File(baseFile, f"${stuff._1}/${stuff._2}/${stuff._3}.json")
-    if (theFile.exists()) {
-
-      Try {
-        new String(Helpers.slurpInput(theFile), "UTF-8")
-      }.toOption
-    } else None
-  }
-}
-
-object StorageReader {
-  def from(url: URL): StorageReader = {
-    if (url.getProtocol() == "file") {
-      new FileStorageReader(url.getPath())
-    } else {
-      throw new IOException(f"Cannot build storage reader for ${url}")
-    }
-  }
-}
 
 /** Can the filenames be listed?
   */
@@ -163,7 +148,7 @@ trait ListFileNames extends Storage {
     * @return
     *   the paths, sorted
     */
-  def sortedPaths(): Vector[String] = keys().sorted
+  def sortedPaths(): Vector[String] = keys().toVector.sorted
 
   /** All the paths in the backing store and the MD5 hash of the path. Sorted by
     * MD5 hash
@@ -209,20 +194,23 @@ class MemStorage(val targetDir: Option[File])
     extends Storage
     with ListFileNames {
 
+
+  override def contains(identifier: String): Boolean = db.get().contains(identifier)
+
   override def destDirectory(): Option[File] = targetDir
 
   private val sync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
   private val locks: java.util.HashMap[String, AtomicInteger] =
     java.util.HashMap()
-  def keys(): Vector[String] = {
+  def keys(): Set[String] = {
 
-    db.get().keysIterator.toVector
+    db.get().keySet
 
   }
 
   override def pathsSortedWithMD5(): Vector[(String, String)] = {
-    keys().map(k => (Helpers.md5hashHex(k), k)).sorted
+    keys().toVector.map(k => (Helpers.md5hashHex(k), k)).sorted
   }
 
   override def size() = db.get().size
@@ -237,7 +225,7 @@ class MemStorage(val targetDir: Option[File])
     ret
   }
 
-  override def write(path: String, opr: Option[Item] => Item): Unit = {
+  override def write(path: String, opr: Option[Item] => Item): Item = {
     val lock = sync.synchronized {
       val theLock = Option(locks.get(path)) match {
         case Some(lock) => lock
@@ -258,6 +246,7 @@ class MemStorage(val targetDir: Option[File])
         sync.synchronized {
           val newVal = db.get() + (path -> updated)
           db.set(newVal)
+          updated
         }
       }
     } finally {

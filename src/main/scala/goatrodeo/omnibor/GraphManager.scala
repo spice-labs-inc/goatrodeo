@@ -19,11 +19,12 @@ import java.time.ZoneOffset
 import java.nio.channels.FileChannel
 import java.time.Duration
 import scala.math.Ordering.Implicits._
-import goatrodeo.omnibor.BuildGraph.logger
+import com.typesafe.scalalogging.Logger
 
 /** Manage many parts of persisting/retrieving the graph information
   */
 object GraphManager {
+  val logger = Logger(getClass())
   object Consts {
     val DataFileMagicNumber: Int = 0x00be1100 // Bell
     val IndexFileMagicNumber: Int = 0x54154170 // Shishitō
