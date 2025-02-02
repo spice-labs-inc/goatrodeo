@@ -149,9 +149,18 @@ object Builder {
                     if (
                       theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
                     ) {
+                      val totalDuration = Duration.between(start, Instant.now())
+                      val totalItems = runningCnt.get()
+                      val avgMsg = if (totalDuration.getSeconds() > 0) {
+                        val itemsPerSecond = updatedCnt.toDouble / totalDuration
+                          .getSeconds()
+                          .toDouble
+                        val itemsPerMinute = itemsPerSecond * 60.0d
+                        val left = totalItems.toDouble - updatedCnt.toDouble
+                        f" Items/minute ${itemsPerMinute.round}, est remaining ${(left / itemsPerMinute).round} minutes"
+                      } else ""
                       logger.info(
-                        f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
-                            .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${String
+                        f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
                       )
                     }
@@ -207,8 +216,10 @@ object Builder {
       }
       t.join()
     }
-    logger.info(f"Finished processing ${runningCnt.get()} at ${Duration
-        .between(start, Instant.now())}")
+    logger.info(
+      f"Finished processing ${runningCnt.get()}, vertices ${storage.size()} at ${Duration
+          .between(start, Instant.now())}"
+    )
 
     val ret = storage match {
       case lf: (ListFileNames & Storage) if !dead_? =>

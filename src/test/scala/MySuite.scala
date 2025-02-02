@@ -314,7 +314,7 @@ class MySuite extends munit.FunSuite {
 
   test("Build from Java") {
     val source = File("test_data/jar_test")
-    val strategy = ToProcess.strategyForDirectory(source)
+    val strategy = ToProcess.strategyForDirectory(source, false)
 
     assert(
       strategy.length >= 2,

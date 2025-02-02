@@ -143,18 +143,23 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
 
 trait ParentScope {
   def beginProcessing(artifact: ArtifactWrapper, item: Item): Item = item
-  def enhanceWithPurls(artifact: ArtifactWrapper,item: Item, purls: Vector[PackageURL]): Item = item
-  def enhanceWithMetadata(artifact: ArtifactWrapper,
+  def enhanceWithPurls(
+      artifact: ArtifactWrapper,
+      item: Item,
+      purls: Vector[PackageURL]
+  ): Item = item
+  def enhanceWithMetadata(
+      artifact: ArtifactWrapper,
       item: Item,
       metadata: TreeMap[String, TreeSet[StringOrPair]],
       paths: Vector[String]
   ): Item = item
-  def finalAugmentation(artifact: ArtifactWrapper,item: Item): Item = item
-  def postFixReferences(artifact: ArtifactWrapper,item: Item): Unit = ()
+  def finalAugmentation(artifact: ArtifactWrapper, item: Item): Item = item
+  def postFixReferences(artifact: ArtifactWrapper, item: Item): Unit = ()
 }
 
 object ParentScope {
-  def empty: ParentScope = new ParentScope{}
+  def empty: ParentScope = new ParentScope {}
 }
 
 /** A file or set of files to process
@@ -171,9 +176,8 @@ trait ToProcess {
     */
   def mimeType: String
 
-  /**
-   * The number of items (e.g., jar, sources, pom) in this process bundle
-   */
+  /** The number of items (e.g., jar, sources, pom) in this process bundle
+    */
   def itemCnt: Int
 
   /** Return the list of artifacts to process along with a `MarkerType` and an
@@ -220,8 +224,9 @@ trait ToProcess {
 
               // enhance with package URLs
               val item2 = itemScope1.enhanceItemWithPurls(purls)
-             
-              val itemScope2 = parentScope.enhanceWithPurls(artifact, item2, purls)
+
+              val itemScope2 =
+                parentScope.enhanceWithPurls(artifact, item2, purls)
 
               // compute metadata
               val (metadata, state3) =
@@ -229,7 +234,10 @@ trait ToProcess {
 
                 // update metadata
               val item3 =
-                itemScope2.enhanceWithMetadata(metadata, Vector(artifact.path()))
+                itemScope2.enhanceWithMetadata(
+                  metadata,
+                  Vector(artifact.path())
+                )
 
               val itemScope3 = parentScope.enhanceWithMetadata(
                 artifact,
@@ -273,7 +281,11 @@ trait ToProcess {
                   FileWalker.withinArchiveStream(artifact = artifact) {
                     foundItems =>
                       val processSet =
-                        ToProcess.strategiesForArtifacts(foundItems, x => ())
+                        ToProcess.strategiesForArtifacts(
+                          foundItems,
+                          x => (),
+                          false
+                        )
                       val parentScope = state4.generateParentScope(
                         artifact,
                         answerItem,
@@ -333,26 +345,38 @@ object ToProcess {
     */
   def strategyForDirectory(
       directory: File,
+      infoMsgs_? : Boolean,
       onFound: ToProcess => Unit = _ => ()
   ): Vector[ToProcess] = {
     val wrappers = Helpers
       .findFiles(directory, _ => true)
       .map(f => FileWrapper(f, f.getPath()))
 
-    strategiesForArtifacts(wrappers, onFound = onFound)
+    strategiesForArtifacts(wrappers, onFound = onFound, infoMsgs_?)
   }
 
   def strategiesForArtifacts(
-      artifacts: Seq[ArtifactWrapper],
-      onFound: ToProcess => Unit
+      artifacts: Vector[ArtifactWrapper],
+      onFound: ToProcess => Unit,
+      infoMsgs_? : Boolean
   ): Vector[ToProcess] = {
 
-    logger.trace("Creating strategies for artifacts")
+    val totalCnt = artifacts.length
+    val by50 = (totalCnt / 50) match {
+      case 0 => 1
+      case x => x
+    }
+    if (infoMsgs_?) logger.info("Creating strategies for artifacts")
     // create the list of the files
-    val byUUID: ByUUID = Map(
-      artifacts.map(f => f.uuid -> f)*
-    )
+    val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
+      f.mimeType
+      if (idx % by50 == 0 && infoMsgs_?) {
+        logger.info(f"Initial file setup ${idx} of ${totalCnt}")
+      }
+      f.uuid -> f
+    }*)
 
+    if (infoMsgs_?) logger.info("Built UUID map")
     // and by name for lookup
     val byName: ByName =
       artifacts.foldLeft(Map()) { case (map, wrapper) =>
@@ -363,18 +387,20 @@ object ToProcess {
         map + (wrapper.filenameWithNoPath -> (v :+ wrapper))
       }
 
-    logger.trace("Finished setting up files for per-ecosystem specialization")
+    if (infoMsgs_?)
+      logger.info("Finished setting up files for per-ecosystem specialization")
 
     val (processSet, finalByUUID, finalByName) =
       computeToProcess.zipWithIndex.foldLeft(
         (Vector[ToProcess](), byUUID, byName)
       ) { case ((workingSet, workingByUUID, workingByName), (theFn, cnt)) =>
-        logger.trace(f"Processing step ${cnt + 1}")
+        if (infoMsgs_?) logger.info(f"Processing step ${cnt + 1}")
         val (addlToProcess, revisedByUUID, revisedByName, name) =
           theFn(workingByUUID, workingByName)
-        logger.trace(
-          f"Finished processing step ${cnt + 1} for ${name} found ${addlToProcess.length}"
-        )
+        if (infoMsgs_?)
+          logger.info(
+            f"Finished processing step ${cnt + 1} for ${name} found ${addlToProcess.length}"
+          )
 
         // put the new items to process in the queue
         addlToProcess.foreach(onFound)
@@ -411,9 +437,12 @@ object ToProcess {
             queue.add(toProcess)
             val total = count.addAndGet(toProcess.itemCnt)
             if (total % 1000 == 0) {
-                logger.info(f"built strategies to handle ${total} of ${allFiles.length}")
+              logger.info(
+                f"built strategies to handle ${total} of ${allFiles.length}"
+              )
             }
-          }
+          },
+          true
         )
 
         logger.info("Finished setting files up")
@@ -480,7 +509,7 @@ object ToProcess {
   ): Storage = {
 
     // generate the strategy
-    val toProcess = strategiesForArtifacts(Vector(artifact), _ => ())
+    val toProcess = strategiesForArtifacts(Vector(artifact), _ => (), false)
 
     buildGraphForToProcess(toProcess, store, purlOut, block)
 

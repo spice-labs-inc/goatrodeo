@@ -47,7 +47,7 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  lazy val _mimeType: String =
+  private lazy val _mimeType: String =
     ArtifactWrapper.mimeTypeFor(this.asStream(), this.path())
 
   def mimeType: String = _mimeType
