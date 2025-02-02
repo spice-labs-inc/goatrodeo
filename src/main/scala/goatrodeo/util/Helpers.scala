@@ -759,7 +759,6 @@ object Helpers {
   ): File = {
 
     val retFile =  Files.createTempFile(tempDir, "goats", ".temp").toFile()
-    retFile.deleteOnExit()
     val ret = FileOutputStream(retFile)
     val buffer = new Array[Byte](4096)
 
