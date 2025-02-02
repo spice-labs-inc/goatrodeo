@@ -301,10 +301,12 @@ object Builder {
     store.target() match {
       case Some(target) => {
         logger.info(f"In store with target ${target}")
+        target.mkdirs()
         val start = Instant.now()
 
         logger.info(f"Writing ${purlOut.length} Package URLs")
         val purlFile = File(target, "purls.txt")
+        purlFile.createNewFile()
         val bw = new BufferedWriter(new FileWriter(purlFile))
         try {
           import scala.jdk.CollectionConverters.CollectionHasAsScala

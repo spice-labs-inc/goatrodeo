@@ -170,7 +170,7 @@ case class MavenState(
                     .toSeq*
                 )
 
-                ret + ("manifest" -> TreeSet(StringOrPair(manifestString)))
+                ret + ("manifest" -> TreeSet(StringOrPair("text/maven-manifest", manifestString)))
 
               case None => TreeMap[String, TreeSet[StringOrPair]]()
             }
@@ -306,36 +306,4 @@ object MavenToProcess {
 
     (toProcess, revisedByUUID, revisedByName, "Maven")
   }
-
-  // def findTag(in: Elem, name: String): Option[String] = {
-  //   val topper = in \ name
-  //   if (topper.length == 1) {
-  //     topper.text match {
-  //       case s if s.length() > 0 => Some(s)
-  //       case _                   => None
-  //     }
-
-  //   } else {
-  //     val t2 = in \ "parent" \ name
-  //     if (t2.length == 1 && t2.text.length() > 0) { Some(t2.text) }
-  //     else None
-  //   }
-  // }
-
-  // def tryToFixVersion(
-  //     in: Option[String],
-  //     fileName: String
-  // ): Option[String] = {
-  //   in match {
-  //     case Some(s) if s.startsWith("${") =>
-  //       val fn2 =
-  //         fileName.substring(0, fileName.length() - 4) // remove ".pom"
-  //       val li = fn2.lastIndexOf("-")
-  //       if (li >= 0) {
-  //         Some(fn2.substring(li + 1))
-  //       } else in
-  //     case _ => in
-  //   }
-  // }
-
 }

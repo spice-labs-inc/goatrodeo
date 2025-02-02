@@ -659,6 +659,28 @@ object Helpers {
     ret.toByteArray()
   }
 
+  /**
+    * Copy from input stream to output stream
+    *
+    * @param in the input stream
+    * @param out the output stream
+    * @return number of bytes
+    */
+  def copy(in: InputStream, out: OutputStream): Long = {
+    var cnt = 0L 
+    val buffer: Array[Byte] = new Array[Byte](4096)
+    var bytesRead = 0
+    while ({bytesRead = in.read(buffer)
+      bytesRead >= 0}) {
+        if (bytesRead > 0) {
+          cnt += bytesRead
+          out.write(buffer, 0, bytesRead)
+        }
+      }
+    out.flush()
+    cnt
+  }
+
   def slurpInputToString(what: InputStream): String = {
     new String(slurpInput(what), "UTF-8")
   }
@@ -722,27 +744,6 @@ object Helpers {
 
   }
 
-  /** Within the context of a temporary file, do something
-    *
-    * @param what
-    *   the stream to create the temporaray file from
-    * @param close_?
-    *   close the stream on copy
-    * @param theFn
-    *   the function to execute with the temporarary file
-    * @return
-    *   the result of the function
-    */
-  def withTemporaryFile[T](what: InputStream, close_? : Boolean)(
-      theFn: File => T
-  ): T = {
-    val tempFile = tempFileFromStream(what, close_?, "temp")
-    try {
-      theFn(tempFile)
-    } finally {
-      tempFile.delete()
-    }
-  }
 
   /** Slurp the contents of an InputStream into a temp file
     *
@@ -754,20 +755,10 @@ object Helpers {
   def tempFileFromStream(
       what: InputStream,
       close_? : Boolean,
-      fileName: String
+      tempDir: Path
   ): File = {
-    val lastDot = fileName.lastIndexOf(".")
-    val suffix = lastDot match {
-      case n if n <= 0 => "goat"
-      case n if {
-            val lastSlash = fileName.lastIndexOf("/")
-            lastSlash < n
-          } =>
-        val it = fileName.substring(n)
-        if (it.length() > 0) it else "goat"
-      case _ => "goat"
-    }
-    val retFile = File.createTempFile("goat_rodeo", f".${suffix}")
+
+    val retFile =  Files.createTempFile(tempDir, "goats", ".temp").toFile()
     retFile.deleteOnExit()
     val ret = FileOutputStream(retFile)
     val buffer = new Array[Byte](4096)

@@ -20,6 +20,10 @@ import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
 import java.nio.file.Files
 import java.nio.file.Path
+import org.apache.commons.compress.utils.IOUtils
+import java.io.FileOutputStream
+import java.io.ByteArrayOutputStream
+import java.io.ByteArrayInputStream
 
 enum FileAction {
   case SkipDive
@@ -27,51 +31,6 @@ enum FileAction {
 }
 object FileWalker {
   val logger = Logger(getClass())
-
-  /** If the file size is greater than 16MB, then always make it a file, don't
-    * keep the bytes in memory
-    */
-  val forceToFileSize = (16L * 1024L * 1024L)
-
-  val forceToFileMimeTypes: Set[String] = Set(
-    "application/x-rpm",
-    "application/x-debian-package",
-    "application/x-iso9660-image",
-    "application/zlib",
-    "type application/x-gtar",
-    "application/zip",
-    "application/java-archive",
-    "application/gzip"
-  )
-
-  /** Should the entity be turned into a real file or will an in-memory set of
-    * bytes suffice?
-    *
-    * @param wrapper
-    *   the ArtifactWrapper to test
-    * @return
-    *   true if the file is large or it's on the "we care about these suffixes
-    *   list"
-    */
-  def shouldForceToFile(wrapper: ArtifactWrapper): Boolean = {
-    shouldForceToFile(wrapper.size(), wrapper.mimeType)
-  }
-
-  /** Should the entity be turned into a real file or will an in-memory set of
-    * bytes suffice?
-    *
-    * @param size
-    *   the size of the entity
-    * @param mimeType
-    *   Mime type of the entity
-    * @return
-    *   true if the file is large or it's on the "we care about these suffixes
-    *   list"
-    */
-  def shouldForceToFile(size: Long, mimeType: String): Boolean = {
-
-    size >= forceToFileSize || forceToFileMimeTypes.contains(mimeType)
-  }
 
   private lazy val zipMimeTypes: Set[String] =
     Set(
@@ -89,41 +48,45 @@ object FileWalker {
     *   the file to try to construct the stream from
     * @return
     */
-  private def asZipContainer(in: ArtifactWrapper): OptionalArchiveStream = {
+  private def asZipContainer(
+      in: ArtifactWrapper,
+      tempDir: Path
+  ): OptionalArchiveStream = {
     if (zipMimeTypes.contains(in.mimeType)) {
       import scala.collection.JavaConverters.asScalaIteratorConverter
-      val (theFile, deleteIt) = in match {
-        case FileWrapper(f, _) => f -> false
-        case _ =>
-          Helpers.tempFileFromStream(in.asStream(), true, in.path()) -> true
+      val theFile = in match {
+        case FileWrapper(f, _) => f
+        case _ => {
+          val tempFile =
+            Helpers.tempFileFromStream(in.asStream(), true, tempDir)
+
+          tempFile
+        }
       }
 
       try {
 
         val zipFile = ZipFile(theFile)
-        val it: Iterator[() => (String, InputStream, Boolean)] = zipFile
+        val it: Vector[ArtifactWrapper] = zipFile
           .stream()
           .iterator()
           .asScala
           .filter(v => { !v.isDirectory() })
-          .map(v =>
-            () => {
-              val name = v.getName()
-              (name, zipFile.getInputStream(v), true)
-            }
-          )
+          .map(v => {
+            val name = v.getName()
+            val size = v.getSize()
+            ArtifactWrapper
+              .newWrapper(name, size, zipFile.getInputStream(v), tempDir)
+          })
+          .toVector
+        zipFile.close()
         Some(
           it,
-          "Zip Container",
-          (() => {
-            zipFile.close(); if (deleteIt) theFile.delete(); ()
-          })
+          "Zip Container"
         )
 
       } catch {
         case e: Exception =>
-          if (deleteIt) theFile.delete()
-
           logger.error(
             f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}"
           )
@@ -139,36 +102,55 @@ object FileWalker {
     * @param in
     * @return
     */
-  private def asISOWrapper(in: ArtifactWrapper): OptionalArchiveStream = {
+  private def asISOWrapper(
+      in: ArtifactWrapper,
+      tempPath: Path
+  ): OptionalArchiveStream = {
     if (isoMimeTypes.contains(in.mimeType)) {
       try {
         import scala.collection.JavaConverters.asScalaIteratorConverter
-        val (theFile, deleteIt) = in match {
-          case FileWrapper(f, _) => f -> false
+        val theFile = in match {
+          case FileWrapper(f, _) => f
           case _ =>
-            Helpers.tempFileFromStream(in.asStream(), true, in.path()) -> true
+            Helpers.tempFileFromStream(in.asStream(), true, tempPath)
         }
 
-        logger.trace(s"TheFile: $theFile")
         val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
-        logger.trace(s"isoFileReader: ${isoFileReader}")
+
         try {
 
           val files = isoFileReader.getAllFiles()
 
+          import scala.jdk.CollectionConverters.ListHasAsScala
           val flatList =
-            isoFileReader.convertTreeFilesToFlatList(files).iterator.asScala
-          Some(
-            for (cycleFile <- flatList if !cycleFile.isDirectory())
-              yield { () =>
-                {
-                  val name = cycleFile.getFileName()
+            isoFileReader.convertTreeFilesToFlatList(files).asScala.toVector
 
-                  (name, isoFileReader.getFileStream(cycleFile), false)
-                }
-              },
-            "ISO Reader",
-            () => (isoFileReader.close())
+          val wrappers =
+            for (cycleFile <- flatList)
+              yield {
+
+                val nameWithThing = cycleFile.getFullFileName('/')
+                val name =
+                  (if (nameWithThing.endsWith(";1")) {
+                     nameWithThing.substring(0, nameWithThing.length() - 2)
+
+                   } else nameWithThing).toLowerCase()
+
+                val size = cycleFile.getSize()
+
+                ArtifactWrapper.newWrapper(
+                  name,
+                  size,
+                  isoFileReader.getFileStream(cycleFile),
+                  tempPath
+                )
+              }
+
+          isoFileReader.close()
+
+          Some(
+            wrappers,
+            "ISO Reader"
           )
 
         } catch {
@@ -176,9 +158,6 @@ object FileWalker {
             logger.error(s"Try getAllFiles failed: ${e.getMessage}", e)
             isoFileReader.close()
             None
-        } finally {
-          // delete the temporary file
-          if (deleteIt) theFile.delete()
         }
       } catch {
         case e: Exception =>
@@ -203,8 +182,7 @@ object FileWalker {
   private def asApacheCommonsArchiveWrapper(
       in: () => InputStream,
       name: String,
-      mime: String,
-      synthetic: Boolean
+      tempDir: Path
   ): OptionalArchiveStream = {
     val factory = (new ArchiveStreamFactory())
 
@@ -218,14 +196,17 @@ object FileWalker {
       val theIterator = Helpers
         .iteratorFor(input)
         .filter(!_.isDirectory())
-        .map(ae =>
-          () => {
-            val name = ae.getName()
+        .map(ae => {
+          val artifactName = ae.getName()
 
-            (name, input, false)
-          }
-        )
-      Some(theIterator, "Apache Common Wrapper", (() => input.close()))
+          val size = ae.getSize()
+
+          ArtifactWrapper.newWrapper(artifactName, size, input, tempDir)
+        })
+        .toVector
+      input.close()
+
+      Some(theIterator -> "Apache Common Wrapper")
     } catch {
       case e: Exception =>
         fis.close(); None
@@ -263,7 +244,8 @@ object FileWalker {
     "application/x-mspublisher",
     "application/octet-stream",
     "application/x-dtbresource+xml",
-    "application/vnd.iccprofile"
+    "application/vnd.iccprofile",
+    "multipart/appledouble"
   )
 
   val notZip = Set(
@@ -276,6 +258,16 @@ object FileWalker {
     "application/zstd"
   )
 
+  def notArchive(in: ArtifactWrapper): Boolean =
+    notArchive(in.path(), in.mimeType)
+
+  def notArchive(path: String, mimeType: String): Boolean = {
+    mimeType.startsWith("text/") ||
+    mimeType.startsWith("image/") ||
+    definitelyNotArchive.contains(mimeType) ||
+    (mimeType == "application/zip" && path.endsWith(".xpi"))
+  }
+
   /** Try a series of strategies (except for uncompressing a file) for creating
     * an archive stream
     *
@@ -286,25 +278,20 @@ object FileWalker {
     *   piece and a closing/cleanup function which *must* be called
     */
   private def tryToConstructArchiveStream(
-      in: ArtifactWrapper
+      in: ArtifactWrapper,
+      tempDir: Path
   ): OptionalArchiveStream = {
     val mimeType = in.mimeType
-    if (
-      mimeType.startsWith("text/") || mimeType.startsWith(
-        "image/"
-      ) || definitelyNotArchive.contains(in.mimeType) || (
-        mimeType == "application/zip" && in.path().endsWith(".xpi")
-      )
-    ) None
+    if (notArchive(in)) None
     else {
       {
-        val ret = asZipContainer(in)
+        val ret = asZipContainer(in, tempDir)
 
         ret
-      }.orElse(asISOWrapper(in).orElse {
-
-        val (inputStreamBuilder, synthetic, uncompressedCleanupFunc)
-            : (() => InputStream, Boolean, () => Unit) =
+      }.orElse(asISOWrapper(in, tempDir).orElse {
+        // the inputstream to the apache stuff is either a
+        // decompressed file or the input stream from the artifact
+        val inputStreamBuilder: () => InputStream =
           Try {
             try {
               val factory = new CompressorStreamFactory()
@@ -313,17 +300,20 @@ object FileWalker {
               val input: CompressorInputStream =
                 factory.createCompressorInputStream(fis)
 
-              val theFile = Helpers.tempFileFromStream(input, true, "Temp")
-              (
-                () => new BufferedInputStream(new FileInputStream(theFile)),
-                true,
-                () => { theFile.delete(); () }
-              )
+              val theFile =
+                Files.createTempFile(tempDir, "goats", "uncompressed").toFile()
 
+              val fos = new FileOutputStream(theFile)
+              Helpers.copy(input, fos)
+              fos.close()
+
+              () => new BufferedInputStream(new FileInputStream(theFile))
             } catch {
               case e: Exception =>
                 if (
-                  in.path().endsWith(".tgz") || in.path().endsWith(".apk") || in
+                  in.path().endsWith(".tgz") ||
+                  in.path().endsWith(".apk") ||
+                  in
                     .path()
                     .endsWith(".xz")
                 ) {
@@ -335,17 +325,13 @@ object FileWalker {
                 throw e
             }
           }.toOption
-            .getOrElse((() => in.asStream(), false, () => ()))
+            .getOrElse(() => new BufferedInputStream(in.asStream()))
+
         asApacheCommonsArchiveWrapper(
           inputStreamBuilder,
           in.path(),
-          in.mimeType,
-          synthetic
-        ) match {
-          case None => uncompressedCleanupFunc(); None
-          case Some(iterator, name, cleanup) =>
-            Some(iterator, name, () => { uncompressedCleanupFunc(); cleanup() })
-        }
+          tempDir
+        )
       })
     }
   }
@@ -366,49 +352,37 @@ object FileWalker {
   def withinArchiveStream[T](artifact: ArtifactWrapper)(
       function: Vector[ArtifactWrapper] => T
   ): Option[T] = {
-    tryToConstructArchiveStream(artifact) match {
-      case None                                 => None
-      case Some(stream, wrapperName, closeFunc) =>
-        // create temporary directory
-        val tempDir: Path = Files.createTempDirectory("goatrodeo_temp_dir")
+    if (notArchive(artifact)) None
+    else {
+      // create temporary directory
+      val tempDir: Path = Files.createTempDirectory("goatrodeo_temp_dir")
 
-        try {
-          // for each stream, create a file in the temp dir and an associated FileWrapper
+      try {
+        tryToConstructArchiveStream(artifact, tempDir) match {
+          case None => None
+          case Some(artifacts -> wrapperName) =>
+            try {
 
-          val artifacts: Vector[ArtifactWrapper] = (for {
-            artifactFunc <- stream
-            (name, inputStream, closeIt) <- Try {
-              artifactFunc()
-            }.toOption.toVector
-          } yield {
-            val tempFile = Files
-              .createTempFile(tempDir, "intermediate_goat", ".tmp")
-              .toFile()
-            Helpers.streamToFile(inputStream, closeIt, tempFile)
-            FileWrapper(tempFile, name)
-          }).toVector
-
-          // call the function
-          Some(function(artifacts))
-        } catch {
-          case e: Exception =>
-            logger.error(
-              f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e.getMessage()}"
-            )
-            None
-        } finally {
-          // clean up
-          Helpers.deleteDirectory(tempDir)
-
-          // close the archive stream
-          closeFunc()
+              // call the function
+              Some(function(artifacts))
+            } catch {
+              case e: Exception =>
+                logger.error(
+                  f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e.getMessage()}"
+                )
+                None
+            }
         }
+      } finally {
+        // clean up
+        Helpers.deleteDirectory(tempDir)
+
+      }
     }
   }
 
   /** A stream of ArtifactWrappers... maybe
     */
   private type OptionalArchiveStream =
-    Option[(Iterator[() => (String, InputStream, Boolean)], String, () => Unit)]
-
+    Option[(Vector[ArtifactWrapper], String)]
 }
