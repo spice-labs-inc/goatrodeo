@@ -409,7 +409,10 @@ object ToProcess {
           allFiles,
           toProcess => {
             queue.add(toProcess)
-            count.addAndGet(toProcess.itemCnt)
+            val total = count.addAndGet(toProcess.itemCnt)
+            if (total % 100 == 0) {
+                logger.info(f"built strategies to handle ${total} of ${allFiles.length}")
+            }
           }
         )
 
