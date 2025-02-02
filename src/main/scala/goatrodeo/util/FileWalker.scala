@@ -262,7 +262,8 @@ object FileWalker {
     "application/wsdl+xml",
     "application/x-mspublisher",
     "application/octet-stream",
-    "application/x-dtbresource+xml"
+    "application/x-dtbresource+xml",
+    "application/vnd.iccprofile"
   )
 
   val notZip = Set(
@@ -291,7 +292,9 @@ object FileWalker {
     if (
       mimeType.startsWith("text/") || mimeType.startsWith(
         "image/"
-      ) || definitelyNotArchive.contains(in.mimeType)
+      ) || definitelyNotArchive.contains(in.mimeType) || (
+        mimeType == "application/zip" && in.path().endsWith(".xpi")
+      )
     ) None
     else {
       {
