@@ -261,7 +261,8 @@ object FileWalker {
     "application/x-bat",
     "application/wsdl+xml",
     "application/x-mspublisher",
-    "application/octet-stream"
+    "application/octet-stream",
+    "application/x-dtbresource+xml"
   )
 
   val notZip = Set(
