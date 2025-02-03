@@ -170,7 +170,9 @@ case class MavenState(
                     .toSeq*
                 )
 
-                ret + ("manifest" -> TreeSet(StringOrPair("text/maven-manifest", manifestString)))
+                ret + ("manifest" -> TreeSet(
+                  StringOrPair("text/maven-manifest", manifestString)
+                ))
 
               case None => TreeMap[String, TreeSet[StringOrPair]]()
             }
@@ -217,6 +219,7 @@ case class MavenState(
       // the code that associates source with class files
       new ParentScope {
         override def finalAugmentation(
+            store: Storage,
             artifact: ArtifactWrapper,
             item: Item
         ): Item = {

@@ -142,20 +142,34 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
 }
 
 trait ParentScope {
-  def beginProcessing(artifact: ArtifactWrapper, item: Item): Item = item
+  def beginProcessing(
+      store: Storage,
+      artifact: ArtifactWrapper,
+      item: Item
+  ): Item = item
   def enhanceWithPurls(
+      store: Storage,
       artifact: ArtifactWrapper,
       item: Item,
       purls: Vector[PackageURL]
   ): Item = item
   def enhanceWithMetadata(
+      store: Storage,
       artifact: ArtifactWrapper,
       item: Item,
       metadata: TreeMap[String, TreeSet[StringOrPair]],
       paths: Vector[String]
   ): Item = item
-  def finalAugmentation(artifact: ArtifactWrapper, item: Item): Item = item
-  def postFixReferences(artifact: ArtifactWrapper, item: Item): Unit = ()
+  def finalAugmentation(
+      store: Storage,
+      artifact: ArtifactWrapper,
+      item: Item
+  ): Item = item
+  def postFixReferences(
+      store: Storage,
+      artifact: ArtifactWrapper,
+      item: Item
+  ): Unit = ()
 }
 
 object ParentScope {
@@ -218,7 +232,8 @@ trait ToProcess {
               orgState -> alreadyDone
             } else {
               val state = orgState.beginProcessing(artifact, item, marker)
-              val itemScope1 = parentScope.beginProcessing(artifact, item)
+              val itemScope1 =
+                parentScope.beginProcessing(store, artifact, item)
               // get purls
               val (purls, state2) = state.getPurls(artifact, itemScope1, marker)
 
@@ -226,7 +241,7 @@ trait ToProcess {
               val item2 = itemScope1.enhanceItemWithPurls(purls)
 
               val itemScope2 =
-                parentScope.enhanceWithPurls(artifact, item2, purls)
+                parentScope.enhanceWithPurls(store, artifact, item2, purls)
 
               // compute metadata
               val (metadata, state3) =
@@ -240,6 +255,7 @@ trait ToProcess {
                 )
 
               val itemScope3 = parentScope.enhanceWithMetadata(
+                store,
                 artifact,
                 item3,
                 metadata,
@@ -250,7 +266,8 @@ trait ToProcess {
               val (item4, state4) =
                 state3.finalAugmentation(artifact, itemScope3, marker)
 
-              val itemScope4 = parentScope.finalAugmentation(artifact, item4)
+              val itemScope4 =
+                parentScope.finalAugmentation(store, artifact, item4)
 
               // if we've seen the gitoid before we write it
               val hasBeenSeen = store.contains(itemScope4.identifier)
@@ -267,10 +284,12 @@ trait ToProcess {
               // update purls
               purls.foreach(purlOut)
 
-              // fix the references
-              answerItem.fixReferences(store)
+              // update back-references for this item and others
+              answerItem
+                .buildListOfReferencesForAliasFromBuiltFromContainedBy()
+                .foreach(_.createOrUpdateInStore(store))
 
-              parentScope.postFixReferences(artifact, answerItem)
+              parentScope.postFixReferences(store, artifact, answerItem)
 
               atEnd(parentId, answerItem)
 
