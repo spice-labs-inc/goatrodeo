@@ -199,7 +199,11 @@ class MemStorage(val targetDir: Option[File])
 
   override def destDirectory(): Option[File] = targetDir
 
+  // synchronize access to the locks map
   private val sync = new Object()
+
+  // synchronize access to the database
+  private val dbSync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
   private val locks: java.util.HashMap[String, AtomicInteger] =
     java.util.HashMap()
@@ -243,7 +247,7 @@ class MemStorage(val targetDir: Option[File])
       lock.synchronized {
         val current = read(path)
         val updated = opr(current)
-        sync.synchronized {
+        dbSync.synchronized {
           val newVal = db.get() + (path -> updated)
           db.set(newVal)
           updated
