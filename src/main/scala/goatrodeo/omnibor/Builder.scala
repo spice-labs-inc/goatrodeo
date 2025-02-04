@@ -67,6 +67,8 @@ object Builder {
       blockList: Option[File]
   ): Option[File] = {
     val totalStart = Instant.now()
+    @volatile var processStart = Instant.now()
+    @volatile var seenFirst = false
     val runningCnt = AtomicInteger(0)
     val (queue, stillWorking) =
       ToProcess.buildQueueOnSeparateThread(source, runningCnt)
@@ -131,6 +133,11 @@ object Builder {
               toProcess
             } != null
           ) {
+            // improve the computation of Item/minute
+            if (!seenFirst) {
+              seenFirst = true
+              processStart = Instant.now()
+            }
             val localStart = Instant.now()
             try {
               // build the package
@@ -149,15 +156,18 @@ object Builder {
                     if (
                       theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
                     ) {
-                      val totalDuration = Duration.between(start, Instant.now())
+                      val now = Instant.now()
+                      val totalDuration = Duration.between(start, now)
+                      val processDuration = Duration.between(processStart, now)
                       val totalItems = runningCnt.get()
-                      val avgMsg = if (totalDuration.getSeconds() > 0) {
+                      val avgMsg = if (processDuration.getSeconds() > 0) {
                         val itemsPerSecond = updatedCnt.toDouble / totalDuration
                           .getSeconds()
                           .toDouble
                         val itemsPerMinute = itemsPerSecond * 60.0d
                         val left = totalItems.toDouble - updatedCnt.toDouble
-                        f" Items/minute ${itemsPerMinute.round}, est remaining ${(left / itemsPerMinute).round} minutes"
+                        val remainingDuration = Duration.ZERO.plusSeconds((left / itemsPerSecond).round)
+                        f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
                       } else ""
                       logger.info(
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
