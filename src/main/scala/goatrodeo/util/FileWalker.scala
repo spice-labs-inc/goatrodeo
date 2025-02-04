@@ -35,7 +35,8 @@ object FileWalker {
   private lazy val zipMimeTypes: Set[String] =
     Set(
       "application/zip",
-      "application/java-archive"
+      "application/java-archive",
+      "application/vnd.android.package-archive"
     )
 
   private lazy val isoMimeTypes: Set[String] = Set(
@@ -265,6 +266,13 @@ object FileWalker {
     "application/zstd"
   )
 
+  val notCompressedSet = Set[String](
+    "application/vnd.android.package-archive",
+    //"application/x-debian-package",
+    //"application/gzip",
+    //"application/x-gtar"
+  )
+
   def notArchive(in: ArtifactWrapper): Boolean =
     notArchive(in.path(), in.mimeType)
 
@@ -273,6 +281,12 @@ object FileWalker {
     mimeType.startsWith("image/") ||
     definitelyNotArchive.contains(mimeType) ||
     (mimeType == "application/zip" && path.endsWith(".xpi"))
+  }
+
+  def notCompressed(path: String, mimeType: String): Boolean = {
+    mimeType.startsWith("text/") ||
+    mimeType.startsWith("image/") ||
+    notCompressedSet.contains(mimeType)
   }
 
   /** Try a series of strategies (except for uncompressing a file) for creating
@@ -299,40 +313,48 @@ object FileWalker {
         // the inputstream to the apache stuff is either a
         // decompressed file or the input stream from the artifact
         val inputStreamBuilder: () => InputStream =
-          Try {
-            try {
-              val factory = new CompressorStreamFactory()
-              val fis = new BufferedInputStream(in.asStream())
+          (if (notCompressed(in.path(), in.mimeType)) None
+           else {
+             Try {
 
-              val input: CompressorInputStream =
-                factory.createCompressorInputStream(fis)
+               try {
+                 val factory = new CompressorStreamFactory()
+                 val fis = new BufferedInputStream(in.asStream())
 
-              val theFile =
-                Files.createTempFile(tempDir, "goats", "uncompressed").toFile()
+                 val input: CompressorInputStream =
+                   factory.createCompressorInputStream(fis)
 
-              val fos = new FileOutputStream(theFile)
-              Helpers.copy(input, fos)
-              fos.close()
+                 val theFile =
+                   Files
+                     .createTempFile(tempDir, "goats", "uncompressed")
+                     .toFile()
 
-              () => new BufferedInputStream(new FileInputStream(theFile))
-            } catch {
-              case e: Exception =>
-                if (
-                  in.path().endsWith(".tgz") ||
-                  in.path().endsWith(".apk") ||
-                  in
-                    .path()
-                    .endsWith(".xz")
-                ) {
-                  logger.error(
-                    f"Expected to open apk/tgz/xz ${in
-                        .path()} -- ${in.mimeType} but got ${e.getMessage()}",
-                    e
-                  )
-                }
-                throw e
-            }
-          }.toOption
+                 val fos = new FileOutputStream(theFile)
+                 Helpers.copy(input, fos)
+                 fos.close()
+
+                 () => new BufferedInputStream(new FileInputStream(theFile))
+               } catch {
+                 case e: Exception =>
+                   if (
+                     /*true ||*/ (in.mimeType != "application/vnd.android.package-archive" && (
+                       in.path().endsWith(".tgz") ||
+                         in.path().endsWith(".apk") ||
+                         in
+                           .path()
+                           .endsWith(".xz")
+                     ))
+                   ) {
+                     logger.error(
+                       f"Expected to open apk/tgz/xz ${in
+                           .path()} -- ${in.mimeType} but got ${e.getMessage()}",
+                       e
+                     )
+                   }
+                   throw e
+               }
+             }.toOption
+           })
             .getOrElse(() => new BufferedInputStream(in.asStream()))
 
         asApacheCommonsArchiveWrapper(

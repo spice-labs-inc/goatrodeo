@@ -134,7 +134,8 @@ object Builder {
             } != null
           ) {
             // improve the computation of Item/minute
-            if (!seenFirst) {
+            // set processing start time after we've seen 30+ items
+            if (!seenFirst && runningCnt.get() > 30) {
               seenFirst = true
               processStart = Instant.now()
             }
