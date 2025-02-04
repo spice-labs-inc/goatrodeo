@@ -23,14 +23,11 @@ import io.bullet.borer.Cbor
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import goatrodeo.omnibor.BuildGraph
 import goatrodeo.omnibor.MemStorage
 import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.omnibor.Builder
 import goatrodeo.omnibor.GraphManager
-import goatrodeo.util.PackageIdentifier
-import goatrodeo.util.PackageProtocol
 import java.io.IOException
 import java.io.BufferedWriter
 import java.io.FileWriter
@@ -40,6 +37,9 @@ import goatrodeo.util.FileWalker
 import goatrodeo.util.FileWrapper
 import java.io.BufferedInputStream
 import goatrodeo.util.ArtifactWrapper
+import goatrodeo.util.PURLHelpers.Ecosystems
+import goatrodeo.omnibor.strategies.Debian
+import com.github.packageurl.PackageURL
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -105,139 +105,139 @@ class MySuite extends munit.FunSuite {
     assert({
       val name = "test_data/HP1973-Source.zip"
       FileWalker
-        .streamForArchive(
-          FileWrapper(File(name), name, false)
-        )
+        .withinArchiveStream(
+          FileWrapper(File(name), name)
+        ) { _ => 42 }
         .isDefined
     })
     assert({
       val name = "test_data/log4j-core-2.22.1.jar"
       FileWalker
-        .streamForArchive(
-          FileWrapper(File(name), name, false)
-        )
-        .isDefined
-    })
-    assert({
-      val name = "test_data/empty.tgz"
-      FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
-        .isDefined
-    })
-    assert({
-      val name = "test_data/toml-rs.tgz"
-      FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
-        .isDefined
-    })
-    assert({
-      val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
-      FileWalker
-        .streamForArchive(
-          FileWrapper(File(name), name, false)
-        )
-        .isDefined
-    })
-    assert({
-      val name = "test_data/tk-8.6.13-r2.apk"
-      FileWalker
-        .streamForArchive(
-          FileWrapper(File(name), name, false)
-        )
+        .withinArchiveStream(
+          FileWrapper(File(name), name)
+        ) { _ => 42 }
         .isDefined
     })
 
     assert({
       val name = "test_data/ics_test.tar"
       FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
+        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
         .isDefined
     })
 
     assert({
       val name = "test_data/nested.tar"
       FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
+        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
+        .isDefined
+    })
+
+    assert({
+      val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
+      FileWalker
+        .withinArchiveStream(
+          FileWrapper(File(name), name)
+        ) { _ => 42 }
+        .isDefined
+    })
+    assert({
+      val name = "test_data/tk-8.6.13-r2.apk"
+      FileWalker
+        .withinArchiveStream(
+          FileWrapper(File(name), name)
+        ) { _ => 42 }
+        .isDefined
+    })
+
+    assert({
+      val name = "test_data/empty.tgz"
+      FileWalker
+        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
+        .isDefined
+    })
+    assert({
+      val name = "test_data/toml-rs.tgz"
+      FileWalker
+        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
         .isDefined
     })
 
   }
 
   test("Walk a tar file") {
-    var cnt = 0
     val name = "test_data/empty.tgz"
-    val (inputStream, _) =
+    val count =
       FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
+        .withinArchiveStream(FileWrapper(File(name), name)) { x => x.length }
         .get
-    for {
-      e <- inputStream
-      (name, file) = e()
-    } {
-      cnt += 1
-      file.delete()
-    }
 
-    assert(cnt > 2)
+    assert(count > 2)
   }
 
   test("deal with nesting") {
     val name = "test_data/nested.tar"
-    val nested = FileWrapper(File(name), name, false)
-    assert(nested.isFile() && nested.exists())
+    val nested = FileWrapper(File(name), name)
 
-    var cnt = 0
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
 
-    FileWalker.processFileAndSubfiles(
-      nested,
-      "nested",
-      None,
-      Vector[String](),
-      false,
-      (file, name, parent, x) => {
-        cnt += 1
-        val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false, None, x)
-      }
-    )
+    val gitoids = store.gitoidKeys()
+    val cnt = gitoids.size
+
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
 
   test("Compute pURL for .deb") {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
-    val purl = PackageIdentifier.computePurl(
-      FileWrapper(File(name), name, false)
-    )
-    assert(purl.isDefined, "Should compute a purl")
-    assertEquals(purl.get.artifactId, "tk8.6")
+    val (maybePurl, attrs) = Debian
+      .computePurl(
+        FileWrapper(File(name), name)
+      )
+      .get
+    assert(maybePurl.isDefined, "Should compute a purl")
+    val purl = maybePurl.get
+    assertEquals(purl.getName(), "tk8.6")
     assert(
-      purl.get.extra.get("maintainer").get.size > 0,
+      attrs.get("maintainer").get.size > 0,
       "Should have a mainter"
     )
+    assert(
+      attrs.get("description").get.head.value.contains("look-and-feel"),
+      "The description must support multi-line"
+    )
+  }
+
+  test("Compute pURL for another .deb") {
+    val name = "test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"
+
+    val (maybePurl, attrs) = Debian
+      .computePurl(
+        FileWrapper(File(name), name)
+      )
+      .get
+    assert(maybePurl.isDefined, "Should compute a purl")
+    val purl = maybePurl.get
+    assertEquals(purl.getName(), "libasound2")
+    assert(
+      attrs.get("maintainer").get.size > 0,
+      "Should have a mainter"
+    )
+    assert(
+      attrs.get("description").get.head.value.contains("ALSA library and its standard plugins"),
+      "The description must support multi-line"
+    )
+
   }
 
   test("deal with .deb and zst") {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val nested =
-      FileWrapper(File(name), name, false)
-    assert(nested.isFile() && nested.exists())
+      FileWrapper(File(name), name)
 
-    var cnt = 0
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val gitoids = store.gitoidKeys()
+    val cnt = gitoids.size
 
-    FileWalker.processFileAndSubfiles(
-      nested,
-      "nested",
-      None,
-      Vector[String](),
-      false,
-      (file, name, parent, x) => {
-        cnt += 1
-        val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false, None, x)
-      }
-    )
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
   }
 
@@ -254,85 +254,55 @@ class MySuite extends munit.FunSuite {
   }
 
   test("Build from nested") {
-    val store = MemStorage.getStorage(None)
-    val nested = File("test_data/nested.tar")
-    val built = BuildGraph.buildItemsFor(
+    val name = "test_data/nested.tar"
+    val nested = FileWrapper(File(name), name)
+    val store1 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store2 = ToProcess.buildGraphFromArtifactWrapper(
       nested,
-      nested.getName(),
-      store,
-      Vector(),
-      None,
-      Map(), {
-        val file = File.createTempFile("goat_rodeo_purls", "_out")
-        file.delete()
-        file.mkdirs()
-        BufferedWriter(FileWriter(File(file, "purls.txt")))
-      },
-      false,
-      Set()
-    )
-
-    val built2 = BuildGraph.buildItemsFor(
-      nested,
-      nested.getName(),
-      MemStorage.getStorage(None),
-      Vector(),
-      None,
-      Map(), {
-        val file = File.createTempFile("goat_rodeo_purls", "_out")
-        file.delete()
-        file.mkdirs()
-        BufferedWriter(FileWriter(File(file, "purls.txt")))
-      },
-      false,
-      Set(
+      block = Set(
         "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
       )
     )
 
-    val built3 = BuildGraph.buildItemsFor(
-      nested,
-      nested.getName(),
-      MemStorage.getStorage(None),
-      Vector(),
-      None,
-      Map(), {
-        val file = File.createTempFile("goat_rodeo_purls", "_out")
-        file.delete()
-        file.mkdirs()
-        BufferedWriter(FileWriter(File(file, "purls.txt")))
-      },
-      false,
-      Set()
+    val store3 = ToProcess.buildGraphFromArtifactWrapper(nested)
+
+    assertEquals(
+      store1.keys().toSet,
+      store3.keys().toSet,
+      "Builds are reproducable"
+    )
+    assertNotEquals(
+      store1.keys().toSet,
+      store2.keys().toSet,
+      "Block list should work"
     )
 
-    assertEquals(built3.nameToGitOID, built.nameToGitOID, "Builds are reproducable")
-    assertNotEquals(built2.nameToGitOID, built.nameToGitOID, "Block list should work")
+    val gitoids = store1.gitoidKeys()
 
     assert(
-      built.nameToGitOID.size > 1200,
-      f"Expection more than 1,200 items, got ${built.nameToGitOID.size}"
+      gitoids.size > 1200,
+      f"Expection more than 1,200 items, got ${gitoids.size}"
     )
-    assert(store.size() > 2200)
-    val keys = store.keys()
+    assert(store1.size() > 2200)
+    val keys = store1.keys()
     assert(!keys.filter(_.startsWith("sha256:")).isEmpty)
     assert(!keys.filter(_.startsWith("md5:")).isEmpty)
     assert(!keys.filter(_.startsWith("sha1:")).isEmpty)
     assert(keys.filter(_.startsWith("floof:")).isEmpty)
-    val topAlias = store
+    val topAlias = store1
       .read(
         "sha256:82ceabe5192a5c3803f8b73536e83cd59e219fb560d8ed9e0c165728b199c0d7"
       )
       .get
     val gitoid = topAlias.connections.head._2
     assert(gitoid.startsWith("gitoid:"))
-    val top = store.read(gitoid).get
-    store.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
+    val top = store1.read(gitoid).get
+    store1.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
     for { edge <- top.connections if edge._1 == EdgeType.contains } {
-      val contained = store.read(edge._2).get
+      val contained = store1.read(edge._2).get
     }
 
-    val log4j = store
+    val log4j = store1
       .read(
         "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
       )
@@ -344,35 +314,32 @@ class MySuite extends munit.FunSuite {
 
   test("Build from Java") {
     val source = File("test_data/jar_test")
-    val files = ToProcess.buildQueueAsVec(source)
+    val strategy = ToProcess.strategyForDirectory(source, false)
 
     assert(
-      files.length >= 2,
-      f"Expecting at least 2 files, got ${files.length}"
+      strategy.length >= 2,
+      f"Expecting at least 2 files, got ${strategy.length}"
     )
 
-    val bos = ByteArrayOutputStream()
-    val purlOut = BufferedWriter(OutputStreamWriter(bos))
-
-    val store = MemStorage.getStorage(Some(File("/tmp/frood")))
-    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-    import scala.collection.JavaConverters.iterableAsScalaIterableConverter
-
-    for { toProcess <- files } {
-      BuildGraph.graphForToProcess(toProcess, store, purlOut = purlOut, Set())
-    }
+    var packages: Vector[PackageURL] = Vector()
+    val store = ToProcess.buildGraphForToProcess(
+      strategy,
+      purlOut = purl => {
+        packages = packages :+ purl
+      }
+    )
 
     val keys = store.keys()
-    val items = keys.flatMap(store.read(_))
+    val items = keys.toVector.flatMap(store.read(_))
     assert(items.length > 1100)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => e._1 == EdgeType.builtFrom).size > 0
+      i.connections.filter(e => EdgeType.isBuiltFrom(e._1)).size > 0
     )
     val fromSource = for {
       i <- items; c <- i.connections if c._1 == EdgeType.buildsTo
     } yield c
-    assert(sourceRef.length > 100)
+    assert(sourceRef.length > 100, "Expected to find source files")
 
     assert(fromSource.length == sourceRef.length)
 
@@ -380,12 +347,27 @@ class MySuite extends munit.FunSuite {
     val withPurl =
       items.filter(i => i.connections.filter(_._2.startsWith("pkg:")).size > 0)
 
-    assert(withPurl.length == 4)
+    assert(
+      withPurl.length == 6,
+      f"expected 6, got ${packages.length} and ${packages}"
+    )
 
     val withPurlSources = withPurl.filter(i =>
       i.connections.filter(_._2.endsWith("?packaging=sources")).size > 0
     )
     assert(withPurlSources.length == 2)
+
+        val jars = withPurl.filter(i =>
+      i.connections.filter(_._2.contains("?")).size == 0
+    )
+
+    assert(jars.length == 2, f"Expecting two JARs, but got ${jars.length}")
+
+    val extra = jars(0).body.get.extra 
+
+    assert(extra.get("manifest").isDefined)
+    assert(extra.get("pom").isDefined)
+    assert(extra.get("$$Sloth").isEmpty)
   }
 
   test("Unreadable JAR") {
@@ -401,31 +383,8 @@ class MySuite extends munit.FunSuite {
         )
       } {
         val bad = File(source, toTry)
-        val store = MemStorage.getStorage(None)
-        BuildGraph.buildItemsFor(
-          bad,
-          "bad",
-          store,
-          Vector(),
-          Some(
-            PackageIdentifier(
-              PackageProtocol.Maven,
-              toTry,
-              "frood",
-              "32",
-              None,
-              None,
-              Map()
-            )
-          ),
-          Map(), {
-            val file = File.createTempFile("goat_rodeo_purls", "_out")
-            file.delete()
-            file.mkdirs()
-            BufferedWriter(FileWriter(File(file, "purls.txt")))
-          },
-          false, Set()
-        )
+        val badWrapper = FileWrapper(bad, toTry)
+        ToProcess.buildGraphFromArtifactWrapper(badWrapper)
         // No pURL
         // val pkgIndex = store.read("pkg:maven").get
         // assert(

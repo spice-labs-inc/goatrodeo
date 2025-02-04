@@ -21,13 +21,10 @@ import java.util.zip.GZIPOutputStream
 import java.io.OutputStreamWriter
 import java.io.BufferedWriter
 import java.math.BigInteger
-import scala.xml.Elem
-import goatrodeo.util.PackageIdentifier
-import java.util.concurrent.ConcurrentLinkedQueue
 import goatrodeo.util.Helpers
 import scala.util.Try
 import java.io.FileInputStream
-import goatrodeo.util.{GitOID, PackageProtocol, GitOIDUtils}
+import goatrodeo.util.{GitOID, GitOIDUtils}
 import java.io.BufferedInputStream
 import java.time.Instant
 import java.time.Duration
@@ -39,23 +36,29 @@ import java.io.FileWriter
 import scala.collection.immutable.TreeSet
 import goatrodeo.util.FileWrapper
 import java.nio.file.Files
+import com.typesafe.scalalogging.Logger
+import com.github.packageurl.PackageURL
+import goatrodeo.util.ArtifactWrapper
+import goatrodeo.omnibor.ToProcess.ByUUID
+import goatrodeo.omnibor.ToProcess.ByName
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
   */
 object Builder {
+  val logger = Logger(getClass())
 
-  /** Build the OmniBOR GitOID Corpus from all the JAR files contained in the
+  /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
     *
     * @param source
-    *   where to search for JAR files
+    *   where to search for files
     * @param storage
     *   the storage destination of the corpus
     * @param threadCnt
     *   the number of threads to use when computings
-    * @param fetchVulns
-    *   Should the vulnerabilities be fetched from a remote vulnerability DB
+    * @param blockList
+    *   a file containing gitoids to not process (e.g., Apache license files)
     */
   def buildDB(
       source: File,
@@ -65,7 +68,8 @@ object Builder {
   ): Option[File] = {
     val totalStart = Instant.now()
     val runningCnt = AtomicInteger(0)
-    val (queue, stillWorking) = ToProcess.buildQueue(source, runningCnt)
+    val (queue, stillWorking) =
+      ToProcess.buildQueueOnSeparateThread(source, runningCnt)
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
@@ -73,34 +77,27 @@ object Builder {
     // Get the gitoids to block
     val blockGitoids: Set[String] = blockList match {
       case None => Set()
-      case Some(file) => 
-        Try{
+      case Some(file) =>
+        Try {
           import scala.jdk.CollectionConverters.CollectionHasAsScala
 
           val lines = Files.readAllLines(file.toPath()).asScala.toSet
           lines
         }.toOption match {
-          case None => Set()
+          case None    => Set()
           case Some(s) => s
         }
-      
+
     }
 
-    val destDir = storage
-      .destDirectory()
-      .getOrElse({
-        val file = File.createTempFile("goat_rodeo_purls", "_out")
-        file.delete()
-        file.mkdirs()
-        file
-      })
+    val lock = Object()
+    var packageUrls: Vector[PackageURL] = Vector()
 
-    destDir.mkdirs()
-    val purlOut = BufferedWriter(
-      FileWriter(
-        File(destDir, "purls.txt")
-      )
-    )
+    val purlOut = (p: PackageURL) => {
+      lock.synchronized {
+        packageUrls = packageUrls :+ p
+      }
+    }
 
     // start time
     val start = Instant.now()
@@ -138,24 +135,44 @@ object Builder {
             try {
               // build the package
 
-              BuildGraph.graphForToProcess(
-                toProcess,
-                storage,
-                purlOut,
-                blockGitoids
+              toProcess.process(
+                None,
+                store = storage,
+                purlOut = purlOut,
+                blockList = blockGitoids,
+                keepRunning = () => !dead_?,
+                atEnd = (parent, _) => {
+                  if (parent.isEmpty) {
+                    val updatedCnt = cnt.addAndGet(1)
+                    val theDuration = Duration
+                      .between(localStart, Instant.now())
+                    if (
+                      theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
+                    ) {
+                      val totalDuration = Duration.between(start, Instant.now())
+                      val totalItems = runningCnt.get()
+                      val avgMsg = if (totalDuration.getSeconds() > 0) {
+                        val itemsPerSecond = updatedCnt.toDouble / totalDuration
+                          .getSeconds()
+                          .toDouble
+                        val itemsPerMinute = itemsPerSecond * 60.0d
+                        val left = totalItems.toDouble - updatedCnt.toDouble
+                        f" Items/minute ${itemsPerMinute.round}, est remaining ${(left / itemsPerMinute).round} minutes"
+                      } else ""
+                      logger.info(
+                        f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
+                            .format("%,d", storage.size())}"
+                      )
+                    }
+                  }
+                }
               )
-              val updatedCnt = cnt.addAndGet(1)
-              val theDuration = Duration
-                .between(localStart, Instant.now())
-              if (theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0) {
-                println(
-                  f"Processed ${updatedCnt} of ${runningCnt.get()} at ${Duration
-                      .between(start, Instant.now())} thread ${threadNum}. ${toProcess.main} took ${theDuration} vertices ${String
-                      .format("%,d", storage.size())}"
-                )
-              }
+
             } catch {
               case ise: IllegalStateException => {
+                logger.error(
+                  f"Failed illegal state ${toProcess.main} -- ${toProcess.mimeType} ${ise}"
+                )
                 dead_? = true
                 throw ise
               }
@@ -169,10 +186,14 @@ object Builder {
                   throw ioe
 
                 }
-                println(f"Failed ${toProcess.main} ${ioe}")
+                logger.error(
+                  f"Failed IO ${toProcess.main} ${toProcess.mimeType} ${ioe}"
+                )
               }
               case e: Exception => {
-                println(f"Failed ${toProcess.main} ${e}")
+                logger.error(
+                  f"Failed generic ${toProcess.main} -- ${toProcess.mimeType} ${e}"
+                )
                 // Helpers.bailFail()
               }
 
@@ -195,28 +216,119 @@ object Builder {
       }
       t.join()
     }
-    println(f"Finished processing ${runningCnt.get()} at ${Duration
-        .between(start, Instant.now())}")
-
-    purlOut.flush()
-    purlOut.close()
+    logger.info(
+      f"Finished processing ${runningCnt.get()}, vertices ${storage.size()} at ${Duration
+          .between(start, Instant.now())}"
+    )
 
     val ret = storage match {
       case lf: (ListFileNames & Storage) if !dead_? =>
-        writeGoatRodeoFiles(lf)
-      case _ => println("Didn't write"); None
+        computeAndAddMerkleTrees(lf)
+        writeGoatRodeoFiles(lf, packageUrls)
+      case _ => logger.error("Didn't write"); None
     }
 
-    println(f"Total build time ${Duration.between(totalStart, Instant.now())}")
+    logger.info(
+      f"Total build time ${Duration.between(totalStart, Instant.now())}"
+    )
 
     ret
   }
 
-  def writeGoatRodeoFiles(store: ListFileNames & Storage): Option[File] = {
+  /** Finds all the Items that "Contain" other items and generate a Merkle Tree
+    * alias
+    *
+    * @param data
+    *   the items
+    */
+  def computeAndAddMerkleTrees(data: ListFileNames & Storage): Unit = {
+    val keys = data.keys()
+
+    logger.info(f"Computing merkle trees for ${keys.size} items")
+    val merkleTrees = for {
+      k <- keys
+      item <- data.read(k)
+      if !item.connections.filter(a => EdgeType.isDown(a._1)).isEmpty
+    } yield {
+      item.identifier -> GitOIDUtils.merkleTreeFromGitoids(
+        item.connections.toVector
+          .filter(a => EdgeType.isDown(a._1))
+          .map(_._2)
+      )
+    }
+
+    logger.info(f"Computed ${merkleTrees.size} Merkle Trees")
+
+    // write the aliases
+    for { (itemId, tree) <- merkleTrees } {
+      // create the Merkle Tree Alias
+      data.write(
+        tree,
+        maybeAlias => {
+          val alias = maybeAlias.getOrElse(
+            Item(
+              identifier = tree,
+              reference = Item.noopLocationReference,
+              connections = TreeSet(),
+              bodyMimeType = None,
+              body = None
+            )
+          )
+          val toAdd = (EdgeType.aliasTo, itemId)
+          val updatedAlias =
+            if (alias.connections.contains(toAdd)) { alias }
+            else {
+              alias.copy(
+                connections = (alias.connections + toAdd)
+              )
+            }
+          updatedAlias
+        }
+      )
+      // and update the Item with the AliasFrom
+      data.write(
+        itemId,
+        {
+          case None =>
+            throw new Exception(
+              f"Should be able to find ${itemId}, but it's missing"
+            )
+          case Some(item) =>
+            val toAdd = (EdgeType.aliasFrom, tree)
+            if (item.connections.contains(toAdd)) item
+            else item.copy(connections = item.connections + toAdd)
+        }
+      )
+    }
+
+    logger.info(f"Wrote ${merkleTrees.size} Merkle Trees")
+
+  }
+
+  def writeGoatRodeoFiles(
+      store: ListFileNames & Storage,
+      purlOut: Vector[PackageURL]
+  ): Option[File] = {
     store.target() match {
       case Some(target) => {
-        println(f"In store with target ${target}")
+        logger.info(f"In store with target ${target}")
+        target.mkdirs()
         val start = Instant.now()
+
+        logger.info(f"Writing ${purlOut.length} Package URLs")
+        val purlFile = File(target, "purls.txt")
+        purlFile.createNewFile()
+        val bw = new BufferedWriter(new FileWriter(purlFile))
+        try {
+          import scala.jdk.CollectionConverters.CollectionHasAsScala
+          for (purl <- purlOut) {
+            bw.write(f"${purl.canonicalize()}\n")
+          }
+        } finally {
+          bw.flush()
+          bw.close()
+        }
+
         // make sure the destination exists
         target.getAbsoluteFile().mkdirs()
         val sorted = {
@@ -227,7 +339,7 @@ object Builder {
           allItems
         }
 
-        println(
+        logger.info(
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
         val cnt = sorted.length
@@ -237,7 +349,7 @@ object Builder {
           sorted.toIterator
         )
 
-        println(
+        logger.info(
           f"Wrote ${cnt} entries in ${Duration.between(start, Instant.now())}"
         )
 
@@ -247,261 +359,4 @@ object Builder {
     }
 
   }
-
-  private def getSha256(f: File): Option[(File, Array[Byte])] = {
-    val name = f.getName()
-    val allHex = name
-      .chars()
-      .allMatch(i => (i >= '0' && i <= '9') || (i >= 'a' && i <= 'f'))
-    val rightLen = name.length() == 64
-    val hasDiff = {
-      val tf = (new File(f, "diff")); tf.exists() && tf.isDirectory()
-    }
-
-    if (allHex && rightLen && hasDiff)
-      Some(f -> new BigInteger(name, 16).toByteArray)
-    else None
-  }
-
-  def buildFromDocker(
-      root: File,
-      storage: Storage
-  ): Vector[(File, Array[Byte])] = {
-    val whichDirs =
-      root.listFiles().toVector.filter(_.isDirectory()).flatMap(getSha256(_))
-
-    whichDirs
-  }
-}
-
-case class ToProcess(
-    pom: Option[PackageIdentifier],
-    main: File,
-    source: Option[File],
-    pomFile: Option[File]
-)
-
-object ToProcess {
-
-  def findTag(in: Elem, name: String): Option[String] = {
-    val topper = in \ name
-    if (topper.length == 1) {
-      topper.text match {
-        case s if s.length() > 0 => Some(s)
-        case _                   => None
-      }
-
-    } else {
-      val t2 = in \ "parent" \ name
-      if (t2.length == 1 && t2.text.length() > 0) { Some(t2.text) }
-      else None
-    }
-  }
-
-  def tryToFixVersion(
-      in: Option[String],
-      fileName: String
-  ): Option[String] = {
-    in match {
-      case Some(s) if s.startsWith("${") =>
-        val fn2 =
-          fileName.substring(0, fileName.length() - 4) // remove ".pom"
-        val li = fn2.lastIndexOf("-")
-        if (li >= 0) {
-          Some(fn2.substring(li + 1))
-        } else in
-      case _ => in
-    }
-  }
-
-  def buildQueueAsVec(root: File): Vector[ToProcess] = {
-    val cnt = AtomicInteger(0)
-    val (queue, stillWorking) = buildQueue(root, cnt)
-
-    // wait for the work to be done
-    while (stillWorking.get()) {
-      Thread.sleep(5)
-    }
-
-    println(f"Found ${cnt.get()} items to process")
-
-    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-    import scala.collection.JavaConverters.iterableAsScalaIterableConverter
-
-    queue.asScala.toVector
-  }
-
-  def buildQueue(
-      root: File,
-      count: AtomicInteger
-  ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
-    val stillWorking = AtomicBoolean(true)
-    val queue = ConcurrentLinkedQueue[ToProcess]()
-    val buildIt: Runnable = () => {
-      var fileSet = TreeSet(
-        Helpers
-          .findFiles(root, _ => true)
-          .map(_.getAbsoluteFile())*
-      )
-
-      val pomLike = buildQueueForPOMS(
-        root,
-        queue,
-        found => {
-          count.incrementAndGet()
-          fileSet -= found.main.getAbsoluteFile()
-          found.pomFile.foreach(f => fileSet -= f.getAbsoluteFile())
-          found.source.foreach(f => fileSet -= f.getAbsoluteFile())
-        }
-      )
-
-      fileSet.foreach(f => {
-        count.incrementAndGet()
-        queue.add(ToProcess(PackageIdentifier.computePurl(FileWrapper(f, f.getPath(), false)), f, None, None))
-      })
-
-      stillWorking.set(false)
-    }
-
-    val t = Thread(buildIt, "File Finder")
-    t.start()
-
-    (queue, stillWorking)
-  }
-
-  def buildQueueForPOMS(
-      root: File,
-      queue: ConcurrentLinkedQueue[ToProcess],
-      found: ToProcess => Unit
-  ): Unit = {
-    val start = Instant.now()
-    val poms = Helpers.findFiles(
-      root,
-      f => f.getName().endsWith(".pom")
-    )
-    println(f"Finding all pom files got ${poms.length} in ${Duration
-        .between(start, Instant.now())}")
-
-    val possibleSize = poms.length
-    var cnt = 0
-
-    for {
-      f <- poms
-
-      xml <- Try {
-        scala.xml.XML.load({
-          val bytes = Helpers.slurpInput(f)
-          new ByteArrayInputStream(bytes)
-        })
-      }.toOption
-      item <- {
-        val grp = findTag(xml, "groupId")
-        val art = findTag(xml, "artifactId")
-        val ver = tryToFixVersion(findTag(xml, "version"), f.getName())
-        (grp, art, ver) match {
-          case (Some(g), Some(a), Some(v))
-              if !g.startsWith("$") && !a
-                .startsWith("$") && !v.startsWith("$") &&
-                f.getName() == f"${a}-${v}.pom" =>
-            val name = f.getName()
-            val jar = new File(
-              f.getAbsoluteFile().getParent(),
-              f"${name.substring(0, name.length() - 4)}.jar"
-            )
-            if (jar.exists()) {
-              Some(
-                ToProcess(
-                  Some(
-                    PackageIdentifier(
-                      PackageProtocol.Maven,
-                      g,
-                      a,
-                      v,
-                      None,
-                      None,
-                      Map()
-                    )
-                  ),
-                  jar,
-                  Helpers.findSrcFile(f),
-                  Some(f)
-                )
-              )
-            } else if ({
-              val jar = new File(
-                f.getAbsoluteFile().getParent(),
-                f"${name.substring(0, name.length() - 4)}.war"
-              )
-              jar.exists()
-            }) {
-              Some(
-                ToProcess(
-                  Some(
-                    PackageIdentifier(
-                      PackageProtocol.Maven,
-                      g,
-                      a,
-                      v,
-                      None,
-                      None,
-                      Map()
-                    )
-                  ),
-                  new File(
-                    f.getAbsoluteFile().getParent(),
-                    f"${name.substring(0, name.length() - 4)}.war"
-                  ),
-                  Helpers.findSrcFile(f),
-                  Some(f)
-                )
-              )
-
-            } else if ({
-              val jar = new File(
-                f.getAbsoluteFile().getParent(),
-                f"${name.substring(0, name.length() - 4)}.aar"
-              )
-              jar.exists()
-            }) {
-              Some(
-                ToProcess(
-                  Some(
-                    PackageIdentifier(
-                      PackageProtocol.Maven,
-                      g,
-                      a,
-                      v,
-                      None,
-                      None,
-                      Map()
-                    )
-                  ),
-                  new File(
-                    f.getAbsoluteFile().getParent(),
-                    f"${name.substring(0, name.length() - 4)}.aar"
-                  ),
-                  Helpers.findSrcFile(f),
-                  Some(f)
-                )
-              )
-
-            } else None
-
-          case _ =>
-            None
-        }
-
-      }
-    } {
-      cnt += 1
-      if (cnt % 5000 == 0) {
-        println(f"pom loading ${cnt} of ${possibleSize} at ${Duration
-            .between(start, Instant.now())}")
-      }
-
-      queue.add(item)
-      found(item)
-    }
-  }
-
 }

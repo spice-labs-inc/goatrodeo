@@ -16,65 +16,50 @@ import com.typesafe.scalalogging.Logger
 import goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
 
 import java.io.File
+import goatrodeo.omnibor.strategies.GenericFile
+import goatrodeo.omnibor.MemStorage
+import com.github.packageurl.PackageURL
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
 class ISOFileSuite extends munit.FunSuite {
-  val logger = Logger("ISOFileSuite")
+  val logger = Logger(getClass())
 
   test("Simple file format parsing to ArtifactWrapper") {
     // todo - rerun this against 'simple.iso'; it mounts on macos fine and checks out as a proper iso file
     // but this test is giving me a "Negative Seek Offset" error…
 
-    val name = "test_data/iso_tests/iso_of_archives.iso"
-    assert(
-      FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
-        .isDefined
+    val name = "test_data/download/iso_tests/iso_of_archives.iso"
+    val result = FileWalker
+      .withinArchiveStream(FileWrapper(File(name), name)) { _ =>
+        42
+      }
+    assertEquals(
+      result,
+      Some(42)
     )
   }
   test("Walk an ISO file") {
-    var cnt = 0
-    val name = "test_data/iso_tests/iso_of_archives.iso"
-    val (inputStream, _) =
+    val name = "test_data/download/iso_tests/iso_of_archives.iso"
+    val count =
       FileWalker
-        .streamForArchive(FileWrapper(File(name), name, false))
-        .get
-    for {
-      e <- inputStream
-      (name, file) = e()
-    } {
-      logger.debug(s"name: $name file: $file")
-      cnt += 1
-      file.delete()
-    }
+        .withinArchiveStream(FileWrapper(File(name), name)) { items =>
+          items.length
+        }
 
-    assert(cnt == 9)
+    assertEquals(count, Some(9))
 
   }
 
   test("deal with nesting archives inside an ISO") {
-    val name = "test_data/iso_tests/iso_of_archives.iso"
+    val name = "test_data/download/iso_tests/iso_of_archives.iso"
     val nested =
-      FileWrapper(File(name), name, false)
-    assert(nested.isFile() && nested.exists())
+      FileWrapper(File(name), name)
 
-    var cnt = 0
-
-    FileWalker.processFileAndSubfiles(
-      nested,
-      "nested",
-      None,
-      Vector[String](),
-      false,
-      (file, name, parent, x) => {
-        logger.trace(s" name: $name parent: $parent x: $x")
-        cnt += 1
-        val (main, _) = GitOIDUtils.computeAllHashes(file, s => false)
-        // println(f"hash for ${name} is ${main} parent ${parent}")
-        (main, false, None, x)
-      }
-    )
+    val tp = GenericFile(nested)
+    val store = MemStorage(None)
+    tp.process(None, store)
+    val cnt = store.keys().size
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
 
