@@ -19,6 +19,7 @@ import java.io.File
 import goatrodeo.omnibor.strategies.GenericFile
 import goatrodeo.omnibor.MemStorage
 import com.github.packageurl.PackageURL
+import goatrodeo.omnibor.ParentScope
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -58,7 +59,7 @@ class ISOFileSuite extends munit.FunSuite {
 
     val tp = GenericFile(nested)
     val store = MemStorage(None)
-    tp.process(None, store)
+    tp.process(None, store, ParentScope.forAndWith("Testing ISO", None))
     val cnt = store.keys().size
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }

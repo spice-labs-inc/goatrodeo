@@ -146,6 +146,7 @@ object Builder {
                 None,
                 store = storage,
                 purlOut = purlOut,
+                parentScope = ParentScope.forAndWith(toProcess.main, None),
                 blockList = blockGitoids,
                 keepRunning = () => !dead_?,
                 atEnd = (parent, _) => {
@@ -166,7 +167,9 @@ object Builder {
                           .toDouble
                         val itemsPerMinute = itemsPerSecond * 60.0d
                         val left = totalItems.toDouble - updatedCnt.toDouble
-                        val remainingDuration = Duration.ZERO.plusSeconds((left / itemsPerSecond).round)
+                        val remainingDuration = Duration.ZERO.plusSeconds(
+                          (left / itemsPerSecond).round
+                        )
                         f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
                       } else ""
                       logger.info(
@@ -293,7 +296,8 @@ object Builder {
               )
             }
           updatedAlias
-        }
+        },
+        item => f"Inserting Merkle Tree of ${itemId}"
       )
       // and update the Item with the AliasFrom
       data.write(
@@ -307,7 +311,8 @@ object Builder {
             val toAdd = (EdgeType.aliasFrom, tree)
             if (item.connections.contains(toAdd)) item
             else item.copy(connections = item.connections + toAdd)
-        }
+        },
+        item => f"Updating Merkle Tree alias for ${itemId}"
       )
     }
 

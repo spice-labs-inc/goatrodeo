@@ -53,51 +53,32 @@ case class Item(
     myHash < thatHash
   }
 
-  /**
-   * Builds a list of items that are referenced from this item. The references
-   * are of types `AliasFrom`, `BuiltFrom`, and `ContainedBy`
-   * 
-   * The resulting `Item`s should be updated in the store
-   */
-  def buildListOfReferencesForAliasFromBuiltFromContainedBy(): Vector[Item] = {
+  /** Builds a list of items that are referenced from this item. The references
+    * are of types `AliasFrom`, `BuiltFrom`, and `ContainedBy`
+    *
+    * The resulting `Item`s should be updated in the store
+    */
+  def buildListOfReferencesForAliasFromBuiltFromContainedBy()
+      : Vector[(String, String)] = {
     for {
       edge <- this.connections.toVector
       toUpdate <- edge match {
         case Edge(EdgeType.aliasFrom, connection) => {
           Vector(
-            Item(
-              identifier = connection,
-              reference = Item.noopLocationReference,
-              connections = TreeSet(EdgeType.aliasTo -> this.identifier),
-              bodyMimeType = None,
-              body = None
-            )
+            (EdgeType.aliasTo -> connection)
           )
 
         }
 
         case Edge(EdgeType.builtFrom, connection) => {
 
-          Vector(
-            Item(
-              identifier = connection,
-              reference = Item.noopLocationReference,
-              connections = TreeSet(EdgeType.buildsTo -> identifier),
-              bodyMimeType = None,
-              body = None
-            )
-          )
+          Vector(EdgeType.buildsTo -> connection)
+
         }
         case Edge(EdgeType.containedBy, connection) => {
 
           Vector(
-            Item(
-              identifier = connection,
-              reference = Item.noopLocationReference,
-              connections = TreeSet(EdgeType.contains -> identifier),
-              bodyMimeType = None,
-              body = None
-            )
+            EdgeType.contains -> connection
           )
         }
         case _ => Vector.empty
@@ -108,30 +89,36 @@ case class Item(
     }
   }
 
-  /**
-   * Create or update (merge) this `Item` in the store.
-   * 
-   * The resulting item will be returned. The resulting `Item`
-   * may be `this` or `this` merged with the item in the store
-   * 
-   * @param store the `Storage` instance
-   * 
-   * @return the updated item
-   */
-  def createOrUpdateInStore(store: Storage): Item = {
-    store.write(identifier, {
-      case None => this
-      case Some(other) => this.merge(other)
-    })
+  /** Create or update (merge) this `Item` in the store.
+    *
+    * The resulting item will be returned. The resulting `Item` may be `this` or
+    * `this` merged with the item in the store
+    *
+    * @param store
+    *   the `Storage` instance
+    *
+    * @return
+    *   the updated item
+    */
+  def createOrUpdateInStore(store: Storage, context: Item => String): Item = {
+    store.write(
+      identifier,
+      {
+        case None        => this
+        case Some(other) => this.merge(other)
+      },
+      context
+    )
   }
 
-  /**
-   * Merge this `Item` with another `Item`
-   * 
-   * @param other the item to merge with
-   * 
-   * @return the merged items
-   */
+  /** Merge this `Item` with another `Item`
+    *
+    * @param other
+    *   the item to merge with
+    *
+    * @return
+    *   the merged items
+    */
   def merge(other: Item): Item = {
 
     val (body, mime) =
