@@ -140,7 +140,7 @@ case class MavenState(
     import scala.collection.JavaConverters.asScalaIteratorConverter
 
     val baseTree = if (pomFile.length() > 4) {
-      TreeMap("pom" -> TreeSet(StringOrPair("text/xml", pomFile)))
+      TreeMap("pom".intern() -> TreeSet(StringOrPair("text/xml".intern(), pomFile)))
     } else TreeMap[String, TreeSet[StringOrPair]]()
 
     val manifest: TreeMap[String, TreeSet[StringOrPair]] = marker match {
@@ -163,15 +163,15 @@ case class MavenState(
                     .asIterator()
                     .asScala
                     .map(k =>
-                      k.asInstanceOf[String].toLowerCase -> TreeSet(
+                      k.asInstanceOf[String].toLowerCase.intern() -> TreeSet(
                         StringOrPair(props.get(k).asInstanceOf[String])
                       )
                     )
                     .toSeq*
                 )
 
-                ret + ("manifest" -> TreeSet(
-                  StringOrPair("text/maven-manifest", manifestString)
+                ret + ("manifest".intern() -> TreeSet(
+                  StringOrPair("text/maven-manifest", manifestString.intern())
                 ))
 
               case None => TreeMap[String, TreeSet[StringOrPair]]()

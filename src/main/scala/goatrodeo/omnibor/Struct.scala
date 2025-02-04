@@ -151,12 +151,12 @@ final case class PairOf(s1: String, s2: String) extends StringOrPair {
 }
 
 object StringOrPair {
-  def apply(s: String): StringOrPair = StringOf(s)
-  def apply(s1: String, s2: String): StringOrPair = PairOf(s1, s2)
-  def apply(s: (String, String)): StringOrPair = PairOf(s._1, s._2)
+  def apply(s: String): StringOrPair = StringOf(s.intern())
+  def apply(s1: String, s2: String): StringOrPair = PairOf(s1.intern(), s2.intern())
+  def apply(s: (String, String)): StringOrPair = PairOf(s._1.intern(), s._2.intern())
 
-  implicit def fromString(s: String): StringOrPair = StringOf(s)
-  implicit def fromPair(p: (String, String)): StringOrPair = PairOf(p._1, p._2)
+  implicit def fromString(s: String): StringOrPair = StringOf(s.intern())
+  implicit def fromPair(p: (String, String)): StringOrPair = PairOf(p._1.intern(), p._2.intern())
 
   given Ordering[StringOrPair] = {
     Ordering.by[StringOrPair, String](e =>
