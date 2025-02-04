@@ -166,7 +166,7 @@ case class Item(
     if (purls.isEmpty) this
     else {
 
-      val textPurls = purls.map(p => p.canonicalize())
+      val textPurls = purls.map(p => p.canonicalize().intern())
       val ret = this.copy(
         connections = this.connections ++ TreeSet(
           textPurls.map(purl => EdgeType.aliasFrom -> purl)*

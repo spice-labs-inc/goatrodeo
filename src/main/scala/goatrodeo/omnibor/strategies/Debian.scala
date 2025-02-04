@@ -177,9 +177,9 @@ object Debian {
         }
         val treeAttrs: TreeMap[String, TreeSet[StringOrPair]] =
           TreeMap(attrs.toSeq.map { case (k, v) =>
-            k -> TreeSet(StringOrPair(v))
+            k.intern() -> TreeSet(StringOrPair(v))
           }*) ++ maybeRawLines.toVector.map { case (str, _) =>
-            "control" -> TreeSet(StringOrPair("text/debian-control", str))
+            "control".intern() -> TreeSet(StringOrPair("text/debian-control", str))
           }
         purl -> treeAttrs
       }
