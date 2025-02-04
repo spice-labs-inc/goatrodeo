@@ -1088,7 +1088,7 @@ object GitOIDUtils {
       tpe.gitoidName(),
       hashType.hashTypeName(),
       hashAsHex(inputStream, len, hashType, tpe)
-    )
+    ).intern()
   }
 
   def computeAllHashes(
@@ -1102,13 +1102,13 @@ object GitOIDUtils {
       Vector(
         url(is(), theFile.size(), HashType.SHA1),
         String
-          .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is()))),
+          .format("sha1:%s", Helpers.toHex(Helpers.computeSHA1(is()))).intern(),
         String
-          .format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is()))),
+          .format("sha256:%s", Helpers.toHex(Helpers.computeSHA256(is()))).intern(),
         String
-          .format("sha512:%s", Helpers.toHex(Helpers.computeSHA512(is()))),
+          .format("sha512:%s", Helpers.toHex(Helpers.computeSHA512(is()))).intern(),
         String
-          .format("md5:%s", Helpers.toHex(Helpers.computeMD5(is())))
+          .format("md5:%s", Helpers.toHex(Helpers.computeMD5(is()))).intern()
       )
     )
   }

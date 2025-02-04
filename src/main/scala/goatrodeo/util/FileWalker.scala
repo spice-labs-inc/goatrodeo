@@ -87,8 +87,11 @@ object FileWalker {
 
       } catch {
         case e: Exception =>
-          logger.error(
-            f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}"
+          // if creating the artfiact wrappers from the thing that might be a zip file fail, it
+          // just means it's not a valid zip. This is okay.
+          logger.trace(
+            f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}",
+            e
           )
           None
       }
@@ -155,13 +158,17 @@ object FileWalker {
 
         } catch {
           case e: Exception =>
-            logger.error(s"Try getAllFiles failed: ${e.getMessage}", e)
+            // if creating the artfiact wrappers from the thing that might be an iso file fail, it
+            // just means it's not a valid iso. This is okay.
+            logger.trace(s"Try getAllFiles failed: ${e.getMessage}", e)
             isoFileReader.close()
             None
         }
       } catch {
         case e: Exception =>
-          logger.error(s"Whole ISO Fetch process failed… ${e.getMessage}", e)
+          // if creating the artfiact wrappers from the thing that might be a zip file fail, it
+          // just means it's not a valid zip. This is okay.
+          logger.trace(s"Whole ISO Fetch process failed… ${e.getMessage}", e)
           None
       }
     } else None
@@ -319,7 +326,8 @@ object FileWalker {
                 ) {
                   logger.error(
                     f"Expected to open apk/tgz/xz ${in
-                        .path()} -- ${in.mimeType} but got ${e.getMessage()}"
+                        .path()} -- ${in.mimeType} but got ${e.getMessage()}",
+                    e
                   )
                 }
                 throw e
@@ -368,7 +376,9 @@ object FileWalker {
             } catch {
               case e: Exception =>
                 logger.error(
-                  f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e.getMessage()}"
+                  f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
+                      .getMessage()}",
+                  e
                 )
                 None
             }
