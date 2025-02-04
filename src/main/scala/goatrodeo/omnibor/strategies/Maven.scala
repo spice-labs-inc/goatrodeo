@@ -140,7 +140,9 @@ case class MavenState(
     import scala.collection.JavaConverters.asScalaIteratorConverter
 
     val baseTree = if (pomFile.length() > 4) {
-      TreeMap("pom".intern() -> TreeSet(StringOrPair("text/xml".intern(), pomFile)))
+      TreeMap(
+        "pom".intern() -> TreeSet(StringOrPair("text/xml".intern(), pomFile))
+      )
     } else TreeMap[String, TreeSet[StringOrPair]]()
 
     val manifest: TreeMap[String, TreeSet[StringOrPair]] = marker match {
@@ -213,11 +215,22 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       store: Storage,
-      marker: MavenMarkers
+      marker: MavenMarkers,
+      parentScope: Option[ParentScope]
   ): ParentScope = marker match {
     case MavenMarkers.JAR =>
       // the code that associates source with class files
       new ParentScope {
+
+        def scopeFor(): String = item.identifier
+        def parentOfParentScope(): Option[ParentScope] = parentScope
+
+        def parentScopeInformation(): String =
+          f"Maven/JAR Scope for ${item.identifier}${parentScope match {
+              case None     => ""
+              case Some(ps) => f" Parent: ${ps.parentScopeInformation()}"
+            }}"
+
         override def finalAugmentation(
             store: Storage,
             artifact: ArtifactWrapper,
@@ -232,7 +245,7 @@ case class MavenState(
           }
         }
       }
-    case _ => ParentScope.empty
+    case _ => ParentScope.forAndWith(item.identifier, parentScope)
   }
 
 }

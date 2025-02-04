@@ -137,8 +137,9 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       artifact: ArtifactWrapper,
       item: Item,
       store: Storage,
-      marker: PM
-  ): ParentScope = ParentScope.empty
+      marker: PM,
+      parent: Option[ParentScope]
+  ): ParentScope = ParentScope.forAndWith(item.identifier, parent)
 }
 
 trait ParentScope {
@@ -165,15 +166,42 @@ trait ParentScope {
       artifact: ArtifactWrapper,
       item: Item
   ): Item = item
-  def postFixReferences(
+  def postFixReferencesAndStore(
       store: Storage,
       artifact: ArtifactWrapper,
       item: Item
   ): Unit = ()
+
+  /** Emit information about the scope
+    */
+  def parentScopeInformation(): String
+
+  /** Get the parent scope of the parent scope
+    */
+  def parentOfParentScope(): Option[ParentScope]
+
+  /** What is this scope part of? E.g., the gitoid of the Item being processed
+    */
+  def scopeFor(): String
 }
 
 object ParentScope {
-  def empty: ParentScope = new ParentScope {}
+  def forAndWith(
+      theScopeFor: String,
+      withParent: Option[ParentScope]
+  ): ParentScope =
+    new ParentScope {
+      def scopeFor(): String = theScopeFor
+      def parentOfParentScope(): Option[ParentScope] = withParent
+
+      def parentScopeInformation(): String =
+        f"Generic Parent Scope for ${theScopeFor}${withParent match {
+            case None     => ""
+            case Some(ps) => f" Parent: ${ps.parentScopeInformation()}"
+          }}"
+
+    }
+
 }
 
 /** A file or set of files to process
@@ -213,7 +241,7 @@ trait ToProcess {
   def process(
       parentId: Option[GitOID],
       store: Storage,
-      parentScope: ParentScope = ParentScope.empty,
+      parentScope: ParentScope,
       purlOut: PackageURL => Unit = _ => (),
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
@@ -272,24 +300,59 @@ trait ToProcess {
               // if we've seen the gitoid before we write it
               val hasBeenSeen = store.contains(itemScope4.identifier)
 
+              // update back-references for this item
+              // this is *only* for the the pre-merged `Item`
+              // why? The post merge `Item` has a lot of back-references
+              // we do not need to update these as it'll only cause thrash
+              itemScope4
+                .buildListOfReferencesForAliasFromBuiltFromContainedBy()
+                .foreach { case (aliasType, itemNeedingAlias) =>
+                  store.write(
+                    itemNeedingAlias,
+                    {
+                      case Some(item) =>
+                        item.copy(connections =
+                          item.connections + (aliasType -> itemScope4.identifier)
+                        )
+                      case None =>
+                        Item(
+                          itemNeedingAlias,
+                          noopLocationReference,
+                          TreeSet(aliasType -> itemScope4.identifier),
+                          None,
+                          None
+                        )
+                    },
+                    item =>
+                      f"Updating alias reference ${itemNeedingAlias} ${item.body match {
+                          case None       => ""
+                          case Some(body) => f"files ${body.fileNames}"
+                        }} alias name ${aliasType} for item ${itemScope4.identifier}${itemScope4.body match {
+                          case None       => ""
+                          case Some(body) => f" files ${body.fileNames}"
+                        }}, parent scope ${parentScope.parentScopeInformation()}"
+                  )
+
+                }
+
               // write
               val answerItem = store.write(
                 itemScope4.identifier,
                 {
                   case None            => itemScope4
                   case Some(otherItem) => otherItem.merge(itemScope4)
-                }
+                },
+                item =>
+                  f"Writing ${itemScope4.identifier}, ${item.body match {
+                      case None       => ""
+                      case Some(body) => f"files ${body.fileNames}"
+                    }} parent scope ${parentScope.parentScopeInformation()}"
               )
 
               // update purls
               purls.foreach(purlOut)
 
-              // update back-references for this item and others
-              answerItem
-                .buildListOfReferencesForAliasFromBuiltFromContainedBy()
-                .foreach(_.createOrUpdateInStore(store))
-
-              parentScope.postFixReferences(store, artifact, answerItem)
+              parentScope.postFixReferencesAndStore(store, artifact, answerItem)
 
               atEnd(parentId, answerItem)
 
@@ -305,17 +368,18 @@ trait ToProcess {
                           x => (),
                           false
                         )
-                      val parentScope = state4.generateParentScope(
+                      val thisParentScope = state4.generateParentScope(
                         artifact,
                         answerItem,
                         store,
-                        marker
+                        marker,
+                        Some(parentScope)
                       )
                       processSet.flatMap(tp =>
                         tp.process(
                           Some(answerItem.identifier),
                           store,
-                          parentScope,
+                          thisParentScope,
                           purlOut,
                           blockList,
                           keepRunning,
@@ -500,7 +564,13 @@ object ToProcess {
       block: Set[GitOID] = Set()
   ): Storage = {
     for { individual <- toProcess } {
-      individual.process(None, store, purlOut = purlOut, blockList = block)
+      individual.process(
+        None,
+        store,
+        parentScope = ParentScope.forAndWith(individual.main, None),
+        purlOut = purlOut,
+        blockList = block
+      )
     }
 
     store

@@ -52,6 +52,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 import java.io.IOException
+import com.typesafe.scalalogging.Logger
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -82,8 +83,11 @@ trait Storage {
     *   the path
     * @param data
     *   the data to write
+    * @param context generate a String containing the context of the call that led to this write. Used for contention logging
+    * 
+    * @return the resulting item if merged
     */
-  def write(path: String, opr: Option[Item] => Item): Item
+  def write(path: String, opr: Option[Item] => Item, context: Item => String): Item
 
   /** Write data to the path
     *
@@ -115,29 +119,15 @@ trait Storage {
 
   def contains(identifier: String): Boolean
 
-  /**
-    * return only the keys that start with "gitoid:blob:sha256:"
+  /** return only the keys that start with "gitoid:blob:sha256:"
     *
     * @return
     */
-  def gitoidKeys(): Set[GitOID] = keys().filter(_.startsWith("gitoid:blob:sha256:"))
+  def gitoidKeys(): Set[GitOID] =
+    keys().filter(_.startsWith("gitoid:blob:sha256:"))
 
   def destDirectory(): Option[File]
 }
-
-// trait StorageReader {
-//   def read(path: GitOID): Option[String]
-// }
-
-// trait BulkStorageReader {
-//   def bulkRead(
-//       paths: Set[GitOID],
-//       known: Map[GitOID, Option[Item]],
-//       totalBytes: Long = 0
-//   ): Map[GitOID, Option[Item]]
-// }
-
-
 
 /** Can the filenames be listed?
   */
@@ -194,8 +184,10 @@ class MemStorage(val targetDir: Option[File])
     extends Storage
     with ListFileNames {
 
+  private val logger = Logger(getClass())
 
-  override def contains(identifier: String): Boolean = db.get().contains(identifier)
+  override def contains(identifier: String): Boolean =
+    db.get().contains(identifier)
 
   override def destDirectory(): Option[File] = targetDir
 
@@ -229,8 +221,9 @@ class MemStorage(val targetDir: Option[File])
     ret
   }
 
-  override def write(path: String, opr: Option[Item] => Item): Item = {
-    val lock = sync.synchronized {
+
+  override def write(path: String, opr: Option[Item] => Item, context: Item => String): Item = {
+    val (lock, waiters) = sync.synchronized {
       val theLock = Option(locks.get(path)) match {
         case Some(lock) => lock
         case None => {
@@ -240,13 +233,24 @@ class MemStorage(val targetDir: Option[File])
         }
       }
 
-      theLock.incrementAndGet()
-      theLock
+      // how many threads are waiting on this row?
+      val waiters = theLock.incrementAndGet()
+
+      theLock -> waiters
     }
+
+      val contentionThreshold = 4
+
+
     try {
       lock.synchronized {
         val current = read(path)
         val updated = opr(current)
+              // if it's contentionThreshold or more, log the message and if it's a multiple of contentionThreshold, log again
+      if (waiters >= contentionThreshold && waiters % contentionThreshold == 0) {
+        logger.info(f"Lock contention for ${path} waiting ${waiters} context ${context(updated)}")
+      }
+
         dbSync.synchronized {
           val newVal = db.get() + (path -> updated)
           db.set(newVal)
