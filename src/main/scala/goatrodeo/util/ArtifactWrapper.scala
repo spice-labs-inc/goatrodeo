@@ -86,7 +86,7 @@ object ArtifactWrapper {
     } catch {
       case e: Exception =>
         logger.error(
-          f"Tika failed, ${e.getMessage()}. Returing octet stream",
+          f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
           e
         )
         "application/octet-stream"
