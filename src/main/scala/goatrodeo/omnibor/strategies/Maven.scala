@@ -157,7 +157,10 @@ case class MavenState(
                 val manifestString =
                   Helpers.slurpInputToString(manifest.asStream())
                 val props = java.util.Properties()
-                props.load(manifest.asStream())
+                // if this causes an exception, welp...
+                Try {
+                  props.load(manifest.asStream())
+                }
 
                 val ret = TreeMap(
                   props
