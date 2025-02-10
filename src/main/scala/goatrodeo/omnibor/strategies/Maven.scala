@@ -39,6 +39,7 @@ case class MavenState(
     sources: Map[String, Item] = Map(),
     sourceGitoids: Map[String, GitOID] = Map()
 ) extends ProcessingState[MavenMarkers, MavenState] {
+  private lazy val logger = Logger(getClass())
 
   /** Call the state object at the beginning of processing an ArtfactWrapper
     * into an Item. This is done just after the generation of the gitoids.
@@ -157,9 +158,15 @@ case class MavenState(
                 val manifestString =
                   Helpers.slurpInputToString(manifest.asStream())
                 val props = java.util.Properties()
-                // if this causes an exception, welp...
-                Try {
+                // if this causes an exception, log it.
+                try {
                   props.load(manifest.asStream())
+                } catch {
+                  case e: Exception =>
+                    logger.error(
+                      f"Failed to parse `META-INF/MANIFEST.MF` for ${artifact
+                          .path()}, error ${e.getMessage()}"
+                    )
                 }
 
                 val ret = TreeMap(

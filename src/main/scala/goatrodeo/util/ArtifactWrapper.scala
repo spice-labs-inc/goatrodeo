@@ -14,6 +14,7 @@ import org.apache.commons.compress.utils.IOUtils
 import java.nio.file.Files
 import java.nio.file.Path
 import java.io.FileOutputStream
+import com.typesafe.scalalogging.Logger
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -62,6 +63,7 @@ sealed trait ArtifactWrapper {
 }
 
 object ArtifactWrapper {
+  private val logger = Logger(getClass())
 
   private val tika = new TikaConfig()
 
@@ -73,14 +75,22 @@ object ArtifactWrapper {
     *   -- the name of the file
     */
   def mimeTypeFor(rawData: InputStream, fileName: String): String = {
+    try {
+      val data = new BufferedInputStream(rawData)
 
-    val data = new BufferedInputStream(rawData)
+      val metadata = new Metadata()
+      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
+      val detected = tika.getDetector.detect(data, metadata)
 
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
-    val detected = tika.getDetector.detect(data, metadata)
-
-    detected.toString()
+      detected.toString()
+    } catch {
+      case e: Exception =>
+        logger.error(
+          f"Tika failed, ${e.getMessage()}. Returing octet stream",
+          e
+        )
+        "application/octet-stream"
+    }
   }
 
   protected def fixPath(p: String): String = {
@@ -102,13 +112,15 @@ object ArtifactWrapper {
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
       if (size != bytes.length) {
-        throw Exception(f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}")
+        throw Exception(
+          f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
+        )
       }
       ByteWrapper(bytes, name)
     } else {
       val tempFile = Files.createTempFile(tempPath, "goats", ".temp").toFile()
       val fos = FileOutputStream(tempFile)
-    Helpers.copy(data, fos)
+      Helpers.copy(data, fos)
       fos.flush()
       fos.close()
       FileWrapper(tempFile, name)
@@ -120,7 +132,9 @@ object ArtifactWrapper {
 
 final case class FileWrapper(f: File, thePath: String) extends ArtifactWrapper {
   if (!f.exists()) {
-    throw Exception(f"Tried to create file wrapper for ${f.getCanonicalPath()} that does not exist")
+    throw Exception(
+      f"Tried to create file wrapper for ${f.getCanonicalPath()} that does not exist"
+    )
   }
   override def asStream(): InputStream = new BufferedInputStream(
     FileInputStream(f)

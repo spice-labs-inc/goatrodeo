@@ -178,6 +178,11 @@ object Helpers {
 
               val clz = cp.parse()
               clz.getSourceFilePath()
+            } catch {
+              case e: OutOfMemoryError => 
+                // if the classfile is corrupt, we may get an OOME, swallow it and just don't
+                // return a file name
+                throw new Exception(f"Failed to parse class ${e.getMessage()}")
             } finally {
               is.close()
             }
