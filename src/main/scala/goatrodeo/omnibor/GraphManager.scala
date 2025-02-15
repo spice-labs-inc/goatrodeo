@@ -29,7 +29,7 @@ object GraphManager {
     val DataFileMagicNumber: Int = 0x00be1100 // Bell
     val IndexFileMagicNumber: Int = 0x54154170 // Shishitō
     val ClusterFileMagicNumber: Int = 0xba4a4a // Banana
-    val TargetMaxFileSize: Long = 15L * 1024L * 1024L * 1024L // 7G
+    val TargetMaxFileSize: Long = 15L * 1024L * 1024L * 1024L // 15G
   }
 
   case class DataAndIndexFiles(dataFile: Long, indexFile: Long)
@@ -66,7 +66,8 @@ object GraphManager {
     while (items.hasNext && writer.position() < Consts.TargetMaxFileSize) {
       val orgEntry = items.next()
       val currentPosition = writer.position()
-      val entry = orgEntry.fixReferencePosition(0L, currentPosition)
+      // val entry = orgEntry.fixReferencePosition(0L, currentPosition)
+      val entry = orgEntry
 
       val md5 = entry.identifierMD5()
 
@@ -75,7 +76,7 @@ object GraphManager {
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
 
 
-      val toAlloc = 256 + /*(envelopeBytes.length) + */(entryBytes.length)
+      val toAlloc = 256 + (entryBytes.length)
       val bb = ByteBuffer.allocate(toAlloc)
 
       bb.putInt(entryBytes.length)
@@ -189,7 +190,6 @@ object GraphManager {
       val dataAndIndex = writeABlock(
         targetDirectory,
         entries,
-       //  compression,
         previous = previousInChain,
         updateBiggest
       )

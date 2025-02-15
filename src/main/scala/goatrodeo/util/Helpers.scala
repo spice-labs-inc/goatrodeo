@@ -60,6 +60,9 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.FileVisitResult
 import java.io.IOException
 import goatrodeo.omnibor.StringOrPair
+import java.text.SimpleDateFormat
+import java.util.TimeZone
+import java.util.Date
 type GitOID = String
 
 /** A bunch of helpers/utilities
@@ -203,6 +206,16 @@ object Helpers {
       case _ => TreeSet()
     }
 
+  }
+
+  /**
+   * Get the current date in ISO 8601 format
+   */
+  def currentDate8601(): String = {
+    val timezone = TimeZone.getTimeZone("UTC")
+    val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+    dateFormat.setTimeZone(timezone);
+    dateFormat.format(new Date())
   }
 
   /** Given a file root and a filter function, return a channel that contains

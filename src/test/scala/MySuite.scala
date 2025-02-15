@@ -411,11 +411,10 @@ class MySuite extends munit.FunSuite {
           resForBigTent.delete()
         }
       }
-      val store = MemStorage.getStorage(Some(resForBigTent))
       import scala.collection.JavaConverters.collectionAsScalaIterableConverter
       import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-      Builder.buildDB(source, store, 32, None)
+      Builder.buildDB(source, resForBigTent, 32, None, 1000000)
 
       // no pURL
       // val pkgIndex = store.read("pkg:maven").get

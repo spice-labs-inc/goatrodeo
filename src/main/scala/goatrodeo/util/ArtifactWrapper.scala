@@ -64,7 +64,8 @@ sealed trait ArtifactWrapper {
 
 object ArtifactWrapper {
   private val logger = Logger(getClass())
-
+  // max in memory size 32MB
+  val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
 
   /** Given an input stream and a filename, get the mime type
@@ -100,6 +101,20 @@ object ArtifactWrapper {
     else p
   }
 
+  /** Give some data, create a new wrapper for it
+    *
+    * @param nominalPath
+    *   the path
+    * @param size
+    *   the size of the data
+    * @param data
+    *   the InputStream of the data
+    * @param tempPath
+    *   the temporary directory to put a file in
+    *
+    * @return
+    *   the built item
+    */
   def newWrapper(
       nominalPath: String,
       size: Long,
@@ -107,7 +122,7 @@ object ArtifactWrapper {
       tempPath: Path
   ): ArtifactWrapper = {
     val name = fixPath(nominalPath)
-    if (size <= 16000000) {
+    if (size <= maxInMemorySize) {
       val bos = ByteArrayOutputStream()
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
@@ -124,10 +139,8 @@ object ArtifactWrapper {
       fos.flush()
       fos.close()
       FileWrapper(tempFile, name)
-
     }
   }
-
 }
 
 final case class FileWrapper(f: File, thePath: String) extends ArtifactWrapper {

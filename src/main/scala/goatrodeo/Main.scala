@@ -40,7 +40,7 @@ import com.typesafe.scalalogging.Logger
 /** The `main` class
   */
 object Howdy {
-  val logger = Logger(getClass())
+  private val logger = Logger(getClass())
   /** Command Line Configuration
     *
     * @param analyze
@@ -58,6 +58,7 @@ object Howdy {
       build: Option[File] = None,
       threads: Int = 4,
       blockList: Option[File] = None,
+      maxRecords: Int = 50000,
   )
 
   lazy val builder = OParser.builder[Config]
@@ -72,6 +73,7 @@ object Howdy {
         .action((x, c) =>
           c.copy(build = Some(x).filter(f => f.exists() && f.isDirectory()))
         ),
+        opt[Int]("maxrecords").text("The maximum number of records to process at once. Default 50,000").action((x,c) => if (x > 100) c.copy(maxRecords = x) else c),
       opt[File]('o', "out")
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
@@ -121,19 +123,16 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-
-
-
-      case Some(Config(out, Some(buildFrom), threads, block))
-          if out.isDefined =>
+      case Some(Config(Some(out), Some(buildFrom), threads, block, maxRecords))
+         =>
         Builder.buildDB(
           buildFrom,
-          Storage.getStorage(out),
-          threads, block, 
+          out,
+          threads, block, maxRecords
         )
 
       case Some(
-            Config(out, Some(buildFrom), threads, _)
+            Config(out, Some(buildFrom), threads, _, _)
           ) =>
         logger.error(
           "`out`  must be defined... where does the build result go?"

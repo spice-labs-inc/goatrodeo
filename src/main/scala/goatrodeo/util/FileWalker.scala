@@ -57,12 +57,7 @@ object FileWalker {
       import scala.collection.JavaConverters.asScalaIteratorConverter
       val theFile = in match {
         case FileWrapper(f, _) => f
-        case _ => {
-          val tempFile =
-            Helpers.tempFileFromStream(in.asStream(), true, tempDir)
-
-          tempFile
-        }
+        case _ => Helpers.tempFileFromStream(in.asStream(), true, tempDir)
       }
 
       try {
@@ -115,8 +110,7 @@ object FileWalker {
         import scala.collection.JavaConverters.asScalaIteratorConverter
         val theFile = in match {
           case FileWrapper(f, _) => f
-          case _ =>
-            Helpers.tempFileFromStream(in.asStream(), true, tempPath)
+          case _ => Helpers.tempFileFromStream(in.asStream(), true, tempPath)
         }
 
         val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
@@ -267,10 +261,10 @@ object FileWalker {
   )
 
   val notCompressedSet = Set[String](
-    "application/vnd.android.package-archive",
-    //"application/x-debian-package",
-    //"application/gzip",
-    //"application/x-gtar"
+    "application/vnd.android.package-archive"
+    // "application/x-debian-package",
+    // "application/gzip",
+    // "application/x-gtar"
   )
 
   def notArchive(in: ArtifactWrapper): Boolean =

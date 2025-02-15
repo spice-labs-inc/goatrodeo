@@ -114,7 +114,7 @@ object MD5 extends DecodeCBOR[MD5] {
 type Position = Long
 
 type MultifilePosition = (Long, Long)
- import io.bullet.borer.derivation.MapBasedCodecs.derived
+import io.bullet.borer.derivation.MapBasedCodecs.derived
 
 case class DataFileEnvelope(
     version: Int,
@@ -123,8 +123,7 @@ case class DataFileEnvelope(
     @key("depends_on") dependsOn: TreeSet[Long],
     @key("built_from_merge") builtFromMerge: Boolean,
     info: TreeMap[String, String]
-) derives Codec
- {
+) derives Codec {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 }
 
@@ -189,6 +188,8 @@ case class ClusterFileEnvelope(
     magic: Int,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
+    @key("built_on") builtOn: Option[String],
+    @key("builder") builder: Option[String],
     info: TreeMap[String, String]
 ) {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -207,10 +208,32 @@ object ClusterFileEnvelope {
     magic = magic,
     dataFiles = dataFiles,
     indexFiles = indexFiles,
-    info = info
+    info = info,
+    builtOn = Some(Helpers.currentDate8601()),
+    builder = Some(f"Goat Rodeo version ${"FIXME"}")
   )
 
-  
+  given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
+    new Encoder.DefaultValueAware[Option[T]] {
+
+      def write(w: Writer, value: Option[T]) =
+        value match {
+          case Some(x) => w.write(x)
+          case None    => w.writeNull()
+        }
+
+      def withDefaultValue(defaultValue: Option[T]): Encoder[Option[T]] =
+        if (defaultValue eq None)
+          new Encoder.PossiblyWithoutOutput[Option[T]] {
+            def producesOutputFor(value: Option[T]) = value ne None
+            def write(w: Writer, value: Option[T]) =
+              value match {
+                case Some(x) => w.write(x)
+                case None    => w
+              }
+          }
+        else this
+    }
 
   given Codec[ClusterFileEnvelope] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
