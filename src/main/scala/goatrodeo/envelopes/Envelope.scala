@@ -188,8 +188,6 @@ case class ClusterFileEnvelope(
     magic: Int,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
-    @key("built_on") builtOn: Option[String],
-    @key("builder") builder: Option[String],
     info: TreeMap[String, String]
 ) {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
@@ -209,8 +207,6 @@ object ClusterFileEnvelope {
     dataFiles = dataFiles,
     indexFiles = indexFiles,
     info = info,
-    builtOn = Some(Helpers.currentDate8601()),
-    builder = Some(f"Goat Rodeo version ${"FIXME"}")
   )
 
   given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
