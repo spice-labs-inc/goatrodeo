@@ -22,6 +22,7 @@ import java.io.InputStreamReader
 import goatrodeo.util.PURLHelpers
 import goatrodeo.util.PURLHelpers.Ecosystems
 import goatrodeo.omnibor.strategies.*
+import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -242,7 +243,6 @@ trait ToProcess {
       parentId: Option[GitOID],
       store: Storage,
       parentScope: ParentScope,
-      purlOut: PackageURL => Unit = _ => (),
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
       atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
@@ -317,7 +317,7 @@ trait ToProcess {
                       case None =>
                         Item(
                           itemNeedingAlias,
-                          noopLocationReference,
+                          // noopLocationReference,
                           TreeSet(aliasType -> itemScope4.identifier),
                           None,
                           None
@@ -344,13 +344,14 @@ trait ToProcess {
                 },
                 item =>
                   f"Writing ${itemScope4.identifier}, ${item.body match {
-                      case None       => ""
-                      case Some(body) => f"files ${body.fileNames}"
+                      case None => ""
+                      case Some(body) =>
+                        f"gitoid:sha1 ${item.connections.map(_._2).filter(_.startsWith("gitoid:blob:sha1"))}"
                     }} parent scope ${parentScope.parentScopeInformation()}"
               )
 
               // update purls
-              purls.foreach(purlOut)
+              purls.foreach(p => store.addPurl(p))
 
               parentScope.postFixReferencesAndStore(store, artifact, answerItem)
 
@@ -361,7 +362,10 @@ trait ToProcess {
                 if (hasBeenSeen) None
                 else {
                   FileWalker.withinArchiveStream(artifact = artifact) {
-                    foundItems =>
+                    rawFoundItems =>
+
+                      val foundItems = rawFoundItems.filter(_.size() > 4)
+
                       val processSet =
                         ToProcess.strategiesForArtifacts(
                           foundItems,
@@ -380,7 +384,6 @@ trait ToProcess {
                           Some(answerItem.identifier),
                           store,
                           thisParentScope,
-                          purlOut,
                           blockList,
                           keepRunning,
                           atEnd
@@ -433,7 +436,7 @@ object ToProcess {
   ): Vector[ToProcess] = {
     val wrappers = Helpers
       .findFiles(directory, _ => true)
-      .map(f => FileWrapper(f, f.getPath()))
+      .map(f => FileWrapper(f, f.getName()))
 
     strategiesForArtifacts(wrappers, onFound = onFound, infoMsgs_?)
   }
@@ -510,9 +513,22 @@ object ToProcess {
         // get all the files
         val allFiles: Vector[ArtifactWrapper] = Helpers
           .findFiles(root, _ => true)
-          .map(f => FileWrapper(f, f.getPath()))
+          .par
+          .map(f => FileWrapper(f, f.getName()))
+          .toVector
 
         logger.info(f"Found all files in ${root}, count ${allFiles.length}")
+
+        val mimeCnt = AtomicInteger(0)
+        allFiles.par.foreach(file => {
+          val cnt = mimeCnt.addAndGet(1)
+          if (cnt % 10000 == 0) {
+            logger.info(f"Mime builder count ${cnt}")
+          }
+          file.mimeType
+        })
+
+        logger.info("Computed mime type for all files")
 
         strategiesForArtifacts(
           allFiles,
@@ -568,7 +584,6 @@ object ToProcess {
         None,
         store,
         parentScope = ParentScope.forAndWith(individual.main, None),
-        purlOut = purlOut,
         blockList = block
       )
     }

@@ -41,6 +41,8 @@ import com.github.packageurl.PackageURL
 import goatrodeo.util.ArtifactWrapper
 import goatrodeo.omnibor.ToProcess.ByUUID
 import goatrodeo.omnibor.ToProcess.ByName
+import java.util.concurrent.ConcurrentLinkedQueue
+import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
@@ -59,16 +61,19 @@ object Builder {
     *   the number of threads to use when computings
     * @param blockList
     *   a file containing gitoids to not process (e.g., Apache license files)
+    * @param maxRecords
+    *   the maximum number of records to process at once
     */
   def buildDB(
       source: File,
-      storage: Storage,
+      dest: File,
+      // storage: Storage,
       threadCnt: Int,
-      blockList: Option[File]
-  ): Option[File] = {
+      blockList: Option[File],
+      maxRecords: Int
+  ): Unit = {
     val totalStart = Instant.now()
-    @volatile var processStart = Instant.now()
-    @volatile var seenFirst = false
+
     val runningCnt = AtomicInteger(0)
     val (queue, stillWorking) =
       ToProcess.buildQueueOnSeparateThread(source, runningCnt)
@@ -92,18 +97,91 @@ object Builder {
 
     }
 
-    val lock = Object()
-    var packageUrls: Vector[PackageURL] = Vector()
-
-    val purlOut = (p: PackageURL) => {
-      lock.synchronized {
-        packageUrls = packageUrls :+ p
-      }
+    logger.info(
+      "Blocking build db until there's at least 1 item in the work queue"
+    )
+    // Don't kick off the consumer threads until at least 1 item
+    // is in the work queue
+    while (queue.isEmpty()) {
+      Thread.sleep(250)
     }
+
+    logger.info("Kicking off work queue consumer threads")
+    val loopStart = Instant.now()
+    var updatedDest = dest
+
+    def destWithCount(dest: File, cnt: Int): File = {
+      val destFileName = dest.getName()
+      File(dest.getParentFile(), f"${destFileName}_${cnt}")
+    }
+
+    if (runningCnt.get() > maxRecords) {
+      updatedDest = destWithCount(dest, 0)
+    }
+
+    var loopCnt = 0
+    val dead_? = AtomicBoolean(false)
+    var runningThreads: Vector[Option[Thread]] = Vector()
+    while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
+      val thread = processMaxRecords(
+        updatedDest,
+        threadCnt = threadCnt,
+        maxRecords = maxRecords,
+        queue = queue,
+        stillWorking = stillWorking,
+        blockGitoids = blockGitoids,
+        cnt = cnt,
+        runningCnt = runningCnt,
+        totalStart = totalStart,
+        dead_? = dead_?,
+        loopStart = loopStart
+      )
+      runningThreads = runningThreads :+ thread
+      loopCnt += 1
+      logger.info(
+        f"Finished multi-thread consumer loop ${loopCnt} at ${Duration
+            .between(totalStart, Instant.now())}"
+      )
+      updatedDest = destWithCount(dest, loopCnt)
+    }
+
+    logger.info("Waiting for write threads")
+
+    for {
+      maybeThread <- runningThreads
+      thread <- maybeThread
+    } thread.join()
+
+    dest.mkdirs()
+    
+    logger.info("Done with run")
+    
+
+  }
+
+  private def processMaxRecords(
+      destDir: File,
+      threadCnt: Int,
+      maxRecords: Int,
+      queue: ConcurrentLinkedQueue[ToProcess],
+      stillWorking: AtomicBoolean,
+      blockGitoids: Set[String],
+      cnt: AtomicInteger,
+      runningCnt: AtomicInteger,
+      totalStart: Instant,
+      dead_? : AtomicBoolean,
+      loopStart: Instant
+  ): Option[Thread] = {
+
+    val storage = MemStorage(Some(destDir))
 
     // start time
     val start = Instant.now()
-    @volatile var dead_? = false
+
+    val startedRunning = cnt.get()
+
+    val batchName = destDir.getName()
+
     // fork `threadCnt` threads to do the work
     val threads = for { threadNum <- 0 until threadCnt } yield {
       val t = new Thread(
@@ -127,18 +205,13 @@ object Builder {
 
           var toProcess: ToProcess = null
           while (
-            !dead_? && {
+            (cnt.get() - startedRunning) < maxRecords // only run so many items
+            &&
+            !dead_?.get() && {
               toProcess = doPoll();
-
               toProcess
             } != null
           ) {
-            // improve the computation of Item/minute
-            // set processing start time after we've seen 30+ items
-            if (!seenFirst) {
-              seenFirst = true
-              processStart = Instant.now()
-            }
             val localStart = Instant.now()
             try {
               // build the package
@@ -146,10 +219,9 @@ object Builder {
               toProcess.process(
                 None,
                 store = storage,
-                purlOut = purlOut,
                 parentScope = ParentScope.forAndWith(toProcess.main, None),
                 blockList = blockGitoids,
-                keepRunning = () => !dead_?,
+                keepRunning = () => !dead_?.get(),
                 atEnd = (parent, _) => {
                   if (parent.isEmpty) {
                     val updatedCnt = cnt.addAndGet(1)
@@ -159,13 +231,14 @@ object Builder {
                       theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
                     ) {
                       val now = Instant.now()
-                      val totalDuration = Duration.between(start, now)
-                      val processDuration = Duration.between(processStart, now)
+                      val totalDuration = Duration.between(totalStart, now)
+                      val processDuration = Duration.between(loopStart, now)
                       val totalItems = runningCnt.get()
                       val avgMsg = if (processDuration.getSeconds() > 0) {
-                        val itemsPerSecond = updatedCnt.toDouble / processDuration
-                          .getSeconds()
-                          .toDouble
+                        val itemsPerSecond =
+                          updatedCnt.toDouble / processDuration
+                            .getSeconds()
+                            .toDouble
                         val itemsPerMinute = itemsPerSecond * 60.0d
                         val left = totalItems.toDouble - updatedCnt.toDouble
                         val remainingDuration = Duration.ZERO.plusSeconds(
@@ -175,7 +248,7 @@ object Builder {
                       } else ""
                       logger.info(
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
-                            .format("%,d", storage.size())}"
+                            .format("%,d", storage.size())} batch ${batchName}"
                       )
                     }
                   }
@@ -187,7 +260,7 @@ object Builder {
                 logger.error(
                   f"Failed illegal state ${toProcess.main} -- ${toProcess.mimeType} ${ise}"
                 )
-                dead_? = true
+                dead_?.set(true)
                 throw ise
               }
               case ioe: IOException => {
@@ -196,7 +269,7 @@ object Builder {
                     .getMessage()
                     .indexOf("Too many open files") > 0
                 ) {
-                  dead_? = true
+                  dead_?.set(true)
                   throw ioe
 
                 }
@@ -224,29 +297,38 @@ object Builder {
     // wait for the threads to complete
     for { t <- threads } {
       // deal with SIGKILL/ctrl-C
-      if (t.isInterrupted() || dead_?) {
+      if (t.isInterrupted() || dead_?.get()) {
         Thread.currentThread().interrupt()
         throw InterruptedException(f"${t.getName()} was interrupted")
       }
       t.join()
     }
-    logger.info(
-      f"Finished processing ${runningCnt.get()}, vertices ${storage.size()} at ${Duration
-          .between(start, Instant.now())}"
-    )
 
-    val ret = storage match {
-      case lf: (ListFileNames & Storage) if !dead_? =>
-        computeAndAddMerkleTrees(lf)
-        writeGoatRodeoFiles(lf, packageUrls)
-      case _ => logger.error("Didn't write"); None
-    }
+    if (!dead_?.get()) {
+      val thread = new Thread(
+        () => {
+          logger.info(
+            f"Finished processing ${cnt.get()}, vertices ${storage.size()} at ${Duration
+                .between(start, Instant.now())}"
+          )
 
-    logger.info(
-      f"Total build time ${Duration.between(totalStart, Instant.now())}"
-    )
+          val ret = storage match {
+            case lf: (ListFileNames & Storage) if !dead_?.get() =>
+              computeAndAddMerkleTrees(lf)
+              writeGoatRodeoFiles(lf)
+            case _ => logger.error("Didn't write"); None
+          }
 
-    ret
+          logger.info(
+            f"Total build time ${Duration.between(totalStart, Instant.now())}"
+          )
+        },
+        f"Saver ${batchName}"
+      )
+      thread.start()
+      Some(thread)
+    } else None
+
   }
 
   /** Finds all the Items that "Contain" other items and generate a Merkle Tree
@@ -260,7 +342,7 @@ object Builder {
 
     logger.info(f"Computing merkle trees for ${keys.size} items")
     val merkleTrees = for {
-      k <- keys
+      k <- keys.toVector.par
       item <- data.read(k)
       if !item.connections.filter(a => EdgeType.isDown(a._1)).isEmpty
     } yield {
@@ -282,7 +364,7 @@ object Builder {
           val alias = maybeAlias.getOrElse(
             Item(
               identifier = tree,
-              reference = Item.noopLocationReference,
+              // reference = Item.noopLocationReference,
               connections = TreeSet(),
               bodyMimeType = None,
               body = None
@@ -322,8 +404,7 @@ object Builder {
   }
 
   def writeGoatRodeoFiles(
-      store: ListFileNames & Storage,
-      purlOut: Vector[PackageURL]
+      store: ListFileNames & Storage
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
@@ -331,12 +412,13 @@ object Builder {
         target.mkdirs()
         val start = Instant.now()
 
+        val purlOut = store.purls()
+
         logger.info(f"Writing ${purlOut.length} Package URLs")
         val purlFile = File(target, "purls.txt")
         purlFile.createNewFile()
         val bw = new BufferedWriter(new FileWriter(purlFile))
         try {
-          import scala.jdk.CollectionConverters.CollectionHasAsScala
           for (purl <- purlOut) {
             bw.write(f"${purl.canonicalize()}\n")
           }
@@ -344,6 +426,7 @@ object Builder {
           bw.flush()
           bw.close()
         }
+        logger.info("Wrote pURLs, about to sort the index")
 
         // make sure the destination exists
         target.getAbsoluteFile().mkdirs()
@@ -358,6 +441,13 @@ object Builder {
         logger.info(
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
+
+        sorted.par.foreach(_.cachedCBOR)
+
+        logger.info(
+          f"Post CBOR cache at ${Duration.between(start, Instant.now())}"
+        )
+
         val cnt = sorted.length
 
         val ret = GraphManager.writeEntries(

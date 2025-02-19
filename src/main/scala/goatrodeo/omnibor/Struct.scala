@@ -56,48 +56,8 @@ object EdgeType {
     s == aliasTo
   }
 
-  /** Is the type a peer "from left"
-    *
-    * @param s
-    *   the EdgeType to check
-    * @return
-    *   the EdgeType a peer "from left"
-    */
-  def isFromLeft(s: String): Boolean = {
-    s.endsWith(fromLeft)
-  }
-
-  /** Is the type a peer "to right"
-    *
-    * @param s
-    *   the EdgeType to check
-    * @return
-    *   the EdgeType is peer "to right"
-    */
-  def isToRight(s: String): Boolean = {
-    s.endsWith(toRight)
-  }
-
-  /** Is the type hierarchical "down" (e.g., ContainsDown)
-    *
-    * @param s
-    *   the EdgeType to check
-    * @return
-    *   the EdgeType is hierarchical "down"
-    */
   def isDown(s: String): Boolean = {
-    s.endsWith(containsDown)
-  }
-
-  /** Is the type hierarchical "up" (e.g., ContainedBy)
-    *
-    * @param s
-    *   the EdgeType to check
-    * @return
-    *   the EdgeType is hierarchical "up"
-    */
-  def isUp(s: String): Boolean = {
-    s.endsWith(containedByUp)
+    s.endsWith(down)
   }
 
   /** Is the type "BuiltFrom"
@@ -122,17 +82,17 @@ object EdgeType {
     s == buildsTo
   }
 
-  val toRight = ":->";
-  val fromLeft = ":<-";
-  val containsDown = ":||";
-  val containedByUp = ":^";
+  val to = ":to"
+  val from = ":from"
+  val down = ":down"
+  val up = ":up"
 
-  val containedBy = "ContainedBy:^";
-  val contains = "Contains:||";
-  val aliasTo = "AliasTo:->";
-  val aliasFrom = "AliasFrom:<-";
-  val buildsTo = "BuildsTo:^"
-  val builtFrom = "BuiltFrom:||"
+  val containedBy = "contained:up";
+  val contains = "contained:down";
+  val aliasTo = "alias:to";
+  val aliasFrom = "alias:from";
+  val buildsTo = "build:up"
+  val builtFrom = "build:down"
 
 }
 
@@ -196,7 +156,6 @@ object StringOrPair {
 
   }
 }
-
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
@@ -206,12 +165,14 @@ case class ItemMetaData(
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
   def merge(other: ItemMetaData): ItemMetaData = {
-    ItemMetaData(
+    val ret = ItemMetaData(
       fileNames = this.fileNames ++ other.fileNames,
       mimeType = this.mimeType ++ other.mimeType,
       fileSize = this.fileSize,
       extra = Helpers.mergeTreeMaps(this.extra, other.extra)
     )
+
+    ret
   }
 }
 

@@ -16,20 +16,20 @@ import goatrodeo.util.GitOID
 
 case class Item(
     identifier: String,
-    reference: LocationReference,
+    //reference: LocationReference,
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
     body: Option[ItemMetaData]
 ) {
 
-  def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
+  def encodeCBOR(): Array[Byte] = cachedCBOR
 
-  def fixReferencePosition(hash: Long, offset: Long): Item = {
-    val hasCur = reference != Item.noopLocationReference
-    this.copy(
-      reference = (hash, offset)
-    )
-  }
+  // def fixReferencePosition(hash: Long, offset: Long): Item = {
+  //   val hasCur = reference != Item.noopLocationReference
+  //   this.copy(
+  //     reference = (hash, offset)
+  //   )
+  // }
 
   /** add a connection
     *
@@ -44,6 +44,8 @@ case class Item(
     this.copy(connections = this.connections + (edgeType -> id))
 
   private lazy val md5 = Helpers.computeMD5(identifier)
+
+  lazy val cachedCBOR: Array[Byte] = Cbor.encode(this).toByteArray
 
   def identifierMD5(): Array[Byte] = md5
 
@@ -131,7 +133,7 @@ case class Item(
 
     Item(
       identifier = this.identifier,
-      reference = this.reference,
+      // reference = this.reference,
       connections = this.connections ++ other.connections,
       bodyMimeType = mime,
       body = body
@@ -232,7 +234,7 @@ object Item {
     val (id, hashes) = GitOIDUtils.computeAllHashes(artifact)
     Item(
       id,
-      Item.noopLocationReference,
+      // Item.noopLocationReference,
       TreeSet(
         hashes.map(hash => EdgeType.aliasFrom -> hash)*
       ) ++ container.toSeq.map(c => EdgeType.containedBy -> c),

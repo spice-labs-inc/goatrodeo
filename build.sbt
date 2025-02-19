@@ -30,7 +30,8 @@ lazy val root = project
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.27.1",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
-    // libraryDependencies += "slf4j" % "simple" % "2.0.16",
+    libraryDependencies +=
+  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
     libraryDependencies +=  "com.github.package-url" % "packageurl-java" % "1.5.0",

@@ -53,6 +53,8 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 import java.io.IOException
 import com.typesafe.scalalogging.Logger
+import com.github.packageurl.PackageURL
+import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -83,22 +85,18 @@ trait Storage {
     *   the path
     * @param data
     *   the data to write
-    * @param context generate a String containing the context of the call that led to this write. Used for contention logging
-    * 
-    * @return the resulting item if merged
-    */
-  def write(path: String, opr: Option[Item] => Item, context: Item => String): Item
-
-  /** Write data to the path
+    * @param context
+    *   generate a String containing the context of the call that led to this
+    *   write. Used for contention logging
     *
-    * @param path
-    *   the path
-    * @param data
-    *   the data to write
+    * @return
+    *   the resulting item if merged
     */
-  // def write(path: String, data: String): Unit = {
-  //   write(path, data.getBytes("UTF-8"))
-  // }
+  def write(
+      path: String,
+      opr: Option[Item] => Item,
+      context: Item => String
+  ): Item
 
   /** Release the backing store or close files or commit the database.
     */
@@ -127,6 +125,19 @@ trait Storage {
     keys().filter(_.startsWith("gitoid:blob:sha256:"))
 
   def destDirectory(): Option[File]
+
+  /** The endpoint for sending package URLs
+    *
+    * @param purl
+    */
+  def addPurl(purl: PackageURL): Unit
+
+  /** Get the purls
+    *
+    * @return
+    *   the purls
+    */
+  def purls(): Vector[PackageURL]
 }
 
 /** Can the filenames be listed?
@@ -197,6 +208,9 @@ class MemStorage(val targetDir: Option[File])
   // synchronize access to the database
   private val dbSync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
+  private var thePurls: AtomicReference[Vector[PackageURL]] = AtomicReference(
+    Vector()
+  )
   private val locks: java.util.HashMap[String, AtomicInteger] =
     java.util.HashMap()
   def keys(): Set[String] = {
@@ -206,8 +220,25 @@ class MemStorage(val targetDir: Option[File])
   }
 
   override def pathsSortedWithMD5(): Vector[(String, String)] = {
-    keys().toVector.map(k => (Helpers.md5hashHex(k), k)).sorted
+    keys().toVector.par
+      .map(k => (Helpers.md5hashHex(k), k))
+      .toArray
+      .sorted
+      .toVector
   }
+
+  /** The endpoint for sending package URLs
+    *
+    * @param purl
+    */
+  def addPurl(purl: PackageURL): Unit = {
+    thePurls.synchronized {
+      val next = thePurls.get() :+ purl
+      thePurls.set(next)
+    }
+  }
+
+  def purls(): Vector[PackageURL] = thePurls.get()
 
   override def size() = db.get().size
 
@@ -221,8 +252,11 @@ class MemStorage(val targetDir: Option[File])
     ret
   }
 
-
-  override def write(path: String, opr: Option[Item] => Item, context: Item => String): Item = {
+  override def write(
+      path: String,
+      opr: Option[Item] => Item,
+      context: Item => String
+  ): Item = {
     val (lock, waiters) = sync.synchronized {
       val theLock = Option(locks.get(path)) match {
         case Some(lock) => lock
@@ -239,17 +273,20 @@ class MemStorage(val targetDir: Option[File])
       theLock -> waiters
     }
 
-      val contentionThreshold = 4
-
+    val contentionThreshold = 8
 
     try {
       lock.synchronized {
         val current = read(path)
         val updated = opr(current)
-              // if it's contentionThreshold or more, log the message and if it's a multiple of contentionThreshold, log again
-      if (waiters >= contentionThreshold && waiters % contentionThreshold == 0) {
-        logger.info(f"Lock contention for ${path} waiting ${waiters} context ${context(updated)}")
-      }
+        // if it's contentionThreshold or more, log the message and if it's a multiple of contentionThreshold, log again
+        if (
+          waiters >= contentionThreshold && waiters % contentionThreshold == 0
+        ) {
+          logger.info(
+            f"Lock contention for ${path} waiting ${waiters} context ${context(updated)}"
+          )
+        }
 
         dbSync.synchronized {
           val newVal = db.get() + (path -> updated)
