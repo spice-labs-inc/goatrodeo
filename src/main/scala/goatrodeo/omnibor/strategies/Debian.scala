@@ -24,7 +24,9 @@ import scala.collection.immutable.TreeSet
 class DebianState(artifact: ArtifactWrapper)
     extends ProcessingState[SingleMarker, DebianState] {
 
-  lazy val artifactMetaData: Option[(Option[PackageURL], TreeMap[String, TreeSet[StringOrPair]])] = Debian.computePurl(artifact)
+  lazy val artifactMetaData
+      : Option[(Option[PackageURL], TreeMap[String, TreeSet[StringOrPair]])] =
+    Debian.computePurl(artifact)
 
   /** Call the state object at the beginning of processing an ArtfactWrapper
     * into an Item. This is done just after the generation of the gitoids.

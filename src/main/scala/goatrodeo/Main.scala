@@ -47,7 +47,8 @@ object Howdy {
       build: Option[File] = None,
       threads: Int = 4,
       blockList: Option[File] = None,
-      maxRecords: Int = 50000
+      maxRecords: Int = 50000,
+      tempDir: Option[File] = None
   )
 
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
@@ -70,6 +71,9 @@ object Howdy {
       opt[File]('o', "out")
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
+      opt[File]("tempdir")
+        .text("Where to temporarily store files... should be a RAM disk")
+        .action((x, c) => c.copy(tempDir = Some(x))),
       opt[Int]('t', "threads")
         .text(
           "How many threads to run (default 4). Should be 2x-3x number of cores"
@@ -88,7 +92,8 @@ object Howdy {
             f = fixTilde(fa)
             i <- {
               val parent = f.getAbsoluteFile().getParentFile()
-              val wcf: FileFilter = WildcardFileFilter.builder.setWildcards(f.getName()).get()
+              val wcf: FileFilter =
+                WildcardFileFilter.builder.setWildcards(f.getName()).get()
               parent.listFiles(wcf)
             }
           } yield {
@@ -117,18 +122,26 @@ object Howdy {
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
       case Some(
-            Config(Some(out), Some(buildFrom), threads, block, maxRecords)
+            Config(
+              Some(out),
+              Some(buildFrom),
+              threads,
+              block,
+              maxRecords,
+              tempDir
+            )
           ) =>
         Builder.buildDB(
           buildFrom,
           out,
           threads,
           block,
-          maxRecords
+          maxRecords,
+          tempDir = tempDir
         )
 
       case Some(
-            Config(out, Some(buildFrom), threads, _, _)
+            Config(out, Some(buildFrom), threads, _, _, _)
           ) =>
         logger.error(
           "`out`  must be defined... where does the build result go?"

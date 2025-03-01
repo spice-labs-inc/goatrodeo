@@ -60,6 +60,8 @@ sealed trait ArtifactWrapper {
   lazy val filenameWithNoPath: String = (new File(path())).getName()
 
   protected def fixPath(p: String): String = ArtifactWrapper.fixPath(p)
+
+  def tempDir: Option[File]
 }
 
 object ArtifactWrapper {
@@ -119,10 +121,13 @@ object ArtifactWrapper {
       nominalPath: String,
       size: Long,
       data: InputStream,
+      tempDir: Option[File],
       tempPath: Path
   ): ArtifactWrapper = {
     val name = fixPath(nominalPath)
-    if (size <= maxInMemorySize) {
+
+    // a defined temp dir implies a RAM disk... copy everything but the smallest items
+    if (size <= (if (tempDir.isDefined) (64L * 1024L) else maxInMemorySize)) {
       val bos = ByteArrayOutputStream()
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
@@ -131,19 +136,20 @@ object ArtifactWrapper {
           f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
         )
       }
-      ByteWrapper(bytes, name)
+      ByteWrapper(bytes, name, tempDir = tempDir)
     } else {
       val tempFile = Files.createTempFile(tempPath, "goats", ".temp").toFile()
       val fos = FileOutputStream(tempFile)
       Helpers.copy(data, fos)
       fos.flush()
       fos.close()
-      FileWrapper(tempFile, name)
+      FileWrapper(tempFile, name, tempDir = tempDir)
     }
   }
 }
 
-final case class FileWrapper(f: File, thePath: String) extends ArtifactWrapper {
+final case class FileWrapper(f: File, thePath: String, tempDir: Option[File])
+    extends ArtifactWrapper {
   if (!f.exists()) {
     throw Exception(
       f"Tried to create file wrapper for ${f.getCanonicalPath()} that does not exist"
@@ -160,13 +166,16 @@ final case class FileWrapper(f: File, thePath: String) extends ArtifactWrapper {
 }
 
 object FileWrapper {
-  def fromName(name: String): FileWrapper = {
-    FileWrapper(new File(name), name)
+  def fromName(name: String, tempDir: Option[File]): FileWrapper = {
+    FileWrapper(new File(name), name, tempDir = tempDir)
   }
 }
 
-final case class ByteWrapper(bytes: Array[Byte], fileName: String)
-    extends ArtifactWrapper {
+final case class ByteWrapper(
+    bytes: Array[Byte],
+    fileName: String,
+    tempDir: Option[File]
+) extends ArtifactWrapper {
 
   override def asStream(): BufferedInputStream = new BufferedInputStream(
     ByteArrayInputStream(bytes)

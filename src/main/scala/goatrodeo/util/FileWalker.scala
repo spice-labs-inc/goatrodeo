@@ -9,6 +9,7 @@ import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
+import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -49,7 +50,7 @@ object FileWalker {
       import scala.jdk.CollectionConverters.IteratorHasAsScala
 
       val theFile = in match {
-        case FileWrapper(f, _) => f
+        case FileWrapper(f, _, _) => f
         case _ => Helpers.tempFileFromStream(in.asStream(), true, tempDir)
       }
 
@@ -65,7 +66,13 @@ object FileWalker {
             val name = v.getName()
             val size = v.getSize()
             ArtifactWrapper
-              .newWrapper(name, size, zipFile.getInputStream(v), tempDir)
+              .newWrapper(
+                name,
+                size,
+                zipFile.getInputStream(v),
+                in.tempDir,
+                tempDir
+              )
           })
           .toVector
         zipFile.close()
@@ -101,7 +108,7 @@ object FileWalker {
     if (isoMimeTypes.contains(in.mimeType)) {
       try {
         val theFile = in match {
-          case FileWrapper(f, _) => f
+          case FileWrapper(f, _, _) => f
           case _ => Helpers.tempFileFromStream(in.asStream(), true, tempPath)
         }
 
@@ -132,6 +139,7 @@ object FileWalker {
                   name,
                   size,
                   isoFileReader.getFileStream(cycleFile),
+                  in.tempDir,
                   tempPath
                 )
               }
@@ -176,6 +184,7 @@ object FileWalker {
   private def asApacheCommonsArchiveWrapper(
       in: () => InputStream,
       name: String,
+      tempPath: Option[File],
       tempDir: Path
   ): OptionalArchiveStream = {
     val factory = (new ArchiveStreamFactory())
@@ -195,7 +204,8 @@ object FileWalker {
 
           val size = ae.getSize()
 
-          ArtifactWrapper.newWrapper(artifactName, size, input, tempDir)
+          ArtifactWrapper
+            .newWrapper(artifactName, size, input, tempPath, tempDir)
         })
         .toVector
       input.close()
@@ -346,6 +356,7 @@ object FileWalker {
         asApacheCommonsArchiveWrapper(
           inputStreamBuilder,
           in.path(),
+          in.tempDir,
           tempDir
         )
       })
@@ -371,7 +382,11 @@ object FileWalker {
     if (notArchive(artifact)) None
     else {
       // create temporary directory
-      val tempDir: Path = Files.createTempDirectory("goatrodeo_temp_dir")
+      val tempDir: Path = artifact.tempDir match {
+        case Some(p) =>
+          Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
+        case None => Files.createTempDirectory("goatrodeo_temp_dir")
+      }
 
       try {
         tryToConstructArchiveStream(artifact, tempDir) match {

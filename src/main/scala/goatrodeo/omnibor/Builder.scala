@@ -56,16 +56,16 @@ object Builder {
   def buildDB(
       source: File,
       dest: File,
-      // storage: Storage,
       threadCnt: Int,
       blockList: Option[File],
-      maxRecords: Int
+      maxRecords: Int,
+      tempDir: Option[File]
   ): Unit = {
     val totalStart = Instant.now()
 
     val runningCnt = AtomicInteger(0)
     val (queue, stillWorking) =
-      ToProcess.buildQueueOnSeparateThread(source, runningCnt)
+      ToProcess.buildQueueOnSeparateThread(source, tempDir, runningCnt)
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)

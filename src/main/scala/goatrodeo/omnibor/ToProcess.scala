@@ -425,11 +425,12 @@ object ToProcess {
   def strategyForDirectory(
       directory: File,
       infoMsgs_? : Boolean,
+      tempDir: Option[File],
       onFound: ToProcess => Unit = _ => ()
   ): Vector[ToProcess] = {
     val wrappers = Helpers
       .findFiles(directory, _ => true)
-      .map(f => FileWrapper(f, f.getName()))
+      .map(f => FileWrapper(f, f.getName(), tempDir))
 
     strategiesForArtifacts(wrappers, onFound = onFound, infoMsgs_?)
   }
@@ -497,6 +498,7 @@ object ToProcess {
 
   def buildQueueOnSeparateThread(
       root: File,
+      tempDir: Option[File],
       count: AtomicInteger
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
@@ -507,7 +509,7 @@ object ToProcess {
         val allFiles: Vector[ArtifactWrapper] = Helpers
           .findFiles(root, _ => true)
           .par
-          .map(f => FileWrapper(f, f.getName()))
+          .map(f => FileWrapper(f, f.getName(), tempDir))
           .toVector
 
         logger.info(f"Found all files in ${root}, count ${allFiles.length}")
