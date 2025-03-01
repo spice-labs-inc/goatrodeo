@@ -57,6 +57,7 @@ object FileWalker {
       try {
 
         val zipFile = ZipFile(theFile)
+        try {
         val it: Vector[ArtifactWrapper] = zipFile
           .stream()
           .iterator()
@@ -75,11 +76,13 @@ object FileWalker {
               )
           })
           .toVector
-        zipFile.close()
         Some(
           it,
           "Zip Container"
         )
+        } finally {
+          zipFile.clone()
+        }
 
       } catch {
         case e: Exception =>
@@ -209,7 +212,7 @@ object FileWalker {
         })
         .toVector
       input.close()
-
+      fis.close()
       Some(theIterator -> "Apache Common Wrapper")
     } catch {
       case e: Exception =>
