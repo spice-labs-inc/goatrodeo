@@ -499,7 +499,8 @@ object ToProcess {
   def buildQueueOnSeparateThread(
       root: File,
       tempDir: Option[File],
-      count: AtomicInteger
+      count: AtomicInteger,
+      dead_? : AtomicBoolean
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
@@ -543,6 +544,7 @@ object ToProcess {
       } catch {
         case e: Exception =>
           logger.error(f"Failed to build graph ${e.getMessage()}")
+          dead_?.set(true)
       } finally {
 
         stillWorking.set(false)

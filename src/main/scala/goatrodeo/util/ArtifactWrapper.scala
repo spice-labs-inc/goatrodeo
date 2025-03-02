@@ -15,6 +15,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import scala.util.Using
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -34,7 +35,13 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def asStream(): InputStream
+  protected def asStream(): InputStream
+
+  def withStream[T](f: InputStream => T): T = {
+    Using.resource(asStream()) { stream =>
+      f(stream)
+    }
+  }
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
     *
@@ -48,8 +55,9 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  private lazy val _mimeType: String =
-    ArtifactWrapper.mimeTypeFor(this.asStream(), this.path())
+  private lazy val _mimeType: String = Using.resource(asStream()) { stream =>
+    ArtifactWrapper.mimeTypeFor(stream, this.path())
+  }
 
   def mimeType: String = _mimeType
 

@@ -12,11 +12,11 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipFile
 import scala.util.Try
+import scala.util.Using
 
 enum FileAction {
   case SkipDive
@@ -51,37 +51,37 @@ object FileWalker {
 
       val theFile = in match {
         case FileWrapper(f, _, _) => f
-        case _ => Helpers.tempFileFromStream(in.asStream(), true, tempDir)
+        case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempDir))
       }
 
       try {
 
         val zipFile = ZipFile(theFile)
         try {
-        val it: Vector[ArtifactWrapper] = zipFile
-          .stream()
-          .iterator()
-          .asScala
-          .filter(v => { !v.isDirectory() })
-          .map(v => {
-            val name = v.getName()
-            val size = v.getSize()
-            ArtifactWrapper
-              .newWrapper(
-                name,
-                size,
-                zipFile.getInputStream(v),
-                in.tempDir,
-                tempDir
-              )
-          })
-          .toVector
-        Some(
-          it,
-          "Zip Container"
-        )
+          val it: Vector[ArtifactWrapper] = zipFile
+            .stream()
+            .iterator()
+            .asScala
+            .filter(v => { !v.isDirectory() })
+            .map(v => {
+              val name = v.getName()
+              val size = v.getSize()
+              ArtifactWrapper
+                .newWrapper(
+                  name,
+                  size,
+                  zipFile.getInputStream(v),
+                  in.tempDir,
+                  tempDir
+                )
+            })
+            .toVector
+          Some(
+            it,
+            "Zip Container"
+          )
         } finally {
-          zipFile.clone()
+          zipFile.close()
         }
 
       } catch {
@@ -112,7 +112,7 @@ object FileWalker {
       try {
         val theFile = in match {
           case FileWrapper(f, _, _) => f
-          case _ => Helpers.tempFileFromStream(in.asStream(), true, tempPath)
+          case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempPath))
         }
 
         val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
@@ -185,19 +185,17 @@ object FileWalker {
     * @return
     */
   private def asApacheCommonsArchiveWrapper(
-      in: () => InputStream,
+      inputStream: BufferedInputStream,
       name: String,
       tempPath: Option[File],
       tempDir: Path
   ): OptionalArchiveStream = {
     val factory = (new ArchiveStreamFactory())
 
-    val fis = in()
-
     try {
       val input: ArchiveInputStream[ArchiveEntry] = factory
         .createArchiveInputStream(
-          fis
+          inputStream
         )
       val theIterator = Helpers
         .iteratorFor(input)
@@ -212,11 +210,11 @@ object FileWalker {
         })
         .toVector
       input.close()
-      fis.close()
+
       Some(theIterator -> "Apache Common Wrapper")
     } catch {
       case e: Exception =>
-        fis.close(); None
+        None
     }
   }
 
@@ -311,57 +309,59 @@ object FileWalker {
       }.orElse(asISOWrapper(in, tempDir).orElse {
         // the inputstream to the apache stuff is either a
         // decompressed file or the input stream from the artifact
-        val inputStreamBuilder: () => InputStream =
-          (if (notCompressed(in.path(), in.mimeType)) None
-           else {
-             Try {
 
-               try {
-                 val factory = new CompressorStreamFactory()
-                 val fis = new BufferedInputStream(in.asStream())
+        val withInputStreamFn: BufferedInputStream => OptionalArchiveStream =
+          theStream =>
+            asApacheCommonsArchiveWrapper(
+              theStream,
+              in.path(),
+              in.tempDir,
+              tempDir
+            )
 
-                 val input: CompressorInputStream =
-                   factory.createCompressorInputStream(fis)
+        // if it's not compressed, just run with the stream
+        if (notCompressed(in.path(), in.mimeType))
+          in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
+        else {
+          // if it might be compressed, try to decompress the stream into a file
+          val maybeFile: Option[File] = Try {
+            in.withStream { stream =>
+              val factory = new CompressorStreamFactory()
+              val fis = new BufferedInputStream(stream)
 
-                 val theFile =
-                   Files
-                     .createTempFile(tempDir, "goats", "uncompressed")
-                     .toFile()
+              val input: CompressorInputStream =
+                factory.createCompressorInputStream(fis)
 
-                 val fos = new FileOutputStream(theFile)
-                 Helpers.copy(input, fos)
-                 fos.close()
+              val theFile =
+                Files
+                  .createTempFile(tempDir, "goats", "uncompressed")
+                  .toFile()
 
-                 () => new BufferedInputStream(new FileInputStream(theFile))
-               } catch {
-                 case e: Exception =>
-                   if (
-                     /*true ||*/ (in.mimeType != "application/vnd.android.package-archive" && (
-                       in.path().endsWith(".tgz") ||
-                         in.path().endsWith(".apk") ||
-                         in
-                           .path()
-                           .endsWith(".xz")
-                     ))
-                   ) {
-                     logger.error(
-                       f"Expected to open apk/tgz/xz ${in
-                           .path()} -- ${in.mimeType} but got ${e.getMessage()}",
-                       e
-                     )
-                   }
-                   throw e
-               }
-             }.toOption
-           })
-            .getOrElse(() => new BufferedInputStream(in.asStream()))
+              val fos = new FileOutputStream(theFile)
+              Helpers.copy(input, fos)
+              fos.close()
+              theFile
+            }
+          }.toOption
 
-        asApacheCommonsArchiveWrapper(
-          inputStreamBuilder,
-          in.path(),
-          in.tempDir,
-          tempDir
-        )
+          maybeFile match {
+            // if we were able to decompress, then use the temp file
+            case Some(uncompressedFile) => {
+              try {
+                Using.resource(
+                  new BufferedInputStream(new FileInputStream(uncompressedFile))
+                ) { stream =>
+                  withInputStreamFn(stream)
+                }
+              } finally {
+                uncompressedFile.delete()
+              }
+            }
+            case None =>
+              in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
+          }
+
+        }
       })
     }
   }

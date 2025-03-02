@@ -159,19 +159,22 @@ object Helpers {
       case maybeClass if javaClassMimeTypes.contains(maybeClass) =>
         val sourceName: Option[String] =
           Try {
-            val is = file.asStream()
-            try {
-              val cp = new ClassParser(is, file.path())
+            file.withStream { is =>
+              try {
+                val cp = new ClassParser(is, file.path())
 
-              val clz = cp.parse()
-              clz.getSourceFilePath()
-            } catch {
-              case e: OutOfMemoryError =>
-                // if the classfile is corrupt, we may get an OOME, swallow it and just don't
-                // return a file name
-                throw new Exception(f"Failed to parse class ${e.getMessage()}")
-            } finally {
-              is.close()
+                val clz = cp.parse()
+                clz.getSourceFilePath()
+              } catch {
+                case e: OutOfMemoryError =>
+                  // if the classfile is corrupt, we may get an OOME, swallow it and just don't
+                  // return a file name
+                  throw new Exception(
+                    f"Failed to parse class ${e.getMessage()}"
+                  )
+              } finally {
+                is.close()
+              }
             }
           }.toOption
 
@@ -1092,39 +1095,40 @@ object GitOIDUtils {
       tpe.gitoidName(),
       hashType.hashTypeName(),
       hashAsHex(inputStream, len, hashType, tpe)
-    ) /*.intern()*/
+    )
   }
 
   def computeAllHashes(
       theFile: ArtifactWrapper
   ): (String, Vector[String]) = {
-    def is(): InputStream = theFile.asStream()
-    val gitoidSha256 = url(is(), theFile.size(), HashType.SHA256)
+
+    val gitoidSha256 =
+      theFile.withStream(url(_, theFile.size(), HashType.SHA256))
 
     (
       gitoidSha256,
       Vector(
-        url(is(), theFile.size(), HashType.SHA1),
+        theFile.withStream(url(_, theFile.size(), HashType.SHA1)),
         String
           .format(
             "sha1:%s",
-            Helpers.toHex(Helpers.computeSHA1(is()))
-          ) /*.intern()*/,
+            Helpers.toHex(theFile.withStream(Helpers.computeSHA1(_)))
+          ),
         String
           .format(
             "sha256:%s",
-            Helpers.toHex(Helpers.computeSHA256(is()))
-          ) /*.intern()*/,
+            Helpers.toHex(theFile.withStream(Helpers.computeSHA256(_)))
+          ),
         String
           .format(
             "sha512:%s",
-            Helpers.toHex(Helpers.computeSHA512(is()))
-          ) /*.intern()*/,
+            Helpers.toHex(theFile.withStream(Helpers.computeSHA512(_)))
+          ),
         String
           .format(
             "md5:%s",
-            Helpers.toHex(Helpers.computeMD5(is()))
-          ) /*.intern()*/
+            Helpers.toHex(theFile.withStream(Helpers.computeMD5(_)))
+          )
       )
     )
   }

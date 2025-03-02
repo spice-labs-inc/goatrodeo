@@ -61,7 +61,7 @@ case class MavenState(
       marker: MavenMarkers
   ): MavenState = marker match {
     case MavenMarkers.POM =>
-      val pomString = Helpers.slurpInputToString(artifact.asStream())
+      val pomString = artifact.withStream(Helpers.slurpInputToString(_))
       val xml =
         Try { XML.loadString(pomString) }.toOption.getOrElse(NodeSeq.Empty)
       this.copy(pomFile = pomString, pomXml = xml)
@@ -156,11 +156,11 @@ case class MavenState(
               .headOption match {
               case Some(manifest) =>
                 val manifestString =
-                  Helpers.slurpInputToString(manifest.asStream())
+                  manifest.withStream(Helpers.slurpInputToString(_))
                 val props = java.util.Properties()
                 // if this causes an exception, log it.
                 try {
-                  props.load(manifest.asStream())
+                  manifest.withStream(props.load(_))
                 } catch {
                   case e: Exception =>
                     logger.error(

@@ -116,13 +116,14 @@ object Debian {
                   .headOption
                   .map(innerArt => {
                     val str =
-                      Helpers.slurpInputToString(innerArt.asStream())
+                      innerArt.withStream(Helpers.slurpInputToString(_))
                     import scala.jdk.CollectionConverters.*
 
-                    val lr =
-                      BufferedReader(InputStreamReader(innerArt.asStream()))
-
-                    str -> lr.lines().iterator().asScala.toVector
+                    val lr = innerArt.withStream { stream =>
+                      val br = BufferedReader(InputStreamReader(stream))
+                      br.lines().iterator().asScala.toVector
+                    }
+                    str -> lr
                   })
               }
 

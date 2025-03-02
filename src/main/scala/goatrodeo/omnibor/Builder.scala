@@ -64,8 +64,9 @@ object Builder {
     val totalStart = Instant.now()
 
     val runningCnt = AtomicInteger(0)
+        val dead_? = AtomicBoolean(false)
     val (queue, stillWorking) =
-      ToProcess.buildQueueOnSeparateThread(source, tempDir, runningCnt)
+      ToProcess.buildQueueOnSeparateThread(source, tempDir, runningCnt, dead_? = dead_? )
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
@@ -109,7 +110,7 @@ object Builder {
     }
 
     var loopCnt = 0
-    val dead_? = AtomicBoolean(false)
+
     val writeThreadCnt = AtomicInteger(0)
     while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
       val thread = processMaxRecords(
@@ -124,7 +125,8 @@ object Builder {
         totalStart = totalStart,
         dead_? = dead_?,
         loopStart = loopStart,
-        writeThreadCnt = writeThreadCnt
+        writeThreadCnt = writeThreadCnt,
+        tempDir = tempDir
       )
 
       loopCnt += 1
@@ -160,7 +162,8 @@ object Builder {
       totalStart: Instant,
       dead_? : AtomicBoolean,
       loopStart: Instant,
-      writeThreadCnt: AtomicInteger
+      writeThreadCnt: AtomicInteger,
+      tempDir: Option[File]
   ): Option[Thread] = {
 
     val storage = MemStorage(Some(destDir))
@@ -220,6 +223,32 @@ object Builder {
                     if (
                       theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
                     ) {
+
+                      // if we've got a temp dir and we're down to 10% free space, bail
+                      tempDir match {
+                        case Some(theDir) =>
+                          for {
+                            fileStore <- Try {
+                              Files.getFileStore(
+                                theDir.toPath().toAbsolutePath()
+                              )
+                            }.toOption
+                            total <- Try { fileStore.getTotalSpace().toDouble }
+                            available <- Try {
+                              fileStore.getUsableSpace().toDouble
+                            }
+                          } {
+                            val remaining = available / total
+                            if (remaining < 0.05) {
+                              val errorMsg =
+                                s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
+                              logger.error(errorMsg)
+                              dead_?.set(true)
+                              throw new Exception(errorMsg)
+                            }
+                          }
+                        case _ => // do nothing
+                      }
                       val now = Instant.now()
                       val totalDuration = Duration.between(totalStart, now)
                       val processDuration = Duration.between(loopStart, now)
