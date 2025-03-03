@@ -32,7 +32,7 @@ class ISOFileSuite extends munit.FunSuite {
 
     val name = "test_data/download/iso_tests/iso_of_archives.iso"
     val result = FileWalker
-      .withinArchiveStream(FileWrapper(File(name), name)) { _ =>
+      .withinArchiveStream(FileWrapper(File(name), name, None)) { _ =>
         42
       }
     assertEquals(
@@ -44,7 +44,7 @@ class ISOFileSuite extends munit.FunSuite {
     val name = "test_data/download/iso_tests/iso_of_archives.iso"
     val count =
       FileWalker
-        .withinArchiveStream(FileWrapper(File(name), name)) { items =>
+        .withinArchiveStream(FileWrapper(File(name), name, None)) { items =>
           items.length
         }
 
@@ -55,7 +55,7 @@ class ISOFileSuite extends munit.FunSuite {
   test("deal with nesting archives inside an ISO") {
     val name = "test_data/download/iso_tests/iso_of_archives.iso"
     val nested =
-      FileWrapper(File(name), name)
+      FileWrapper(File(name), name, None)
 
     val tp = GenericFile(nested)
     val store = MemStorage(None)

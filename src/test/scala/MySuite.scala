@@ -106,7 +106,7 @@ class MySuite extends munit.FunSuite {
       val name = "test_data/HP1973-Source.zip"
       FileWalker
         .withinArchiveStream(
-          FileWrapper(File(name), name)
+          FileWrapper(File(name), name, None)
         ) { _ => 42 }
         .isDefined
     })
@@ -114,7 +114,7 @@ class MySuite extends munit.FunSuite {
       val name = "test_data/log4j-core-2.22.1.jar"
       FileWalker
         .withinArchiveStream(
-          FileWrapper(File(name), name)
+          FileWrapper(File(name), name, None)
         ) { _ => 42 }
         .isDefined
     })
@@ -122,14 +122,14 @@ class MySuite extends munit.FunSuite {
     assert({
       val name = "test_data/ics_test.tar"
       FileWalker
-        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
+        .withinArchiveStream(FileWrapper(File(name), name, None)) { _ => 42 }
         .isDefined
     })
 
     assert({
       val name = "test_data/nested.tar"
       FileWalker
-        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
+        .withinArchiveStream(FileWrapper(File(name), name, None)) { _ => 42 }
         .isDefined
     })
 
@@ -137,7 +137,7 @@ class MySuite extends munit.FunSuite {
       val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
       FileWalker
         .withinArchiveStream(
-          FileWrapper(File(name), name)
+          FileWrapper(File(name), name, None)
         ) { _ => 42 }
         .isDefined
     })
@@ -145,7 +145,7 @@ class MySuite extends munit.FunSuite {
       val name = "test_data/tk-8.6.13-r2.apk"
       FileWalker
         .withinArchiveStream(
-          FileWrapper(File(name), name)
+          FileWrapper(File(name), name, None)
         ) { _ => 42 }
         .isDefined
     })
@@ -153,13 +153,13 @@ class MySuite extends munit.FunSuite {
     assert({
       val name = "test_data/empty.tgz"
       FileWalker
-        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
+        .withinArchiveStream(FileWrapper(File(name), name, None)) { _ => 42 }
         .isDefined
     })
     assert({
       val name = "test_data/toml-rs.tgz"
       FileWalker
-        .withinArchiveStream(FileWrapper(File(name), name)) { _ => 42 }
+        .withinArchiveStream(FileWrapper(File(name), name, None)) { _ => 42 }
         .isDefined
     })
 
@@ -169,7 +169,9 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/empty.tgz"
     val count =
       FileWalker
-        .withinArchiveStream(FileWrapper(File(name), name)) { x => x.length }
+        .withinArchiveStream(FileWrapper(File(name), name, None)) { x =>
+          x.length
+        }
         .get
 
     assert(count > 2)
@@ -177,7 +179,7 @@ class MySuite extends munit.FunSuite {
 
   test("deal with nesting") {
     val name = "test_data/nested.tar"
-    val nested = FileWrapper(File(name), name)
+    val nested = FileWrapper(File(name), name, None)
 
     val store = ToProcess.buildGraphFromArtifactWrapper(nested)
 
@@ -191,12 +193,12 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val (maybePurl, attrs) = Debian
       .computePurl(
-        FileWrapper(File(name), name)
+        FileWrapper(File(name), name, None)
       )
       .get
     assert(maybePurl.isDefined, "Should compute a purl")
     val purl = maybePurl.get
-    assertEquals(purl.getName(), "tk8.6")
+    assertEquals(purl.getName(), "tk8.6", None)
     assert(
       attrs.get("maintainer").get.size > 0,
       "Should have a mainter"
@@ -212,18 +214,23 @@ class MySuite extends munit.FunSuite {
 
     val (maybePurl, attrs) = Debian
       .computePurl(
-        FileWrapper(File(name), name)
+        FileWrapper(File(name), name, None)
       )
       .get
     assert(maybePurl.isDefined, "Should compute a purl")
     val purl = maybePurl.get
-    assertEquals(purl.getName(), "libasound2")
+    assertEquals(purl.getName(), "libasound2", None)
     assert(
       attrs.get("maintainer").get.size > 0,
       "Should have a mainter"
     )
     assert(
-      attrs.get("description").get.head.value.contains("ALSA library and its standard plugins"),
+      attrs
+        .get("description")
+        .get
+        .head
+        .value
+        .contains("ALSA library and its standard plugins"),
       "The description must support multi-line"
     )
 
@@ -232,7 +239,7 @@ class MySuite extends munit.FunSuite {
   test("deal with .deb and zst") {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val nested =
-      FileWrapper(File(name), name)
+      FileWrapper(File(name), name, None)
 
     val store = ToProcess.buildGraphFromArtifactWrapper(nested)
     val gitoids = store.gitoidKeys()
@@ -255,7 +262,7 @@ class MySuite extends munit.FunSuite {
 
   test("Build from nested") {
     val name = "test_data/nested.tar"
-    val nested = FileWrapper(File(name), name)
+    val nested = FileWrapper(File(name), name, None)
     val store1 = ToProcess.buildGraphFromArtifactWrapper(nested)
     val store2 = ToProcess.buildGraphFromArtifactWrapper(
       nested,
@@ -314,7 +321,7 @@ class MySuite extends munit.FunSuite {
 
   test("Build from Java") {
     val source = File("test_data/jar_test")
-    val strategy = ToProcess.strategyForDirectory(source, false)
+    val strategy = ToProcess.strategyForDirectory(source, false, None)
 
     assert(
       strategy.length >= 2,
@@ -357,13 +364,12 @@ class MySuite extends munit.FunSuite {
     )
     assert(withPurlSources.length == 2)
 
-        val jars = withPurl.filter(i =>
-      i.connections.filter(_._2.contains("?")).size == 0
-    )
+    val jars =
+      withPurl.filter(i => i.connections.filter(_._2.contains("?")).size == 0)
 
     assert(jars.length == 2, f"Expecting two JARs, but got ${jars.length}")
 
-    val extra = jars(0).body.get.extra 
+    val extra = jars(0).body.get.extra
 
     assert(extra.get("manifest").isDefined)
     assert(extra.get("pom").isDefined)
@@ -383,7 +389,7 @@ class MySuite extends munit.FunSuite {
         )
       } {
         val bad = File(source, toTry)
-        val badWrapper = FileWrapper(bad, toTry)
+        val badWrapper = FileWrapper(bad, toTry, None)
         ToProcess.buildGraphFromArtifactWrapper(badWrapper)
         // No pURL
         // val pkgIndex = store.read("pkg:maven").get
@@ -411,10 +417,9 @@ class MySuite extends munit.FunSuite {
           resForBigTent.delete()
         }
       }
-      import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-      import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+      import scala.jdk.CollectionConverters.*
 
-      Builder.buildDB(source, resForBigTent, 32, None, 1000000)
+      Builder.buildDB(source, resForBigTent, 32, None, 1000000, None)
 
       // no pURL
       // val pkgIndex = store.read("pkg:maven").get

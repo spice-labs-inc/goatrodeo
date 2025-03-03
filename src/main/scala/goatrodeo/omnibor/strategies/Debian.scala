@@ -1,29 +1,32 @@
 package goatrodeo.omnibor.strategies
 
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.omnibor.SingleMarker
-import goatrodeo.omnibor.ProcessingState
-import goatrodeo.omnibor.Item
 import com.github.packageurl.PackageURL
-import scala.collection.immutable.TreeMap
-import scala.collection.immutable.TreeSet
+import goatrodeo.omnibor.Item
+import goatrodeo.omnibor.ProcessingState
+import goatrodeo.omnibor.SingleMarker
+import goatrodeo.omnibor.Storage
 import goatrodeo.omnibor.StringOrPair
 import goatrodeo.omnibor.ToProcess
-import goatrodeo.util.GitOID
+import goatrodeo.omnibor.ToProcess.ByName
+import goatrodeo.omnibor.ToProcess.ByUUID
+import goatrodeo.util.ArtifactWrapper
 import goatrodeo.util.FileWalker
+import goatrodeo.util.GitOID
 import goatrodeo.util.Helpers
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import goatrodeo.util.PURLHelpers
 import goatrodeo.util.PURLHelpers.Ecosystems
-import goatrodeo.omnibor.ToProcess.ByUUID
-import goatrodeo.omnibor.ToProcess.ByName
-import goatrodeo.omnibor.Storage
+
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
 class DebianState(artifact: ArtifactWrapper)
     extends ProcessingState[SingleMarker, DebianState] {
 
-  lazy val artifactMetaData = Debian.computePurl(artifact)
+  lazy val artifactMetaData
+      : Option[(Option[PackageURL], TreeMap[String, TreeSet[StringOrPair]])] =
+    Debian.computePurl(artifact)
 
   /** Call the state object at the beginning of processing an ArtfactWrapper
     * into an Item. This is done just after the generation of the gitoids.
@@ -113,13 +116,14 @@ object Debian {
                   .headOption
                   .map(innerArt => {
                     val str =
-                      Helpers.slurpInputToString(innerArt.asStream())
-                    import scala.collection.JavaConverters.asScalaIteratorConverter
+                      innerArt.withStream(Helpers.slurpInputToString(_))
+                    import scala.jdk.CollectionConverters.*
 
-                    val lr =
-                      BufferedReader(InputStreamReader(innerArt.asStream()))
-
-                    str -> lr.lines().iterator().asScala.toVector
+                    val lr = innerArt.withStream { stream =>
+                      val br = BufferedReader(InputStreamReader(stream))
+                      br.lines().iterator().asScala.toVector
+                    }
+                    str -> lr
                   })
               }
 
@@ -177,9 +181,9 @@ object Debian {
         }
         val treeAttrs: TreeMap[String, TreeSet[StringOrPair]] =
           TreeMap(attrs.toSeq.map { case (k, v) =>
-            k.intern() -> TreeSet(StringOrPair(v))
+            k /*.intern()*/ -> TreeSet(StringOrPair(v))
           }*) ++ maybeRawLines.toVector.map { case (str, _) =>
-            "control".intern() -> TreeSet(StringOrPair("text/debian-control", str))
+            "control" -> TreeSet(StringOrPair("text/debian-control", str))
           }
         purl -> treeAttrs
       }

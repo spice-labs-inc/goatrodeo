@@ -14,41 +14,30 @@ limitations under the License. */
 
 package goatrodeo.omnibor
 
-import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
-import java.io.FileOutputStream
-import java.util.zip.GZIPOutputStream
-import java.io.OutputStreamWriter
-import java.io.BufferedWriter
-import java.math.BigInteger
-import goatrodeo.util.Helpers
-import scala.util.Try
-import java.io.FileInputStream
-import goatrodeo.util.{GitOID, GitOIDUtils}
-import java.io.BufferedInputStream
-import java.time.Instant
-import java.time.Duration
-import java.io.ByteArrayInputStream
-import java.util.concurrent.atomic.AtomicBoolean
-import java.io.IOException
-import scala.annotation.tailrec
-import java.io.FileWriter
-import scala.collection.immutable.TreeSet
-import goatrodeo.util.FileWrapper
-import java.nio.file.Files
 import com.typesafe.scalalogging.Logger
-import com.github.packageurl.PackageURL
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.omnibor.ToProcess.ByUUID
-import goatrodeo.omnibor.ToProcess.ByName
+import goatrodeo.util.GitOIDUtils
+import goatrodeo.util.Helpers
+
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileWriter
+import java.io.IOException
+import java.nio.file.Files
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import scala.annotation.tailrec
+import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+import scala.util.Try
 
 /** Build the GitOIDs the container and all the sub-elements found in the
   * container
   */
 object Builder {
-  val logger = Logger(getClass())
+  val logger: Logger = Logger(getClass())
 
   /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
@@ -67,16 +56,17 @@ object Builder {
   def buildDB(
       source: File,
       dest: File,
-      // storage: Storage,
       threadCnt: Int,
       blockList: Option[File],
-      maxRecords: Int
+      maxRecords: Int,
+      tempDir: Option[File]
   ): Unit = {
     val totalStart = Instant.now()
 
     val runningCnt = AtomicInteger(0)
+        val dead_? = AtomicBoolean(false)
     val (queue, stillWorking) =
-      ToProcess.buildQueueOnSeparateThread(source, runningCnt)
+      ToProcess.buildQueueOnSeparateThread(source, tempDir, runningCnt, dead_? = dead_? )
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
@@ -120,8 +110,8 @@ object Builder {
     }
 
     var loopCnt = 0
-    val dead_? = AtomicBoolean(false)
-    var runningThreads: Vector[Option[Thread]] = Vector()
+
+    val writeThreadCnt = AtomicInteger(0)
     while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
       val thread = processMaxRecords(
         updatedDest,
@@ -134,9 +124,11 @@ object Builder {
         runningCnt = runningCnt,
         totalStart = totalStart,
         dead_? = dead_?,
-        loopStart = loopStart
+        loopStart = loopStart,
+        writeThreadCnt = writeThreadCnt,
+        tempDir = tempDir
       )
-      runningThreads = runningThreads :+ thread
+
       loopCnt += 1
       logger.info(
         f"Finished multi-thread consumer loop ${loopCnt} at ${Duration
@@ -147,16 +139,15 @@ object Builder {
 
     logger.info("Waiting for write threads")
 
-    for {
-      maybeThread <- runningThreads
-      thread <- maybeThread
-    } thread.join()
+    // loop while we wait for the end of processing
+    while (writeThreadCnt.get() > 0) {
+      Thread.sleep(250)
+    }
 
+    // create the non-number-suffixed directory
     dest.mkdirs()
-    
-    logger.info("Done with run")
-    
 
+    logger.info("Done with run")
   }
 
   private def processMaxRecords(
@@ -170,7 +161,9 @@ object Builder {
       runningCnt: AtomicInteger,
       totalStart: Instant,
       dead_? : AtomicBoolean,
-      loopStart: Instant
+      loopStart: Instant,
+      writeThreadCnt: AtomicInteger,
+      tempDir: Option[File]
   ): Option[Thread] = {
 
     val storage = MemStorage(Some(destDir))
@@ -230,6 +223,32 @@ object Builder {
                     if (
                       theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
                     ) {
+
+                      // if we've got a temp dir and we're down to 10% free space, bail
+                      tempDir match {
+                        case Some(theDir) =>
+                          for {
+                            fileStore <- Try {
+                              Files.getFileStore(
+                                theDir.toPath().toAbsolutePath()
+                              )
+                            }.toOption
+                            total <- Try { fileStore.getTotalSpace().toDouble }
+                            available <- Try {
+                              fileStore.getUsableSpace().toDouble
+                            }
+                          } {
+                            val remaining = available / total
+                            if (remaining < 0.05) {
+                              val errorMsg =
+                                s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
+                              logger.error(errorMsg)
+                              dead_?.set(true)
+                              throw new Exception(errorMsg)
+                            }
+                          }
+                        case _ => // do nothing
+                      }
                       val now = Instant.now()
                       val totalDuration = Duration.between(totalStart, now)
                       val processDuration = Duration.between(loopStart, now)
@@ -248,7 +267,7 @@ object Builder {
                       } else ""
                       logger.info(
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
-                            .format("%,d", storage.size())} batch ${batchName}"
+                            .format("%,d", storage.size())}"
                       )
                     }
                   }
@@ -288,7 +307,7 @@ object Builder {
 
           }
         },
-        f"gitoid compute ${threadNum}"
+        f"gitoid ${batchName} ${threadNum}"
       )
       t.start()
       t
@@ -307,24 +326,33 @@ object Builder {
     if (!dead_?.get()) {
       val thread = new Thread(
         () => {
-          logger.info(
-            f"Finished processing ${cnt.get()}, vertices ${storage.size()} at ${Duration
-                .between(start, Instant.now())}"
-          )
+          try {
+            logger.info(
+              f"Finished processing ${cnt.get()}, vertices ${storage.size()} at ${Duration
+                  .between(start, Instant.now())}"
+            )
 
-          val ret = storage match {
-            case lf: (ListFileNames & Storage) if !dead_?.get() =>
-              computeAndAddMerkleTrees(lf)
-              writeGoatRodeoFiles(lf)
-            case _ => logger.error("Didn't write"); None
+            val writeStart = Instant.now()
+
+            val ret = storage match {
+              case lf: (ListFileNames & Storage) if !dead_?.get() =>
+                computeAndAddMerkleTrees(lf)
+                writeGoatRodeoFiles(lf)
+              case _ => logger.error("Didn't write"); None
+            }
+
+            logger.info(
+              f"Total build time for ${batchName} ${Duration
+                  .between(start, Instant.now())}, write took ${Duration
+                  .between(writeStart, Instant.now())}"
+            )
+          } finally {
+            writeThreadCnt.decrementAndGet()
           }
-
-          logger.info(
-            f"Total build time ${Duration.between(totalStart, Instant.now())}"
-          )
         },
         f"Saver ${batchName}"
       )
+      writeThreadCnt.addAndGet(1)
       thread.start()
       Some(thread)
     } else None
@@ -452,7 +480,7 @@ object Builder {
 
         val ret = GraphManager.writeEntries(
           target,
-          sorted.toIterator
+          sorted.iterator
         )
 
         logger.info(

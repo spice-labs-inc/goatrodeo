@@ -1,27 +1,20 @@
 package goatrodeo.omnibor
 
-import goatrodeo.util.ArtifactWrapper
 import com.github.packageurl.PackageURL
+import com.typesafe.scalalogging.Logger
+import goatrodeo.omnibor.strategies._
+import goatrodeo.util.ArtifactWrapper
+import goatrodeo.util.FileWalker
+import goatrodeo.util.FileWrapper
+import goatrodeo.util.GitOID
+import goatrodeo.util.Helpers
+
 import java.io.File
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
-import goatrodeo.util.Helpers
-import goatrodeo.util.FileWrapper
-import com.typesafe.scalalogging.Logger
-import goatrodeo.util.GitOID
-import goatrodeo.util.GitOIDUtils
-import goatrodeo.omnibor.ToProcess.ByUUID
-import goatrodeo.omnibor.ToProcess.ByName
-import goatrodeo.omnibor.Item.noopLocationReference
-import scala.collection.immutable.TreeSet
+import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.TreeMap
-import goatrodeo.util.FileWalker
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import goatrodeo.util.PURLHelpers
-import goatrodeo.util.PURLHelpers.Ecosystems
-import goatrodeo.omnibor.strategies.*
+import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
@@ -405,7 +398,7 @@ trait ToProcess {
 }
 
 object ToProcess {
-  val logger = Logger(getClass())
+  val logger: Logger = Logger(getClass())
 
   type ByUUID = Map[String, ArtifactWrapper]
   type ByName = Map[String, Vector[ArtifactWrapper]]
@@ -432,11 +425,12 @@ object ToProcess {
   def strategyForDirectory(
       directory: File,
       infoMsgs_? : Boolean,
+      tempDir: Option[File],
       onFound: ToProcess => Unit = _ => ()
   ): Vector[ToProcess] = {
     val wrappers = Helpers
       .findFiles(directory, _ => true)
-      .map(f => FileWrapper(f, f.getName()))
+      .map(f => FileWrapper(f, f.getName(), tempDir))
 
     strategiesForArtifacts(wrappers, onFound = onFound, infoMsgs_?)
   }
@@ -504,7 +498,9 @@ object ToProcess {
 
   def buildQueueOnSeparateThread(
       root: File,
-      count: AtomicInteger
+      tempDir: Option[File],
+      count: AtomicInteger,
+      dead_? : AtomicBoolean
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
@@ -514,7 +510,7 @@ object ToProcess {
         val allFiles: Vector[ArtifactWrapper] = Helpers
           .findFiles(root, _ => true)
           .par
-          .map(f => FileWrapper(f, f.getName()))
+          .map(f => FileWrapper(f, f.getName(), tempDir))
           .toVector
 
         logger.info(f"Found all files in ${root}, count ${allFiles.length}")
@@ -548,6 +544,7 @@ object ToProcess {
       } catch {
         case e: Exception =>
           logger.error(f"Failed to build graph ${e.getMessage()}")
+          dead_?.set(true)
       } finally {
 
         stillWorking.set(false)

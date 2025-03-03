@@ -1,20 +1,21 @@
 package goatrodeo.util
 
-import java.io.InputStream
-import java.io.File
-import java.io.BufferedInputStream
-import java.io.FileInputStream
-import java.io.ByteArrayInputStream
+import com.typesafe.scalalogging.Logger
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
-import java.util.UUID
+
+import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import org.apache.commons.compress.utils.IOUtils
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.io.FileOutputStream
-import com.typesafe.scalalogging.Logger
+import java.util.UUID
+import scala.util.Using
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -34,7 +35,13 @@ sealed trait ArtifactWrapper {
     *
     * @return
     */
-  def asStream(): InputStream
+  protected def asStream(): InputStream
+
+  def withStream[T](f: InputStream => T): T = {
+    Using.resource(asStream()) { stream =>
+      f(stream)
+    }
+  }
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
     *
@@ -48,18 +55,21 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  private lazy val _mimeType: String =
-    ArtifactWrapper.mimeTypeFor(this.asStream(), this.path())
+  private lazy val _mimeType: String = Using.resource(asStream()) { stream =>
+    ArtifactWrapper.mimeTypeFor(stream, this.path())
+  }
 
   def mimeType: String = _mimeType
 
-  lazy val uuid = UUID.randomUUID().toString()
+  lazy val uuid: String = UUID.randomUUID().toString()
 
   /** Get the name for the file irregarless of the path
     */
   lazy val filenameWithNoPath: String = (new File(path())).getName()
 
   protected def fixPath(p: String): String = ArtifactWrapper.fixPath(p)
+
+  def tempDir: Option[File]
 }
 
 object ArtifactWrapper {
@@ -119,10 +129,13 @@ object ArtifactWrapper {
       nominalPath: String,
       size: Long,
       data: InputStream,
+      tempDir: Option[File],
       tempPath: Path
   ): ArtifactWrapper = {
     val name = fixPath(nominalPath)
-    if (size <= maxInMemorySize) {
+
+    // a defined temp dir implies a RAM disk... copy everything but the smallest items
+    if (size <= (if (tempDir.isDefined) (64L * 1024L) else maxInMemorySize)) {
       val bos = ByteArrayOutputStream()
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
@@ -131,19 +144,20 @@ object ArtifactWrapper {
           f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
         )
       }
-      ByteWrapper(bytes, name)
+      ByteWrapper(bytes, name, tempDir = tempDir)
     } else {
       val tempFile = Files.createTempFile(tempPath, "goats", ".temp").toFile()
       val fos = FileOutputStream(tempFile)
       Helpers.copy(data, fos)
       fos.flush()
       fos.close()
-      FileWrapper(tempFile, name)
+      FileWrapper(tempFile, name, tempDir = tempDir)
     }
   }
 }
 
-final case class FileWrapper(f: File, thePath: String) extends ArtifactWrapper {
+final case class FileWrapper(f: File, thePath: String, tempDir: Option[File])
+    extends ArtifactWrapper {
   if (!f.exists()) {
     throw Exception(
       f"Tried to create file wrapper for ${f.getCanonicalPath()} that does not exist"
@@ -160,13 +174,16 @@ final case class FileWrapper(f: File, thePath: String) extends ArtifactWrapper {
 }
 
 object FileWrapper {
-  def fromName(name: String): FileWrapper = {
-    FileWrapper(new File(name), name)
+  def fromName(name: String, tempDir: Option[File]): FileWrapper = {
+    FileWrapper(new File(name), name, tempDir = tempDir)
   }
 }
 
-final case class ByteWrapper(bytes: Array[Byte], fileName: String)
-    extends ArtifactWrapper {
+final case class ByteWrapper(
+    bytes: Array[Byte],
+    fileName: String,
+    tempDir: Option[File]
+) extends ArtifactWrapper {
 
   override def asStream(): BufferedInputStream = new BufferedInputStream(
     ByteArrayInputStream(bytes)
