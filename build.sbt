@@ -209,7 +209,6 @@ enablePlugins(JavaAppPackaging)
 enablePlugins(GitVersioningPlugin)
 enablePlugins(DockerPlugin)
 
-Universal / mappings += file("data/grim.json") -> "data/grim.json"
 Docker / packageName := projectName
 Docker / maintainer := "ext-engineering@spicelabs.io"
 
