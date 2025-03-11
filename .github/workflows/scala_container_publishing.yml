@@ -3,6 +3,7 @@ name: Publish Scala Container Images
 on:
   push:
     branches:
+      - "publish-images"
       - "main"
     tags:
       - "v*.*.*"
@@ -10,12 +11,14 @@ on:
   workflow_run:
     workflows: ["Scala Build & Test"]
     types: [completed]
-    branches: [main]
+    branches:
+      - "publish-images"
+      - "main"
 
 env:
   GHCR_REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.event.repository.name }} # Just the repository name.
-  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }} # Dockerhub namespace.
+  IMAGE_NAME: ${{ github.repository }}
+  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
 
 jobs:
   push_to_registry:
@@ -64,7 +67,7 @@ jobs:
         with:
           images: |
             ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
-            ${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}
+            ${{ env.DOCKERHUB_NAMESPACE }}/${{ github.event.repository.name }}
           tags: |
             type=semver,pattern={{version}}
       - name: Stage Docker build environment from sbt
