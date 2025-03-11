@@ -14,7 +14,6 @@ on:
 
 env:
   GHCR_REGISTRY: ghcr.io
-  DOCKERHUB_NAMESPACE: spicelabs
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -64,7 +63,7 @@ jobs:
         with:
           images: |
             ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
-            ${{ env.DOCKERHUB_NAMESPACE }}/${{ env.IMAGE_NAME }}
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
