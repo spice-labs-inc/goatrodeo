@@ -4,13 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
-  workflow_dispatch:
   workflow_run:
     workflows: ["Scala Build & Test"]
     types: [completed]
     branches:
-      - "publish-images"
       - "main"
+      - "publish-images"
 
 env:
   GHCR_REGISTRY: ghcr.io
@@ -21,7 +20,7 @@ jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub and GHCR
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event.push.ref_type == 'tag') }}
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event.push.ref_type == 'tag') }}
     permissions:
       packages: write
       contents: read
