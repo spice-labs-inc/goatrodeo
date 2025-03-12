@@ -2,9 +2,6 @@ name: Publish Scala Container Images
 
 on:
   push:
-    branches:
-      - "publish-images"
-      - "main"
     tags:
       - "v*.*.*"
   workflow_dispatch:
