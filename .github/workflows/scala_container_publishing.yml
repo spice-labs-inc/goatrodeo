@@ -3,16 +3,16 @@ name: Publish Scala Container Images
 on:
   push:
     branches:
-      - "publish-images"
+      - "docker-images"
       - "main"
     tags:
-      - "v*.*.*"
+      - "v0.6.6"
   workflow_dispatch:
   workflow_run:
     workflows: ["Scala Build & Test"]
     types: [completed]
     branches:
-      - "publish-images"
+      - "docker-images"
       - "main"
 
 env:
