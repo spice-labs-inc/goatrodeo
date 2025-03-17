@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: goatrodeo-${{ github.run_id }}
-          path: target/scala-*/goatrodeo-${{ github.run_id }}.jar
+          path: jars/goatrodeo-${{ github.run_id }}.jar
 
       - name: Declare some variables
         shell: bash
