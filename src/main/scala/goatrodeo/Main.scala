@@ -57,7 +57,7 @@ object Howdy {
     OParser.sequence(
       programName("goatrodeo"),
       head("goatrodeo", "0.6.2"),
-      opt[File]("block").action((x, c) => c.copy(blockList = Some(x))),
+      opt[File]("block").text("The gitoid block list. Do not process these gitoids. Used for common gitoids such as licnese files").action((x, c) => c.copy(blockList = Some(x))),
       opt[File]('b', "build")
         .text("Build gitoid database from jar files in a directory")
         .action((x, c) =>
