@@ -2,18 +2,8 @@ name: Publish Scala Container Images
 
 on:
   push:
-    branches:
-      - "publish-images"
-      - "main"
-    tags:
-      - "v*.*.*"
-  workflow_dispatch:
-  workflow_run:
-    workflows: ["Scala Build & Test"]
-    types: [completed]
-    branches:
-      - "publish-images"
-      - "main"
+    # Publish semver tags as releases.
+    tags: [ 'v*.*.*' ]
 
 env:
   GHCR_REGISTRY: ghcr.io
@@ -61,8 +51,8 @@ jobs:
       - name: Save JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-scala-app-${{ github.run_id }}
-          path: target/scala-*/goatrodeo*.jar
+          name: goatrodeo-${{ github.run_id }}
+          path: target/release/goatrodeo
       
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
