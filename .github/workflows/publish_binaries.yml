@@ -5,6 +5,12 @@ on:
     workflows: ["Publish Scala Container Images"]
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to run the workflow on"
+        required: true
+        default: "main"
 
 jobs:
   publish_binaries:
@@ -15,6 +21,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
