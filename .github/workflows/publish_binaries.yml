@@ -5,12 +5,6 @@ on:
     workflows: ["Publish Scala Container Images"]
     types:
       - completed
-  workflow_dispatch:  # Adds manual trigger
-    inputs:
-      branch:
-        description: "Branch to run the workflow on"
-        required: true
-        default: "main"
 
 jobs:
   publish_binaries:
