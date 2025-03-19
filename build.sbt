@@ -17,7 +17,6 @@ ThisBuild / scalacOptions ++=
     "21"
   )
 
-
 resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/public/"
 Test / logBuffered := false
 
@@ -44,10 +43,10 @@ lazy val root = project
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.27.1",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
     libraryDependencies +=
-  "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
+      "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
-    libraryDependencies +=  "com.github.package-url" % "packageurl-java" % "1.5.0",
+    libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
     assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala,
@@ -202,7 +201,7 @@ Test / testOptions += Tests.Setup(() => {
       log.error(err)
       throw new MessageOnlyException(err)
     }
-  } 
+  }
 })
 
 enablePlugins(JavaAppPackaging)

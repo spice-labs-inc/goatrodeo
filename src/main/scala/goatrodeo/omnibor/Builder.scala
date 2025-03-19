@@ -64,9 +64,14 @@ object Builder {
     val totalStart = Instant.now()
 
     val runningCnt = AtomicInteger(0)
-        val dead_? = AtomicBoolean(false)
+    val dead_? = AtomicBoolean(false)
     val (queue, stillWorking) =
-      ToProcess.buildQueueOnSeparateThread(source, tempDir, runningCnt, dead_? = dead_? )
+      ToProcess.buildQueueOnSeparateThread(
+        source,
+        tempDir,
+        runningCnt,
+        dead_? = dead_?
+      )
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)

@@ -1,0 +1,179 @@
+# How Goat Rodeo works
+
+When Goat Rodeo builds a set of Artifact Dependency Graphs (ADGs) from
+a series of files, it goes through a series of steps and each step
+has certain operational characteristics.
+
+This document describes how Goat Rodeo works and how to tune parameters.
+
+## CLI parameters:
+
+     
+* `-b`, `--build`: the directory that contains the files to build ADGs for
+* `-o`, `--out`: the directory to place the computed ADGs
+* `-t`, `--threads`: the number of CPU threads to use to simultaneously build ADGs
+* `--maxrecords` : the maximum number of files to process in a single batch. If more
+   than this number of files are contained in the build directory, a separate set of ADGs
+   will be emitted when `maxrecords` is hit and the balance of the records will then be processed.
+* `--block` : a list of gitoids not to process. These are typically common and not useful gitoids such as
+   common configuration files, common license files, etc.
+* `--tempdir` : a temporary directory to store artifacts (e.g., a zip file contained in a tar file) during
+  processing. By default Goat Rodeo uses `/tmp`. But to improve performance, create a RAM disk and
+  use the RAM disk as the `tempdir`
+
+## Operation
+
+Goat Rodeo has the following phases of operation:
+
+* File Discovery
+* Determining Processing Strategies for the discovered files
+* Building ADGs based on the strategies
+
+### File Discovery
+
+Goat Rodeo traverses all the files and directories from the `build` directory down
+making a list of all the files that do not begin with `.` in all the directories that
+do not begin with `.`.
+
+Each file is wrapped in an `ArtifactWrapper`.
+
+Using Scala's [parallel collections](https://docs.scala-lang.org/overviews/parallel-collections/overview.html)
+and [Apache Tika](https://tika.apache.org/), Goat Rodeo assigns a [mime type](https://en.wikipedia.org/wiki/MIME)
+to each file/artifact.
+
+### Strategy Determination
+
+With the collection of all file, Goat Rodeo hands the set of files to different
+handlers to choose which of the files the handler chooses to process.
+
+The list is in the `ToProcess` object and it's currently:
+
+```scala
+    Vector(
+      MavenToProcess.computeMavenFiles,
+      Debian.computeDebianFiles,
+      GenericFile.computeGenericFiles
+    )
+```
+
+As there are additional modules that can handle file processing, they can
+be added to this list. For example, an RPM processor or a Docker image processor.
+
+These functions create a list to `ToProcess` for its types.
+
+Also note that `GenericFile` should always be last. It takes whatever files the
+others did not select.
+
+The `MavenToProcess` looks for groupings of `pom`, `jar`, `sources`, and `javadocs`. It processes
+these are a unit so that it can pull metadata from the pom file to insert into the `jar`'s ADG,
+associates source file with `.class` file based on the class file's debug information, etc.
+
+In the future, there may be ways to group files together (e.g., a yaml file associated with an ISO
+that describes the contents of the ISO, a `Dockerfile` associated with a Docker image, etc.)
+
+As each `ToProcess` is yielded from the determination groups, the `ToProcess` items are
+enqueued.
+
+### Building ADGs
+
+The gitoid and other hash information is computed for each `ArtifactWrapper`. If the gitoid is on
+the block list (see `--block`), it is discarded. Otherwise it is added to the in-memory `MemStorage`
+instance. If there's already a node for the gitoid, the current gitoid is merged into that node.
+The additional hashes are treated as aliases to the node with is identified by it's `gitoid:sha256`.
+
+Each `ArtifactWrapper` is itself is a container is "opened". Containers include `tar`, `zip`, `jar`,
+`ISO`, etc. If the `ArtifactWrapper` is compressed (e.g. a `gzipped` file), it is uncompressed and the
+uncompressed file is tested to see if it's a container.
+
+For containers, smaller artifacts, an in-memory `ArtifactWrapper` is created, and for larger artifacts,
+the artifact is copied to a temporary file.
+
+**IMPORTANT** If you specify `--tempdir` the size threshold for in-memory vs. temp file is much lower. Using
+a `--tempdir` reduces memory pressure. Using a RAM disk also radically improves performance because writing
+to real media (NVMe, SSD, HDD) is a slow process. Writing to RAM is a fast process. Allocating a 25G RAM
+disk will make all the performance difference in the world. Note that processing will fail and the Goat Rodeo
+run will be terminated if `tempdir` exceeds 95% full.
+
+For each "container", the list of files in the container is made and the process starts at the top (determine
+MIME type, determine strategy, build gitoid for each artifact). This process is recursive. Thus, an ISO that
+contains a tar file that contains a zip file that contains a tar file that contains an ISO that contains a JAR
+file will be processed and the correct strategy will be chosen for each file at each level.
+
+As a practical matter, this means the a `.deb` file that contains a JVM distribution will initially be processed
+with the Debian strategy, but when the JAR file is encountered, it will be processed with the Maven strategy which
+is particularly helpful if the pom and sources file is in the `.deb` file in addition to the JAR.
+
+On a system that has fast disk IO (e.g., NVMe or SSD), choosing a thread count that's roughly equal to the number
+of logical CPUs will maximize processing. The only shared resource among the threads (other than the `ToProcess`
+queue) is the `MemStorage` instance.
+
+#### `MemStorage` 
+
+The "graph" of artifacts is kept in `MemStorage`, and in-memory data structure that stores all the nodes in the graph.
+
+`MemStorage` is a low-lock structure that uses node-level locking to avoid write contention and an immutable
+representation of the data for lock-free reading.
+
+When a node is created/modified, there's an atomically executed block that reads the current node value, passes
+that to a function that merges additional node information, and then merges the changed node back into the immutable
+`Map`
+
+Thus, most ADG building will not be processing the same node at the same time and there will be little to no
+lock contention.
+
+The size of `MemStorage` will increase with the number of `ArtifactsWapper` instances processed. Thus,
+choosing `--maxrecords` number (the default is 50,000) that will comfortably fit in memory is a tuning.
+
+#### Threads
+
+Threads consume CPU, but there are also intermediate data structures (e.g., in-memory `ArtifactWrappers`) that
+consume memory. In terms of choosing the number of threads, it's not simply the number of logical CPUs, it's
+also the amount of RAM.
+
+## Tuning for performance
+
+If you're processing a few hundred artifacts, don't worry. Goat Rodeo will do the right thing.
+
+If you are processing thousands or millions of artifacts (Goat Rodeo has been tested against 2M mixed
+Maven and Debian artifacts), tuning becomes important.
+
+### Use a RAM Disk
+
+Create a RAM disk:
+
+```shell
+sudo mkdir /tmp/ramdisk
+sudo mount -t tmpfs -o size=10G myramdisk /tmp/ramdisk
+```
+
+The size of the RAM disk matters. When processing using 60 threads, a 50G RAM disk
+was necessary. The fewer the number of threads, the smaller the RAM disk.
+
+### Tune the number of threads
+
+On a system that is not I/O constrained (NVMe, SSD), at most use the number of logical CPUs in the system.
+However, the more CPUs, the more RAM pressure, especially if you're not using `--tempdir`.
+
+For I/O constrained systems (e.g. HDD-based), choosing more threads than the number of logic CPUs may
+improve performance.
+
+Using tools like [iotop](https://www.geeksforgeeks.org/iotop-command-in-linux-with-examples/) will allow you
+to see the way the system is reading/writing to/from disk.
+
+Monitoring memory use with [top](https://www.man7.org/linux/man-pages/man1/top.1.html) will allow you to
+see how the JVM is using memory as seen by the OS.
+
+If you find your system is RAM constrained, reduce the number of threads and reduce `--maxrecords`.
+
+If your system is I/O constrained and it's looking like there's contention across threads, reduce the
+number of threads.
+
+### Concrete
+
+* Set up and use the RAM disk unless there's a solid reason not to (e.g., you've got 16GB of RAM total)
+* Run 50,000+ files using the default configuration.
+     * If this works, increase the number of threads to the number of logical CPUs
+     * If this doesn't work (out of memory)
+         * First try reducing `--maxrecords` to 25,000 then 10,000
+         * If that doesn't work, reduce the number of threads
+
