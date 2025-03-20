@@ -45,8 +45,13 @@ jobs:
           echo "short_git_hash=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
           echo "git_branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
       
-      - name: Package Scala Application
-        run: sbt package
+      # Previously used package. See Issue #81 jtp
+      # Converting to sbt assembly
+      #- name: Package Scala Application
+      #  run: sbt package
+
+       -- name: Package Scala Assembly
+          run: sbt assembly
         
       - name: Save JAR Artifact
         uses: actions/upload-artifact@v4

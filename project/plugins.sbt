@@ -5,3 +5,5 @@ addSbtPlugin("com.rallyhealth.sbt" % "sbt-git-versioning" % "1.6.0")
 
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.2")
+
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.1")
