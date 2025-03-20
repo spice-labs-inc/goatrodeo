@@ -79,6 +79,11 @@ class DebianState(artifact: ArtifactWrapper)
 
 final case class Debian(deb: ArtifactWrapper) extends ToProcess {
 
+  /** Call at the end of successfull completing the operation
+    */
+  def markSuccessfulCompletion(): Unit = {
+    deb.finished()
+  }
   override def itemCnt: Int = 1
   override def main: String = deb.path()
 

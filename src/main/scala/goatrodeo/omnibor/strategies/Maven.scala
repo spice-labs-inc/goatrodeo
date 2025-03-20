@@ -267,6 +267,15 @@ final case class MavenToProcess(
     source: Option[ArtifactWrapper],
     javaDoc: Option[ArtifactWrapper]
 ) extends ToProcess {
+
+  /** Call at the end of successfull completing the operation
+    */
+  def markSuccessfulCompletion(): Unit = {
+    jar.finished()
+    pom.foreach(_.finished())
+    source.foreach(_.finished())
+    javaDoc.foreach(_.finished())
+  }
   type MarkerType = MavenMarkers
   type StateType = MavenState
 

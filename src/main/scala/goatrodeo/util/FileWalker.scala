@@ -50,7 +50,7 @@ object FileWalker {
       import scala.jdk.CollectionConverters.IteratorHasAsScala
 
       val theFile = in match {
-        case FileWrapper(f, _, _) => f
+        case fw: FileWrapper => fw.wrappedFile
         case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempDir))
       }
 
@@ -111,7 +111,7 @@ object FileWalker {
     if (isoMimeTypes.contains(in.mimeType)) {
       try {
         val theFile = in match {
-          case FileWrapper(f, _, _) => f
+          case fw: FileWrapper => fw.wrappedFile
           case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempPath))
         }
 

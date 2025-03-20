@@ -70,6 +70,11 @@ sealed trait ArtifactWrapper {
   protected def fixPath(p: String): String = ArtifactWrapper.fixPath(p)
 
   def tempDir: Option[File]
+
+  /** When the ArtifactWrapper is done being processed and it was processed
+    * successfully, call this method
+    */
+  def finished(): Unit
 }
 
 object ArtifactWrapper {
@@ -156,21 +161,29 @@ object ArtifactWrapper {
   }
 }
 
-final case class FileWrapper(f: File, thePath: String, tempDir: Option[File])
-    extends ArtifactWrapper {
-  if (!f.exists()) {
+final case class FileWrapper(
+    wrappedFile: File,
+    thePath: String,
+    tempDir: Option[File],
+    finishedFunc: File => Unit = f => ()
+) extends ArtifactWrapper {
+  if (!wrappedFile.exists()) {
     throw Exception(
-      f"Tried to create file wrapper for ${f.getCanonicalPath()} that does not exist"
+      f"Tried to create file wrapper for ${wrappedFile.getCanonicalPath()} that does not exist"
     )
   }
   override def asStream(): InputStream = new BufferedInputStream(
-    FileInputStream(f)
+    FileInputStream(wrappedFile)
   )
 
   override def path(): String = fixPath(thePath)
 
-  override def size(): Long = f.length()
+  override def size(): Long = wrappedFile.length()
 
+  /** When the ArtifactWrapper is done being processed and it was processed
+    * successfully, call this method
+    */
+  def finished(): Unit = finishedFunc(wrappedFile)
 }
 
 object FileWrapper {
@@ -192,4 +205,9 @@ final case class ByteWrapper(
   override def path(): String = fileName
 
   override def size(): Long = bytes.length
+
+  /** When the ArtifactWrapper is done being processed and it was processed
+    * successfully, call this method
+    */
+  def finished(): Unit = {} // do nothing
 }

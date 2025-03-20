@@ -12,34 +12,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.util.GitOIDUtils
+import goatrodeo.util._
 import java.util.regex.Pattern
-import goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
-import goatrodeo.envelopes.MD5
-import goatrodeo.envelopes.Position
-import goatrodeo.envelopes.MultifilePosition
-import io.bullet.borer.Cbor
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import goatrodeo.omnibor.MemStorage
-import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
-import goatrodeo.omnibor.Builder
-import goatrodeo.omnibor.GraphManager
-import java.io.IOException
-import java.io.BufferedWriter
-import java.io.FileWriter
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
-import goatrodeo.util.FileWalker
-import goatrodeo.util.FileWrapper
-import java.io.BufferedInputStream
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.util.PURLHelpers.Ecosystems
 import goatrodeo.omnibor.strategies.Debian
+import java.io.BufferedInputStream
+import java.io.FileInputStream
+import goatrodeo.omnibor.EdgeType
 import com.github.packageurl.PackageURL
+import goatrodeo.omnibor.Builder
+
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -417,9 +401,25 @@ class MySuite extends munit.FunSuite {
           resForBigTent.delete()
         }
       }
-      import scala.jdk.CollectionConverters.*
+    
+      var captured: Vector[File] = Vector()
+      val sync = new Object()
+      var finished = false 
 
-      Builder.buildDB(source, resForBigTent, 32, None, 1000000, None)
+      Builder.buildDB(
+        dest = resForBigTent,
+          tempDir = None,
+          threadCnt = 32,
+          maxRecords = 50000,
+          fileListers = Vector(() => Helpers.findFiles(source, f => true)),
+          ignorePathSet = Set(),
+          excludeFileRegex = Vector(),
+          blockList = None,
+          finishedFile = f => {sync.synchronized{captured = captured :+ f}; ()},
+          done = b => {finished = b})
+
+        assert(captured.size > 5, "We should have built files")
+        assert(finished, "Should have finished processing with success")
 
       // no pURL
       // val pkgIndex = store.read("pkg:maven").get
