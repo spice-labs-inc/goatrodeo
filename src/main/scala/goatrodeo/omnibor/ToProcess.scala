@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -216,6 +215,10 @@ trait ToProcess {
     */
   def itemCnt: Int
 
+  /** Call at the end of successfull completing the operation
+    */
+  def markSuccessfulCompletion(): Unit
+
   /** Return the list of artifacts to process along with a `MarkerType` and an
     * initial state
     */
@@ -392,6 +395,7 @@ trait ToProcess {
             }
         }
 
+      markSuccessfulCompletion()
       ret
     } else Vector.empty
   }
@@ -497,23 +501,39 @@ object ToProcess {
   }
 
   def buildQueueOnSeparateThread(
-      root: File,
+      fileListers: Seq[() => Seq[File]],
+      ignorePathList: Set[String],
+      excludeFileRegex: Seq[java.util.regex.Pattern],
+      finishedFile: File => Unit,
       tempDir: Option[File],
       count: AtomicInteger,
-      dead_? : AtomicBoolean
+      dead_? : AtomicBoolean,
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
     val buildIt: Runnable = () => {
       try {
+        import scala.collection.parallel.CollectionConverters.ImmutableSeqIsParallelizable
         // get all the files
-        val allFiles: Vector[ArtifactWrapper] = Helpers
-          .findFiles(root, _ => true)
-          .par
-          .map(f => FileWrapper(f, f.getName(), tempDir))
-          .toVector
+        val allFiles: Vector[ArtifactWrapper] =
+          fileListers
+            .flatMap(fl => fl())
+            .par
+            // canonicalize path
+            .map(f => f.getCanonicalFile())
+            .filter(f => f.exists() && f.isFile())
+            // remove those in ignore list
+            .filter(f => !ignorePathList.contains(f.getPath()))
+            // filter based on regex
+            .filter(f => {
+              val name = f.getName()
+              excludeFileRegex.find(p => p.matcher(name).find()).isEmpty
+            })
+            .toSet // remove duplicates
+            .map(f => FileWrapper(f, f.getName(), tempDir, finishedFile))
+            .toVector
 
-        logger.info(f"Found all files in ${root}, count ${allFiles.length}")
+        logger.info(f"Found all files, count ${allFiles.length}")
 
         val mimeCnt = AtomicInteger(0)
         allFiles.par.foreach(file => {

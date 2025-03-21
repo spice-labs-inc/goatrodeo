@@ -65,6 +65,12 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
 }
 
 final case class GenericFile(file: ArtifactWrapper) extends ToProcess {
+
+  /** Call at the end of successfull completing the operation
+    */
+  def markSuccessfulCompletion(): Unit = {
+    file.finished()
+  }
   type MarkerType = SingleMarker
   type StateType = GenericFileState
   override def main: String = file.path()

@@ -42,8 +42,6 @@ object Builder {
   /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
     *
-    * @param source
-    *   where to search for files
     * @param storage
     *   the storage destination of the corpus
     * @param threadCnt
@@ -52,22 +50,42 @@ object Builder {
     *   a file containing gitoids to not process (e.g., Apache license files)
     * @param maxRecords
     *   the maximum number of records to process at once
+    * @param fileListers
+    *   a sequence of functions that list files. This allows for multiple `-b`
+    *   and and `--file-list` flags to be sent in
+    * @param ignorePathList
+    *   a set of paths (canonical) to exclude. This can be used to exclude files
+    *   that were processed in previous runs
+    * @param excludeFileRegex
+    *   regular expressions to exclude from processing
+    * @param finishedFile
+    *   once a file has been processed, write the file to a destination
+    * @param call
+    *   when the processing is done, true success, false failure
     */
   def buildDB(
-      source: File,
       dest: File,
       threadCnt: Int,
       blockList: Option[File],
       maxRecords: Int,
-      tempDir: Option[File]
+      tempDir: Option[File],
+      fileListers: Seq[() => Seq[File]],
+      ignorePathSet: Set[String],
+      excludeFileRegex: Seq[java.util.regex.Pattern],
+      finishedFile: File => Unit,
+      done: Boolean => Unit
   ): Unit = {
     val totalStart = Instant.now()
 
     val runningCnt = AtomicInteger(0)
     val dead_? = AtomicBoolean(false)
+    var queueBuildingDone = false
     val (queue, stillWorking) =
       ToProcess.buildQueueOnSeparateThread(
-        source,
+        fileListers,
+        ignorePathSet,
+        excludeFileRegex,
+        finishedFile,
         tempDir,
         runningCnt,
         dead_? = dead_?
@@ -97,8 +115,12 @@ object Builder {
     )
     // Don't kick off the consumer threads until at least 1 item
     // is in the work queue
-    while (queue.isEmpty()) {
+    while (queue.isEmpty() && stillWorking.get()) {
       Thread.sleep(250)
+      if (dead_?.get()) {
+        logger.error("Died while waiting for any files")
+        System.exit(1)
+      }
     }
 
     logger.info("Kicking off work queue consumer threads")
@@ -151,6 +173,9 @@ object Builder {
 
     // create the non-number-suffixed directory
     dest.mkdirs()
+
+    // call the finalize function
+    done(!dead_?.get())
 
     logger.info("Done with run")
   }
