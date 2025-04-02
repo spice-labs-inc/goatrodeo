@@ -48,7 +48,7 @@ class ADGTests extends munit.FunSuite {
       Builder.buildDB(
         dest = resForBigTent,
         tempDir = None,
-        threadCnt = 32,
+        threadCnt = 5, // make small to avoid OOMe
         maxRecords = 50000,
         fileListers = Vector(() => Helpers.findFiles(source, f => true)),
         ignorePathSet = Set(),
