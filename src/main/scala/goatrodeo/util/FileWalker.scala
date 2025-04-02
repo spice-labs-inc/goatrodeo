@@ -17,6 +17,10 @@ import java.nio.file.Path
 import java.util.zip.ZipFile
 import scala.util.Try
 import scala.util.Using
+import java.io.ByteArrayInputStream
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.TikaCoreProperties
 
 enum FileAction {
   case SkipDive
@@ -170,6 +174,49 @@ object FileWalker {
           None
       }
     } else None
+  }
+
+  /** Get the names of the files in an archive if the Apache commons tools can
+    * open the archive
+    *
+    * @param inputStream
+    *   the input stream to the archive
+    * @return
+    *   if it's an openable archive, the names of the files inside it and true
+    *   if the name is a directory
+    */
+  def getContentNamesFromArchive(
+      inputStream: BufferedInputStream
+  ): Option[Vector[(String, Boolean, Option[String])]] = {
+    Some({
+      val factory = (new ArchiveStreamFactory())
+      val input: ArchiveInputStream[ArchiveEntry] = factory
+        .createArchiveInputStream(
+          inputStream
+        )
+
+      Helpers
+        .iteratorFor(input)
+        .map(ae => {
+          val name = ae.getName()
+          val dir = ae.isDirectory()
+
+          (
+            name,
+            dir,
+            if (dir) None
+            else {
+              val metadata = new Metadata()
+              metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, name)
+              val bi =
+                TikaInputStream.get(Helpers.slurpInputNoClose(input), metadata)
+
+              Some(ArtifactWrapper.mimeTypeFor(bi, name))
+            }
+          )
+        })
+        .toVector
+    })
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we

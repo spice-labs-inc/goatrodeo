@@ -23,6 +23,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+import scala.collection.immutable.TreeSet
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -105,7 +106,7 @@ trait Storage {
     * @return
     *   the purls
     */
-  def purls(): Vector[PackageURL]
+  def purls(): TreeSet[String]
 }
 
 /** Can the filenames be listed?
@@ -176,8 +177,8 @@ class MemStorage(val targetDir: Option[File])
   // synchronize access to the database
   private val dbSync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
-  private var thePurls: AtomicReference[Vector[PackageURL]] = AtomicReference(
-    Vector()
+  private var thePurls: AtomicReference[TreeSet[String]] = AtomicReference(
+    TreeSet()
   )
   private val locks: java.util.HashMap[String, AtomicInteger] =
     java.util.HashMap()
@@ -201,12 +202,12 @@ class MemStorage(val targetDir: Option[File])
     */
   def addPurl(purl: PackageURL): Unit = {
     thePurls.synchronized {
-      val next = thePurls.get() :+ purl
+      val next = thePurls.get() + purl.canonicalize()
       thePurls.set(next)
     }
   }
 
-  def purls(): Vector[PackageURL] = thePurls.get()
+  def purls(): TreeSet[String] = thePurls.get()
 
   override def size(): Int = db.get().size
 

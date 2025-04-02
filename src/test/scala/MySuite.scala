@@ -23,7 +23,9 @@ import java.io.FileInputStream
 import goatrodeo.omnibor.EdgeType
 import com.github.packageurl.PackageURL
 import goatrodeo.omnibor.Builder
-
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -236,7 +238,9 @@ class MySuite extends munit.FunSuite {
     val classFileName = "target/scala-3.6.3/classes/goatrodeo/Howdy.class"
 
     val f = new File(classFileName)
-    val inputStream = new BufferedInputStream(new FileInputStream(f))
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, classFileName)
+    val inputStream = TikaInputStream.get(f.toPath(), metadata)
     val mimeType = ArtifactWrapper.mimeTypeFor(inputStream, classFileName)
     assert(
       mimeType == "application/java-vm",
@@ -358,76 +362,6 @@ class MySuite extends munit.FunSuite {
     assert(extra.get("manifest").isDefined)
     assert(extra.get("pom").isDefined)
     assert(extra.get("$$Sloth").isEmpty)
-  }
-
-  test("Unreadable JAR") {
-    val source = File(File(System.getProperty("user.home")), "/tmp/repo_ea")
-
-    // the test takes a couple of files with questionable TAR and ZIP archives
-    // and ensures that they don't cause exceptions
-    if (source.isDirectory()) {
-      for {
-        toTry <- Vector(
-          "adif-processor-1.0.65.jar",
-          "alpine-executable-war-1.2.2.jar"
-        )
-      } {
-        val bad = File(source, toTry)
-        val badWrapper = FileWrapper(bad, toTry, None)
-        ToProcess.buildGraphFromArtifactWrapper(badWrapper)
-        // No pURL
-        // val pkgIndex = store.read("pkg:maven").get
-        // assert(
-        //   pkgIndex.connections.size > 0,
-        //   f"We should have had at least one package, but only found ${pkgIndex.connections.size}"
-        // )
-      }
-
-    }
-  }
-
-  test("Build lots of JARs") {
-    val source = File(File(System.getProperty("user.home")), "/tmp/repo_ea")
-
-    if (source.isDirectory()) {
-
-      val resForBigTent = File("res_for_big_tent")
-
-      // delete files if they exist
-      if (resForBigTent.exists()) {
-        if (resForBigTent.isDirectory()) {
-          for { v <- resForBigTent.listFiles() } { v.delete() }
-        } else {
-          resForBigTent.delete()
-        }
-      }
-    
-      var captured: Vector[File] = Vector()
-      val sync = new Object()
-      var finished = false 
-
-      Builder.buildDB(
-        dest = resForBigTent,
-          tempDir = None,
-          threadCnt = 32,
-          maxRecords = 50000,
-          fileListers = Vector(() => Helpers.findFiles(source, f => true)),
-          ignorePathSet = Set(),
-          excludeFileRegex = Vector(),
-          blockList = None,
-          finishedFile = f => {sync.synchronized{captured = captured :+ f}; ()},
-          done = b => {finished = b})
-
-        assert(captured.size > 5, "We should have built files")
-        assert(finished, "Should have finished processing with success")
-
-      // no pURL
-      // val pkgIndex = store.read("pkg:maven").get
-      // assert(
-      //   pkgIndex.connections.size > 4500,
-      //   f"We should have had more than 100 packages, but only found ${pkgIndex.connections.size}"
-      // )
-    }
   }
 
 }

@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.6.3-SNAPSHOT"
+val projectVersion = "0.6.4-SNAPSHOT"
 val scala3Version = "3.6.3"
 
 fork := true
@@ -63,113 +63,43 @@ ThisBuild / assemblyMergeStrategy := {
 Test / testOptions += Tests.Setup(() => {
   val log = (streams.value: @sbtUnchecked).log
   log.info("Downloading and caching test data…")
-  try {
-    Files.createDirectories(Paths.get("test_data/download/iso_tests"))
-  } catch {
-    case fE: FileAlreadyExistsException =>
-      log.info("\t! iso_tests directory already exists.")
-    case e: Throwable =>
-      val err = s"Exception setting up iso_tests directory: ${e.getMessage}"
-      log.error(err)
-      throw new MessageOnlyException(err)
-  }
 
   try {
-    Files.createDirectories(Paths.get("test_data/download/gem_tests"))
-  } catch {
-    case fE: FileAlreadyExistsException =>
-    // log.info("\t! gem_tests directory already exists.")
-    case e: Throwable =>
-      val err = s"Exception setting up gem_tests directory: ${e.getMessage}"
-      log.error(err)
-      throw new MessageOnlyException(err)
-  }
+    val toDownload: Seq[(String, String, Option[String])] = Vector(
+      ("docker_tests", "bigtent_2025_03_22_docker.tar", None),
+      ("docker_tests", "grinder_bt_pg_docker.tar", None),
+      ("iso_tests", "iso_of_archives.iso", None),
+      ("iso_tests", "simple.iso", None),
+      ("", "sample-tomcat-6.war", None),
+      ("", "EnterpriseHelloWorld.ear", None),
+      ("apk_tests", "bitbar-sample-app.apk", None),
+      ("gem_tests", "java-properties-0.3.0.gem", None),
+      ("deb_tests", "hello_2.10-3_arm64.deb", None),
+      (
+        "adg_tests",
+        "repo_ea.tgz",
+        Some(
+          "tar -xzvf test_data/download/adg_tests/repo_ea.tgz -C test_data/download/adg_tests/"
+        )
+      )
+    )
 
-  try {
+    for {
+      (dir, item, cmd) <- toDownload
+    } {
+      val f = file(f"./test_data/download/${dir}/${item}")
+      f.getParentFile().mkdirs()
+      if (!f.exists()) {
+        log.info(f"Downloading ${item}")
+        url(f"https://public-test-data.spice-labs.dev/${item}") #> f ! log
 
-    Files.createDirectories(Paths.get("test_data/download/apk_tests"))
-  } catch {
-    case fE: FileAlreadyExistsException =>
-    // log.info("\t! apk_tests directory already exists.")
-    case e: Throwable =>
-      val err = s"Exception setting up apk_tests directory: ${e.getMessage}"
-      log.error(err)
-      throw new MessageOnlyException(err)
-  }
+        cmd match {
+          case None      => // do nothing
+          case Some(cmd) => cmd ! log
+        }
+      }
+    }
 
-  try {
-
-    Files.createDirectories(Paths.get("test_data/download/deb_tests"))
-  } catch {
-    case fE: FileAlreadyExistsException =>
-      log.info("\t! deb_tests directory already exists.")
-    case e: Throwable =>
-      val err = s"Exception setting up deb_tests directory: ${e.getMessage}"
-      log.error(err)
-      throw new MessageOnlyException(err)
-  }
-
-  try {
-    {
-      val f = new File("./test_data/download/iso_tests/iso_of_archives.iso")
-      if (!f.exists()) {
-        log.info("\t* Fetching test ISOs…")
-        url(
-          "https://public-test-data.spice-labs.dev/iso_of_archives.iso"
-        ) #> f ! log
-      }
-    }
-    {
-      val f = file("./test_data/download/iso_tests/simple.iso")
-      if (!f.exists()) {
-        url("https://public-test-data.spice-labs.dev/simple.iso") #> f ! log
-      }
-    }
-    {
-      val f = file("./test_data/download/gem_tests/java-properties-0.3.0.gem")
-      if (!f.exists()) {
-        log.info("\t * Fetching test Gems…")
-        url(
-          "https://public-test-data.spice-labs.dev/java-properties-0.3.0.gem"
-        ) #> f ! log
-      }
-    }
-    {
-      val f = file("./test_data/download/sample-tomcat-6.war")
-      if (!f.exists()) {
-        log.info("\t * Fetching test WARs…")
-        url(
-          "https://public-test-data.spice-labs.dev/sample-tomcat-6.war"
-        ) #> f ! log
-      }
-    }
-    {
-      val f = file("./test_data/download/EnterpriseHelloWorld.ear")
-      if (!f.exists()) {
-        log.info("\t * Fetching test EARs…")
-        url(
-          "https://public-test-data.spice-labs.dev/EnterpriseHelloWorld.ear"
-        ) #> f ! log
-      }
-    }
-    {
-      val f = file("./test_data/download/apk_tests/bitbar-sample-app.apk")
-      if (!f.exists()) {
-        log.info("\t * Fetching test Android APKs…")
-        url(
-          "https://public-test-data.spice-labs.dev/bitbar-sample-app.apk"
-        ) #> f ! log
-      }
-    }
-    {
-      val f = file("./test_data/download/deb_tests/hello_2.10-3_arm64.deb")
-      if (!f.exists()) {
-        log.info("\t * Fetching test Debian Packages…")
-        url(
-          "https://public-test-data.spice-labs.dev/hello_2.10-3_arm64.deb"
-        ) #> f ! log
-      }
-    }
   } catch {
     case e: Throwable =>
       val err = s"Exception fetching test files: ${e.getMessage}"

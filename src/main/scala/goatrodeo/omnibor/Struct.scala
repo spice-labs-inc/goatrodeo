@@ -38,6 +38,8 @@ object EdgeType {
     s == aliasFrom
   }
 
+  def isContains(s: String): Boolean = s == contains
+
   /** Is the type `AliasTo`
     *
     * @param s
@@ -159,9 +161,43 @@ case class ItemMetaData(
 ) {
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
-  def merge(other: ItemMetaData): ItemMetaData = {
+  /** Merge two metadata instances. If the filenames will only contain one name
+    * after merge, then that's the filename. If the filename will diverge,
+    * attach "contains" to each of the names
+    */
+  def merge(
+      other: ItemMetaData,
+      thisContains: () => Vector[String],
+      otherContains: () => Vector[String]
+  ): ItemMetaData = {
+
+    def fix(filename: String, gitoids: Vector[String]): TreeSet[String] = {
+      TreeSet(gitoids.map(go => f"${go}!${filename}") :+ filename*)
+    }
+
+    val mergedFilenames = this.fileNames ++ other.fileNames
+
+    val resolvedFilenames =
+      (mergedFilenames.size, this.fileNames.size, other.fileNames.size) match {
+        // if there's only one filename, then it's a clean merge
+        case (1, _, _) => mergedFilenames
+
+        // if both have already done the filename to gitoid mapping, then it's safe to merge
+        case (_, tsize, osize) if tsize > 1 && osize > 1 => mergedFilenames
+
+        // create the mapping
+        case (_, tsize, osize) =>
+          val thisWithMapping =
+            if (tsize > 1) this.fileNames
+            else fix(this.fileNames.head, thisContains())
+          val otherWithMapping =
+            if (osize > 1) other.fileNames
+            else fix(other.fileNames.head, otherContains())
+          thisWithMapping ++ otherWithMapping
+      }
+
     val ret = ItemMetaData(
-      fileNames = this.fileNames ++ other.fileNames,
+      fileNames = resolvedFilenames,
       mimeType = this.mimeType ++ other.mimeType,
       fileSize = this.fileSize,
       extra = Helpers.mergeTreeMaps(this.extra, other.extra)

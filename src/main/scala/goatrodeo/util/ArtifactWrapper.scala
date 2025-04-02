@@ -16,6 +16,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 import scala.util.Using
+import org.apache.tika.detect.DefaultDetector
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.mime.MediaType
+import scala.util.Try
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -55,11 +59,14 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  private lazy val _mimeType: String = Using.resource(asStream()) { stream =>
-    ArtifactWrapper.mimeTypeFor(stream, this.path())
+  private lazy val _mimeType: String = Using.resource(getTikaInputStream()) {
+    stream =>
+      ArtifactWrapper.mimeTypeFor(stream, this.path())
   }
 
   def mimeType: String = _mimeType
+
+  protected def getTikaInputStream(): TikaInputStream
 
   lazy val uuid: String = UUID.randomUUID().toString()
 
@@ -90,15 +97,30 @@ object ArtifactWrapper {
     * @param fileName
     *   -- the name of the file
     */
-  def mimeTypeFor(rawData: InputStream, fileName: String): String = {
+  def mimeTypeFor(rawData: TikaInputStream, fileName: String): String = {
     try {
-      val data = new BufferedInputStream(rawData)
+      val data = rawData
+      val len = rawData.getLength()
 
       val metadata = new Metadata()
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
       val detected = tika.getDetector.detect(data, metadata)
 
-      detected.toString()
+      val isJson = Try {
+        if (detected == MediaType.TEXT_PLAIN && len < 1000000) {
+          import org.json4s._
+          import org.json4s.native.JsonMethods._
+
+          if (rawData.getPosition() > 0) {
+            rawData.skip(-rawData.getPosition())
+          }
+          val bytes = new String(Helpers.slurpInputNoClose(rawData), "UTF-8")
+          parseOpt(bytes).isDefined
+        } else false
+      }.toOption
+      if (isJson == Some(true)) "application/json"
+      else
+        detected.toString()
     } catch {
       case e: Exception =>
         logger.error(
@@ -167,12 +189,19 @@ final case class FileWrapper(
     tempDir: Option[File],
     finishedFunc: File => Unit = f => ()
 ) extends ArtifactWrapper {
+
+  override protected def getTikaInputStream(): TikaInputStream = {
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, thePath)
+    TikaInputStream.get(wrappedFile.toPath(), metadata)
+  }
+
   if (!wrappedFile.exists()) {
     throw Exception(
       f"Tried to create file wrapper for ${wrappedFile.getCanonicalPath()} that does not exist"
     )
   }
-  override def asStream(): InputStream = new BufferedInputStream(
+  override protected def asStream(): InputStream = new BufferedInputStream(
     FileInputStream(wrappedFile)
   )
 
@@ -198,6 +227,11 @@ final case class ByteWrapper(
     tempDir: Option[File]
 ) extends ArtifactWrapper {
 
+  override protected def getTikaInputStream(): TikaInputStream = {
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
+    TikaInputStream.get(bytes, metadata)
+  }
   override def asStream(): BufferedInputStream = new BufferedInputStream(
     ByteArrayInputStream(bytes)
   )
