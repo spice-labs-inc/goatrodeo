@@ -1,8 +1,9 @@
-import java.io.File
 import goatrodeo.omnibor.Builder
-import goatrodeo.util.Helpers
-import goatrodeo.util.FileWrapper
 import goatrodeo.omnibor.ToProcess
+import goatrodeo.util.FileWrapper
+import goatrodeo.util.Helpers
+
+import java.io.File
 class ADGTests extends munit.FunSuite {
   test("Unreadable JAR") {
     val source = File("test_data/download/adg_tests/repo_ea")

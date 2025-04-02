@@ -13,13 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.{FileWalker, FileWrapper, GitOIDUtils}
+import goatrodeo.omnibor.MemStorage
+import goatrodeo.omnibor.ParentScope
+import goatrodeo.omnibor.strategies.GenericFile
+import goatrodeo.util.FileWalker
+import goatrodeo.util.FileWrapper
 
 import java.io.File
-import goatrodeo.omnibor.strategies.GenericFile
-import goatrodeo.omnibor.MemStorage
-import com.github.packageurl.PackageURL
-import goatrodeo.omnibor.ParentScope
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html

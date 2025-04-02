@@ -7,6 +7,9 @@ import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.BufferedInputStream
 import java.io.File
@@ -17,10 +20,6 @@ import java.nio.file.Path
 import java.util.zip.ZipFile
 import scala.util.Try
 import scala.util.Using
-import java.io.ByteArrayInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.TikaCoreProperties
 
 enum FileAction {
   case SkipDive

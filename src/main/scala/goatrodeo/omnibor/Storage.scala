@@ -22,8 +22,8 @@ import goatrodeo.util.Helpers
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 import scala.collection.immutable.TreeSet
+import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
 /** An abstract definition of a GitOID Corpus storage backend
   */

@@ -12,20 +12,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import goatrodeo.util._
-import java.util.regex.Pattern
-import java.io.ByteArrayInputStream
-import java.io.File
+import com.github.packageurl.PackageURL
+import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.omnibor.strategies.Debian
-import java.io.BufferedInputStream
-import java.io.FileInputStream
-import goatrodeo.omnibor.EdgeType
-import com.github.packageurl.PackageURL
-import goatrodeo.omnibor.Builder
+import goatrodeo.util._
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
+
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.util.regex.Pattern
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html

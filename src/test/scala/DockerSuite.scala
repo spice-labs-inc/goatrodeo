@@ -1,14 +1,15 @@
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.FileWrapper
-import goatrodeo.omnibor.ToProcess
-import java.io.File
-import scala.collection.immutable.TreeSet
 import goatrodeo.omnibor.EdgeType
+import goatrodeo.omnibor.Item
+import goatrodeo.omnibor.Storage
+import goatrodeo.omnibor.ToProcess
+import goatrodeo.util.FileWrapper
+import org.json4s.JsonAST._
 import org.json4s._
 import org.json4s.native._
-import org.json4s.JsonAST._
-import goatrodeo.omnibor.Storage
-import goatrodeo.omnibor.Item
+
+import java.io.File
+import scala.collection.immutable.TreeSet
 
 class DockerSuite extends munit.FunSuite {
   val logger = Logger(getClass())
@@ -40,6 +41,8 @@ class DockerSuite extends munit.FunSuite {
     testLayersAndManifest(aliasTo, store1)
 
   }
+
+  test("Merging names works") {}
 
   test("Can build for a complex file") {
     val name = "test_data/download/docker_tests/grinder_bt_pg_docker.tar"

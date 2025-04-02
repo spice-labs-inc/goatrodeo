@@ -2,8 +2,10 @@ package goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import org.apache.tika.config.TikaConfig
+import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
+import org.apache.tika.mime.MediaType
 
 import java.io.BufferedInputStream
 import java.io.ByteArrayInputStream
@@ -15,11 +17,8 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
-import scala.util.Using
-import org.apache.tika.detect.DefaultDetector
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.mime.MediaType
 import scala.util.Try
+import scala.util.Using
 
 /** In OmniBOR, everything is seen as a byte stream.
   *

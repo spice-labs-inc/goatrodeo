@@ -23,19 +23,13 @@ import scopt.OParserBuilder
 
 import java.io.File
 import java.io.FileFilter
-import scala.jdk.CollectionConverters._
-import java.util.regex.Pattern
-import scala.util.Try
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.util.regex.Pattern
+import scala.jdk.CollectionConverters._
 import scala.util.Failure
 import scala.util.Success
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.util.FileWrapper
-import goatrodeo.util.FileWalker
-import java.io.BufferedInputStream
-import org.json4s.JString
-import org.json4s.JField
+import scala.util.Try
 
 /** The `main` class
   */
@@ -86,7 +80,7 @@ object Howdy {
     import builder._
     OParser.sequence(
       programName("goatrodeo"),
-      head("goatrodeo", "0.6.4-SNAPSHOT"),
+      head("goatrodeo", hellogoat.BuildInfo.version),
       opt[File]("block")
         .text(
           "The gitoid block list. Do not process these gitoids. Used for common gitoids such as license files"

@@ -22,6 +22,7 @@ Test / logBuffered := false
 
 lazy val root = project
   .in(file("."))
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     name := projectName,
     scalaVersion := scala3Version,
@@ -50,7 +51,9 @@ lazy val root = project
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
     assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala,
-    scalacOptions += "-no-indent"
+    scalacOptions += "-no-indent",
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoPackage := "hellogoat"
   )
 
 ThisBuild / assemblyJarName := "goatrodeo.jar"
