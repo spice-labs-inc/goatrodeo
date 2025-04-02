@@ -1,6 +1,7 @@
 import com.typesafe.scalalogging.Logger
 import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.Item
+import goatrodeo.omnibor.ItemMetaData
 import goatrodeo.omnibor.Storage
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.util.FileWrapper
@@ -9,6 +10,7 @@ import org.json4s._
 import org.json4s.native._
 
 import java.io.File
+import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 class DockerSuite extends munit.FunSuite {
@@ -42,7 +44,23 @@ class DockerSuite extends munit.FunSuite {
 
   }
 
-  test("Merging names works") {}
+  test("Merging names works") {
+    val a = ItemMetaData(TreeSet("foo"), TreeSet(), 1, TreeMap())
+    val b = ItemMetaData(TreeSet("bar"), TreeSet(), 1, TreeMap())
+
+    val aGitoids = () => Vector("yak", "moose")
+    val bGitoids = () => Vector("dog", "cat")
+
+    val mergedAA = a.merge(a, aGitoids, bGitoids)
+    assertEquals(a, mergedAA, "merging with self should be same")
+
+    val mergedAB = a.merge(b, aGitoids, bGitoids)
+    assertNotEquals(a, mergedAB, "They should differ")
+    assert(
+      mergedAB.fileNames.size == 6,
+      f"there should be 6 different filenames, but got ${mergedAB.fileNames}"
+    )
+  }
 
   test("Can build for a complex file") {
     val name = "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
