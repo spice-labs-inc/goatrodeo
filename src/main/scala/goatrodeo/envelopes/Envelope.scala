@@ -116,8 +116,9 @@ case class DataFileEnvelope(
 }
 
 object DataFileEnvelope {
+  val DataFileEnvelopeVersion = 1
   def build(
-      version: Int = 1,
+      version: Int = DataFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.DataFileMagicNumber,
       previous: Long,
       dependsOn: TreeSet[Long] = TreeSet(),
@@ -150,9 +151,9 @@ case class IndexFileEnvelope(
 }
 
 object IndexFileEnvelope {
-
+  val IndexFileEnvelopeVersion = 2
   def build(
-      version: Int = 2,
+      version: Int = IndexFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.IndexFileMagicNumber,
       size: Int,
       dataFiles: Vector[Long],
@@ -183,8 +184,10 @@ case class ClusterFileEnvelope(
 }
 
 object ClusterFileEnvelope {
+  val ClusterFileEnvelopeVersion = 3
+
   def build(
-      version: Int = 2,
+      version: Int = ClusterFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],

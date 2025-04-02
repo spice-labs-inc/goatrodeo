@@ -19,14 +19,14 @@ The artifact dependency graphs for all inspected artifacts is emitted and can be
 and inspected using [Big Tent](https://github.com/spice-labs-inc/bigtent/).
 
 This [Scala 3](https://docs.scala-lang.org/tour/tour-of-scala.html) code is built with the nominal Simple Build Tool [sbt](https://www.scala-sbt.org/)
-and can be run on Java 17 or newer.
+and can be run on Java 21 or newer.
 
 The code is licensed under and Apache 2.0 license and is intended to be used, shared, contributed to, etc.
 
 ## Hidden Reapers
 
 There are hundreds of thousands of [Hidden Reapers](info/hidden_reapers.md) in the JVM ecosystem.
-Sonatype has identied [336,000](https://www.sonatype.com/en/press-releases/sonatype-uncovers-millions-of-previously-hidden-open-source-vulnerabilities-through-unique-shaded-vulnerability-detection-system) across
+Sonatype has identified [336,000](https://www.sonatype.com/en/press-releases/sonatype-uncovers-millions-of-previously-hidden-open-source-vulnerabilities-through-unique-shaded-vulnerability-detection-system) across
 Maven Central. Goat Rodeo can be used to "unmask" the Hidden Reapers in any JAR files.
 
 ## Building
@@ -37,9 +37,9 @@ Install [sbt](https://www.scala-sbt.org/) to build and run Goat Rodeo.
 
 To create an "assembly" (a stand-alone executable JAR file): `sbt assembly`
 
-The resulting JAR file can be executed: `java -jar target/scala-3.3.3/goatrodeo.jar`
+The resulting JAR file can be executed: `java -jar target/scala-3.6.3/goatrodeo.jar`
 
-To build an artifact dependency graph from local JAR files: `java -jar target/scala-3.3.3/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24`
+To build an artifact dependency graph from local JAR files: `java -jar target/scala-3.6.3/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24`
 
 The above command tells the system to "build" (`-b`) the corpus from the JAR files in `~/.m2` and output the corpus
 to the `/tmp/gitoidcorpus` directory using 24 threads. 
@@ -59,9 +59,8 @@ the discovered packages.
 
 ## Development
 
-Download a small set of JAR files to use as tests from https://goatrodeo.org/repo_ea.tgz
-
-In `~/tmp` untar the file: `tar -xzvf repo_ea.tgz`
+Goat Rodeo's tests require a set of large files. They are downloaded from a CDN
+and cached locally during test runs.
 
 This will be a set of files that Goat Rodeo will index as part of it's normal tests.
 
@@ -72,7 +71,7 @@ When you run the Goat Rodeo tests, a `res_for_big_tent` directory is created tha
 generated index files. When you run Big Tent tests, the tests look for `../goatrodeo/res_for_big_tent`
 and the generated files.
 
-To create a test data set from within SBT: `run "-b" "<path_to>/tmp/repo_ea" "-o" "/tmp/ff" "-t" "15"`
+This directory is deleted and re-built on every test run.
 
 Then use Cargo to build Big Tent: `cargo build`
 
