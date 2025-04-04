@@ -27,6 +27,9 @@ jobs:
         distribution: 'adopt-hotspot'
         cache: 'sbt'
 
+    - name: Set up sbt
+      uses: sbt/setup-sbt@v1
+
     - name: Build Goat Rodeo Package
       run: sbt package
 
