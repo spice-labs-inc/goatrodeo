@@ -1,0 +1,40 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Run Goat Rodeo
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Build Goat Rodeo Package
+      run: sbt package
+
+    - name: Set up directories for running Goat Rodeo against the Goat Rodeo package
+      run: |
+        mkdir -p target/input
+        mkdir -p target/output
+        cp target/scala-*/goatrodeo*.jar target/input
+
+    - name: Run Goat Rodeo against the Goat Rodeo package
+      run: |
+        docker run --platform linux/amd64 --quiet --rm --network none \
+           --user $(id -u):$(id -g) \
+           -v $(pwd)/target/input:/input:ro \
+           -v $(pwd)/target/output:/output \
+           spicelabs/goatrodeo:0.6.3 \
+           -b /input \
+           -o /output
