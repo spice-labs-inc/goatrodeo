@@ -3,13 +3,14 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Run Goat Rodeo
+name: Build ADG from Goat Rodeo JAR
 
 on:
-  push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:  # Allows manual triggering
+  workflow_run:
+    workflows: ["Scala Build & Test"]
+    types: 
+      - completed  # Triggers only when "Scala Build & Test" completes
 
 permissions:
   contents: read
