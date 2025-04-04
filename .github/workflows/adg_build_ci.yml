@@ -1,4 +1,4 @@
-name: Build ADG for Goat Rodeo JAR
+name: Build ADG from JAR
 
 on:
   push:
@@ -15,6 +15,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout with LFS
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'adopt-hotspot'
+        cache: 'sbt'
+
     - name: Build Goat Rodeo Package
       run: sbt package
 
