@@ -43,27 +43,51 @@ case class DockerState(
       marker: DockerMarkers
   ): (Vector[PackageURL], DockerState) = marker match {
     case DockerMarkers.Config(info) =>
-      val tags = for {
+      val purls = for {
+        // get "RepoTags" which should be an Array of tags
         case JArray(tags) <- info.manifestConfig \ "RepoTags"
+
+        // for each of the found tags
         case JString(tag) <- tags
       } yield {
-        tag.lastIndexOf(":") match {
-          case x if x > 0 => tag.substring(0, x) -> tag.substring(x + 1)
+        val (base, version) = tag.lastIndexOf(":") match {
+          case x if x > 0 => (tag.substring(0, x), Some(tag.substring(x + 1)))
+          case _          => (tag, None)
         }
-      }
 
-      val tagBase = Set(tags.map(t => t._1)*)
+        val (namespace, path) = base.split("/").toList match {
+          case Nil                    => ??? /// this should never happen
+          case blob :: Nil            => (None, blob)
+          case path :: subPath :: Nil => (None, f"${path}/${subPath}")
+          case namespace :: pathAndSubpath =>
+            (
+              Some(namespace),
+              pathAndSubpath.reduceLeft { case (a, b) =>
+                a + "/" + b
+              }
+            )
+        }
 
-      val allTags: Seq[(String, String)] = (tags ::: Nil)
-
-      val purls = allTags.map { case (name, label) =>
-        PackageURLBuilder
+        // construct a Docker Package URL based on the pURL examples
+        // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
+        val withName = PackageURLBuilder
           .aPackageURL()
           .withType("docker")
-          .withName(name)
-          .withVersion(label)
-          .build()
+          .withName(path)
+
+        val withVersion = version match {
+          case Some(v) => withName.withVersion(v)
+          case None    => withName
+        }
+
+        val withNamespace = namespace match {
+          case Some(ns) => withVersion.withNamespace(ns)
+          case None     => withVersion
+        }
+
+        withNamespace.build()
       }
+
       purls.toVector -> this
     case _ => Vector.empty -> this
   }

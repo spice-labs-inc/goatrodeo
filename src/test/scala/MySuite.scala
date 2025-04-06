@@ -325,6 +325,7 @@ class MySuite extends munit.FunSuite {
     val keys = store.keys()
     val items = keys.toVector.flatMap(store.read(_))
     assert(items.length > 1100)
+    assert(items.length == keys.size)
 
     val sourceRef = items.filter(i =>
       i.connections.filter(e => EdgeType.isBuiltFrom(e._1)).size > 0

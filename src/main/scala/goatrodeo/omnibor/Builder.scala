@@ -305,6 +305,11 @@ object Builder {
               )
 
             } catch {
+              case oom: OutOfMemoryError => {
+                logger.error("Out of memory", oom)
+                dead_?.set(true)
+                throw oom
+              }
               case ise: IllegalStateException => {
                 logger.error(
                   f"Failed illegal state ${toProcess.main} -- ${toProcess.mimeType} ${ise}"

@@ -2,6 +2,41 @@
 
 ![Build Status](https://github.com/spice-labs-inc/goatrodeo/actions/workflows/scala_ci.yml/badge.svg)
 
+## Quick Start
+
+Goat Rodeo builds [Artifact Dependency Graphs](https://omnibor.io/glossary/#artifact-dependency-graph) from artifacts where
+artifacts can be Docker images, JVM JAR/WAR files, Debian packages, and any other files including files that contain other files
+such as Zip, TAR, AR, cpio, etc.
+
+The basic operation is to `-b` build from a file or directory and `-o` output the ADG and found [Package URLs](https://github.com/package-url/purl-spec).
+
+There are many [options to tune](info/goat_rodeo_operation.md) Goat Rodeo when building ADGs for a large number of files (tens of thousands,
+millions) in a single batch.
+
+### Docker
+
+To run Goat Rodeo without installing a JVM or doing anything else other than having Docker, [Rancher](https://rancherdesktop.io/),
+[Podman](https://podman.io/), or another container runner installed:
+
+```shell
+mkdir /tmp/goat_rodeo
+docker run -ti --rm -v $(pwd)/target:/data/input -v /tmp/goat_rodeo:/data/output -u $(id -u ${USER}):$(id -g ${USER}) spicelabs/goatrodeo:0.7.0 -b /data/input -o /data/output
+```
+
+You can substitute whatever input location by replacing `$(pwd)/target` with the files that you want to build an ADG from.
+
+You can substitute whatever output location by replacing `/tmp/goat_rodeo` with the appropriate output location.
+
+### Running code natively
+
+In order to run Goat Rodeo natively, you will need to install [JDK 21+](https://openjdk.org/projects/jdk/21/) and [sbt](https://www.scala-sbt.org/).
+
+From the root of the [Goat Rodeo sources](https://goatrodeo.cc), build an "assembly": `sbt assembly`
+
+Once the assembly is built, run Goat Rodeo: `java -jar target/scala-3.6.3/goatrodeo.jar -b target -o /tmp/goat_rodeo`
+
+## Background
+
 Using Inherent Identifiers (e.g., cryptographic hashes) to describe nodes in
 [Artifact Dependency Graphs](https://omnibor.io/glossary/#artifact-dependency-graph) is the same
 technique [Git](https://git-scm.com/) uses to identify branches, tags, etc.

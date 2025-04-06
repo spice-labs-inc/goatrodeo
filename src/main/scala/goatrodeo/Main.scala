@@ -91,7 +91,7 @@ object Howdy {
         .action((x, c) =>
           c.copy(build =
             (c.build ++ ExpandFiles(x))
-              .filter(f => f.exists() && f.isDirectory())
+              .filter(f => f.exists())
           )
         ),
       opt[File]("ingested")
@@ -252,6 +252,9 @@ object Howdy {
                       StandardOpenOption.CREATE,
                       StandardOpenOption.APPEND
                     )
+                  } else {
+                    logger.error("Failed to process the input.")
+                    System.exit(1) // non-zero exit
                   }
 
                   ()
