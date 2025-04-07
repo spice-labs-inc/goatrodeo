@@ -5,3 +5,4 @@ addSbtPlugin("com.rallyhealth.sbt" % "sbt-git-versioning" % "1.6.0")
 
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.2")
+addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.2")

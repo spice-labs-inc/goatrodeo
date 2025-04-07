@@ -50,7 +50,9 @@ lazy val root = project
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
     assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala,
-    scalacOptions += "-no-indent"
+    scalacOptions += "-no-indent",
+    nativeImageJvm := "graalvm-java21",
+    nativeImageVersion := "21.0.2"
   )
 
 ThisBuild / assemblyJarName := "goatrodeo.jar"
@@ -207,6 +209,7 @@ Test / testOptions += Tests.Setup(() => {
 enablePlugins(JavaAppPackaging)
 enablePlugins(GitVersioningPlugin)
 enablePlugins(DockerPlugin)
+enablePlugins(NativeImagePlugin)
 
 Docker / packageName := projectName
 Docker / maintainer := "ext-engineering@spicelabs.io"
