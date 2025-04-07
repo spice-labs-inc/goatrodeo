@@ -23,13 +23,13 @@ import scopt.OParserBuilder
 
 import java.io.File
 import java.io.FileFilter
-import scala.jdk.CollectionConverters._
-import java.util.regex.Pattern
-import scala.util.Try
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.util.regex.Pattern
+import scala.jdk.CollectionConverters._
 import scala.util.Failure
 import scala.util.Success
+import scala.util.Try
 
 /** The `main` class
   */
@@ -80,7 +80,7 @@ object Howdy {
     import builder._
     OParser.sequence(
       programName("goatrodeo"),
-      head("goatrodeo", "0.6.3"),
+      head("goatrodeo", hellogoat.BuildInfo.version),
       opt[File]("block")
         .text(
           "The gitoid block list. Do not process these gitoids. Used for common gitoids such as license files"
@@ -91,7 +91,7 @@ object Howdy {
         .action((x, c) =>
           c.copy(build =
             (c.build ++ ExpandFiles(x))
-              .filter(f => f.exists() && f.isDirectory())
+              .filter(f => f.exists())
           )
         ),
       opt[File]("ingested")
@@ -139,7 +139,21 @@ object Howdy {
         .text(
           "How many threads to run (default 4). Should be 2x-3x number of cores"
         )
-        .action((t, c) => c.copy(threads = t))
+        .action((t, c) => c.copy(threads = t)),
+      opt[Unit]('V', "version")
+        .text("print version and exit")
+        .action((_, c) => {
+          logger.info(f"Goat Rodeo version ${hellogoat.BuildInfo}")
+          System.exit(0)
+          c
+        }),
+      opt[Unit]('?', "help")
+        .text("print help and exit")
+        .action((_, c) => {
+          logger.info(OParser.usage(parser1))
+          System.exit(0)
+          c
+        })
     )
   }
 
@@ -203,6 +217,7 @@ object Howdy {
 
         if (fileListers.isEmpty) {
           logger.error("At least one `-b` or `--file-list` must be provided")
+          logger.info(OParser.usage(parser1))
           Helpers.bailFail()
           return
         }
@@ -237,6 +252,9 @@ object Howdy {
                       StandardOpenOption.CREATE,
                       StandardOpenOption.APPEND
                     )
+                  } else {
+                    logger.error("Failed to process the input.")
+                    System.exit(1) // non-zero exit
                   }
 
                   ()

@@ -305,6 +305,11 @@ object Builder {
               )
 
             } catch {
+              case oom: OutOfMemoryError => {
+                logger.error("Out of memory", oom)
+                dead_?.set(true)
+                throw oom
+              }
               case ise: IllegalStateException => {
                 logger.error(
                   f"Failed illegal state ${toProcess.main} -- ${toProcess.mimeType} ${ise}"
@@ -472,13 +477,13 @@ object Builder {
 
         val purlOut = store.purls()
 
-        logger.info(f"Writing ${purlOut.length} Package URLs")
+        logger.info(f"Writing ${purlOut.size} Package URLs")
         val purlFile = File(target, "purls.txt")
         purlFile.createNewFile()
         val bw = new BufferedWriter(new FileWriter(purlFile))
         try {
           for (purl <- purlOut) {
-            bw.write(f"${purl.canonicalize()}\n")
+            bw.write(f"${purl}\n")
           }
         } finally {
           bw.flush()

@@ -114,6 +114,12 @@ case class Item(
     )
   }
 
+  /** Make a list of all the gitoids that this Item contains
+    */
+  def listContains(): Vector[String] = {
+    this.connections.toVector.filter(v => EdgeType.isContains(v._1)).map(_._2)
+  }
+
   /** Merge this `Item` with another `Item`
     *
     * @param other
@@ -126,15 +132,17 @@ case class Item(
 
     val (body, mime) =
       (this.body, other.body, this.bodyMimeType == other.bodyMimeType) match {
-        case (Some(a), Some(b), true) => Some(a.merge(b)) -> this.bodyMimeType
-        case (Some(a), _, _)          => Some(a) -> this.bodyMimeType
-        case (_, Some(b), _)          => Some(b) -> other.bodyMimeType
-        case _                        => None -> None
+        case (Some(a), Some(b), true) =>
+          Some(
+            a.merge(b, () => this.listContains(), () => other.listContains())
+          ) -> this.bodyMimeType
+        case (Some(a), _, _) => Some(a) -> this.bodyMimeType
+        case (_, Some(b), _) => Some(b) -> other.bodyMimeType
+        case _               => None -> None
       }
 
     Item(
       identifier = this.identifier,
-      // reference = this.reference,
       connections = this.connections ++ other.connections,
       bodyMimeType = mime,
       body = body
@@ -156,7 +164,7 @@ case class Item(
     if (purls.isEmpty) this
     else {
 
-      val textPurls = purls.map(p => p.canonicalize() /*.intern() */ )
+      val textPurls = purls.map(p => p.canonicalize())
       val ret = this.copy(
         connections = this.connections ++ TreeSet(
           textPurls.map(purl => EdgeType.aliasFrom -> purl)*
@@ -190,6 +198,7 @@ case class Item(
     *   the enhanced `Item`
     */
   def enhanceWithMetadata(
+      maybeParent: Option[GitOID],
       extra: TreeMap[String, TreeSet[StringOrPair]],
       filenames: Seq[String] = Vector()
   ): Item = {
@@ -209,8 +218,23 @@ case class Item(
               extra = TreeMap()
             )
         }
+        val baseFileNames = base.fileNames
+
+        // If the filename we found is different from any existing filenames,
+        // include the gitoid of the thing containing the filename
+        // this will support detection of docker image file overlays
+        // if there's just one filename,
+        val augmentedFileNames = filenames.flatMap(name =>
+          maybeParent match {
+            case Some(parent)
+                if baseFileNames.size > 1 || !baseFileNames.contains(name) =>
+              Vector(name, f"${parent}/${name}")
+            case _ => Vector(name)
+          }
+        )
+
         base.copy(
-          fileNames = base.fileNames ++ filenames,
+          fileNames = base.fileNames ++ augmentedFileNames,
           extra = base.extra ++ extra
         )
       })
