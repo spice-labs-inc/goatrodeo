@@ -52,4 +52,4 @@ jobs:
 
     - name: Upload with Ginger
       run: |
-        docker run -ti --rm -v $(pwd)/target/output:/data/to_upload ghcr.io/spice-labs-inc/ginger:0.1.10 -j ${{ GINGER_JWT_TOKEN }} -p /data/to_upload -m bt
+        docker run -ti --rm -v $(pwd)/target/output:/data/to_upload ghcr.io/spice-labs-inc/ginger:0.1.10 -j ${{ GRINDER_JWT }} -p /data/to_upload -m bt
