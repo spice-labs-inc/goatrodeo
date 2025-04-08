@@ -50,6 +50,12 @@ jobs:
            -b /input \
            -o /output
 
+    - name: Log in to Github Container Registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GH_TOKEN }}
+  
     - name: Upload with Ginger
       run: |
         docker run -ti --rm -v $(pwd)/target/output:/data/to_upload ghcr.io/spice-labs-inc/ginger:0.1.10 -j ${{ secrets.GRINDER_JWT }} -p /data/to_upload -m bt
