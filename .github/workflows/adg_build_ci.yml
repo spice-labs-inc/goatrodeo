@@ -56,6 +56,6 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_TOKEN }}
   
-    - name: Upload with Ginger
+    - name: Upload with Spice Grinder
       run: |
-        docker run -i --rm -v $(pwd)/target/output:/data/to_upload ghcr.io/spice-labs-inc/ginger:0.1.10 -j ${{ secrets.GRINDER_JWT }} -p /data/to_upload -m bt
+        docker run -i --rm -v $(pwd)/target/output:/data/to_upload ghcr.io/spice-labs-inc/grinder:latest -j ${{ secrets.GRINDER_JWT }} -p /data/to_upload -m bt
