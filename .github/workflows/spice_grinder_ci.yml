@@ -1,0 +1,53 @@
+name: Spice Grinder Action
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  packages: read  # Needed to pull private images from GHCR
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout with LFS
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'adopt-hotspot'
+        cache: 'sbt'
+
+    - name: Set up sbt
+      uses: sbt/setup-sbt@v1
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ secrets.GH_USERNAME_SG }}
+        password: ${{ secrets.GH_TOKEN }}
+
+    - name: Scan with Spice Grinder
+      run: |
+        docker run --platform linux/amd64 --quiet --rm --network none --user $(id -u):$(id -g) \
+        -v $(pwd)/target/input:/input:ro -v $(pwd)/target/output:/output ghcr.io/spice-labs-inc/grinder:latest \
+        -c adg -b /input -o /output
+
+    - name: Upload with Spice Grinder
+      run: |
+        docker run --platform linux/amd64 --quiet --rm --user $(id -u):$(id -g) \
+        -v $(pwd)/target/output:/output  ghcr.io/spice-labs-inc/grinder:latest \
+        -c upload -p /output \
+        -j ${{ secrets.GRINDER_JWT }} \
