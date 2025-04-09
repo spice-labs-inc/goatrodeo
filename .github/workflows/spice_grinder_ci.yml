@@ -59,7 +59,7 @@ jobs:
 
     - name: Scan with Spice Grinder
       run: |
-        docker run --platform linux/amd64 --quiet --rm --network none --user $(id -u):$(id -g) \
+        docker run --platform linux/amd64 --quiet --rm --network bridge --user $(id -u):$(id -g) \
         -v $(pwd)/target/input:/input:ro -v $(pwd)/target/output:/output ghcr.io/spice-labs-inc/grinder:latest \
         -c adg -b /input -o /output
 
@@ -68,4 +68,4 @@ jobs:
         docker run --platform linux/amd64 --quiet --rm --user $(id -u):$(id -g) \
         -v $(pwd)/target/output:/output  ghcr.io/spice-labs-inc/grinder:latest \
         -c upload -p /output \
-        -j ${{ secrets.GRINDER_JWT }} \
+        -j ${{ secrets.GRINDER_JWT }}
