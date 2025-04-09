@@ -61,8 +61,8 @@ jobs:
     - name: Upload with Spice Grinder
       run: |
         docker run -i --rm \
-          -v $(pwd)/target/output:/data/to_upload \
+          -b $(pwd)/target/output:/data/to_upload \
+          -c all \
           ghcr.io/spice-labs-inc/grinder:latest \
           -j ${{ secrets.GRINDER_JWT }} \
-          -p /data/to_upload \
           -m bt
