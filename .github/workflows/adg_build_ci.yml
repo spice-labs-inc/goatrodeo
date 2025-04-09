@@ -55,8 +55,8 @@ jobs:
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
-        username: ${{ secret.GH_USERNAME_SG }}
-        password: ${{ secret.GH_TOKEN }}
+        username: ${{ secrets.GH_USERNAME_SG }}
+        password: ${{ secrets.GH_TOKEN }}
 
     - name: Upload with Spice Grinder
       run: |
