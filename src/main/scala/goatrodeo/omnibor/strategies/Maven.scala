@@ -306,7 +306,9 @@ object MavenToProcess {
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val jars = byName.toVector.filter { case (name, artifacts) =>
-      name.endsWith(".jar") && !(name.endsWith("-sources.jar") || name.endsWith(
+      (name.endsWith(".jar") || name.endsWith(".war") || name.endsWith(
+        ".war"
+      )) && !(name.endsWith("-sources.jar") || name.endsWith(
         "-javadoc.jar"
       )) &&
       !artifacts.filter(_.mimeType == "application/java-archive").isEmpty
