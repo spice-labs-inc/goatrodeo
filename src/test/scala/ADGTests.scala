@@ -4,6 +4,7 @@ import goatrodeo.util.FileWrapper
 import goatrodeo.util.Helpers
 
 import java.io.File
+import scala.util.Try
 class ADGTests extends munit.FunSuite {
   test("Unreadable JAR") {
     val source = File("test_data/download/adg_tests/repo_ea")
@@ -48,7 +49,9 @@ class ADGTests extends munit.FunSuite {
       Builder.buildDB(
         dest = resForBigTent,
         tempDir = None,
-        threadCnt = 25,
+        threadCnt = (Option(System.getenv("TEST_THREAD_CNT")))
+          .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
+          .getOrElse(25),
         maxRecords = 50000,
         fileListers = Vector(() => Helpers.findFiles(source, f => true)),
         ignorePathSet = Set(),

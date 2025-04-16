@@ -5,7 +5,14 @@ val projectName = "goatrodeo"
 val projectVersion = "0.7.0-SNAPSHOT"
 val scala3Version = "3.6.3"
 
-fork := true
+// If "TEST_THREAD_CNT" is set that means we're
+// running on a memory constrained system and we
+// don't want to for a process to run tests
+if (System.getenv("TEST_THREAD_CNT") == null) {
+  fork := true
+} else {
+  fork := false
+}
 
 ThisBuild / scalacOptions ++=
   Seq(
@@ -94,8 +101,26 @@ Test / testOptions += Tests.Setup(() => {
       f.getParentFile().mkdirs()
       if (!f.exists()) {
         log.info(f"Downloading ${item}")
-        url(f"https://public-test-data.spice-labs.dev/${item}") #> f ! log
+        var loopCnt = 0
+        var keepOn = true
 
+        while (keepOn) {
+          val cmdResult =
+            url(f"https://public-test-data.spice-labs.dev/${item}") #> f ! log
+
+          // if the download succeeds, stop the loop
+          if (cmdResult == 0) {
+            keepOn = false
+          } else {
+            // if the download failed, repeat up to 10 times
+            loopCnt += 1
+            if (loopCnt >= 10) {
+              throw new Exception(
+                f"Failed to download ${item} after ${loopCnt} tries. Aborting"
+              )
+            }
+          }
+        }
         cmd match {
           case None      => // do nothing
           case Some(cmd) => cmd ! log
@@ -104,7 +129,7 @@ Test / testOptions += Tests.Setup(() => {
     }
 
   } catch {
-    case e: Throwable =>
+    case e: Exception =>
       val err = s"Exception fetching test files: ${e.getMessage}"
       log.error(err)
       println(err)
