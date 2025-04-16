@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.7.0-SNAPSHOT"
+val projectVersion = "0.7.1-SNAPSHOT"
 val scala3Version = "3.6.3"
 
 // If "TEST_THREAD_CNT" is set that means we're
