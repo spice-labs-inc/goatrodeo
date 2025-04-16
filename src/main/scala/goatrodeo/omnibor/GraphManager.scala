@@ -6,6 +6,8 @@ import goatrodeo.envelopes.DataFileEnvelope
 import goatrodeo.envelopes.IndexFileEnvelope
 import goatrodeo.envelopes.Position
 import goatrodeo.util.Helpers
+import org.json4s.JsonDSL
+import org.json4s.JsonDSL._
 
 import java.io.File
 import java.io.FileInputStream
@@ -16,8 +18,10 @@ import java.nio.file.Files
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
-import scala.math.Ordering.Implicits._
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import scala.util.Try
 
 /** Manage many parts of persisting/retrieving the graph information
@@ -224,15 +228,18 @@ object GraphManager {
 
     val now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
 
+    val grcName =
+      f"${now.getYear()}_${"%02d".format(now.getMonthValue())}_${"%02d"
+          .format(now.getDayOfMonth())}_${"%02d".format(
+          now
+            .getHour()
+        )}_${"%02d".format(now.getMinute())}_${"%02d"
+          .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grc"
+
     val targetFile =
       new File(
         targetDirectory,
-        f"${now.getYear()}_${"%02d".format(now.getMonthValue())}_${"%02d"
-            .format(now.getDayOfMonth())}_${"%02d".format(
-            now
-              .getHour()
-          )}_${"%02d".format(now.getMinute())}_${"%02d"
-            .format(now.getSecond())}_${Helpers.toHex(sha256Long)}.grc"
+        grcName
       )
 
     tempFile.toFile().renameTo(targetFile)
@@ -243,6 +250,20 @@ object GraphManager {
         )
       }
     }
+
+    import org.json4s.native.JsonMethods._
+
+    val jsonLine = ("date" -> DateTimeFormatter.ISO_DATE_TIME.format(
+      ZonedDateTime.now(ZoneId.of("UTC"))
+    )) ~
+      ("goat_rodeo_version" -> hellogoat.BuildInfo.version) ~
+      ("operation" -> "build_adg") ~
+      ("goat_rodeo_commit" -> hellogoat.BuildInfo.commit) ~ ("cluster_name" -> grcName)
+
+    Files.writeString(
+      File(targetDirectory, "history.jsonl").toPath(),
+      compact(render(jsonLine))
+    )
     (fileSet, targetFile)
   }
 

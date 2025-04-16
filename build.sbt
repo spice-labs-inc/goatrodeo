@@ -59,7 +59,15 @@ lazy val root = project
     assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala,
     scalacOptions += "-no-indent",
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoKeys := Seq[BuildInfoKey](
+      name,
+      version,
+      scalaVersion,
+      sbtVersion,
+      BuildInfoKey.action("commit") {
+        scala.sys.process.Process("git rev-parse HEAD").!!.trim
+      }
+    ),
     buildInfoPackage := "hellogoat"
   )
 
