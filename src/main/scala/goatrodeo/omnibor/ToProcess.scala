@@ -274,6 +274,7 @@ trait ToProcess {
                 // update metadata
               val item3 =
                 itemScope2.enhanceWithMetadata(
+                  parentId,
                   metadata,
                   Vector(artifact.path())
                 )
@@ -412,6 +413,7 @@ object ToProcess {
   ] =
     Vector(
       MavenToProcess.computeMavenFiles,
+      DockerToProcess.computeDockerFiles,
       Debian.computeDebianFiles,
       GenericFile.computeGenericFiles
     )
@@ -507,7 +509,7 @@ object ToProcess {
       finishedFile: File => Unit,
       tempDir: Option[File],
       count: AtomicInteger,
-      dead_? : AtomicBoolean,
+      dead_? : AtomicBoolean
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
