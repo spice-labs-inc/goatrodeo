@@ -262,7 +262,7 @@ object GraphManager {
 
     Files.writeString(
       File(targetDirectory, "history.jsonl").toPath(),
-      compact(render(jsonLine))
+      f"${compact(render(jsonLine))}\n"
     )
     (fileSet, targetFile)
   }
