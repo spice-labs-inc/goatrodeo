@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.7.0-SNAPSHOT"
+val projectVersion = "0.7.1-SNAPSHOT"
 val scala3Version = "3.6.3"
 
 // If "TEST_THREAD_CNT" is set that means we're
@@ -59,7 +59,15 @@ lazy val root = project
     assembly / mainClass := Some("goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala,
     scalacOptions += "-no-indent",
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoKeys := Seq[BuildInfoKey](
+      name,
+      version,
+      scalaVersion,
+      sbtVersion,
+      BuildInfoKey.action("commit") {
+        scala.sys.process.Process("git rev-parse HEAD").!!.trim
+      }
+    ),
     buildInfoPackage := "hellogoat"
   )
 
