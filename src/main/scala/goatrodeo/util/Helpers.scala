@@ -44,12 +44,40 @@ import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
+
 type GitOID = String
 
 /** A bunch of helpers/utilities
   */
 object Helpers {
+
+  /** Take a JAR manifest and turn it into metadata stuff
+    */
+  def treeInfoFromManifest(
+      manifestString: String
+  ): TreeMap[String, TreeSet[StringOrPair]] = {
+    val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
+    val manifest = java.util.jar.Manifest.apply(bis)
+
+    val mapping = for {
+      entry <- manifest.getMainAttributes().entrySet().asScala.toVector
+
+    } yield {
+      entry.getKey.toString.toLowerCase -> TreeSet(
+        StringOrPair(entry.getValue().toString)
+      )
+    }
+
+    val ret = TreeMap(
+      (mapping :+ "manifest" -> TreeSet(
+        StringOrPair("text/maven-manifest", manifestString)
+      ))*
+    )
+
+    ret
+  }
 
   /** Merge TreeMaps together
     *

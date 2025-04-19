@@ -363,4 +363,57 @@ class MySuite extends munit.FunSuite {
     assert(extra.get("$$Sloth").isEmpty)
   }
 
+  val complexManifest = """Manifest-Version: 1.0
+Created-By: Apache Maven Bundle Plugin 5.1.9
+Build-Jdk-Spec: 21
+Specification-Title: Apache Commons IO
+Specification-Version: 2.15
+Specification-Vendor: The Apache Software Foundation
+Implementation-Title: Apache Commons IO
+Implementation-Version: 2.15.1
+Implementation-Vendor: The Apache Software Foundation
+Automatic-Module-Name: org.apache.commons.io
+Bundle-Description: The Apache Commons IO library contains utility class
+ es, stream implementations, file filters,file comparators, endian trans
+ formation classes, and much more.
+Bundle-DocURL: https://commons.apache.org/proper/commons-io/
+Bundle-License: https://www.apache.org/licenses/LICENSE-2.0.txt
+Bundle-ManifestVersion: 2
+Bundle-Name: Apache Commons IO
+Bundle-SymbolicName: org.apache.commons.commons-io
+Bundle-Vendor: The Apache Software Foundation
+Bundle-Version: 2.15.1
+Export-Package: org.apache.commons.io;version="1.4.9999",org.apache.comm
+ ons.io.comparator;version="1.4.9999",org.apache.commons.io.filefilter;v
+ ersion="1.4.9999",org.apache.commons.io.input;version="1.4.9999",org.ap
+ ache.commons.io.output;version="1.4.9999",org.apache.commons.io.build;v
+ ersion="2.15.1",org.apache.commons.io.channels;version="2.15.1",org.apa
+ che.commons.io.charset;version="2.15.1",org.apache.commons.io.file;vers
+ ion="2.15.1",org.apache.commons.io.file.attribute;version="2.15.1",org.
+ apache.commons.io.file.spi;version="2.15.1",org.apache.commons.io.funct
+ ion;version="2.15.1",org.apache.commons.io.input.buffer;version="2.15.1
+ ",org.apache.commons.io.monitor;version="2.15.1",org.apache.commons.io.
+ serialization;version="2.15.1",org.apache.commons.io;version="2.15.1",o
+ rg.apache.commons.io.comparator;version="2.15.1",org.apache.commons.io.
+ filefilter;version="2.15.1",org.apache.commons.io.input;version="2.15.1
+ ",org.apache.commons.io.output;version="2.15.1"
+Import-Package: sun.nio.ch;resolution:=optional,sun.misc;resolution:=opt
+ ional
+Include-Resource: META-INF/LICENSE.txt=LICENSE.txt,META-INF/NOTICE.txt=N
+ OTICE.txt
+Require-Capability: osgi.ee;filter:="(&(osgi.ee=JavaSE)(version=1.8))"
+Tool: Bnd-6.4.1.202306080939
+Multi-Release: true
+
+"""
+
+  test("Parse manifest") {
+    val tree = Helpers.treeInfoFromManifest(complexManifest)
+    assert(!tree.isEmpty, "Should have items in tree")
+    assert(!tree("manifest").isEmpty, "Should find manifest")
+    assert(
+      tree("export-package").size >= 1,
+      f"Should be lots of at least on entry in 'export pacakge' got ${tree("export-package")}"
+    )
+  }
 }

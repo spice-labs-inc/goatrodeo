@@ -19,7 +19,6 @@ import goatrodeo.util.Helpers
 import goatrodeo.util.PURLHelpers
 import goatrodeo.util.PURLHelpers.Ecosystems
 
-import java.util.Properties
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -132,13 +131,11 @@ case class MavenState(
       case _ => in
     }
   }
-
   override def getMetadata(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
   ): (TreeMap[String, TreeSet[StringOrPair]], MavenState) = {
-    import scala.jdk.CollectionConverters.*
 
     val baseTree = if (pomFile.length() > 4) {
       TreeMap(
@@ -155,37 +152,9 @@ case class MavenState(
               .filter(_.path().toUpperCase() == "META-INF/MANIFEST.MF")
               .headOption match {
               case Some(manifest) =>
-                val manifestString =
-                  manifest.withStream(Helpers.slurpInputToString(_))
-                val props = java.util.Properties()
-                // if this causes an exception, log it.
-                try {
-                  manifest.withStream(props.load(_))
-                } catch {
-                  case e: Exception =>
-                    logger.error(
-                      f"Failed to parse `META-INF/MANIFEST.MF` for ${artifact
-                          .path()}, error ${e.getMessage()}"
-                    )
-                }
-
-                val ret = TreeMap(
-                  props
-                    .keys()
-                    .asIterator()
-                    .asScala
-                    .map(k =>
-                      k.asInstanceOf[String]
-                        .toLowerCase /*.intern()*/ -> TreeSet(
-                        StringOrPair(props.get(k).asInstanceOf[String])
-                      )
-                    )
-                    .toSeq*
-                )
-
-                ret + ("manifest" -> TreeSet(
-                  StringOrPair("text/maven-manifest", manifestString)
-                ))
+                Helpers.treeInfoFromManifest(manifest.withStream(stream => {
+                  Helpers.slurpInputToString(stream)
+                }))
 
               case None => TreeMap[String, TreeSet[StringOrPair]]()
             }
