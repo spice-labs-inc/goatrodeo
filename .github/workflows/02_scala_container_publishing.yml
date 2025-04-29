@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'  # Trigger on semver tag release (v1.2.3)
   workflow_run:
     workflows:
-      - "01. Scala Build & Test"  # Trigger after successful Scala build/test
+      - "01. Scala Build & Test"
     types:
       - completed
     conclusions:
@@ -71,7 +71,7 @@ jobs:
           name: grinder-scan-app-${{ github.run_id }}
           path: ./target
 
-      - name: Save war/WAR Artifact
+      - name: Save WAR Artifact
         uses: actions/upload-artifact@v4
         with:
           name: goatrodeo-${{ github.run_id }}
@@ -139,4 +139,10 @@ jobs:
           subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      - name: Upload Deployment Events to Spice
+        uses: spice-labs-inc/grinder-deployment-events-action@main
+        with:
+          spice_pass: ${{ secrets.GRINDER_JWT }}
+          file_path: .github/deploy-events.json
 
