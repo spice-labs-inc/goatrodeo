@@ -1,9 +1,16 @@
-name: Publish Scala Container Images
+name: 02. Publish Scala Container Images
 
 on:
   push:
-    # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
+    tags:
+      - 'v*.*.*'  # Trigger on semver tag release (v1.2.3)
+  workflow_run:
+    workflows:
+      - "01. Scala Build & Test"  # Trigger after "01. Rust Build & Test"
+    types:
+      - completed
+    conclusions:
+      - success  # Only run after a successful build/test run
 
 env:
   GHCR_REGISTRY: ghcr.io
