@@ -1,0 +1,148 @@
+name: 02. Publish Scala Container Images
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on semver tag release (v1.2.3)
+  workflow_run:
+    workflows:
+      - "01. Scala Build & Test"
+    types:
+      - completed
+    conclusions:
+      - success
+
+env:
+  GHCR_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+  push_to_registry:
+    name: Push Docker image to Docker Hub and GHCR
+    runs-on: ubuntu-24.04
+
+    permissions:
+      packages: write
+      contents: read
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Checkout with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'adopt-hotspot'
+          cache: 'sbt'
+
+      - name: Set up SBT
+        uses: sbt/setup-sbt@v1
+
+      - name: Declare some Variables
+        shell: bash
+        run: |
+          echo "short_git_hash=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "git_branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
+
+      - name: Package Scala Application
+        run: sbt package
+
+      - name: Generate POM File
+        run: sbt makePom
+
+      - name: Run Grinder Scan on WAR + POM
+        uses: spice-labs-inc/grinder-scan-action@main
+        with:
+          spice_pass: ${{ secrets.GRINDER_JWT }}
+          file_path: ./target
+
+      - name: Upload WAR + POM Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: grinder-scan-app-${{ github.run_id }}
+          path: ./target
+
+<<<<<<< HEAD
+      - name: Save WAR Artifact
+=======
+      - name: Save JAR/WAR Artifact
+>>>>>>> parent of c609176 (Change: Files saved as war file)
+        uses: actions/upload-artifact@v4
+        with:
+          name: goatrodeo-${{ github.run_id }}
+          path: target/scala-*/goatrodeo*.war
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Log in to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Extract Metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.DOCKERHUB_NAMESPACE }}/${{ github.event.repository.name }}
+          tags: |
+            type=semver,pattern={{version}}
+
+      - name: Stage Docker Build Environment from SBT
+        run: sbt Docker/stage
+
+      - name: Build and Push Docker Image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: target/docker/stage
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Save Docker Image Locally
+        run: |
+          mkdir -p ./docker-artifacts
+          image_tag=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          docker pull "$image_tag"
+          docker save "$image_tag" > ./docker-artifacts/goatrodeo.oci.tar
+
+      - name: Run Grinder Scan on Docker Image
+        uses: spice-labs-inc/grinder-scan-action@main
+        with:
+          spice_pass: ${{ secrets.GRINDER_JWT }}
+          file_path: ./docker-artifacts
+
+      - name: Upload Docker Image Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: grinder-scan-image-${{ github.run_id }}
+          path: ./docker-artifacts
+
+      - name: Generate Artifact Attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+          
+
+
