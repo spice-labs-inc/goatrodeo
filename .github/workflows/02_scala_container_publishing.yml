@@ -71,11 +71,7 @@ jobs:
           name: grinder-scan-app-${{ github.run_id }}
           path: ./target
 
-<<<<<<< HEAD
       - name: Save WAR Artifact
-=======
-      - name: Save JAR/WAR Artifact
->>>>>>> parent of c609176 (Change: Files saved as war file)
         uses: actions/upload-artifact@v4
         with:
           name: goatrodeo-${{ github.run_id }}
@@ -143,6 +139,4 @@ jobs:
           subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
-          
-
 
