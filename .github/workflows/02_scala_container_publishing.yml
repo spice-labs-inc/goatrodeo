@@ -71,7 +71,7 @@ jobs:
           name: grinder-scan-app-${{ github.run_id }}
           path: ./target
 
-      - name: Save JAR/WAR Artifact
+      - name: Save war/WAR Artifact
         uses: actions/upload-artifact@v4
         with:
           name: goatrodeo-${{ github.run_id }}
