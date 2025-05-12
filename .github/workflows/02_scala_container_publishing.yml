@@ -115,23 +115,27 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Save Docker Image Locally
+        shell: bash
         run: |
-          mkdir -p ./docker-artifacts
+          mkdir -p "${{ github.workspace }}/target/release"
           image_tag=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "Saving $image_tag"
           docker pull "$image_tag"
-          docker save "$image_tag" > ./docker-artifacts/goatrodeo.oci.tar
+          docker save "$image_tag" > "${{ github.workspace }}/target/release/${{ github.event.repository.name }}.oci.tar"
 
-      - name: Run Grinder Scan on Docker Image
-        uses: spice-labs-inc/grinder-scan-action@main
+      - name: Run Spice Grinder Scan
+        uses: spice-labs-inc/action-grinder-scan@main
         with:
           spice_pass: ${{ secrets.GRINDER_JWT }}
-          file_path: ./docker-artifacts
+          file_path: "${{ github.workspace }}/target/release/"
 
-      - name: Upload Docker Image Scan Results
+      - name: Upload Docker Image and SBOM
         uses: actions/upload-artifact@v4
         with:
-          name: grinder-scan-image-${{ github.run_id }}
-          path: ./docker-artifacts
+          name: docker-artifacts
+          path: |
+            ${{ github.workspace }}/target/release/${{ github.event.repository.name }}.oci.tar
+            /tmp/sbom.spdx.json
 
       - name: Generate Artifact Attestation
         uses: actions/attest-build-provenance@v1
