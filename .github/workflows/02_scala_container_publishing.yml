@@ -59,23 +59,23 @@ jobs:
       - name: Generate POM File
         run: sbt makePom
 
-      - name: Run Grinder Scan on WAR + POM
+      - name: Run Grinder Scan on JAR + POM
         uses: spice-labs-inc/grinder-scan-action@main
         with:
           spice_pass: ${{ secrets.GRINDER_JWT }}
           file_path: ./target
 
-      - name: Upload WAR + POM Scan Results
+      - name: Upload JAR + POM Scan Results
         uses: actions/upload-artifact@v4
         with:
           name: grinder-scan-app-${{ github.run_id }}
           path: ./target
 
-      - name: Save WAR Artifact
+      - name: Save JAR Artifact
         uses: actions/upload-artifact@v4
         with:
           name: goatrodeo-${{ github.run_id }}
-          path: target/scala-*/goatrodeo*.war
+          path: target/scala-*/goatrodeo*.jar
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
