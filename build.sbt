@@ -68,7 +68,9 @@ lazy val root = project
         scala.sys.process.Process("git rev-parse HEAD").!!.trim
       }
     ),
-    buildInfoPackage := "hellogoat"
+    buildInfoPackage := "hellogoat",
+    nativeImageJvm := "graalvm-java21",
+    nativeImageVersion := "21.0.2"
   )
 
 ThisBuild / assemblyJarName := "goatrodeo.jar"
@@ -173,6 +175,7 @@ Test / testOptions += Tests.Setup(() => {
 enablePlugins(JavaAppPackaging)
 enablePlugins(GitVersioningPlugin)
 enablePlugins(DockerPlugin)
+enablePlugins(NativeImagePlugin)
 
 Docker / packageName := projectName
 Docker / maintainer := "ext-engineering@spicelabs.io"
