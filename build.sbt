@@ -70,8 +70,8 @@ lazy val root = project
     ),
     buildInfoPackage := "hellogoat",
     nativeImageJvm := "graalvm-java21",
-    nativeImageVersion := "21.0.2"
-    nativeImageOptions := List("--no-fallback")
+    nativeImageVersion := "21.0.2",
+    nativeImageOptions += s"--no-fallback"
   )
 
 ThisBuild / assemblyJarName := "goatrodeo.jar"
