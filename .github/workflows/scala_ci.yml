@@ -6,8 +6,9 @@
 name: Scala Build & Test
 
 on:
-  push:
-    branches: [ "**" ]
+  #JT Turned off for native work
+  #push:
+  #  branches: [ "**" ]
   pull_request:
     branches: [ "main" ]
 
