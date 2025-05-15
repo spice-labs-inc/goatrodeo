@@ -72,6 +72,7 @@ lazy val root = project
     nativeImageJvm := "graalvm-java21",
     nativeImageVersion := "21.0.2",
     nativeImageOptions += s"--no-fallback"
+    nativeImageOptions += s"-R:MaximumHeapSizePercent=90"
   )
 
 ThisBuild / assemblyJarName := "goatrodeo.jar"
