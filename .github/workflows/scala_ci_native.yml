@@ -16,9 +16,10 @@ permissions:
 
 jobs:
   build:
-    #let the other platforms build even if one fails for now anyway
-    fail-fast: false
+   
     strategy:
+         #let the other platforms build even if one fails for now anyway
+        fail-fast: false
         matrix:
           os:
               - ubuntu-latest
