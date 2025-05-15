@@ -16,8 +16,6 @@ permissions:
 
 jobs:
   nixbuild:
-
-    
     strategy:
         matrix:
           os:
@@ -50,20 +48,19 @@ jobs:
           os:
               - windows-latest
               - windows-11-arm
-
-    runs-on: ${{ matrix.os }}
-    steps:
-    - name: Checkout with LFS
-      uses: actions/checkout@v4
-      with:
-        lfs: true
-    - name: Set up JDK 21
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'adopt-hotspot'
-        cache: 'sbt'
-    - name: Set up sbt
-      uses: sbt/setup-sbt@v1
-    - name: Run tests
-      run: set SBT_OPTS="-Xmx8G  -Duser.timezone=GMT"; set TEST_THREAD_CNT="2"; sbt -v nativeImage test 
+     runs-on: ${{ matrix.os }}
+     steps:
+      - name: Checkout with LFS
+        uses: actions/checkout@v4
+        with:
+         lfs: true
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'adopt-hotspot'
+          cache: 'sbt'
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+      - name: Run tests
+        run: set SBT_OPTS="-Xmx8G  -Duser.timezone=GMT"; set TEST_THREAD_CNT="2"; sbt -v nativeImage test 
