@@ -29,7 +29,7 @@ jobs:
           include:
               # defaults command is the *nix command line but if windows use the windows specific
               - command: SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" TEST_THREAD_CNT="2" sbt -v nativeImage test 
-              - command: set SBT_OPTS="-Xmx8G  -Duser.timezone=GMT"; set TEST_THREAD_CNT="2"; sbt -v nativeImage test 
+              - command: set SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" & set TEST_THREAD_CNT="2" & sbt -v nativeImage test 
                 os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
