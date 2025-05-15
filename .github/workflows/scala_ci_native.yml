@@ -18,8 +18,8 @@ jobs:
   build:
    
     strategy:
-         #let the other platforms build even if one fails for now anyway
-        fail-fast: false
+         #fail everything if one fails. This will catch the tests and stop windows if any tests fail
+        fail-fast: true
         matrix:
           os:
               - ubuntu-latest
@@ -29,8 +29,18 @@ jobs:
           include:
               # defaults command is the *nix command line but if windows use the windows specific
               - command: SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" TEST_THREAD_CNT="2" sbt -v nativeImage test 
-              - command: set SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" & set TEST_THREAD_CNT="2" & sbt -v nativeImage test 
+              # no tests for windows and we will fail the whole thing with fail fast if it anything fails
+              - command: set SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" & set TEST_THREAD_CNT="2" & sbt -v nativeImage  
                 os: windows-latest
+              - nativepath: /home/runner/work/goatrodeo/goatrodeo/target/native-image/goatrodeo
+              - nativepath: Users/runner/work/goatrodeo/goatrodeo/target/native-image/goatrodeo
+                os: macos-latest
+              - nativepath: D:\a\goatrodeo\goatrodeo\target\native-image\goatrodeo.exe
+                os: windows-latest
+              - savedname: goatrodeo
+              - savedname: goatrodeo.exe
+                os: windows-latest
+
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout with LFS
@@ -45,8 +55,13 @@ jobs:
         cache: 'sbt'
     - name: Set up sbt
       uses: sbt/setup-sbt@v1
-    - name: Run tests
+    - name: Build native and run tests
       run: ${{ matrix.command }}
+    - name: Save Native Artifact
+      uses: actions/upload-artifact@v4
+      with:
+          name: ${{ matrix.savedname }}-${{ matrix.os }}-${{ github.run_id }}
+          path: ${{ matrix.nativepath }}
       # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
     #- name: Upload dependency graph
     # uses: scalacenter/sbt-dependency-submission@ab086b50c947c9774b70f39fc7f6e20ca2706c91
