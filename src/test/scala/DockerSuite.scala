@@ -5,9 +5,9 @@ import goatrodeo.omnibor.ItemMetaData
 import goatrodeo.omnibor.Storage
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.util.FileWrapper
-import org.json4s.JsonAST._
-import org.json4s._
-import org.json4s.native._
+import org.json4s.*
+import org.json4s.JsonAST.*
+import org.json4s.native.*
 
 import java.io.File
 import scala.collection.immutable.TreeMap

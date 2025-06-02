@@ -37,7 +37,7 @@ import scala.util.Try
   * container
   */
 object Builder {
-  val logger: Logger = Logger(getClass())
+  private val logger: Logger = Logger(getClass())
 
   /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
@@ -50,6 +50,8 @@ object Builder {
     *   a file containing gitoids to not process (e.g., Apache license files)
     * @param maxRecords
     *   the maximum number of records to process at once
+    * @param tag
+    *   the tag associated with this run
     * @param fileListers
     *   a sequence of functions that list files. This allows for multiple `-b`
     *   and and `--file-list` flags to be sent in
@@ -68,12 +70,14 @@ object Builder {
       threadCnt: Int,
       blockList: Option[File],
       maxRecords: Int,
+      tag: Option[String],
       tempDir: Option[File],
       fileListers: Seq[() => Seq[File]],
       ignorePathSet: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
-      done: Boolean => Unit
+      done: Boolean => Unit,
+      preWriteDB: Storage => Unit = store => ()
   ): Unit = {
     val totalStart = Instant.now()
 
@@ -93,6 +97,8 @@ object Builder {
 
     // The count of all the files found
     val cnt = new AtomicInteger(0)
+
+    val fullTag = tag.map(t => f"${Helpers.currentDate8601()}/${t}")
 
     // Get the gitoids to block
     val blockGitoids: Set[String] = blockList match {
@@ -150,10 +156,12 @@ object Builder {
         cnt = cnt,
         runningCnt = runningCnt,
         totalStart = totalStart,
+        tag = fullTag,
         dead_? = dead_?,
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
-        tempDir = tempDir
+        tempDir = tempDir,
+        preWriteDB = preWriteDB
       )
 
       loopCnt += 1
@@ -188,15 +196,33 @@ object Builder {
       stillWorking: AtomicBoolean,
       blockGitoids: Set[String],
       cnt: AtomicInteger,
+      tag: Option[String],
       runningCnt: AtomicInteger,
       totalStart: Instant,
       dead_? : AtomicBoolean,
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
-      tempDir: Option[File]
+      tempDir: Option[File],
+      preWriteDB: Storage => Unit = store => ()
   ): Option[Thread] = {
 
     val storage = MemStorage(Some(destDir))
+
+// if there's a tag, set it up
+    tag match {
+      case None => {} // do nothing
+      case Some(tag) =>
+        storage.write(
+          "tags",
+          item => Item("tags", TreeSet(EdgeType.tagTo -> tag), None, None),
+          item => "set up tags"
+        )
+        storage.write(
+          tag,
+          item => Item(tag, TreeSet(EdgeType.tagFrom -> "tags"), None, None),
+          x => "tags"
+        )
+    }
 
     // start time
     val start = Instant.now()
@@ -242,6 +268,7 @@ object Builder {
               toProcess.process(
                 None,
                 store = storage,
+                tag = tag,
                 parentScope = ParentScope.forAndWith(toProcess.main, None),
                 blockList = blockGitoids,
                 keepRunning = () => !dead_?.get(),
@@ -368,6 +395,8 @@ object Builder {
             )
 
             val writeStart = Instant.now()
+
+            preWriteDB(storage)
 
             val ret = storage match {
               case lf: (ListFileNames & Storage) if !dead_?.get() =>

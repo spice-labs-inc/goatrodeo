@@ -1,10 +1,12 @@
 import goatrodeo.omnibor.Builder
+import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.util.FileWrapper
 import goatrodeo.util.Helpers
 
 import java.io.File
 import scala.util.Try
+
 class ADGTests extends munit.FunSuite {
   test("Unreadable JAR") {
     val source = File("test_data/download/adg_tests/repo_ea")
@@ -45,6 +47,7 @@ class ADGTests extends munit.FunSuite {
       var captured: Vector[File] = Vector()
       val sync = new Object()
       var finished = false
+      var tagCount = 0
 
       Builder.buildDB(
         dest = resForBigTent,
@@ -53,6 +56,7 @@ class ADGTests extends munit.FunSuite {
           .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
           .getOrElse(25),
         maxRecords = 50000,
+        tag = Some("test"),
         fileListers = Vector(() => Helpers.findFiles(source, f => true)),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
@@ -60,9 +64,26 @@ class ADGTests extends munit.FunSuite {
         finishedFile = f => {
           sync.synchronized { captured = captured :+ f }; ()
         },
-        done = b => { finished = b }
+        done = b => { finished = b },
+        preWriteDB = store => {
+          store.read("tags") match {
+            case Some(tags) => {
+
+              val theTag =
+                tags.connections.filter(e => e._1 == EdgeType.tagTo).head._2
+              tagCount = store
+                .read(theTag)
+                .get
+                .connections
+                .filter(_._1 == EdgeType.tagTo)
+                .size
+            }
+            case None =>
+          }
+        }
       )
 
+      assert(tagCount > 8000, s"Expecting lots of tags, got ${tagCount}")
       assert(captured.size > 5, "We should have built files")
       assert(finished, "Should have finished processing with success")
     }

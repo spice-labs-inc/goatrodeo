@@ -2,7 +2,7 @@ package goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
-import goatrodeo.omnibor.strategies._
+import goatrodeo.omnibor.strategies.*
 import goatrodeo.util.ArtifactWrapper
 import goatrodeo.util.FileWalker
 import goatrodeo.util.FileWrapper
@@ -239,6 +239,7 @@ trait ToProcess {
       parentId: Option[GitOID],
       store: Storage,
       parentScope: ParentScope,
+      tag: Option[String],
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
       atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
@@ -279,13 +280,22 @@ trait ToProcess {
                   Vector(artifact.path())
                 )
 
-              val itemScope3 = parentScope.enhanceWithMetadata(
+              val itemScopePre3 = parentScope.enhanceWithMetadata(
                 store,
                 artifact,
                 item3,
                 metadata,
                 Vector(artifact.path())
               )
+
+              // update tags
+              val itemScope3 = tag match {
+                case None => itemScopePre3
+                case Some(tag) =>
+                  itemScopePre3.copy(connections =
+                    itemScopePre3.connections + (EdgeType.tagFrom -> tag)
+                  )
+              }
 
               // do final augmentation (e.g., mapping source to classes)
               val (item4, state4) =
@@ -381,6 +391,7 @@ trait ToProcess {
                           Some(answerItem.identifier),
                           store,
                           thisParentScope,
+                          None,
                           blockList,
                           keepRunning,
                           atEnd
@@ -603,6 +614,7 @@ object ToProcess {
         None,
         store,
         parentScope = ParentScope.forAndWith(individual.main, None),
+        tag = None,
         blockList = block
       )
     }

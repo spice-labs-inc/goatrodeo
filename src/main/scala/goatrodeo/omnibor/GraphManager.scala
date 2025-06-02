@@ -7,7 +7,7 @@ import goatrodeo.envelopes.IndexFileEnvelope
 import goatrodeo.envelopes.Position
 import goatrodeo.util.Helpers
 import org.json4s.JsonDSL
-import org.json4s.JsonDSL._
+import org.json4s.JsonDSL.*
 
 import java.io.File
 import java.io.FileInputStream
@@ -27,7 +27,7 @@ import scala.util.Try
 /** Manage many parts of persisting/retrieving the graph information
   */
 object GraphManager {
-  val logger: Logger = Logger(getClass())
+  private val logger: Logger = Logger(getClass())
   object Consts {
     val DataFileMagicNumber: Int = 0x00be1100 // Bell
     val IndexFileMagicNumber: Int = 0x54154170 // Shishitō
