@@ -5,7 +5,7 @@ on:
 env:
   GHCR_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKERHUB_USER }}
 
 jobs:
   push_to_registry:
@@ -64,23 +64,24 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Log in to Github Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.GHCR_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GH_TOKEN }}
+      # - name: Log in to Github Container Registry
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ${{ env.GHCR_REGISTRY }}
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GH_TOKEN }}
       
       - name: Extract Metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
-            ${{ env.DOCKERHUB_NAMESPACE }}/${{ github.event.repository.name }}
+              ${{ env.DOCKERHUB_NAMESPACE }}/${{ github.event.repository.name }}  
+    # ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
+            
           tags: |
             type=semver,pattern={{version}}
       
@@ -99,9 +100,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
       
-      - name: Generate Artifact Attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+      # - name: Generate Artifact Attestation
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}
+      #     subject-digest: ${{ steps.push.outputs.digest }}
+      #     push-to-registry: true
