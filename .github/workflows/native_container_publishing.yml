@@ -1,4 +1,4 @@
-name: Publish Scala Container Images
+name: Publish Native Container Images
 
 on:
   workflow_dispatch
