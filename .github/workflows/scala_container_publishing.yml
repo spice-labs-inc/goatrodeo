@@ -9,6 +9,7 @@ env:
   GHCR_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+  PLATFORMS: linux/amd64, linux/arm64
 
 jobs:
   push_to_registry:
@@ -21,8 +22,14 @@ jobs:
       attestations: write
       id-token: write
     steps:
+      #setup qemu for all other platforms
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+            platforms: ${{env.PLATFORMS}}
       
       - name: Checkout with LFS
         uses: actions/checkout@v4
@@ -76,6 +83,8 @@ jobs:
             ${{ env.DOCKERHUB_NAMESPACE }}/${{ github.event.repository.name }}
           tags: |
             type=semver,pattern={{version}}
+          flavor: |
+            latest=true
       
       - name: Stage Docker Build Environment from SBT
         run: |
@@ -86,6 +95,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: target/docker/stage
+          platforms: ${{env.PLATFORMS}}
           push: true
           provenance: mode=max
           sbom: true
