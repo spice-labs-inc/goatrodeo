@@ -59,7 +59,12 @@ class ISOFileSuite extends munit.FunSuite {
 
     val tp = GenericFile(nested)
     val store = MemStorage(None)
-    tp.process(None, store, ParentScope.forAndWith("Testing ISO", None))
+    tp.process(
+      None,
+      store,
+      ParentScope.forAndWith("Testing ISO", None),
+      tag = None
+    )
     val cnt = store.keys().size
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }

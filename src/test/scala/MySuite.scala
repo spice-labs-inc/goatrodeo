@@ -16,7 +16,7 @@ import com.github.packageurl.PackageURL
 import goatrodeo.omnibor.EdgeType
 import goatrodeo.omnibor.ToProcess
 import goatrodeo.omnibor.strategies.Debian
-import goatrodeo.util._
+import goatrodeo.util.*
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties

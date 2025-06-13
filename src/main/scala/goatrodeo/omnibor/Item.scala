@@ -84,6 +84,9 @@ case class Item(
             EdgeType.contains -> connection
           )
         }
+        case Edge(EdgeType.tagFrom, connection) => {
+          Vector(EdgeType.tagTo -> connection)
+        }
         case _ => Vector.empty
       }
 

@@ -14,6 +14,7 @@ limitations under the License. */
 
 package goatrodeo.util
 
+import com.typesafe.scalalogging.Logger
 import goatrodeo.omnibor.StringOrPair
 import io.bullet.borer.Cbor
 import org.apache.bcel.classfile.ClassParser
@@ -41,6 +42,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -52,6 +54,7 @@ type GitOID = String
 /** A bunch of helpers/utilities
   */
 object Helpers {
+  private val logger: Logger = Logger(getClass())
 
   /** Take a JAR manifest and turn it into metadata stuff
     */
@@ -246,14 +249,28 @@ object Helpers {
       root: File,
       ok: File => Boolean
   ): Vector[File] = {
+    val count: AtomicLong = AtomicLong()
+    import scala.jdk.CollectionConverters.IteratorHasAsScala
 
-    if (root.isDirectory()) {
-      Option(root.listFiles()).toVector
-        .flatMap(_.toVector)
-        .flatMap(findFiles(_, ok))
-    } else if (root.isFile() && ok(root) && !root.getName().startsWith(".")) {
-      Vector(root)
-    } else Vector()
+    Files
+      .find(
+        root.toPath(),
+        1000,
+        (path, info) => {
+          val f = path.toFile()
+          if (info.isRegularFile() && ok(f) && !f.getName().startsWith(".")) {
+            val curCount = count.addAndGet(1)
+            if (curCount % 100000 == 0) {
+              logger.info(s"Find Files count ${curCount}")
+            }
+            true
+          } else false
+        }
+      )
+      .iterator()
+      .asScala
+      .map(_.toFile())
+      .toVector
   }
 
   /** Write data over a file

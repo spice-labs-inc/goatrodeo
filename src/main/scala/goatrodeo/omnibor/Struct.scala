@@ -88,7 +88,8 @@ object EdgeType {
   val aliasFrom = "alias:from";
   val buildsTo = "build:up"
   val builtFrom = "build:down"
-
+  val tagFrom = "tag:from"
+  val tagTo = "tag:to"
 }
 
 type Edge = (String, String)

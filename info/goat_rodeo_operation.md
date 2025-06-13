@@ -20,6 +20,8 @@ This document describes how Goat Rodeo works and how to tune parameters.
 * `--tempdir` : a temporary directory to store artifacts (e.g., a zip file contained in a tar file) during
   processing. By default Goat Rodeo uses `/tmp`. But to improve performance, create a RAM disk and
   use the RAM disk as the `tempdir`
+* `--tag` : create a `tags` Item and link to `{iso 8601 date}/{text after tag param}` Item and link each Item representing a found file
+  to that Item. This allows for the identification of all the top level files in a Goat Rodeo run on a particular day.
 * `--ingested` : Append all the ingested files to this file on successful completion
 * `--ignore` : A file containing paths to ignore, likely because they have been processed in the past. This can be used in conjunction
   with `--ingested` (they can point to the same file) to record the files that were processed by Goat Rodeo such that those files

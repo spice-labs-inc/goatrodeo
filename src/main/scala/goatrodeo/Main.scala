@@ -23,10 +23,10 @@ import scopt.OParserBuilder
 
 import java.io.File
 import java.io.FileFilter
+import java.io.FileWriter
 import java.nio.file.Files
-import java.nio.file.StandardOpenOption
 import java.util.regex.Pattern
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -54,6 +54,7 @@ object Howdy {
       ingested: Option[File] = None,
       ignore: Vector[File] = Vector(),
       fileList: Vector[File] = Vector(),
+      tag: Option[String] = None,
       exclude: Vector[(String, Try[Pattern])] = Vector(),
       threads: Int = 4,
       blockList: Option[File] = None,
@@ -94,6 +95,11 @@ object Howdy {
               .filter(f => f.exists())
           )
         ),
+      opt[String]("tag")
+        .text(
+          "Tag all top level artifacts (files) with the current date and the text of the tag"
+        )
+        .action((x, c) => c.copy(tag = Some(x))),
       opt[File]("ingested")
         .text(
           "Append all the ingested files to this file on successful completion"
@@ -233,25 +239,27 @@ object Howdy {
               val sync = Object()
               (
                 (f: File) => {
-                  sync.synchronized { success = success :+ f }; ()
+                  sync.synchronized {
+                    success = success :+ f.getCanonicalFile()
+                  }; ()
                 },
                 (good: Boolean) => {
                   if (good) {
                     logger.info(
                       f"Completed, exporting ${success.length} ingested items to ${destFile}"
                     )
-                    Files.writeString(
-                      destFile.toPath(),
-                      (success
-                        .foldLeft(StringBuilder()) { case (sb, file) =>
-                          sb.append(file.getCanonicalPath())
-                          sb.append('\n')
-                          sb
-                        })
-                        .toString(),
-                      StandardOpenOption.CREATE,
-                      StandardOpenOption.APPEND
+
+                    val out = java.io.FileWriter(
+                      destFile,
+                      java.nio.charset.Charset.forName("UTF-8"),
+                      true
                     )
+                    for { f <- success } {
+                      out.write(f.getPath())
+                      out.write("\n")
+                    }
+                    out.flush()
+                    out.close()
                   } else {
                     logger.error("Failed to process the input.")
                     System.exit(1) // non-zero exit
@@ -305,6 +313,7 @@ object Howdy {
           tempDir = params.tempDir,
           threadCnt = params.threads,
           maxRecords = params.maxRecords,
+          tag = params.tag,
           fileListers = fileListers,
           ignorePathSet = ignorePathSet,
           excludeFileRegex = excludePatterns,

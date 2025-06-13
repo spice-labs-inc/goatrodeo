@@ -14,8 +14,8 @@ import goatrodeo.omnibor.ToProcess.ByName
 import goatrodeo.omnibor.ToProcess.ByUUID
 import goatrodeo.util.ArtifactWrapper
 import goatrodeo.util.GitOID
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
