@@ -1,16 +1,16 @@
-package goatrodeo.omnibor.strategies
+package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
-import goatrodeo.omnibor.Item
-import goatrodeo.omnibor.ProcessingState
-import goatrodeo.omnibor.SingleMarker
-import goatrodeo.omnibor.Storage
-import goatrodeo.omnibor.StringOrPair
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.omnibor.ToProcess.ByName
-import goatrodeo.omnibor.ToProcess.ByUUID
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.omnibor.Storage
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
+import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.GitOID
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet

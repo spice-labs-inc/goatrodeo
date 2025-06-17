@@ -1,11 +1,11 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
-import goatrodeo.envelopes.ClusterFileEnvelope
-import goatrodeo.envelopes.DataFileEnvelope
-import goatrodeo.envelopes.IndexFileEnvelope
-import goatrodeo.envelopes.Position
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.Position
+import io.spicelabs.goatrodeo.util.Helpers
 import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
 

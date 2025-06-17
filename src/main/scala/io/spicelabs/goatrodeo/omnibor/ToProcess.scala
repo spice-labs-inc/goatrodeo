@@ -1,13 +1,14 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
-import goatrodeo.omnibor.strategies.*
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.util.FileWalker
-import goatrodeo.util.FileWrapper
-import goatrodeo.util.GitOID
-import goatrodeo.util.Helpers
+
+import io.spicelabs.goatrodeo.omnibor.strategies.*
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
+import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue

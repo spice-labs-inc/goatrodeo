@@ -13,11 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.typesafe.scalalogging.Logger
-import goatrodeo.omnibor.MemStorage
-import goatrodeo.omnibor.ParentScope
-import goatrodeo.omnibor.strategies.GenericFile
-import goatrodeo.util.FileWalker
-import goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.omnibor.MemStorage
+import io.spicelabs.goatrodeo.omnibor.ParentScope
+import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
+import io.spicelabs.goatrodeo.util.FileWalker
+import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
 

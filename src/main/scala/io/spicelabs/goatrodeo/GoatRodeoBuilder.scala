@@ -1,4 +1,4 @@
-package goatrodeo
+package io.spicelabs.goatrodeo
 
 import java.nio.file.{Path, Paths}
 import scala.annotation.static

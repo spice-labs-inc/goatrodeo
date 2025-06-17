@@ -12,11 +12,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo
+package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
-import goatrodeo.omnibor.Builder
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.omnibor.Builder
+import io.spicelabs.goatrodeo.util.Helpers
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
 import scopt.OParserBuilder

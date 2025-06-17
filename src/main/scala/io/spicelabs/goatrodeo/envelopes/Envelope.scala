@@ -1,6 +1,6 @@
-package goatrodeo.envelopes
+package io.spicelabs.goatrodeo.envelopes
 
-import goatrodeo.omnibor.GraphManager
+import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.bullet.borer.Cbor
 import io.bullet.borer.Codec
 import io.bullet.borer.Decoder

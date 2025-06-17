@@ -1,9 +1,9 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
-import goatrodeo.envelopes.ClusterFileEnvelope
-import goatrodeo.envelopes.DataFileEnvelope
-import goatrodeo.envelopes.IndexFileEnvelope
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
+import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
+import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
 import java.io.FileInputStream
