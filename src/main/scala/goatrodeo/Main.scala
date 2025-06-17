@@ -30,7 +30,9 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.annotation.static
 
+class Howdy
 /** The `main` class
   */
 object Howdy {
@@ -212,6 +214,11 @@ object Howdy {
     *   an array of command line paramets
     */
   def main(args: Array[String]): Unit = {
+    run(args);
+  }
+
+  @static
+  def run(args: Array[String]): Unit = {
     val logger = Logger(getClass())
     // parse the CLI params
     val parsed = OParser.parse(parser1, args, Config())
