@@ -14,7 +14,8 @@ Was the documentation appropriate for the scope of this change?
 ### 💣 Quality Control
 (All items must be checked before a PR is merged)
 Did you…
-- [ ] Mention an issue number in the PR title?
+
+- [ ] Mention an issue number in the PR body?
 - [ ] Update the version # in the build file?
 - [ ] Create new and/or update relevant existing tests?
 - [ ] Create or update relevant documentation and/or diagrams?
