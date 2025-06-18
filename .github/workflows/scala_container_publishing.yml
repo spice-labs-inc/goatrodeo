@@ -78,7 +78,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
           flavor: |
-            latest=true
+            latest=auto
       
       - name: Stage Docker Build Environment from SBT
         run: |
