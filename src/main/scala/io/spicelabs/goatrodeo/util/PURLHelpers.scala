@@ -1,4 +1,4 @@
-package goatrodeo.util
+package io.spicelabs.goatrodeo.util
 
 import com.github.packageurl.PackageURL
 import com.github.packageurl.PackageURLBuilder

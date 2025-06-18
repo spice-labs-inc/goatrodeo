@@ -1,8 +1,8 @@
-import goatrodeo.omnibor.Builder
-import goatrodeo.omnibor.EdgeType
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.util.FileWrapper
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.omnibor.Builder
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
 import scala.util.Try

@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.github.packageurl.PackageURL
-import goatrodeo.omnibor.EdgeType
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.omnibor.strategies.Debian
-import goatrodeo.util.*
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.strategies.Debian
+import io.spicelabs.goatrodeo.util.*
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
@@ -233,7 +233,7 @@ class MySuite extends munit.FunSuite {
   }
 
   test("calculate mime type for class file") {
-    val classFileName = "target/scala-3.6.3/classes/goatrodeo/Howdy.class"
+    val classFileName = "target/scala-3.6.3/classes/io/spicelabs/goatrodeo/Howdy.class"
 
     val f = new File(classFileName)
     val metadata = new Metadata()

@@ -1,10 +1,10 @@
 import com.typesafe.scalalogging.Logger
-import goatrodeo.omnibor.EdgeType
-import goatrodeo.omnibor.Item
-import goatrodeo.omnibor.ItemMetaData
-import goatrodeo.omnibor.Storage
-import goatrodeo.omnibor.ToProcess
-import goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.Storage
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.util.FileWrapper
 import org.json4s.*
 import org.json4s.JsonAST.*
 import org.json4s.native.*

@@ -12,12 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.GitOID
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger

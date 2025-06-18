@@ -1,4 +1,4 @@
-package goatrodeo.util
+package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import org.apache.tika.config.TikaConfig

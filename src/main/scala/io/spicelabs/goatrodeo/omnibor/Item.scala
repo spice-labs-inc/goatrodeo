@@ -1,11 +1,11 @@
-package goatrodeo.omnibor
+package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
-import goatrodeo.util.ArtifactWrapper
-import goatrodeo.util.GitOID
-import goatrodeo.util.GitOIDUtils
-import goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.Helpers
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
 import io.bullet.borer.Encoder

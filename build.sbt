@@ -5,6 +5,27 @@ val projectName = "goatrodeo"
 val projectVersion = "0.7.4-SNAPSHOT"
 val scala3Version = "3.6.3"
 
+ThisBuild / organization := "io.spicelabs"
+ThisBuild / version := "1.0.0-SNAPSHOT"
+ThisBuild / licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html"))
+ThisBuild / homepage := Some(url("https://github.com/spice-labs-inc/goatrodeo"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/spice-labs-inc/goatrodeo"),
+    "scm:git@github.com:spice-labs-inc/goatrodeo.git"
+  )
+)
+ThisBuild / developers := List(
+  Developer(
+    id = "spicelabs",
+    name = "Spice Labs",
+    email = "engineering@spicelabs.io",
+    url = url("https://github.com/spice-labs-inc")
+  )
+)
+
+ThisBuild / publishTo := sonatypePublishToBundle.value
+
 // If "TEST_THREAD_CNT" is set that means we're
 // running on a memory constrained system and we
 // don't want to for a process to run tests
@@ -56,7 +77,7 @@ lazy val root = project
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
-    assembly / mainClass := Some("goatrodeo.Howdy"),
+    assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     compileOrder := CompileOrder.JavaThenScala,
     scalacOptions += "-no-indent",
     buildInfoKeys := Seq[BuildInfoKey](
