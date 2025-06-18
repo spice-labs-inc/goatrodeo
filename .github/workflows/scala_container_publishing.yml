@@ -95,10 +95,3 @@ jobs:
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-      
-      - name: Generate Artifact Attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: spicelabs/goatrodeo
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
