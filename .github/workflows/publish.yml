@@ -1,4 +1,4 @@
-name: Publish Scala Container Image
+name: Publish Container Image and Maven Artifact
 
 on:
   push:
@@ -13,7 +13,7 @@ env:
 jobs:
   push_to_dockerhub:
     name: Push Docker image to Docker Hub
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
 
     permissions:
@@ -39,7 +39,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: '21'
-          distribution: 'adopt-hotspot'
+          distribution: 'temurin'
           cache: 'sbt'
       
       - name: Set up SBT
@@ -52,8 +52,11 @@ jobs:
           echo "git_branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
       
       - name: Package Scala Application
-        run: sbt package
+        run: SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" TEST_THREAD_CNT="2" sbt package
 
+      - name: Publish maven Artifact (Locally)
+        run: SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" TEST_THREAD_CNT="2" sbt publishM2
+        
       - name: Save JAR Artifact
         uses: actions/upload-artifact@v4
         with:
