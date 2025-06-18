@@ -2,11 +2,10 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val projectVersion = "0.7.4-SNAPSHOT"
 val scala3Version = "3.6.3"
 
 ThisBuild / organization := "io.spicelabs"
-ThisBuild / version := "1.0.0-SNAPSHOT"
+ThisBuild / version := "0.0.1-SNAPSHOT" // Don't change this, it is overridden by the GitHub Actions workflow
 ThisBuild / licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html"))
 ThisBuild / homepage := Some(url("https://github.com/spice-labs-inc/goatrodeo"))
 ThisBuild / scmInfo := Some(
@@ -24,11 +23,44 @@ ThisBuild / developers := List(
   )
 )
 
-ThisBuild / publishTo := sonatypePublishToBundle.value
+ThisBuild / publishTo := {
+  val repo = "https://maven.pkg.github.com/spice-labs-inc/goatrodeo"
+  Some("GitHub Package Registry" at repo)
+}
+credentials += Credentials(
+  "GitHub Package Registry",
+  "maven.pkg.github.com",
+  "x-access-token",
+  sys.env.getOrElse("GITHUB_TOKEN", "")
+)
+
+
+
+// ThisBuild / publishTo := sonatypePublishToBundle.value
+// ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
+// ThisBuild / sonatypeProfileName := "io.spicelabs"
+
+// GPG signing
+ThisBuild / pgpPassphrase := sys.env.get("PGP_PASSPHRASE").map(_.toCharArray)
+Global / excludeLintKeys += pgpPassphrase
+
+// Publish both standard and fat jars
+Compile / packageBin := (Compile / packageBin).value
+val fatJar = taskKey[File]("Assembles the fat jar for publishing")
+
+fatJar := {
+  val jar = (Compile / assembly).value
+  val targetPath = target.value / s"${projectName}-${version.value}-fat.jar"
+  IO.copyFile(jar, targetPath)
+  targetPath
+}
+
+publishMavenStyle := true
+publish / packagedArtifacts += (Artifact(projectName, "jar", "jar", classifier = "fat") -> fatJar.value)
 
 // If "TEST_THREAD_CNT" is set that means we're
 // running on a memory constrained system and we
-// don't want to for a process to run tests
+// don't want to fork a process to run tests
 if (System.getenv("TEST_THREAD_CNT") == null) {
   fork := true
 } else {
@@ -45,12 +77,16 @@ ThisBuild / scalacOptions ++=
     "21"
   )
 
+
+// Add GitHub Packages resolver
+resolvers += "GitHub Package Registry" at "https://maven.pkg.github.com/spice-labs-inc/goatrodeo"
+
 resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/public/"
 Test / logBuffered := false
 
 lazy val root = project
   .in(file("."))
-  .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin, JavaAppPackaging, GitVersioningPlugin, AssemblyPlugin)
   .settings(
     name := projectName,
     scalaVersion := scala3Version,
@@ -78,6 +114,7 @@ lazy val root = project
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
+    assembly / assemblyJarName := s"${projectName}-${version.value}-fat.jar",
     compileOrder := CompileOrder.JavaThenScala,
     scalacOptions += "-no-indent",
     buildInfoKeys := Seq[BuildInfoKey](
@@ -91,8 +128,6 @@ lazy val root = project
     ),
     buildInfoPackage := "hellogoat"
   )
-
-ThisBuild / assemblyJarName := "goatrodeo.jar"
 
 ThisBuild / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
@@ -137,11 +172,9 @@ Test / testOptions += Tests.Setup(() => {
           val cmdResult =
             url(f"https://public-test-data.spice-labs.dev/${item}") #> f ! log
 
-          // if the download succeeds, stop the loop
           if (cmdResult == 0) {
             keepOn = false
           } else {
-            // if the download failed, repeat up to 10 times
             loopCnt += 1
             if (loopCnt >= 10) {
               throw new Exception(
@@ -151,7 +184,7 @@ Test / testOptions += Tests.Setup(() => {
           }
         }
         cmd match {
-          case None      => // do nothing
+          case None      =>
           case Some(cmd) => cmd ! log
         }
       }
@@ -167,7 +200,6 @@ Test / testOptions += Tests.Setup(() => {
   log.info("Test data caching complete.")
 })
 
-// Verify that git LFS is installed and files are correct before running tests
 Test / testOptions += Tests.Setup(() => {
   val log = (streams.value: @sbtUnchecked).log
   log.info("Testing for git LFS…")
@@ -190,14 +222,3 @@ Test / testOptions += Tests.Setup(() => {
     }
   }
 })
-
-enablePlugins(JavaAppPackaging)
-enablePlugins(GitVersioningPlugin)
-enablePlugins(DockerPlugin)
-
-Docker / packageName := projectName
-Docker / maintainer := "ext-engineering@spicelabs.io"
-
-dockerBaseImage := "eclipse-temurin:21-jre-ubi9-minimal"
-dockerLabels := Map.empty
-dockerExposedPorts := Seq.empty
