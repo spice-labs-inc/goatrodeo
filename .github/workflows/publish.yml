@@ -1,0 +1,187 @@
+name: Publish package to Maven Central, Github Packages, and Container Image to Docker Hub
+
+on:
+  release:
+    types: [published]
+
+env:
+  IMAGE_NAME: ${{ github.repository }}
+  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+  PLATFORMS: linux/amd64,linux/arm64
+
+jobs:
+  publish-jars:
+    name: Publish JARs to GitHub (Maven Central temporarily disabled)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'sbt'
+
+      - name: Set up SBT
+        uses: sbt/setup-sbt@v1
+
+      - name: Derive and validate version
+        id: version
+        shell: bash
+        run: |
+          raw_version="${GITHUB_REF#refs/tags/v}"
+          if [[ ! "$raw_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format: $raw_version. Must be v<major>.<minor>.<patch>." >&2
+            exit 1
+          fi
+          echo "projectVersion=$raw_version" >> "$GITHUB_ENV"
+          echo "version=$raw_version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish standard and fat JARs to GitHub Packages
+        run: |
+          SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
+            "set ThisBuild / version := \"${{ env.projectVersion }}\"" \
+            +publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_TARGET: github
+
+      
+
+  publish-to-central:
+    name: Re-publish Goatrodeo to Maven Central
+    runs-on: ubuntu-24.04
+    needs: publish-jars
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Write settings.xml for Central
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>central</id>
+                <username>${{ secrets.MAVEN_CENTRAL_USERNAME }}</username>
+                <password>${{ secrets.MAVEN_CENTRAL_PASSWORD }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.MAVEN_CENTRAL_GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+
+      - name: Set project version from tag
+        run: |
+          mvn -B --file maven/pom.xml \
+              versions:set -DnewVersion="${{ needs.publish-jars.outputs.version }}" -DgenerateBackupPoms=false
+
+      - name: Create target dir
+        run: mkdir -p maven/target
+
+      - name: Download artifacts from GitHub Maven
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.publish-jars.outputs.version }}
+        run: |
+          ARTIFACTS=(
+            "goatrodeo_3-${VERSION}.jar"
+            "goatrodeo_3-${VERSION}-sources.jar"
+            "goatrodeo_3-${VERSION}-javadoc.jar"
+            "goatrodeo_3-${VERSION}.pom"
+            "goatrodeo_3-${VERSION}-fat.jar"
+          )
+          for file in "${ARTIFACTS[@]}"; do
+            echo "Downloading $file"
+            curl -fL -o "maven/target/$file" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/octet-stream" \
+              "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/${file}"
+          done
+
+      - name: Publish to Maven Central (staging only)
+        run: |
+          cd maven
+          mvn --batch-mode deploy
+        env:
+          GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}
+
+  docker-image:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-24.04
+    needs: publish-jars
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ env.PLATFORMS }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Fat JAR from GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fL -o goatrodeo-fat.jar \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${{ needs.publish-jars.outputs.version }}/goatrodeo_3-${{ needs.publish-jars.outputs.version }}-fat.jar"
+
+      - name: Extract Metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: spicelabs/goatrodeo
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+          flavor: |
+            latest=auto
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

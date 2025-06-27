@@ -7,7 +7,7 @@ This folder contains GitHub Actions workflows.
     1. Push to any branch (`**`)
     2. Pull requests to the `main` branch
 
-**`scala_container_publishing.yml` publishes container images to [Docker Hub](https://hub.docker.com/u/spicelabs)  
+**`publish.yml` publishes container images to [Docker Hub](https://hub.docker.com/u/spicelabs)  and jar to maven central
 **
 - The image includes provenance attestations and a software bill of materials (SBOM)
 - This workflow triggers automatically on:
