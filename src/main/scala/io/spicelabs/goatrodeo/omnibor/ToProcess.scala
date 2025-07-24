@@ -240,7 +240,7 @@ trait ToProcess {
       parentId: Option[GitOID],
       store: Storage,
       parentScope: ParentScope,
-      tag: Option[String],
+      tag: Option[TagPass],
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
       atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()

@@ -1061,6 +1061,27 @@ object GitOIDUtils {
     }
   }
 
+  /** Given an object type, String, and a hash type, compute the GitOID
+    *
+    * @param hashType
+    *   the hash type
+    * @param type
+    *   the type of object
+    * @param bytes
+    *   the bytes to compute the gitoid for
+    * @return
+    *   the gitoid
+    */
+  def computeGitOIDForString(
+      str: String,
+      hashType: HashType = HashType.SHA256,
+      tpe: ObjectType = ObjectType.Blob
+  ): Array[Byte] = {
+    val bytes = str.getBytes("UTF-8")
+    val bos = ByteArrayInputStream(bytes)
+    computeGitOID(bos, bytes.length, hashType = hashType, tpe = tpe)
+  }
+
   /** Given an object type, a pile of bytes, and a hash type, compute the GitOID
     *
     * @param hashType
@@ -1123,6 +1144,28 @@ object GitOIDUtils {
     )
   }
 
+    /** Take bytes, compute the GitOID and return the hexadecimal bytes
+    * representing the GitOID
+    *
+    * @param bytes
+    *   the bytes to compute gitoid for
+    * @param hashType
+    *   the hash type... default SHA256
+    * @param tpe
+    *   the object type... default Blob
+    * @return
+    *   the hex representation of the GitOID
+    */
+  def hashAsHexForString(
+      str: String,
+      hashType: HashType = HashType.SHA256,
+      tpe: ObjectType = ObjectType.Blob
+  ): String = {
+    Helpers.toHex(
+      computeGitOIDForString(str, hashType, tpe)
+    )
+  }
+
   /** A `gitoid` URL. See
     * https://www.iana.org/assignments/uri-schemes/prov/gitoid
     *
@@ -1140,6 +1183,25 @@ object GitOIDUtils {
       tpe.gitoidName(),
       hashType.hashTypeName(),
       hashAsHex(inputStream, len, hashType, tpe)
+    )
+  }
+
+    /** A `gitoid` URL. See
+    * https://www.iana.org/assignments/uri-schemes/prov/gitoid
+    *
+    * @return
+    *   the `gitoid` URL
+    */
+  def urlForString(
+      str: String,
+      hashType: HashType = HashType.SHA256,
+      tpe: ObjectType = ObjectType.Blob
+  ): String = {
+    String.format(
+      "gitoid:%s:%s:%s",
+      tpe.gitoidName(),
+      hashType.hashTypeName(),
+      hashAsHexForString(str, hashType, tpe)
     )
   }
 

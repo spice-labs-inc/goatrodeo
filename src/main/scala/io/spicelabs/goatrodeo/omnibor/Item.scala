@@ -15,22 +15,16 @@ import io.bullet.borer.derivation.key
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
+import org.json4s.JValue
 
 case class Item(
     identifier: String,
     // reference: LocationReference,
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
-    body: Option[ItemMetaData]
+    body: Option[ItemMetaData | ItemTagData]
 ) {
   def encodeCBOR(): Array[Byte] = cachedCBOR
-
-  // def fixReferencePosition(hash: Long, offset: Long): Item = {
-  //   val hasCur = reference != Item.noopLocationReference
-  //   this.copy(
-  //     reference = (hash, offset)
-  //   )
-  // }
 
   /** add a connection
     *
@@ -344,3 +338,8 @@ object Item {
     Cbor.decode(bytes).to[Item].valueTry
   }
 }
+
+/**
+ * Information about how to tag an ADG
+ */
+case class TagInfo(name: String, extra: Option[JValue])

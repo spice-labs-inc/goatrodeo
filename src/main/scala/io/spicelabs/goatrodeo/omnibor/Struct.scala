@@ -222,6 +222,22 @@ object ItemMetaData {
   }
 }
 
+object TagMetaData {
+  val mimeType = "application/vnd.cc.goatrodeo.tag"
+
+    given Encoder[ItemTagData] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveEncoder[ItemTagData]
+  }
+
+  given Decoder[ItemTagData] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveDecoder[ItemTagData]
+  }
+}
+
+case class ItemTagData(tag: JValue)
+
 type LocationReference = (Long, Long)
 
 enum IndexLoc {
