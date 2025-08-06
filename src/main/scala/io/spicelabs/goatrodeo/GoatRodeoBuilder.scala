@@ -90,7 +90,11 @@ class GoatRodeoBuilder {
   }
 
   def withExtraArgs(args: java.util.Map[String, String]): GoatRodeoBuilder = {
-    args.asScala.toMap.foreach { case (k, v) => withExtraArg(k, v) }
+    withExtraArgs(args.asScala.toMap)
+  }
+
+  def withExtraArgs(args: Map[String, String]): GoatRodeoBuilder = {
+    args.foreach { case (k, v) => withExtraArg(k, v) }
     this
   }
 
