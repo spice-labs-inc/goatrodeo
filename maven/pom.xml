@@ -67,7 +67,7 @@
                                 over the empty one that Maven just created.
                             -->
                                 <copy todir="${project.build.directory}/" overwrite="true" >
-                                    <fileset dir="${project.build.directory}/external" excludes="pom.xml"/>
+                                    <fileset dir="${project.build.directory}/external"/>
                                 </copy>
                             </target>
                         </configuration>
