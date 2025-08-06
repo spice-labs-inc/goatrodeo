@@ -6,7 +6,7 @@
 
     <groupId>io.spicelabs</groupId>
     <artifactId>goatrodeo_3</artifactId>
-    <version>0.8.2</version>
+    <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>GoatRodeo</name>
     <description>Static analysis toolkit for unpacking artifacts</description>
@@ -89,20 +89,17 @@
                         <configuration>
                             <artifacts>
                                 <artifact>
-                                    <file>
-                                        ${project.basedir}/target/goatrodeo_3-${project.version}-fat.jar</file>
+                                    <file>${project.basedir}/target/goatrodeo_3-${project.version}-fat.jar</file>
                                     <type>jar</type>
                                     <classifier>fat</classifier>
                                 </artifact>
                                 <artifact>
-                                    <file>
-                                        ${project.basedir}/target/goatrodeo_3-${project.version}-sources.jar</file>
+                                    <file>${project.basedir}/target/goatrodeo_3-${project.version}-sources.jar</file>
                                     <type>jar</type>
                                     <classifier>sources</classifier>
                                 </artifact>
                                 <artifact>
-                                    <file>
-                                        ${project.basedir}/target/goatrodeo_3-${project.version}-javadoc.jar</file>
+                                    <file>${project.basedir}/target/goatrodeo_3-${project.version}-javadoc.jar</file>
                                     <type>jar</type>
                                     <classifier>javadoc</classifier>
                                 </artifact>
