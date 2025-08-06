@@ -100,10 +100,10 @@ jobs:
       - name: Set project version from tag
         run: |
           mvn -B --file maven/pom.xml \
-              versions:set -DnewVersion="${{ needs.publish-jars.outputs.version }}" -DgenerateBackupPoms=false
+              clean versions:set -DnewVersion="${{ needs.publish-jars.outputs.version }}" -DgenerateBackupPoms=false
 
       - name: Create target dir
-        run: mkdir -p maven/target
+        run: mkdir -p maven/target/external
 
       - name: Download artifacts from GitHub Maven
         env:
@@ -119,7 +119,7 @@ jobs:
           )
           for file in "${ARTIFACTS[@]}"; do
             echo "Downloading $file"
-            curl -fL -o "maven/target/$file" \
+            curl -fL -o "maven/target/external/$file" \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/octet-stream" \
               "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/${file}"
