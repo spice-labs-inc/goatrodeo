@@ -71,7 +71,7 @@
                 <artifactId>flatten-maven-plugin</artifactId>
                 <version>1.7.2</version>
                 <configuration>
-                    <flattenMode>pom</flattenMode>
+                    <flattenMode>replace</flattenMode>
                     <updatePomFile>true</updatePomFile>
                     <createBackupPoms>false</createBackupPoms>
                 </configuration>
@@ -85,7 +85,6 @@
                     </execution>
                 </executions>
             </plugin>
-
 
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
