@@ -68,32 +68,6 @@
 
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
-                <artifactId>flatten-maven-plugin</artifactId>
-                <version>1.7.2</version>
-                <configuration>
-                    <updatePomFile>true</updatePomFile>
-                    <createBackupPoms>false</createBackupPoms>
-                    <pomElements>
-                        <name/>
-                        <description/>
-                        <url/>
-                        <developers/>
-                        <scm/>
-                    </pomElements>
-                </configuration>
-                <executions>
-                    <execution>
-                    <id>flatten</id>
-                    <phase>process-resources</phase>
-                    <goals>
-                        <goal>flatten</goal>
-                    </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
                 <version>3.2.0</version>
                 <executions>
