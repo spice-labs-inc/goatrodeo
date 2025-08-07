@@ -74,17 +74,16 @@
                     <updatePomFile>true</updatePomFile>
                     <createBackupPoms>false</createBackupPoms>
                     <pomElements>
-                        <element>groupId</element>
-                        <element>artifactId</element>
-                        <element>version</element>
-                        <element>name</element>
-                        <element>description</element>
-                        <element>url</element>
-                        <element>scm</element>
-                        <element>developers</element>
-                        <element>licenses</element>
-                        <element>dependencies</element>
-                        <element>scm</element>
+                        <groupId/>
+                        <artifactId/>
+                        <version/>
+                        <name/>
+                        <description/>
+                        <url/>
+                        <licenses/>
+                        <developers/>
+                        <scm/>
+                        <dependencies/>
                     </pomElements>
                 </configuration>
                 <executions>
