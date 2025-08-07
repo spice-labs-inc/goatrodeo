@@ -167,4 +167,4 @@ Artifacts include:
 ## 📜 License
 
 Apache 2.0  
-© 2025 Spice Labs, Inc. & Contributors
+© 2025 Spice Labs, Inc. & Contributors%       
