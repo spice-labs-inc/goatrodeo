@@ -71,7 +71,6 @@
                 <artifactId>flatten-maven-plugin</artifactId>
                 <version>1.7.2</version>
                 <configuration>
-                    <flattenMode>replace</flattenMode>
                     <updatePomFile>true</updatePomFile>
                     <createBackupPoms>false</createBackupPoms>
                 </configuration>
