@@ -35,19 +35,10 @@
         </developer>
     </developers>
 
+    <!-- @REAL_DEPENDENCIES@ -->
+
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <version>0.8.0</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <publishingServerId>central</publishingServerId>
-                    <autoPublish>true</autoPublish>
-                    <checksums>all</checksums>
-                </configuration>
-            </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -71,6 +62,32 @@
                                 </copy>
                             </target>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.7.2</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <createBackupPoms>false</createBackupPoms>
+                    <pomElements>
+                        <name/>
+                        <description/>
+                        <url/>
+                        <developers/>
+                        <scm/>
+                    </pomElements>
+                </configuration>
+                <executions>
+                    <execution>
+                    <id>flatten</id>
+                    <phase>process-resources</phase>
+                    <goals>
+                        <goal>flatten</goal>
+                    </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -137,6 +154,17 @@
                 <configuration>
                     <generatePom>false</generatePom>
                     <pomFile>${project.basedir}/target/goatrodeo_3-${project.version}.pom</pomFile>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.8.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                    <checksums>all</checksums>
                 </configuration>
             </plugin>
         </plugins>
