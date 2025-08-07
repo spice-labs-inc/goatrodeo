@@ -125,6 +125,20 @@ jobs:
               "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/${file}"
           done
 
+      - name: Inject real dependencies block into fake pom.xml
+        run: |
+          set -e
+
+          VERSION="${{ needs.publish-jars.outputs.version }}"
+          REAL_POM="maven/target/external/goatrodeo_3-${VERSION}.pom"
+          FAKE_POM="maven/pom.xml"
+          real_deps=$(awk '/<dependencies>/,/<\/dependencies>/' "$REAL_POM")
+          awk -v repl="$real_deps" '
+            /<!-- @REAL_DEPENDENCIES@ -->/ {print repl; next}
+            {print}
+          ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
+
+
       - name: Publish to Maven Central (staging only)
         run: |
           cd maven
