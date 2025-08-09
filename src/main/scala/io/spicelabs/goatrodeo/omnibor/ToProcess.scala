@@ -2,7 +2,6 @@ package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
-
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
@@ -294,7 +293,7 @@ trait ToProcess {
                 case None => itemScopePre3
                 case Some(tag) =>
                   itemScopePre3.copy(connections =
-                    itemScopePre3.connections + (EdgeType.tagFrom -> tag)
+                    itemScopePre3.connections + (EdgeType.tagFrom -> tag.gitoid)
                   )
               }
 
@@ -332,10 +331,10 @@ trait ToProcess {
                         )
                     },
                     item =>
-                      f"Updating alias reference ${itemNeedingAlias} ${item.body match {
+                      f"Updating alias reference ${itemNeedingAlias} ${item.bodyAsItemMetaData match {
                           case None       => ""
                           case Some(body) => f"files ${body.fileNames}"
-                        }} alias name ${aliasType} for item ${itemScope4.identifier}${itemScope4.body match {
+                        }} alias name ${aliasType} for item ${itemScope4.identifier}${itemScope4.bodyAsItemMetaData match {
                           case None       => ""
                           case Some(body) => f" files ${body.fileNames}"
                         }}, parent scope ${parentScope.parentScopeInformation()}"

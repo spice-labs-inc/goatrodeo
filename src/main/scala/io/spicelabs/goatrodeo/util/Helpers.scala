@@ -15,8 +15,8 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.bullet.borer.Cbor
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.apache.bcel.classfile.ClassParser
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
@@ -1144,7 +1144,7 @@ object GitOIDUtils {
     )
   }
 
-    /** Take bytes, compute the GitOID and return the hexadecimal bytes
+  /** Take bytes, compute the GitOID and return the hexadecimal bytes
     * representing the GitOID
     *
     * @param bytes
@@ -1186,7 +1186,7 @@ object GitOIDUtils {
     )
   }
 
-    /** A `gitoid` URL. See
+  /** A `gitoid` URL. See
     * https://www.iana.org/assignments/uri-schemes/prov/gitoid
     *
     * @return

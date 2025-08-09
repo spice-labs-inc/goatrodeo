@@ -246,7 +246,7 @@ object GraphManager {
     if (false) {
       for { i <- biggest } {
         logger.info(
-          f"Item ${i._1.identifier} ${i._1.body.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
+          f"Item ${i._1.identifier} ${i._1.bodyAsItemMetaData.map(_.fileNames).getOrElse(Vector())} has ${i._2} connections"
         )
       }
     }

@@ -14,12 +14,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.Helpers
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
+import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -139,7 +139,7 @@ object StringOrPair {
   }
 
   given Decoder[StringOrPair] = Decoder { reader =>
-    if (reader.hasArrayStart) {
+    if (reader.hasArrayStart || reader.hasArrayHeader(2)) {
       val unbounded = reader.readArrayOpen(2)
       val item = PairOf(
         reader.readString(),
@@ -149,11 +149,14 @@ object StringOrPair {
     } else if (reader.hasString) {
       StringOf(reader.readString())
     } else {
-      reader.unexpectedDataItem("Looking for 'String' or Array of String")
+      reader.unexpectedDataItem(
+        f"Looking for 'String' or Array of String got ${reader.dataItem()}"
+      )
     }
 
   }
 }
+
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
@@ -222,10 +225,10 @@ object ItemMetaData {
   }
 }
 
-object TagMetaData {
+object ItemTagData {
   val mimeType = "application/vnd.cc.goatrodeo.tag"
 
-    given Encoder[ItemTagData] = {
+  given Encoder[ItemTagData] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
     deriveEncoder[ItemTagData]
   }
@@ -236,7 +239,11 @@ object TagMetaData {
   }
 }
 
-case class ItemTagData(tag: JValue)
+case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
+  def merge(other: ItemTagData): ItemTagData = {
+    this
+  }
+}
 
 type LocationReference = (Long, Long)
 

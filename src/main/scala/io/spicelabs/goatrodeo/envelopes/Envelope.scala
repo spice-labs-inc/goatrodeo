@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.envelopes
 
-import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.bullet.borer.Cbor
 import io.bullet.borer.Codec
 import io.bullet.borer.Decoder
@@ -8,6 +7,7 @@ import io.bullet.borer.Dom.*
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
+import io.spicelabs.goatrodeo.omnibor.GraphManager
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet

@@ -180,7 +180,7 @@ case class MavenState(
       val items = for {
         gitoid <- kids
         item <- store.read(gitoid).toVector
-        metadata <- item.body.toVector
+        metadata <- item.bodyAsItemMetaData.toVector
         filename <- metadata.fileNames.toVector
       } yield filename -> item
       val ret = this.copy(
