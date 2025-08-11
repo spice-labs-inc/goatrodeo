@@ -241,7 +241,20 @@ object ItemTagData {
 
 case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
   def merge(other: ItemTagData): ItemTagData = {
-    this
+    // Merge logic for Dom.Element
+    val mergedTag = (this.tag, other.tag) match {
+      case (io.bullet.borer.Dom.Object(fields1), io.bullet.borer.Dom.Object(fields2)) =>
+        io.bullet.borer.Dom.Object(fields1 ++ fields2)
+      case (io.bullet.borer.Dom.Array(items1), io.bullet.borer.Dom.Array(items2)) =>
+        io.bullet.borer.Dom.Array(items1 ++ items2)
+      case (io.bullet.borer.Dom.Array(items1), _) =>
+        io.bullet.borer.Dom.Array(items1 :+ other.tag)
+      case (_, io.bullet.borer.Dom.Array(items2)) =>
+        io.bullet.borer.Dom.Array(this.tag +: items2)
+      case _ =>
+        io.bullet.borer.Dom.Array(Vector(this.tag, other.tag))
+    }
+    ItemTagData(mergedTag)
   }
 }
 
