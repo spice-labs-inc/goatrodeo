@@ -5,48 +5,80 @@
 [![GitHub Package](https://img.shields.io/badge/GitHub-Packages-blue?logo=github)](https://github.com/spice-labs-inc/goatrodeo/packages/)
 [![Docker Image Version (latest by date)](https://img.shields.io/docker/v/spicelabs/goatrodeo?sort=date&label=Docker%20Hub)](https://hub.docker.com/r/spicelabs/goatrodeo)
 
-**Goat Rodeo** is an open-source tool that constructs **Artifact Dependency Graphs (ADGs)** from software artifacts.  
-It powers [Spice Labs CLI](https://github.com/spice-labs-inc/spice-labs-cli) and implements the [OmniBOR](https://omnibor.io) approach to content-addressable software graphs.
+**Goat Rodeo** is an open-source tool from [Spice Labs](https://spicelabs.io) that constructs **Artifact Dependency Graphs (ADGs)** from software artifacts using [OmniBOR](https://omnibor.io) content-addressable identifiers. It can be run standalone or as part of the [Spice Labs CLI](https://github.com/spice-labs-inc/spice-labs-cli).
+
+Supported artifact types include: `TAR`, `ZIP`, `JAR`, `class` files, `ISO`, `AR`, `cpio`, and Docker images.
 
 ---
 
-## 📦 Getting Started
+## 🧠 What It Does
 
-### Maven Usage
+Given a starting directory, Goat Rodeo recursively scans and processes its contents to generate:
 
-Add Goat Rodeo to your project:
+- A **Gitoid database** of artifacts
+- An **ADG (Artifact Dependency Graph)** in JSON format
+- An optional **ingestion log** for tracking processed files
+
+The ADG represents relationships between software components, enabling deep insights for supply chain visibility, reproducibility, and security analysis.
+
+---
+
+## 📦 How to Use Goat Rodeo
+
+You can use Goat Rodeo in one of three ways:
+
+### 1️⃣ Run as a Docker Image
+
+```bash
+docker run -ti --rm \
+  -v ~/tmp/goat_rodeo/data/input:/data/input \
+  -v ~/tmp/goat_rodeo/data/output:/data/output \
+  -u $(id -u):$(id -g) \
+  spicelabs/goatrodeo:latest \
+  -b /data/input \
+  -o /data/output
+```
+
+---
+
+### 2️⃣ Build and Run as a Java Program
+
+**Requirements:** Git LFS, Java 21+, Scala 3, and `sbt`
+
+```bash
+git lfs install
+git clone https://github.com/spice-labs-inc/goatrodeo.git
+cd goatrodeo
+sbt assembly
+```
+
+Produces fat JAR at:
+
+```
+target/scala-3.6.3/goatrodeo.jar
+```
+
+Run example:
+
+```bash
+java -jar target/scala-3.6.3/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24
+```
+
+---
+
+### 3️⃣ Use as a Java Library (via Maven)
+
+Add the following to your project's `pom.xml`:
 
 ```xml
 <dependency>
   <groupId>io.spicelabs</groupId>
   <artifactId>goatrodeo_3</artifactId>
-  <version>0.8.1</version>
+  <version>0.8.4</version>
 </dependency>
 ```
 
-If not yet synced to Maven Central, you can use GitHub Packages:
-
-```xml
-<repositories>
-  <repository>
-    <id>github</id>
-    <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
-  </repository>
-</repositories>
-```
-
----
-
-### CLI via Docker
-
-```bash
-mkdir /tmp/goat_rodeo
-docker run -ti --rm   -v $(pwd)/target:/data/input   -v /tmp/goat_rodeo:/data/output   -u $(id -u):$(id -g)   ghcr.io/spice-labs-inc/goatrodeo:0.7.0   -b /data/input -o /data/output
-```
-
----
-
-### Java Usage
+Example usage:
 
 ```java
 GoatRodeo.builder()
@@ -59,112 +91,56 @@ GoatRodeo.builder()
 
 ---
 
-## 🔍 What is an ADG?
+## 🛠️ CLI Options
 
-An **Artifact Dependency Graph (ADG)** is a deterministic, content-addressable graph that maps all software inputs recursively.  
-This includes `.jar` → `.class`, nested archives, Docker image layers, etc. Goat Rodeo uses GitOID-style hashing for full verifiability.
-
----
-
-## 🔎 Query with Big Tent
-
-1. Clone and build Big Tent:
-```bash
-git clone https://github.com/spice-labs-inc/bigtent.git
-cd bigtent
-cargo build
-```
-
-2. Launch Big Tent:
-```bash
-./target/debug/bigtent -r /tmp/gitoidcorpus/<corpus>.grc
-```
-
-3. Query:
-```bash
-curl http://localhost:3000/omnibor/sha256:<hash>
-```
+| Option                      | Description |
+|----------------------------|-------------|
+| `--block <value>`          | Gitoid block list. Skips common gitoids like license files. |
+| `-b`, `--build <value>`    | Build gitoid database from directory of JAR files. |
+| `--tag <value>`            | Tag top-level artifacts with a label and timestamp. |
+| `--ingested <value>`       | Append successfully processed files to this file. |
+| `--ignore <value>`         | File containing paths to skip (e.g., previously processed). |
+| `--file-list <value>`      | File containing list of specific files to process. |
+| `--exclude-pattern <value>`| Regex pattern to exclude files (e.g., `html$`). |
+| `--maxrecords <value>`     | Max records to process at once (default: 50,000). |
+| `-o`, `--out <value>`      | Output directory for gitoid database and results. |
+| `--tempdir <value>`        | Directory for temporary storage (RAM disk recommended). |
+| `-t`, `--threads <value>`  | Number of threads (default: 4). Suggest 2–3× CPU cores. |
+| `-V`, `--version`          | Print version and exit. |
+| `-?`, `--help`             | Print help and exit. |
 
 ---
 
-## 🛠️ Maintainers
+## 🚀 Release and Maintenance
 
-### Build Requirements
+### Releasing a New Version
 
-- Goat Rodeo uses **Git LFS**. Install it before cloning or building:
-  ```bash
-  git lfs install
-  git clone https://github.com/spice-labs-inc/goatrodeo.git
-  ```
+1. **Create a GitHub Release**
+   - Tag it with `v0.x.y`
+   - Triggers GitHub Actions to publish to:
+     - GitHub Packages
+     - Maven Central
 
----
+2. **Monitor Maven Central**
+   - [central.sonatype.com → Deployments](https://central.sonatype.com)
+   - Publishing may take ~40 minutes
 
-### Build from Source
-
-Goat Rodeo requires **JDK 21+**, **Scala 3**, and **sbt**:
-
-```bash
-cd goatrodeo
-sbt assembly
-```
-
-Outputs fat JAR at:
-```
-target/scala-3.6.3/goatrodeo.jar
-```
-
-Run locally:
-```bash
-java -jar target/scala-3.6.3/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24
-```
-
----
-
-### Full CLI Reference
-
-```text
--b, --build <dir>             Build ADG from this directory (recursive)
--o, --out <dir>               Output directory
--t, --threads <int>           Number of threads (default 4)
---tag <text>                  Add tag metadata to output
---file-list <file>            File containing list of paths to include
---ignore <file>               File of paths to ignore (previously processed)
---ingested <file>             Log successful processed inputs
---exclude-pattern <regex>     Regex pattern to exclude files
---block <file>                GitOID blocklist (e.g. license gitoids)
---tempdir <dir>               Temp dir (RAM disk recommended)
---maxrecords <int>            Max records to process (default 50000)
--V, --version                 Print version and exit
--?, --help                    Print help and exit
-```
-
----
-
-### Releasing
-
-1. **Create a GitHub release**  
-   Tag with `v0.x.y`. GitHub Actions will build and publish to GitHub Packages and Maven Central.
-
-2. **Monitor Maven Central** (optional)  
-   Visit [https://central.sonatype.com](https://central.sonatype.com) → `Publish → Deployments`  
-   Publishing takes ~40 minutes.
-
-3. **Verify the release**:
+3. **Verify via Maven**:
 
 ```bash
-mvn dependency:get -Dartifact=io.spicelabs:goatrodeo_3:0.8.1
+mvn dependency:get -Dartifact=io.spicelabs:goatrodeo_3:0.8.4
 ```
 
-Artifacts include:
+Published artifacts:
 
-- GitHub Release: [releases](https://github.com/spice-labs-inc/goatrodeo/releases)
-- GitHub Packages: [Packages](https://github.com/spice-labs-inc/goatrodeo/packages)
-- Maven Central: [central.sonatype.com](https://central.sonatype.com/artifact/io.spicelabs/goatrodeo_3)
-- Docker Hub: [hub.docker.com](https://hub.docker.com/r/spicelabs/goatrodeo)
+- [GitHub Releases](https://github.com/spice-labs-inc/goatrodeo/releases)
+- [GitHub Packages](https://github.com/spice-labs-inc/goatrodeo/packages)
+- [Maven Central](https://central.sonatype.com/artifact/io.spicelabs/goatrodeo_3)
+- [Docker Hub](https://hub.docker.com/r/spicelabs/goatrodeo)
 
 ---
 
 ## 📜 License
 
-Apache 2.0  
-© 2025 Spice Labs, Inc. & Contributors
+Apache License 2.0  
+© 2025 [Spice Labs, Inc.](https://spicelabs.io) & Contributors
