@@ -98,7 +98,7 @@ class DockerSuite extends munit.FunSuite {
       store1: Storage
   ): Unit = {
     val item2 = store1.read(identifier).get
-    val extraMetadata = item2.body.get.extra
+    val extraMetadata = item2.body.get.asInstanceOf[ItemMetaData].extra
     val config = extraMetadata.get("docker_config").get
     val manifest = extraMetadata.get("docker_manifest").get
 
@@ -106,6 +106,17 @@ class DockerSuite extends munit.FunSuite {
     assertEquals(manifest.size, 1)
 
     val configJson = parseJsonOpt(config.head.value).get
+
+    val mimeTypes = item2.body.get.asInstanceOf[ItemMetaData].mimeType
+
+    assert(
+      mimeTypes.contains("application/vnd.oci.image.config.v1+json"),
+      s"Should have ${"application/vnd.oci.image.config.v1+json"} "
+    )
+    assert(
+      mimeTypes.contains("application/vnd.oci.image.manifest.v1+json"),
+      s"Should have ${"application/vnd.oci.image.manifest.v1+json"} "
+    )
 
     val layers = for {
       case JArray(layers) <- configJson \ "rootfs" \ "diff_ids"
@@ -121,6 +132,13 @@ class DockerSuite extends munit.FunSuite {
       assert(
         layerItem.connections.size > 3,
         f"Layer ${layer} must have more than 3 files, found ${layerItem.connections.size}"
+      )
+      assert(
+        layerItem.body.get
+          .asInstanceOf[ItemMetaData]
+          .mimeType
+          .contains("application/vnd.oci.image.layer.v1.tar"),
+        "layer should have layer mime type"
       )
     }
 

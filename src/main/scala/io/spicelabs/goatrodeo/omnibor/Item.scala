@@ -2,15 +2,16 @@ package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
+import io.bullet.borer.Cbor
+import io.bullet.borer.Decoder
+import io.bullet.borer.Encoder
+import io.bullet.borer.Reader
+import io.bullet.borer.Writer
+import io.bullet.borer.derivation.key
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
-import io.bullet.borer.Cbor
-import io.bullet.borer.Decoder
-import io.bullet.borer.Encoder
-import io.bullet.borer.Writer
-import io.bullet.borer.derivation.key
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -21,16 +22,14 @@ case class Item(
     // reference: LocationReference,
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
-    body: Option[ItemMetaData]
+    body: Option[ItemMetaData | ItemTagData]
 ) {
   def encodeCBOR(): Array[Byte] = cachedCBOR
 
-  // def fixReferencePosition(hash: Long, offset: Long): Item = {
-  //   val hasCur = reference != Item.noopLocationReference
-  //   this.copy(
-  //     reference = (hash, offset)
-  //   )
-  // }
+  def bodyAsItemMetaData: Option[ItemMetaData] = body match {
+    case Some(b: ItemMetaData) => Some(b)
+    case _                     => None
+  }
 
   /** add a connection
     *
@@ -135,10 +134,15 @@ case class Item(
 
     val (body, mime) =
       (this.body, other.body, this.bodyMimeType == other.bodyMimeType) match {
-        case (Some(a), Some(b), true) =>
+        case (Some(a: ItemMetaData), Some(b: ItemMetaData), true) =>
           Some(
             a.merge(b, () => this.listContains(), () => other.listContains())
           ) -> this.bodyMimeType
+        case (Some(a: ItemTagData), Some(b: ItemTagData), true) =>
+          Some(
+            a.merge(b)
+          ) -> this.bodyMimeType
+
         case (Some(a), _, _) => Some(a) -> this.bodyMimeType
         case (_, Some(b), _) => Some(b) -> other.bodyMimeType
         case _               => None -> None
@@ -182,8 +186,10 @@ case class Item(
                 extra = TreeMap()
               )
             )
-          case Some(body) =>
+          case Some(body: ItemMetaData) =>
             Some(body.copy(fileNames = body.fileNames ++ textPurls))
+          case Some(body: ItemTagData) =>
+            Some(body)
         }
       )
       ret
@@ -212,8 +218,8 @@ case class Item(
       },
       body = Some({
         val base = this.body match {
-          case Some(b) => b
-          case None =>
+          case Some(b: ItemMetaData) => b
+          case _ =>
             ItemMetaData(
               fileNames = TreeSet(),
               mimeType = TreeSet(),
@@ -240,6 +246,7 @@ case class Item(
           fileNames = base.fileNames ++ augmentedFileNames,
           extra = base.extra ++ extra
         )
+
       })
     )
   }
@@ -300,7 +307,11 @@ object Item {
   ): Map[String, GitOID] = {
     val mapping = for {
       item <- items
-      metadata <- item.body.toSeq if mimeFilter(metadata.mimeType)
+      metadata <- item.body match {
+        case Some(body: ItemMetaData) if mimeFilter(body.mimeType) =>
+          Some(body).toSeq
+        case _ => None.toSeq
+      }
       filename <- metadata.fileNames.toSeq if nameFilter(filename)
     } yield filename -> item.identifier
 
@@ -332,15 +343,88 @@ object Item {
   val noopLocationReference: LocationReference = (0L, 0L)
   given Encoder[Item] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveEncoder[Item]
+    import io.bullet.borer.Dom
+    // deriveEncoder[Item]
+    new Encoder[Item] {
+      def write(w: Writer, item: Item): w.type = {
+        /*
+            identifier: String,
+    // reference: LocationReference,
+    connections: TreeSet[Edge],
+    @key("body_mime_type") bodyMimeType: Option[String],
+    body: Option[ItemMetaData | ItemTagData]
+         */
+
+        w.writeMapOpen(4)
+        item.body match {
+          case None                  => w.writeMapMember("body", Dom.NullElem)
+          case Some(v: ItemMetaData) => w.writeMapMember("body", v)
+          case Some(v: ItemTagData)  => w.writeMapMember("body", v.tag)
+        }
+
+        item.bodyMimeType match {
+          case None => w.writeMapMember("body_mime_type", Dom.NullElem)
+          case Some(mimeType) => w.writeMapMember("body_mime_type", mimeType)
+
+        }
+
+        w.writeMapMember("connections", item.connections)
+        w.writeMapMember("identifier", item.identifier)
+        w.writeMapClose()
+
+      }
+    }
   }
 
   given Decoder[Item] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveDecoder[Item]
+    new Decoder[Item] {
+      import io.bullet.borer.Dom
+      def read(r: Reader): Item = {
+        val unbounded = r.readMapOpen(4)
+        assert(r.readString() == "body")
+        val bodyOpt: Option[Dom.Element] = if (r.hasNull) {
+          r.readNull()
+          None
+        } else {
+          Some(r.read[Dom.Element]())
+        }
+        assert(r.readString() == "body_mime_type")
+        val bodyMimeType: Option[String] = if (r.hasNull) {
+          r.readNull()
+          None
+        } else { Some(r.readString()) }
+        assert(r.readString() == "connections")
+        val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
+        assert(r.readString() == "identifier")
+        val identifier = r.readString()
+
+        val ret = Item(
+          identifier,
+          connections,
+          bodyMimeType,
+          (bodyMimeType, bodyOpt) match {
+            case (None, _) => None
+            case (Some(ItemMetaData.mimeType), Some(body)) =>
+              Some(Cbor.transEncode(body).transDecode.to[ItemMetaData].value)
+            case (Some(ItemTagData.mimeType), Some(body)) =>
+              Some(ItemTagData(body))
+
+            case _ =>
+              throw new IllegalArgumentException(
+                s"Unexpected bodyMimeType/bodyOpt combination: bodyMimeType=$bodyMimeType, bodyOpt=$bodyOpt"
+              )
+          }
+        )
+        r.readMapClose(unbounded = unbounded, ret)
+      }
+    }
   }
 
   def decode(bytes: Array[Byte]): Try[Item] = {
     Cbor.decode(bytes).to[Item].valueTry
   }
 }
+
+/** Information about how to tag an ADG
+  */
+case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])

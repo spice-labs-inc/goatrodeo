@@ -15,6 +15,8 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
+import io.bullet.borer.Dom
+import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -70,14 +72,14 @@ object Builder {
       threadCnt: Int,
       blockList: Option[File],
       maxRecords: Int,
-      tag: Option[String],
+      tag: Option[TagInfo],
       tempDir: Option[File],
       fileListers: Seq[() => Seq[File]],
       ignorePathSet: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
-      preWriteDB: Storage => Unit = store => ()
+      preWriteDB: Storage => Boolean = store => true
   ): Unit = {
     val totalStart = Instant.now()
 
@@ -98,7 +100,30 @@ object Builder {
     // The count of all the files found
     val cnt = new AtomicInteger(0)
 
-    val fullTag = tag.map(t => f"${Helpers.currentDate8601()}/${t}")
+    val fullTag = tag.map { tag =>
+      // this ordering allows the user generated JSON to override the tag and the date... the latter being
+      // useful for testing
+      val base: Map[String, Dom.Element] = Map(
+        ("tag" -> Dom.StringElem(tag.name)),
+        ("date" -> Dom.StringElem(Helpers.currentDate8601()))
+      )
+      val toAppend: Map[String, Dom.Element] = tag.extra match {
+        case None => Map()
+        case Some(me: Dom.MapElem) =>
+          me.members.flatMap {
+            case (s: Dom.StringElem, v) => Some(s.value -> v)
+            case _                      => None
+          }.toMap
+        case Some(v) => Map(("extra" -> v))
+      }
+    val fieldMap = toAppend.foldLeft(base) { case (curr, (k, v)) =>
+      curr + (k -> v)
+    }
+    val json: Dom.MapElem = Dom.MapElem.Unsized(fieldMap.toVector*)
+    val jsonString = Json.encode(json).toUtf8String
+
+    TagPass(GitOIDUtils.urlForString(jsonString), jsonString, json)
+    }
 
     // Get the gitoids to block
     val blockGitoids: Set[String] = blockList match {
@@ -196,14 +221,14 @@ object Builder {
       stillWorking: AtomicBoolean,
       blockGitoids: Set[String],
       cnt: AtomicInteger,
-      tag: Option[String],
+      tag: Option[TagPass],
       runningCnt: AtomicInteger,
       totalStart: Instant,
       dead_? : AtomicBoolean,
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
       tempDir: Option[File],
-      preWriteDB: Storage => Unit = store => ()
+      preWriteDB: Storage => Boolean = store => true
   ): Option[Thread] = {
 
     val storage = MemStorage(Some(destDir))
@@ -214,12 +239,14 @@ object Builder {
       case Some(tag) =>
         storage.write(
           "tags",
-          item => Item("tags", TreeSet(EdgeType.tagTo -> tag), None, None),
+          item =>
+            Item("tags", TreeSet(EdgeType.tagTo -> tag.gitoid), None, None),
           item => "set up tags"
         )
         storage.write(
-          tag,
-          item => Item(tag, TreeSet(EdgeType.tagFrom -> "tags"), None, None),
+          tag.gitoid,
+          item =>
+            Item(tag.gitoid, TreeSet(EdgeType.tagFrom -> "tags"), None, None),
           x => "tags"
         )
     }
@@ -396,10 +423,11 @@ object Builder {
 
             val writeStart = Instant.now()
 
-            preWriteDB(storage)
+            val writeToStorage = preWriteDB(storage)
 
             val ret = storage match {
-              case lf: (ListFileNames & Storage) if !dead_?.get() =>
+              case lf: (ListFileNames & Storage)
+                  if writeToStorage && !dead_?.get() =>
                 computeAndAddMerkleTrees(lf)
                 writeGoatRodeoFiles(lf)
               case _ => logger.error("Didn't write"); None
@@ -558,3 +586,5 @@ object Builder {
 
   }
 }
+
+case class TagPass(gitoid: String, jsonStr: String, json: Dom.Element)

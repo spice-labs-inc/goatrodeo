@@ -6,7 +6,9 @@ val scala3Version = "3.6.3"
 
 ThisBuild / organization := "io.spicelabs"
 ThisBuild / version := "0.0.1-SNAPSHOT" // Don't change this, it is overridden by the GitHub Actions workflow
-ThisBuild / licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html"))
+ThisBuild / licenses := Seq(
+  "Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html")
+)
 ThisBuild / homepage := Some(url("https://github.com/spice-labs-inc/goatrodeo"))
 ThisBuild / scmInfo := Some(
   ScmInfo(
@@ -34,8 +36,6 @@ credentials += Credentials(
   sys.env.getOrElse("GITHUB_TOKEN", "")
 )
 
-
-
 // ThisBuild / publishTo := sonatypePublishToBundle.value
 // ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
 // ThisBuild / sonatypeProfileName := "io.spicelabs"
@@ -56,7 +56,12 @@ fatJar := {
 }
 
 publishMavenStyle := true
-publish / packagedArtifacts += (Artifact(projectName, "jar", "jar", classifier = "fat") -> fatJar.value)
+publish / packagedArtifacts += (Artifact(
+  projectName,
+  "jar",
+  "jar",
+  classifier = "fat"
+) -> fatJar.value)
 
 // If "TEST_THREAD_CNT" is set that means we're
 // running on a memory constrained system and we
@@ -77,7 +82,6 @@ ThisBuild / scalacOptions ++=
     "21"
   )
 
-
 // Add GitHub Packages resolver
 resolvers += "GitHub Package Registry" at "https://maven.pkg.github.com/spice-labs-inc/goatrodeo"
 
@@ -86,7 +90,12 @@ Test / logBuffered := false
 
 lazy val root = project
   .in(file("."))
-  .enablePlugins(BuildInfoPlugin, JavaAppPackaging, GitVersioningPlugin, AssemblyPlugin)
+  .enablePlugins(
+    BuildInfoPlugin,
+    JavaAppPackaging,
+    GitVersioningPlugin,
+    AssemblyPlugin
+  )
   .settings(
     name := projectName,
     scalaVersion := scala3Version,

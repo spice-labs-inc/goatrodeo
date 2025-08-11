@@ -15,7 +15,13 @@ limitations under the License. */
 package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
+import io.bullet.borer.Dom
+import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.omnibor.Builder
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.Storage
+import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.util.Helpers
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
@@ -26,13 +32,14 @@ import java.io.FileFilter
 import java.io.FileWriter
 import java.nio.file.Files
 import java.util.regex.Pattern
+import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import scala.annotation.static
 
 class Howdy
+
 /** The `main` class
   */
 object Howdy {
@@ -59,6 +66,8 @@ object Howdy {
       tag: Option[String] = None,
       exclude: Vector[(String, Try[Pattern])] = Vector(),
       threads: Int = 4,
+      hotdog: Option[File] = None,
+      tagJson: Option[Dom.Element] = None,
       blockList: Option[File] = None,
       maxRecords: Int = 50000,
       tempDir: Option[File] = None
@@ -97,6 +106,11 @@ object Howdy {
               .filter(f => f.exists())
           )
         ),
+      opt[File]('m', "hotdog")
+        .text(
+          "match the gitoids in this file with the gitoids generated from the input files and outputs the files containing the matches https://youtu.be/ACmydtFDTGs"
+        )
+        .action((x, c) => c.copy(hotdog = Some(x))),
       opt[String]("tag")
         .text(
           "Tag all top level artifacts (files) with the current date and the text of the tag"
@@ -113,6 +127,13 @@ object Howdy {
         )
         .action((x, c) =>
           c.copy(ignore = (c.ignore ++ ExpandFiles(x)).filter(_.exists()))
+        ),
+      opt[String]("tag-json")
+        .text("Json that is included as part of the tag")
+        .action((s, c) =>
+          c.copy(tagJson =
+            Some(Json.decode(s.getBytes("UTF-8")).to[Dom.Element].value)
+          )
         ),
       opt[File]("file-list")
         .text(
@@ -315,21 +336,88 @@ object Howdy {
           return
         }
 
+        val preWriteDB: Storage => Boolean = params.hotdog match {
+          case Some(dog) =>
+            val contents = Files.readString(dog.toPath())
+
+            val toFind = Json
+              .decode(contents.getBytes("UTF-8"))
+              .to[Map[String, Vector[String]]]
+              .value
+
+            s => {
+              emitFound(s, toFind)
+              false
+            }
+
+          case _ => _ => true
+        }
+
         Builder.buildDB(
           dest = dest,
           tempDir = params.tempDir,
           threadCnt = params.threads,
           maxRecords = params.maxRecords,
-          tag = params.tag,
+          tag = (params.tag, params.tagJson) match {
+            case (None, None)       => None
+            case (Some(tag), v)     => Some(TagInfo(tag, v))
+            case (_, Some(tagJson)) => Some(TagInfo("N/A", Some(tagJson)))
+          },
           fileListers = fileListers,
           ignorePathSet = ignorePathSet,
           excludeFileRegex = excludePatterns,
           blockList = params.blockList,
           finishedFile = onFileFinish,
-          done = onRunFinish
+          done = onRunFinish,
+          preWriteDB = preWriteDB
         )
 
       case _ => Helpers.bailFail()
     }
+  }
+
+  def emitFound(s: Storage, toFind: Map[String, Vector[String]]): Unit = {
+
+    // from storage, find all the items that match a particular human text string
+    val mapped = toFind.foldLeft(Map[String, Set[Item]]()) {
+      case (found, (looking, names)) =>
+        s.read(looking) match {
+          case Some(item) =>
+            names.foldLeft(found) { case (found, name) =>
+              found + (name -> (found.getOrElse(name, Set()) + item))
+            }
+          case _ => found
+        }
+    }
+
+  }
+
+  /** Find all the nodes north of these nodes that have filenames
+    *
+    * @param s
+    *   storage
+    * @param items
+    *   the base items
+    * @return
+    *   the resulting items with filenames
+    */
+  private def nodesWithFilenames(s: Storage, items: Set[Item]): Set[Item] = {
+    items.foldLeft(Set[Item]()) { case (set, toTest) =>
+      if (set.contains(toTest)) set
+      else {
+        val possibles = northOf(s, toTest, Set(toTest))
+        // FIXME
+        ???
+      }
+    }
+  }
+
+  private def northOf(s: Storage, item: Item, current: Set[Item]): Set[Item] = {
+    item.connections
+      .filter(e => EdgeType.containedBy == e._1)
+      .foldLeft(current) { case (ret, (edgeType, gitoid)) =>
+        // FIXME
+        ???
+      }
   }
 }

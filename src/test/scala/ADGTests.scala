@@ -1,10 +1,14 @@
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 class ADGTests extends munit.FunSuite {
@@ -56,7 +60,7 @@ class ADGTests extends munit.FunSuite {
           .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
           .getOrElse(25),
         maxRecords = 50000,
-        tag = Some("test"),
+        tag = Some(TagInfo("foo", None)),
         fileListers = Vector(() => Helpers.findFiles(source, f => true)),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
@@ -66,19 +70,39 @@ class ADGTests extends munit.FunSuite {
         },
         done = b => { finished = b },
         preWriteDB = store => {
+          store.keys().toVector.zipWithIndex.foreach {
+            case (key, idx) => {
+              val item = store.read(key).get
+              val round = Item.decode(item.encodeCBOR())
+              round match {
+                case Success(value) =>
+                case Failure(exception) =>
+                  exception.printStackTrace()
+              }
+
+              assert(
+                round == Success(item),
+                f"Pos ${idx} Failed to round trip ${key} original ${item} round tripped ${round}"
+              )
+            }
+          }
+
           store.read("tags") match {
             case Some(tags) => {
 
               val theTag =
                 tags.connections.filter(e => e._1 == EdgeType.tagTo).head._2
+
               tagCount = store
                 .read(theTag)
                 .get
                 .connections
                 .filter(_._1 == EdgeType.tagTo)
                 .size
+
+              true
             }
-            case None =>
+            case None => assert(false, "Failed to read tags"); true
           }
         }
       )

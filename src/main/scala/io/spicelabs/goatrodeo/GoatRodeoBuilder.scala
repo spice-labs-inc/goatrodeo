@@ -14,10 +14,12 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo
 
-import java.nio.file.{Path, Paths}
-import scala.annotation.static
-import scala.jdk.CollectionConverters._
 import com.typesafe.scalalogging.Logger
+
+import java.nio.file.Path
+import java.nio.file.Paths
+import scala.annotation.static
+import scala.jdk.CollectionConverters.*
 
 class GoatRodeoBuilder {
   private val log = Logger(classOf[GoatRodeoBuilder])
@@ -100,17 +102,17 @@ class GoatRodeoBuilder {
 
   def withExtraArg(key: String, value: String): GoatRodeoBuilder = {
     key match {
-      case "payload"         => withPayload(value)
-      case "output"          => withOutput(value)
-      case "threads"         => withThreads(value.toInt)
-      case "maxRecords"      => withMaxRecords(value.toInt)
-      case "ingested"        => withIngested(value)
-      case "ignore"          => withIgnore(value)
-      case "fileList"        => withFileList(value)
-      case "excludePattern"  => withExcludePattern(value)
-      case "blockList"       => withBlockList(value)
-      case "tempDir"         => withTempDir(value)
-      case "tag"             => withTag(value)
+      case "payload"        => withPayload(value)
+      case "output"         => withOutput(value)
+      case "threads"        => withThreads(value.toInt)
+      case "maxRecords"     => withMaxRecords(value.toInt)
+      case "ingested"       => withIngested(value)
+      case "ignore"         => withIgnore(value)
+      case "fileList"       => withFileList(value)
+      case "excludePattern" => withExcludePattern(value)
+      case "blockList"      => withBlockList(value)
+      case "tempDir"        => withTempDir(value)
+      case "tag"            => withTag(value)
       case unknown =>
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
         this

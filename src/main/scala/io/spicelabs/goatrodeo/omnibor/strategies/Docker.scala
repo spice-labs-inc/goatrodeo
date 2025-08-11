@@ -3,9 +3,9 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 import com.github.packageurl.PackageURL
 import com.github.packageurl.PackageURLBuilder
 import com.typesafe.scalalogging.Logger
-
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.Storage
@@ -115,16 +115,67 @@ case class DockerState(
       marker: DockerMarkers
   ): (Item, DockerState) = marker match {
     case DockerMarkers.Layer(hash) =>
+      val updatedItem = item.body match {
+        case None =>
+          item.copy(body =
+            Some(
+              ItemMetaData(
+                TreeSet(),
+                TreeSet("application/vnd.oci.image.layer.v1.tar"),
+                0,
+                TreeMap()
+              )
+            )
+          )
+        case Some(md: ItemMetaData) =>
+          item.copy(body =
+            Some(
+              md.copy(mimeType =
+                md.mimeType + "application/vnd.oci.image.layer.v1.tar"
+              )
+            )
+          )
+        case _ => item
+      }
       // Associate the item's hash with the item's gitoid/identifier
-      item -> this.copy(layerToGitoidMapping =
-        this.layerToGitoidMapping + (hash -> item.identifier)
+      updatedItem -> this.copy(layerToGitoidMapping =
+        this.layerToGitoidMapping + (hash -> updatedItem.identifier)
       )
 
     case DockerMarkers.Config(info) =>
+      val updatedItem = item.body match {
+        case None =>
+          item.copy(body =
+            Some(
+              ItemMetaData(
+                TreeSet(),
+                TreeSet(
+                  "application/vnd.oci.image.config.v1+json",
+                  "application/vnd.oci.image.manifest.v1+json"
+                ),
+                0,
+                TreeMap()
+              )
+            )
+          )
+        case Some(md: ItemMetaData) =>
+          item.copy(body =
+            Some(
+              md.copy(mimeType =
+                md.mimeType ++ TreeSet(
+                  "application/vnd.oci.image.config.v1+json",
+                  "application/vnd.oci.image.manifest.v1+json"
+                )
+              )
+            )
+          )
+        case _ => item
+      }
+
       // for config, make sure it contains all the layers
       // and the layers will have a containedBy reference
       // to the config
-      val itemWithConnections = info.layers.foldLeft(item) {
+      val itemWithConnections = info.layers.foldLeft(updatedItem) {
         case (item, layer) =>
           layerToGitoidMapping.get(layer) match {
             case None => item

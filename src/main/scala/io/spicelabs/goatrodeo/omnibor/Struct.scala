@@ -14,12 +14,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.util.Helpers
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
+import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -139,7 +139,7 @@ object StringOrPair {
   }
 
   given Decoder[StringOrPair] = Decoder { reader =>
-    if (reader.hasArrayStart) {
+    if (reader.hasArrayStart || reader.hasArrayHeader(2)) {
       val unbounded = reader.readArrayOpen(2)
       val item = PairOf(
         reader.readString(),
@@ -149,11 +149,14 @@ object StringOrPair {
     } else if (reader.hasString) {
       StringOf(reader.readString())
     } else {
-      reader.unexpectedDataItem("Looking for 'String' or Array of String")
+      reader.unexpectedDataItem(
+        f"Looking for 'String' or Array of String got ${reader.dataItem()}"
+      )
     }
 
   }
 }
+
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
@@ -219,6 +222,40 @@ object ItemMetaData {
   given Decoder[ItemMetaData] = {
     import io.bullet.borer.derivation.MapBasedCodecs.*
     deriveDecoder[ItemMetaData]
+  }
+}
+
+object ItemTagData {
+  val mimeType = "application/vnd.cc.goatrodeo.tag"
+
+  given Encoder[ItemTagData] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveEncoder[ItemTagData]
+  }
+
+  given Decoder[ItemTagData] = {
+    import io.bullet.borer.derivation.MapBasedCodecs.*
+    deriveDecoder[ItemTagData]
+  }
+}
+
+case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
+  def merge(other: ItemTagData): ItemTagData = {
+    
+    // Merge logic for Dom.Element
+    val mergedTag = (this.tag, other.tag) match {
+      case (f1: io.bullet.borer.Dom.MapElem,f2: io.bullet.borer.Dom.MapElem) =>
+        io.bullet.borer.Dom.MapElem.Unsized(f1.members ++ f2.members)
+      case (a1: io.bullet.borer.Dom.ArrayElem, a2: io.bullet.borer.Dom.ArrayElem) =>
+        io.bullet.borer.Dom.ArrayElem.Unsized(a1.elems ++ a2.elems)
+      case (a1: io.bullet.borer.Dom.ArrayElem, _) =>
+        a1
+      case (_,a2: io.bullet.borer.Dom.ArrayElem) =>
+        a2
+      case (a, _) =>
+        a
+    }
+    ItemTagData(mergedTag)
   }
 }
 

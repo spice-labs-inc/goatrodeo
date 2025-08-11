@@ -14,6 +14,7 @@ limitations under the License. */
 
 import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.Debian
 import io.spicelabs.goatrodeo.util.*
@@ -233,7 +234,8 @@ class MySuite extends munit.FunSuite {
   }
 
   test("calculate mime type for class file") {
-    val classFileName = "target/scala-3.6.3/classes/io/spicelabs/goatrodeo/Howdy.class"
+    val classFileName =
+      "target/scala-3.6.3/classes/io/spicelabs/goatrodeo/Howdy.class"
 
     val f = new File(classFileName)
     val metadata = new Metadata()
@@ -356,7 +358,7 @@ class MySuite extends munit.FunSuite {
 
     assert(jars.length == 2, f"Expecting two JARs, but got ${jars.length}")
 
-    val extra = jars(0).body.get.extra
+    val extra = jars(0).body.get.asInstanceOf[ItemMetaData].extra
 
     assert(extra.get("manifest").isDefined)
     assert(extra.get("pom").isDefined)
