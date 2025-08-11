@@ -66,6 +66,7 @@ object Howdy {
       tag: Option[String] = None,
       exclude: Vector[(String, Try[Pattern])] = Vector(),
       threads: Int = 4,
+      hotdog: Option[File] = None,
       tagJson: Option[Dom.Element] = None,
       blockList: Option[File] = None,
       maxRecords: Int = 50000,
@@ -105,6 +106,11 @@ object Howdy {
               .filter(f => f.exists())
           )
         ),
+      opt[File]('m', "hotdog")
+        .text(
+          "match the gitoids in this file with the gitoids generated from the input files and outputs the files containing the matches https://youtu.be/ACmydtFDTGs"
+        )
+        .action((x, c) => c.copy(hotdog = Some(x))),
       opt[String]("tag")
         .text(
           "Tag all top level artifacts (files) with the current date and the text of the tag"
@@ -330,9 +336,19 @@ object Howdy {
           return
         }
 
-        // Placeholder for emitting JSON of ADGs and roots of ADGs...
-        // but it's blank for now
-        val preWriteDB: Storage => Boolean = true match {
+        val preWriteDB: Storage => Boolean = params.hotdog match {
+          case Some(dog) =>
+            val contents = Files.readString(dog.toPath())
+
+            val toFind = Json
+              .decode(contents.getBytes("UTF-8"))
+              .to[Map[String, Vector[String]]]
+              .value
+
+            s => {
+              emitFound(s, toFind)
+              false
+            }
 
           case _ => _ => true
         }
