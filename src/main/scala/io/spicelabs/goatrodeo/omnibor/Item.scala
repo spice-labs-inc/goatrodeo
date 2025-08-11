@@ -409,7 +409,10 @@ object Item {
             case (Some(ItemTagData.mimeType), Some(body)) =>
               Some(ItemTagData(body))
 
-            case _ => ???
+            case _ =>
+              throw new IllegalArgumentException(
+                s"Unexpected bodyMimeType/bodyOpt combination: bodyMimeType=$bodyMimeType, bodyOpt=$bodyOpt"
+              )
           }
         )
         r.readMapClose(unbounded = unbounded, ret)
