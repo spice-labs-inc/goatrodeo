@@ -342,19 +342,10 @@ object Item {
 
   val noopLocationReference: LocationReference = (0L, 0L)
   given Encoder[Item] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
+
     import io.bullet.borer.Dom
-    // deriveEncoder[Item]
     new Encoder[Item] {
       def write(w: Writer, item: Item): w.type = {
-        /*
-            identifier: String,
-    // reference: LocationReference,
-    connections: TreeSet[Edge],
-    @key("body_mime_type") bodyMimeType: Option[String],
-    body: Option[ItemMetaData | ItemTagData]
-         */
-
         w.writeMapOpen(4)
         item.body match {
           case None                  => w.writeMapMember("body", Dom.NullElem)

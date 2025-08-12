@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.Debian
 import io.spicelabs.goatrodeo.util.*
+import io.spicelabs.goatrodeo.util.Config
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
@@ -166,7 +167,7 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
@@ -226,7 +227,7 @@ class MySuite extends munit.FunSuite {
     val nested =
       FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
 
@@ -251,15 +252,18 @@ class MySuite extends munit.FunSuite {
   test("Build from nested") {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
-    val store1 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store1 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
     val store2 = ToProcess.buildGraphFromArtifactWrapper(
       nested,
+      args = Config(),
       block = Set(
         "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
       )
     )
 
-    val store3 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store3 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
     assertEquals(
       store1.keys().toSet,
@@ -319,6 +323,7 @@ class MySuite extends munit.FunSuite {
     var packages: Vector[PackageURL] = Vector()
     val store = ToProcess.buildGraphForToProcess(
       strategy,
+      args = Config(),
       purlOut = purl => {
         packages = packages :+ purl
       }

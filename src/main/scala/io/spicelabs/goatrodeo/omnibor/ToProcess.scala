@@ -4,10 +4,12 @@ import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Syft
 
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -135,7 +137,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
   ): ParentScope = ParentScope.forAndWith(item.identifier, parent)
 }
 
-trait ParentScope {
+abstract class ParentScope {
   def beginProcessing(
       store: Storage,
       artifact: ArtifactWrapper,
@@ -240,6 +242,7 @@ trait ToProcess {
       store: Storage,
       parentScope: ParentScope,
       tag: Option[TagPass],
+      args: Config,
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
       atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
@@ -256,6 +259,7 @@ trait ToProcess {
             if (blockList.contains(item.identifier)) {
               orgState -> alreadyDone
             } else {
+              if (args.useSyft && Syft.isContainer(artifact)) {}
               val state = orgState.beginProcessing(artifact, item, marker)
               val itemScope1 =
                 parentScope.beginProcessing(store, artifact, item)
@@ -392,6 +396,7 @@ trait ToProcess {
                           store,
                           thisParentScope,
                           None,
+                          args = args,
                           blockList,
                           keepRunning,
                           atEnd
@@ -606,6 +611,7 @@ object ToProcess {
   def buildGraphForToProcess(
       toProcess: Vector[ToProcess],
       store: Storage = MemStorage(None),
+      args: Config,
       purlOut: PackageURL => Unit = _ => (),
       block: Set[GitOID] = Set()
   ): Storage = {
@@ -613,6 +619,7 @@ object ToProcess {
       individual.process(
         None,
         store,
+        args = args,
         parentScope = ParentScope.forAndWith(individual.main, None),
         tag = None,
         blockList = block
@@ -638,6 +645,7 @@ object ToProcess {
     */
   def buildGraphFromArtifactWrapper(
       artifact: ArtifactWrapper,
+      args: Config,
       store: Storage = MemStorage(None),
       purlOut: PackageURL => Unit = _ => (),
       block: Set[GitOID] = Set()
@@ -646,7 +654,7 @@ object ToProcess {
     // generate the strategy
     val toProcess = strategiesForArtifacts(Vector(artifact), _ => (), false)
 
-    buildGraphForToProcess(toProcess, store, purlOut, block)
+    buildGraphForToProcess(toProcess, store, args, purlOut, block)
 
   }
 }

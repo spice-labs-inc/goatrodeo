@@ -52,10 +52,7 @@ object FileWalker {
     if (zipMimeTypes.contains(in.mimeType)) {
       import scala.jdk.CollectionConverters.IteratorHasAsScala
 
-      val theFile = in match {
-        case fw: FileWrapper => fw.wrappedFile
-        case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempDir))
-      }
+      val theFile = in.forceFile(tempDir)
 
       try {
 

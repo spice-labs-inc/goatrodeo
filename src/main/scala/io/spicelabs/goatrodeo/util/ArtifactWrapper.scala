@@ -81,6 +81,21 @@ sealed trait ArtifactWrapper {
     * successfully, call this method
     */
   def finished(): Unit
+
+  /** If the ArtifactWraper doesn't point to a file, create a temporary file
+    *
+    * @param tempDir
+    *   the temporary directory to put the file in
+    *
+    * @return
+    *   the file
+    */
+  def forceFile(tempDir: Path): File = {
+    this match {
+      case fw: FileWrapper => fw.wrappedFile
+      case _ => this.withStream(Helpers.tempFileFromStream(_, true, tempDir))
+    }
+  }
 }
 
 object ArtifactWrapper {

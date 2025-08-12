@@ -17,6 +17,7 @@ package io.spicelabs.goatrodeo.omnibor
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -74,6 +75,7 @@ object Builder {
       maxRecords: Int,
       tag: Option[TagInfo],
       tempDir: Option[File],
+      args: Config,
       fileListers: Seq[() => Seq[File]],
       ignorePathSet: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
@@ -186,6 +188,7 @@ object Builder {
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
         tempDir = tempDir,
+        args = args,
         preWriteDB = preWriteDB
       )
 
@@ -228,6 +231,7 @@ object Builder {
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
       tempDir: Option[File],
+      args: Config,
       preWriteDB: Storage => Boolean = store => true
   ): Option[Thread] = {
 
@@ -296,6 +300,7 @@ object Builder {
                 None,
                 store = storage,
                 tag = tag,
+                args = args,
                 parentScope = ParentScope.forAndWith(toProcess.main, None),
                 blockList = blockGitoids,
                 keepRunning = () => !dead_?.get(),

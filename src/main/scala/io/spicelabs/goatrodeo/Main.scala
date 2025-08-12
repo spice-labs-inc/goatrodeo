@@ -22,6 +22,7 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Helpers
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
@@ -29,7 +30,6 @@ import scopt.OParserBuilder
 
 import java.io.File
 import java.io.FileFilter
-import java.io.FileWriter
 import java.nio.file.Files
 import java.util.regex.Pattern
 import scala.annotation.static
@@ -44,48 +44,6 @@ class Howdy
   */
 object Howdy {
   private val logger = Logger(getClass())
-
-  /** Command Line Configuration
-    *
-    * @param analyze
-    *   -- analyze a file against the GC (GitOID Corpus)
-    * @param out
-    *   -- the place to output either the analysis or the results of the build
-    * @param build
-    *   -- build a GitOID Corpus based on JAR files found in the directory
-    * @param threads
-    *   -- the number of threads for the build -- default 4... typically 4x the
-    *   number of physical CPUs
-    */
-  case class Config(
-      out: Option[File] = None,
-      build: Vector[File] = Vector(),
-      ingested: Option[File] = None,
-      ignore: Vector[File] = Vector(),
-      fileList: Vector[File] = Vector(),
-      tag: Option[String] = None,
-      exclude: Vector[(String, Try[Pattern])] = Vector(),
-      threads: Int = 4,
-      hotdog: Option[File] = None,
-      tagJson: Option[Dom.Element] = None,
-      blockList: Option[File] = None,
-      maxRecords: Int = 50000,
-      tempDir: Option[File] = None
-  ) {
-    def getFileListBuilders(): Vector[() => Seq[File]] = {
-      build.map(file => () => Helpers.findFiles(file, f => true)) ++ fileList
-        .map(f => {
-          val fileNames =
-            Files
-              .readAllLines(f.toPath())
-              .asScala
-              .toSeq
-              .map(fn => new File(fn))
-              .filter(_.exists())
-          () => fileNames
-        })
-    }
-  }
 
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
   lazy val parser1: OParser[Unit, Config] = {
@@ -106,11 +64,11 @@ object Howdy {
               .filter(f => f.exists())
           )
         ),
-      opt[File]('m', "hotdog")
+      opt[Boolean]("syft")
         .text(
-          "match the gitoids in this file with the gitoids generated from the input files and outputs the files containing the matches https://youtu.be/ACmydtFDTGs"
+          "Enhance metadata with Syft (must install https://github.com/anchore/syft)"
         )
-        .action((x, c) => c.copy(hotdog = Some(x))),
+        .action((x, c) => c.copy(useSyft = x)),
       opt[String]("tag")
         .text(
           "Tag all top level artifacts (files) with the current date and the text of the tag"
@@ -336,19 +294,7 @@ object Howdy {
           return
         }
 
-        val preWriteDB: Storage => Boolean = params.hotdog match {
-          case Some(dog) =>
-            val contents = Files.readString(dog.toPath())
-
-            val toFind = Json
-              .decode(contents.getBytes("UTF-8"))
-              .to[Map[String, Vector[String]]]
-              .value
-
-            s => {
-              emitFound(s, toFind)
-              false
-            }
+        val preWriteDB: Storage => Boolean = true match {
 
           case _ => _ => true
         }
@@ -369,6 +315,7 @@ object Howdy {
           blockList = params.blockList,
           finishedFile = onFileFinish,
           done = onRunFinish,
+          args = params,
           preWriteDB = preWriteDB
         )
 
