@@ -7,6 +7,10 @@ import org.json4s.native.JsonMethods.*
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import scala.util.Try
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.*
 
 /** The bridge to Syft https://github.com/anchore/syft
   */
@@ -33,21 +37,36 @@ object Syft {
     syftMimeTypes.contains(artifact.mimeType)
   }
 
-  def runSyftFor(artfiact: ArtifactWrapper, tempDir: Path): SyftResult = {
-    val targetFile = artfiact.forceFile(tempDir)
-    val pb = ProcessBuilder(
-      List(
-        "syft",
-        "scan",
-        f"file:${targetFile.getName()}",
-        "--output",
-        "syft-json"
-      )*
-    ).directory(targetFile.getCanonicalFile().getParentFile())
-    val ret = SyftResult(pb, targetFile.getCanonicalPath())
-    ret.go()
+  lazy val hasSyft: Boolean = {
+    Try {
+      val process = ProcessBuilder("syft", "--help").start()
+      while (process.isAlive()) {
+        Thread.sleep(100)
+      }
+      process.exitValue() == 0
+    }.toOption == Some(true)
+  }
 
-    ret
+  def runSyftFor(
+      artfiact: ArtifactWrapper,
+      tempDir: Path
+  ): Option[SyftResult] = {
+    if (hasSyft) {
+      val targetFile = artfiact.forceFile(tempDir)
+      val pb = ProcessBuilder(
+        List(
+          "syft",
+          "scan",
+          f"file:${targetFile.getName()}",
+          "--output",
+          "syft-json"
+        )*
+      ).directory(targetFile.getCanonicalFile().getParentFile())
+      val ret = SyftResult(pb, targetFile.getCanonicalPath())
+      ret.go()
+
+      Some(ret)
+    } else None
 
   }
 }
@@ -83,12 +102,97 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
   def exitCode(): Option[Int] = processExitCode
   def isRunning(): Boolean = running
   def theAnswer(): Option[(String, JValue)] = answer
-  def runUntil(when: Long): Option[(String, JValue)] = {
+  def runForMillis(howLongMillis: Long): Option[(String, JValue)] = {
     this.synchronized {
       if (running) {
-        this.wait(when - System.currentTimeMillis())
+        this.wait(howLongMillis)
       }
       theAnswer()
+    }
+  }
+
+  def buildAugmentation(): Map[String, Vector[Augmentation]] = {
+    answer match {
+      case None => Map()
+      case Some((str, json)) => {
+
+        val files = Map((for {
+          case JArray(files) <- json \ "files"
+          file <- files
+          case JString(id) <- file \ "id"
+          case JArray(digests) <- file \ "digests"
+          digest <- digests
+          case JString(algo) <- digest \ "algorithm"
+          case JString(value) <- digest \ "value"
+        } yield id -> f"${algo}:${value}")*)
+
+        val relatationships = Map((for {
+          case JArray(rels) <- json \ "artifactRelationships"
+          rel <- rels
+          case JString(parent) <- rel \ "parent"
+          case JString(child) <- rel \ "child"
+          key <- files.get(child).toList
+        } yield parent -> key)*)
+
+        val artifacts = (json \ "artifacts" match {
+          case JArray(arr) => arr
+          case _           => List()
+        }): List[JValue]
+
+        val digestedAugmentations = (for {
+
+          artifact <- artifacts
+        } yield {
+          val purls = artifact \ "purl" match {
+            case JString(purl) => Vector(purl)
+            case _ =>
+              Vector()
+          }
+
+          val metadataDigest = artifact \ "metadata" \ "digest" match {
+            case JArray(rawDigests) =>
+              (rawDigests.flatMap { digest =>
+                (digest \ "algorithm", digest \ "value") match {
+                  case (JString(algo), JString(value)) =>
+                    Vector(f"${algo}:${value}")
+                  case _ => Vector()
+                }
+              }).toVector
+
+            case _ => Vector()
+          }
+
+          val digests = metadataDigest ++ (for {
+            case JString(id) <- artifact \ "id"
+            hash <- relatationships.get(id).toList
+          } yield hash)
+
+          val purlAugment = for {
+            digest <- digests
+            purl <- purls
+          } yield ConnectionAugmentation(digest, (EdgeType.aliasFrom, purl))
+          val artifactStr = pretty(render(artifact match {
+            case JObject(obj) => JObject(obj.filter(_._1 != "id"))
+            case v            => v
+          }))
+
+          val extra =
+            for { digest <- digests } yield ExtraAugmentation(
+              digest,
+              "syft-artifact",
+              StringOrPair("application/json", artifactStr)
+            )
+
+          extra ++ purlAugment
+        }).toVector.flatten
+
+        (digestedAugmentations).foldLeft(Map()) { case (map, item) =>
+          map.get(item.hashValue) match {
+            case None    => map + (item.hashValue -> Vector(item))
+            case Some(v) => map + (item.hashValue -> (v :+ item))
+          }
+        }
+      }
     }
   }
 
@@ -128,7 +232,7 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
               case JObject(obj) =>
                 // remove some Syft noise
                 JObject(obj.filter { f =>
-                  f._1 != "source" && f._1 != "descriptor"
+                  f._1 != "source" && f._1 != "descriptor" && f._1 != "distro"
                 })
               case v => v
             }

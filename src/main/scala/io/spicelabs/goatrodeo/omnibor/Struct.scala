@@ -138,7 +138,7 @@ object StringOrPair {
 
   }
 
-  given Decoder[StringOrPair] = Decoder { reader =>
+  given Decoder[StringOrPair] = { reader =>
     if (reader.hasArrayStart || reader.hasArrayHeader(2)) {
       val unbounded = reader.readArrayOpen(2)
       val item = PairOf(

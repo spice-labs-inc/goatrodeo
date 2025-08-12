@@ -167,12 +167,71 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+    val store = ToProcess.buildGraphFromArtifactWrapper(
+      nested,
+      args = Config(useSyft = true)
+    )
 
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
 
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
+
+    if (Syft.hasSyft) { // only run the Syft tests if Syft is installed
+      {
+        // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
+        val item = store
+          .read(
+            store
+              .read(
+                "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
+              )
+              .get
+              .connections
+              .head
+              ._2
+          )
+          .get
+
+        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
+
+        assert(purls.length == 1, s"should be a purl ${purls} on log4j")
+
+        assert(
+          item.bodyAsItemMetaData.get.extra.get("syft-artifact").get.size == 1,
+          "Should have one augmentation on log4j"
+        )
+      }
+
+      {
+        // a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17 tk
+
+        val item = store
+          .read(
+            store
+              .read(
+                "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
+              )
+              .get
+              .connections
+              .head
+              ._2
+          )
+          .get
+
+        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
+
+        assert(
+          purls.length == 2,
+          s"should be two purls (the deb plugin and the syft generated) ${purls} on tk"
+        )
+
+        assert(
+          item.bodyAsItemMetaData.get.extra.get("syft-artifact").get.size == 1,
+          "Should have one augmentation on tk"
+        )
+      }
+    }
   }
 
   test("Compute pURL for .deb") {
@@ -236,7 +295,7 @@ class MySuite extends munit.FunSuite {
 
   test("calculate mime type for class file") {
     val classFileName =
-      "target/scala-3.6.3/classes/io/spicelabs/goatrodeo/Howdy.class"
+      "target/scala-3.7.2/classes/io/spicelabs/goatrodeo/Howdy.class"
 
     val f = new File(classFileName)
     val metadata = new Metadata()

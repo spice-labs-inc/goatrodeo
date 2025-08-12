@@ -18,34 +18,44 @@ import org.json4s.*
 import java.io.File
 class SyftSuite extends munit.FunSuite {
   test("Syft works") {
-    val file = File("test_data/jar_test/slf4j-simple-1.6.1.jar")
-    val fileWrapper = FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
-    val runner = Syft.runSyftFor(fileWrapper, file.toPath())
-    val (str, json) = runner.runUntil(System.currentTimeMillis() + 100000).get
+    if (Syft.hasSyft) {
+      val file = File("test_data/jar_test/slf4j-simple-1.6.1.jar")
+      val fileWrapper =
+        FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
+      val runner = Syft.runSyftFor(fileWrapper, file.toPath())
+      val (str, json) = runner.get.runForMillis(100000).get
 
-    assert(str.length() > 400, s"Syft answer too small ${str}")
+      assert(str.length() > 400, s"Syft answer too small ${str}")
+    } else {
+      assert(true)
+    }
   }
 
   test("Syft works on nested stuff") {
-    val file = File("test_data/nested.tar")
-    val fileWrapper = FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
-    val runner = Syft.runSyftFor(fileWrapper, file.toPath())
-    val (str, json) = runner.runUntil(System.currentTimeMillis() + 100000).get
+    if (Syft.hasSyft) {
+      val file = File("test_data/nested.tar")
+      val fileWrapper =
+        FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
+      val runner = Syft.runSyftFor(fileWrapper, file.toPath())
+      val (str, json) = runner.get.runForMillis(100000).get
 
-    // val artifacts =
+      // val artifacts =
 
-    val purls = for {
-      case JArray(artifacts) <- json \ "artifacts"
-      artifact <- artifacts
-      case JString(purl) <- artifact \ "purl"
-    } yield purl
+      val purls = for {
+        case JArray(artifacts) <- json \ "artifacts"
+        artifact <- artifacts
+        case JString(purl) <- artifact \ "purl"
+      } yield purl
 
-    assert(
-      purls == List(
-        "pkg:maven/org.apache.logging.log4j/log4j-core@2.22.1",
-        "pkg:deb/tk8.6@8.6.14-1build1?arch=amd64"
-      ),
-      f"expected to get proper purls, got ${purls}"
-    )
+      assert(
+        purls == List(
+          "pkg:maven/org.apache.logging.log4j/log4j-core@2.22.1",
+          "pkg:deb/tk8.6@8.6.14-1build1?arch=amd64"
+        ),
+        f"expected to get proper purls, got ${purls}"
+      )
+    } else {
+      assert(true)
+    }
   }
 }

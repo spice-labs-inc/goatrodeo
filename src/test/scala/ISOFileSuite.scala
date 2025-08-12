@@ -63,7 +63,7 @@ class ISOFileSuite extends munit.FunSuite {
     tp.process(
       None,
       store,
-      ParentScope.forAndWith("Testing ISO", None),
+      ParentScope.forAndWith("Testing ISO", None, Map()),
       args = Config(),
       tag = None
     )

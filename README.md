@@ -55,13 +55,13 @@ sbt assembly
 Produces fat JAR at:
 
 ```
-target/scala-3.6.3/goatrodeo.jar
+target/scala-3.7.2/goatrodeo-0.0.1-SNAPSHOT-fat.jar
 ```
 
 Run example:
 
 ```bash
-java -jar target/scala-3.6.3/goatrodeo.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24
+java -jar target/scala-*/goatrodeo-*-fat.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24
 ```
 
 ---
