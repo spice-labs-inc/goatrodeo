@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val scala3Version = "3.6.3"
+val scala3Version = "3.7.2"
 
 ThisBuild / organization := "io.spicelabs"
 ThisBuild / version := "0.0.1-SNAPSHOT" // Don't change this, it is overridden by the GitHub Actions workflow

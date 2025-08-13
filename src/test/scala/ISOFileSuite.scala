@@ -16,6 +16,7 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
@@ -62,7 +63,8 @@ class ISOFileSuite extends munit.FunSuite {
     tp.process(
       None,
       store,
-      ParentScope.forAndWith("Testing ISO", None),
+      ParentScope.forAndWith("Testing ISO", None, Map()),
+      args = Config(),
       tag = None
     )
     val cnt = store.keys().size

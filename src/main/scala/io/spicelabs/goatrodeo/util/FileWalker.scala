@@ -52,10 +52,7 @@ object FileWalker {
     if (zipMimeTypes.contains(in.mimeType)) {
       import scala.jdk.CollectionConverters.IteratorHasAsScala
 
-      val theFile = in match {
-        case fw: FileWrapper => fw.wrappedFile
-        case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempDir))
-      }
+      val theFile = in.forceFile(tempDir)
 
       try {
 
@@ -412,6 +409,8 @@ object FileWalker {
     }
   }
 
+  private val threadTempDir: ThreadLocal[Option[Path]] = ThreadLocal()
+
   /** If the Artifact is a "container" (e.g., tar file, zip file, etc.) then
     * expand the contained artifacts and traverse into the container with a
     * function.
@@ -438,6 +437,7 @@ object FileWalker {
       }
 
       try {
+        threadTempDir.set(Some(tempDir))
         tryToConstructArchiveStream(artifact, tempDir) match {
           case None => None
           case Some(artifacts -> wrapperName) =>
@@ -456,9 +456,25 @@ object FileWalker {
             }
         }
       } finally {
+        threadTempDir.set(None)
         // clean up
         Helpers.deleteDirectory(tempDir)
 
+      }
+    }
+  }
+
+  def withinTempDir[T](f: Path => T): T = {
+    val (del, dir) = threadTempDir.get() match {
+      case None    => true -> Files.createTempDirectory("goatrodeo_temp_dir")
+      case Some(p) => false -> p
+    }
+
+    try {
+      f(dir)
+    } finally {
+      if (del) {
+        Helpers.deleteDirectory(dir)
       }
     }
   }

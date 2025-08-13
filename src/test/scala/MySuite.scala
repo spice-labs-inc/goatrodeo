@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.Debian
 import io.spicelabs.goatrodeo.util.*
+import io.spicelabs.goatrodeo.util.Config
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
@@ -166,12 +167,71 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store = ToProcess.buildGraphFromArtifactWrapper(
+      nested,
+      args = Config(useSyft = true)
+    )
 
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
 
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
+
+    if (Syft.hasSyft) { // only run the Syft tests if Syft is installed
+      {
+        // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
+        val item = store
+          .read(
+            store
+              .read(
+                "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
+              )
+              .get
+              .connections
+              .head
+              ._2
+          )
+          .get
+
+        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
+
+        assert(purls.length == 1, s"should be a purl ${purls} on log4j")
+
+        assert(
+          item.bodyAsItemMetaData.get.extra.get("syft-artifact").get.size == 1,
+          "Should have one augmentation on log4j"
+        )
+      }
+
+      {
+        // a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17 tk
+
+        val item = store
+          .read(
+            store
+              .read(
+                "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
+              )
+              .get
+              .connections
+              .head
+              ._2
+          )
+          .get
+
+        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
+
+        assert(
+          purls.length == 2,
+          s"should be two purls (the deb plugin and the syft generated) ${purls} on tk"
+        )
+
+        assert(
+          item.bodyAsItemMetaData.get.extra.get("syft-artifact").get.size == 1,
+          "Should have one augmentation on tk"
+        )
+      }
+    }
   }
 
   test("Compute pURL for .deb") {
@@ -226,7 +286,7 @@ class MySuite extends munit.FunSuite {
     val nested =
       FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
 
@@ -235,7 +295,7 @@ class MySuite extends munit.FunSuite {
 
   test("calculate mime type for class file") {
     val classFileName =
-      "target/scala-3.6.3/classes/io/spicelabs/goatrodeo/Howdy.class"
+      "target/scala-3.7.2/classes/io/spicelabs/goatrodeo/Howdy.class"
 
     val f = new File(classFileName)
     val metadata = new Metadata()
@@ -251,15 +311,18 @@ class MySuite extends munit.FunSuite {
   test("Build from nested") {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
-    val store1 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store1 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
     val store2 = ToProcess.buildGraphFromArtifactWrapper(
       nested,
+      args = Config(),
       block = Set(
         "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
       )
     )
 
-    val store3 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store3 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
     assertEquals(
       store1.keys().toSet,
@@ -319,6 +382,7 @@ class MySuite extends munit.FunSuite {
     var packages: Vector[PackageURL] = Vector()
     val store = ToProcess.buildGraphForToProcess(
       strategy,
+      args = Config(),
       purlOut = purl => {
         packages = packages :+ purl
       }

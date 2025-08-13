@@ -18,7 +18,7 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
-
+import io.spicelabs.goatrodeo.omnibor.Augmentation
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -196,11 +196,12 @@ case class MavenState(
       item: Item,
       store: Storage,
       marker: MavenMarkers,
-      parentScope: Option[ParentScope]
+      parentScope: Option[ParentScope],
+      augmentationByHash: Map[String, Vector[Augmentation]]
   ): ParentScope = marker match {
     case MavenMarkers.JAR =>
       // the code that associates source with class files
-      new ParentScope {
+      new ParentScope(augmentationByHash) {
 
         def scopeFor(): String = item.identifier
         def parentOfParentScope(): Option[ParentScope] = parentScope
@@ -225,7 +226,7 @@ case class MavenState(
           }
         }
       }
-    case _ => ParentScope.forAndWith(item.identifier, parentScope)
+    case _ => ParentScope.forAndWith(item.identifier, parentScope, Map())
   }
 
 }

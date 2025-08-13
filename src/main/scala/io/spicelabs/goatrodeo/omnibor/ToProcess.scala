@@ -4,10 +4,12 @@ import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Syft
 
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -131,11 +133,15 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       item: Item,
       store: Storage,
       marker: PM,
-      parent: Option[ParentScope]
-  ): ParentScope = ParentScope.forAndWith(item.identifier, parent)
+      parent: Option[ParentScope],
+      augmentationByHash: Map[String, Vector[Augmentation]]
+  ): ParentScope =
+    ParentScope.forAndWith(item.identifier, parent, augmentationByHash)
 }
 
-trait ParentScope {
+abstract class ParentScope(
+    val augmentationByHash: Map[String, Vector[Augmentation]]
+) {
   def beginProcessing(
       store: Storage,
       artifact: ArtifactWrapper,
@@ -176,14 +182,33 @@ trait ParentScope {
   /** What is this scope part of? E.g., the gitoid of the Item being processed
     */
   def scopeFor(): String
+
+  def itemAugmentationByHashes(hashes: Vector[String]): Vector[Augmentation] = {
+    val mine = if (this.augmentationByHash.isEmpty) { Vector() }
+    else {
+
+      for {
+        hash <- hashes
+        augs <- this.augmentationByHash.get(hash).toVector
+        aug <- augs
+      } yield aug
+    }
+
+    mine ++ (for {
+      parent <- this.parentOfParentScope().toVector
+      aug <- parent.itemAugmentationByHashes(hashes)
+
+    } yield aug)
+  }
 }
 
 object ParentScope {
   def forAndWith(
       theScopeFor: String,
-      withParent: Option[ParentScope]
+      withParent: Option[ParentScope],
+      augmentationByHash: Map[String, Vector[Augmentation]]
   ): ParentScope =
-    new ParentScope {
+    new ParentScope(augmentationByHash) {
       def scopeFor(): String = theScopeFor
       def parentOfParentScope(): Option[ParentScope] = withParent
 
@@ -224,6 +249,29 @@ trait ToProcess {
     */
   def getElementsToProcess(): (Seq[(ArtifactWrapper, MarkerType)], StateType)
 
+  def runSyft(): Map[String, Vector[Augmentation]] = {
+    FileWalker.withinTempDir { tempDir =>
+      {
+        val augmentation: Seq[Map[String, Vector[Augmentation]]] = for {
+          (wrapper, _) <- getElementsToProcess()._1
+          it <- Syft.runSyftFor(wrapper, tempDir).toList
+          answer <- it.runForMillis(120L * 1000 * 60) // 120 minutes
+
+        } yield it.buildAugmentation()
+
+        augmentation.foldLeft(Map[String, Vector[Augmentation]]()) {
+          case (curr, next) =>
+            curr.foldLeft(next) { case (map, (k, v)) =>
+              map.get(k) match {
+                case None      => map + (k -> v)
+                case Some(vec) => map + (k -> (v ++ vec))
+              }
+            }
+        }
+      }
+    }
+  }
+
   /** Recursively process
     *
     * @param parentId
@@ -240,6 +288,7 @@ trait ToProcess {
       store: Storage,
       parentScope: ParentScope,
       tag: Option[TagPass],
+      args: Config,
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
       atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
@@ -250,12 +299,19 @@ trait ToProcess {
       val (finalState, ret) =
         elements.foldLeft(initialState -> Vector[GitOID]()) {
           case ((orgState, alreadyDone), (artifact, marker)) =>
-            val item = Item.itemFrom(artifact, parentId)
+            val itemRaw = Item.itemFrom(artifact, parentId)
 
             // in blocklist do nothing
-            if (blockList.contains(item.identifier)) {
+            if (blockList.contains(itemRaw.identifier)) {
               orgState -> alreadyDone
             } else {
+              val aliases = itemRaw.connections.toVector
+                .filter(_._1 == EdgeType.aliasFrom)
+                .map(_._2)
+              val augmentations = parentScope.itemAugmentationByHashes(aliases)
+              val item = augmentations.foldLeft(itemRaw) { case (item, aug) =>
+                aug.augment(item)
+              }
               val state = orgState.beginProcessing(artifact, item, marker)
               val itemScope1 =
                 parentScope.beginProcessing(store, artifact, item)
@@ -384,7 +440,8 @@ trait ToProcess {
                         answerItem,
                         store,
                         marker,
-                        Some(parentScope)
+                        Some(parentScope),
+                        Map()
                       )
                       processSet.flatMap(tp =>
                         tp.process(
@@ -392,6 +449,7 @@ trait ToProcess {
                           store,
                           thisParentScope,
                           None,
+                          args = args,
                           blockList,
                           keepRunning,
                           atEnd
@@ -606,14 +664,22 @@ object ToProcess {
   def buildGraphForToProcess(
       toProcess: Vector[ToProcess],
       store: Storage = MemStorage(None),
+      args: Config,
       purlOut: PackageURL => Unit = _ => (),
       block: Set[GitOID] = Set()
   ): Storage = {
+
     for { individual <- toProcess } {
+      val augmentation = if (args.useSyft) {
+        individual.runSyft()
+      } else Map()
+
       individual.process(
         None,
         store,
-        parentScope = ParentScope.forAndWith(individual.main, None),
+        args = args,
+        parentScope =
+          ParentScope.forAndWith(individual.main, None, augmentation),
         tag = None,
         blockList = block
       )
@@ -638,6 +704,7 @@ object ToProcess {
     */
   def buildGraphFromArtifactWrapper(
       artifact: ArtifactWrapper,
+      args: Config,
       store: Storage = MemStorage(None),
       purlOut: PackageURL => Unit = _ => (),
       block: Set[GitOID] = Set()
@@ -646,7 +713,7 @@ object ToProcess {
     // generate the strategy
     val toProcess = strategiesForArtifacts(Vector(artifact), _ => (), false)
 
-    buildGraphForToProcess(toProcess, store, purlOut, block)
+    buildGraphForToProcess(toProcess, store, args, purlOut, block)
 
   }
 }

@@ -17,6 +17,7 @@ package io.spicelabs.goatrodeo.omnibor
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -74,6 +75,7 @@ object Builder {
       maxRecords: Int,
       tag: Option[TagInfo],
       tempDir: Option[File],
+      args: Config,
       fileListers: Seq[() => Seq[File]],
       ignorePathSet: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
@@ -186,6 +188,7 @@ object Builder {
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
         tempDir = tempDir,
+        args = args,
         preWriteDB = preWriteDB
       )
 
@@ -228,6 +231,7 @@ object Builder {
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
       tempDir: Option[File],
+      args: Config,
       preWriteDB: Storage => Boolean = store => true
   ): Option[Thread] = {
 
@@ -292,11 +296,20 @@ object Builder {
             try {
               // build the package
 
+              val byHash: Map[String, Vector[Augmentation]] =
+                if (args.useSyft) {
+                  toProcess.runSyft()
+                } else {
+                  Map()
+                }
+
               toProcess.process(
                 None,
                 store = storage,
                 tag = tag,
-                parentScope = ParentScope.forAndWith(toProcess.main, None),
+                args = args,
+                parentScope =
+                  ParentScope.forAndWith(toProcess.main, None, byHash),
                 blockList = blockGitoids,
                 keepRunning = () => !dead_?.get(),
                 atEnd = (parent, _) => {
@@ -428,7 +441,6 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                computeAndAddMerkleTrees(lf)
                 writeGoatRodeoFiles(lf)
               case _ => logger.error("Didn't write"); None
             }
@@ -448,78 +460,6 @@ object Builder {
       thread.start()
       Some(thread)
     } else None
-
-  }
-
-  /** Finds all the Items that "Contain" other items and generate a Merkle Tree
-    * alias
-    *
-    * @param data
-    *   the items
-    */
-  def computeAndAddMerkleTrees(data: ListFileNames & Storage): Unit = {
-    val keys = data.keys()
-
-    logger.info(f"Computing merkle trees for ${keys.size} items")
-    val merkleTrees = for {
-      k <- keys.toVector.par
-      item <- data.read(k)
-      if !item.connections.filter(a => EdgeType.isDown(a._1)).isEmpty
-    } yield {
-      item.identifier -> GitOIDUtils.merkleTreeFromGitoids(
-        item.connections.toVector
-          .filter(a => EdgeType.isDown(a._1))
-          .map(_._2)
-      )
-    }
-
-    logger.info(f"Computed ${merkleTrees.size} Merkle Trees")
-
-    // write the aliases
-    for { (itemId, tree) <- merkleTrees } {
-      // create the Merkle Tree Alias
-      data.write(
-        tree,
-        maybeAlias => {
-          val alias = maybeAlias.getOrElse(
-            Item(
-              identifier = tree,
-              // reference = Item.noopLocationReference,
-              connections = TreeSet(),
-              bodyMimeType = None,
-              body = None
-            )
-          )
-          val toAdd = (EdgeType.aliasTo, itemId)
-          val updatedAlias =
-            if (alias.connections.contains(toAdd)) { alias }
-            else {
-              alias.copy(
-                connections = (alias.connections + toAdd)
-              )
-            }
-          updatedAlias
-        },
-        item => f"Inserting Merkle Tree of ${itemId}"
-      )
-      // and update the Item with the AliasFrom
-      data.write(
-        itemId,
-        {
-          case None =>
-            throw new Exception(
-              f"Should be able to find ${itemId}, but it's missing"
-            )
-          case Some(item) =>
-            val toAdd = (EdgeType.aliasFrom, tree)
-            if (item.connections.contains(toAdd)) item
-            else item.copy(connections = item.connections + toAdd)
-        },
-        item => f"Updating Merkle Tree alias for ${itemId}"
-      )
-    }
-
-    logger.info(f"Wrote ${merkleTrees.size} Merkle Trees")
 
   }
 

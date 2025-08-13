@@ -3,6 +3,7 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -26,7 +27,7 @@ class ADGTests extends munit.FunSuite {
       } {
         val bad = File(source, toTry)
         val badWrapper = FileWrapper(bad, toTry, None)
-        ToProcess.buildGraphFromArtifactWrapper(badWrapper)
+        ToProcess.buildGraphFromArtifactWrapper(badWrapper, Config())
       }
 
     }
@@ -56,6 +57,7 @@ class ADGTests extends munit.FunSuite {
       Builder.buildDB(
         dest = resForBigTent,
         tempDir = None,
+        args = Config(),
         threadCnt = (Option(System.getenv("TEST_THREAD_CNT")))
           .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
           .getOrElse(25),

@@ -4,6 +4,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import org.json4s.*
 import org.json4s.JsonAST.*
@@ -12,7 +13,6 @@ import org.json4s.native.*
 import java.io.File
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-
 class DockerSuite extends munit.FunSuite {
   val logger = Logger(getClass())
 
@@ -20,7 +20,8 @@ class DockerSuite extends munit.FunSuite {
     val name = "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
 
     val nested = FileWrapper(File(name), name, None)
-    val store1 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store1 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
     val result = store1.purls()
 
@@ -66,7 +67,8 @@ class DockerSuite extends munit.FunSuite {
     val name = "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
 
     val nested = FileWrapper(File(name), name, None)
-    val store1 = ToProcess.buildGraphFromArtifactWrapper(nested)
+    val store1 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
     val result = store1.purls()
     val expectedpurls = TreeSet(

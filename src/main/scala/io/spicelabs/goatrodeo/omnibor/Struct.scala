@@ -138,7 +138,7 @@ object StringOrPair {
 
   }
 
-  given Decoder[StringOrPair] = Decoder { reader =>
+  given Decoder[StringOrPair] = { reader =>
     if (reader.hasArrayStart || reader.hasArrayHeader(2)) {
       val unbounded = reader.readArrayOpen(2)
       val item = PairOf(
@@ -241,16 +241,19 @@ object ItemTagData {
 
 case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
   def merge(other: ItemTagData): ItemTagData = {
-    
+
     // Merge logic for Dom.Element
     val mergedTag = (this.tag, other.tag) match {
-      case (f1: io.bullet.borer.Dom.MapElem,f2: io.bullet.borer.Dom.MapElem) =>
+      case (f1: io.bullet.borer.Dom.MapElem, f2: io.bullet.borer.Dom.MapElem) =>
         io.bullet.borer.Dom.MapElem.Unsized(f1.members ++ f2.members)
-      case (a1: io.bullet.borer.Dom.ArrayElem, a2: io.bullet.borer.Dom.ArrayElem) =>
+      case (
+            a1: io.bullet.borer.Dom.ArrayElem,
+            a2: io.bullet.borer.Dom.ArrayElem
+          ) =>
         io.bullet.borer.Dom.ArrayElem.Unsized(a1.elems ++ a2.elems)
       case (a1: io.bullet.borer.Dom.ArrayElem, _) =>
         a1
-      case (_,a2: io.bullet.borer.Dom.ArrayElem) =>
+      case (_, a2: io.bullet.borer.Dom.ArrayElem) =>
         a2
       case (a, _) =>
         a

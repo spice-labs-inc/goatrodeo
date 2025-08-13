@@ -16,78 +16,87 @@ package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
 
-import java.nio.file.Path
 import java.nio.file.Paths
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
+import io.spicelabs.goatrodeo.util.Config
+import scala.util.Try
+import java.util.regex.Pattern
+import io.bullet.borer.Dom
+import io.bullet.borer.Json
 
 class GoatRodeoBuilder {
   private val log = Logger(classOf[GoatRodeoBuilder])
 
-  private var payload: Option[Path] = None
-  private var output: Option[Path] = None
-  private var threads: Int = 4
-  private var ingested: Option[Path] = None
-  private var ignore: Option[Path] = None
-  private var fileList: Option[Path] = None
-  private var excludePattern: Option[String] = None
-  private var maxRecords: Int = 50000
-  private var blockList: Option[Path] = None
-  private var tempDir: Option[Path] = None
-  private var tag: Option[String] = None
+  private var config = Config()
 
   def withPayload(p: String): GoatRodeoBuilder = {
-    this.payload = Some(Paths.get(p))
+    this.config =
+      this.config.copy(build = this.config.build :+ Paths.get(p).toFile())
     this
   }
 
   def withOutput(o: String): GoatRodeoBuilder = {
-    this.output = Some(Paths.get(o))
+    this.config = this.config.copy(out = Some(Paths.get(o).toFile()))
     this
   }
 
   def withThreads(t: Int): GoatRodeoBuilder = {
-    this.threads = t
+    this.config = this.config.copy(threads = t)
     this
   }
 
   def withIngested(i: String): GoatRodeoBuilder = {
-    this.ingested = Some(Paths.get(i))
+    this.config = this.config.copy(ingested = Some(Paths.get(i).toFile()))
     this
   }
 
   def withIgnore(i: String): GoatRodeoBuilder = {
-    this.ignore = Some(Paths.get(i))
+    this.config =
+      this.config.copy(ignore = config.ignore :+ Paths.get(i).toFile())
     this
   }
 
   def withFileList(f: String): GoatRodeoBuilder = {
-    this.fileList = Some(Paths.get(f))
+    config = config.copy(fileList = config.fileList :+ Paths.get(f).toFile())
     this
   }
 
   def withExcludePattern(p: String): GoatRodeoBuilder = {
-    this.excludePattern = Some(p)
+    config =
+      config.copy(exclude = config.exclude :+ (p, Try(Pattern.compile(p))))
     this
   }
 
   def withMaxRecords(r: Int): GoatRodeoBuilder = {
-    this.maxRecords = r
+    config = config.copy(maxRecords = r)
     this
   }
 
   def withBlockList(b: String): GoatRodeoBuilder = {
-    this.blockList = Some(Paths.get(b))
+    config = config.copy(blockList = Some(Paths.get(b).toFile()))
     this
   }
 
   def withTempDir(d: String): GoatRodeoBuilder = {
-    this.tempDir = Some(Paths.get(d))
+    config = config.copy(tempDir = Some(Paths.get(d).toFile()))
     this
   }
 
   def withTag(t: String): GoatRodeoBuilder = {
-    this.tag = Option(t)
+    config = config.copy(tag = Some(t))
+    this
+  }
+
+  def withSyft(b: Boolean): GoatRodeoBuilder = {
+    config = config.copy(useSyft = b)
+    this
+  }
+
+  def withTagJson(t: String): GoatRodeoBuilder = {
+    config = config.copy(tagJson =
+      Some(Json.decode(t.getBytes("UTF-8")).to[Dom.Element].value)
+    )
     this
   }
 
@@ -112,6 +121,7 @@ class GoatRodeoBuilder {
       case "excludePattern" => withExcludePattern(value)
       case "blockList"      => withBlockList(value)
       case "tempDir"        => withTempDir(value)
+      case "tag-json"       => withTagJson(value)
       case "tag"            => withTag(value)
       case unknown =>
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
@@ -120,21 +130,8 @@ class GoatRodeoBuilder {
   }
 
   def run(): Unit = {
-    val args = Seq(
-      Some("--build").zip(payload.map(_.toString)),
-      Some("--out").zip(output.map(_.toString)),
-      Some("--threads").map(_ -> threads.toString),
-      tag.map(t => "--tag" -> t),
-      ingested.map(i => "--ingested" -> i.toString),
-      ignore.map(i => "--ignore" -> i.toString),
-      fileList.map(f => "--file-list" -> f.toString),
-      excludePattern.map(p => "--exclude-pattern" -> p),
-      Some("--maxrecords" -> maxRecords.toString),
-      blockList.map(b => "--block" -> b.toString),
-      tempDir.map(d => "--tempdir" -> d.toString)
-    ).flatten.flatMap { case (k, v) => Seq(k, v) }
 
-    Howdy.run(args.toArray)
+    Howdy.run(config)
   }
 }
 
