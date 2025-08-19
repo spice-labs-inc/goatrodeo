@@ -71,7 +71,7 @@ class ADGTests extends munit.FunSuite {
           sync.synchronized { captured = captured :+ f }; ()
         },
         done = b => { finished = b },
-        preWriteDB = store => {
+        preWriteDB = Vector(store => {
           store.keys().toVector.zipWithIndex.foreach {
             case (key, idx) => {
               val item = store.read(key).get
@@ -106,7 +106,7 @@ class ADGTests extends munit.FunSuite {
             }
             case None => assert(false, "Failed to read tags"); true
           }
-        }
+        })
       )
 
       assert(tagCount > 8000, s"Expecting lots of tags, got ${tagCount}")

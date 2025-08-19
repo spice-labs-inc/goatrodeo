@@ -1,8 +1,9 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import scala.collection.immutable.TreeSet
-import scala.collection.immutable.TreeMap
 import io.spicelabs.goatrodeo.util.Helpers
+
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
 /** Data that augments an Item
   */

@@ -55,6 +55,27 @@ case class Item(
     myHash < thatHash
   }
 
+  /** Is the item a root item
+    *
+    * @return
+    */
+  def isRoot(): Boolean = {
+    if (this.bodyMimeType != Some(ItemMetaData.mimeType)) {
+      false
+    } else if (this.identifier == "tags") {
+      false
+    } else if (
+      this.connections
+        .find(e => EdgeType.isAliasTo(e._1) || EdgeType.isContainedByUp(e._1))
+        .isDefined
+    ) { false }
+    else {
+
+      true
+    }
+
+  }
+
   /** Builds a list of items that are referenced from this item. The references
     * are of types `AliasFrom`, `BuiltFrom`, and `ContainedBy`
     *
@@ -236,7 +257,7 @@ case class Item(
         val augmentedFileNames = filenames.flatMap(name =>
           maybeParent match {
             case Some(parent)
-                if baseFileNames.size > 1 || !baseFileNames.contains(name) =>
+                if baseFileNames.size > 1 || (baseFileNames.size == 1 && !baseFileNames.contains(name)) =>
               Vector(name, f"${parent}/${name}")
             case _ => Vector(name)
           }

@@ -17,13 +17,11 @@ package io.spicelabs.goatrodeo
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.omnibor.Builder
-import io.spicelabs.goatrodeo.omnibor.EdgeType
-import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Helpers
-
+import scopt.OParser
 
 import java.io.File
 import java.nio.file.Files
@@ -32,7 +30,6 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import scopt.OParser
 
 class Howdy
 
@@ -41,9 +38,6 @@ class Howdy
 object Howdy {
   private val logger = Logger(getClass())
 
-  
-
-  
   /** The entrypoint
     *
     * @param args
@@ -154,10 +148,13 @@ object Howdy {
       return
     }
 
-    val preWriteDB: Storage => Boolean = true match {
-
-      case _ => _ => true
-    }
+    val preWriteDB: Vector[Storage => Boolean] =
+      params.dumpRootDir.toVector.map(dir =>
+        (storage: Storage) => { storage.emitRootsToDir(dir); true }
+      ) ++
+        params.emitJsonDir.toVector.map(dir =>
+          (storage: Storage) => { storage.emitAllItemsToDir(dir); true }
+        )
 
     Builder.buildDB(
       dest = dest,
@@ -181,48 +178,4 @@ object Howdy {
 
   }
 
-  def emitFound(s: Storage, toFind: Map[String, Vector[String]]): Unit = {
-
-    // from storage, find all the items that match a particular human text string
-    val mapped = toFind.foldLeft(Map[String, Set[Item]]()) {
-      case (found, (looking, names)) =>
-        s.read(looking) match {
-          case Some(item) =>
-            names.foldLeft(found) { case (found, name) =>
-              found + (name -> (found.getOrElse(name, Set()) + item))
-            }
-          case _ => found
-        }
-    }
-
-  }
-
-  /** Find all the nodes north of these nodes that have filenames
-    *
-    * @param s
-    *   storage
-    * @param items
-    *   the base items
-    * @return
-    *   the resulting items with filenames
-    */
-  private def nodesWithFilenames(s: Storage, items: Set[Item]): Set[Item] = {
-    items.foldLeft(Set[Item]()) { case (set, toTest) =>
-      if (set.contains(toTest)) set
-      else {
-        val possibles = northOf(s, toTest, Set(toTest))
-        // FIXME
-        ???
-      }
-    }
-  }
-
-  private def northOf(s: Storage, item: Item, current: Set[Item]): Set[Item] = {
-    item.connections
-      .filter(e => EdgeType.containedBy == e._1)
-      .foldLeft(current) { case (ret, (edgeType, gitoid)) =>
-        // FIXME
-        ???
-      }
-  }
 }

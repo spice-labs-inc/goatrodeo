@@ -2,6 +2,7 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ParentScope
@@ -18,7 +19,7 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
-import io.spicelabs.goatrodeo.omnibor.Augmentation
+
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try

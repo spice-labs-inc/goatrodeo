@@ -15,15 +15,15 @@ limitations under the License. */
 package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
-
-import java.nio.file.Paths
-import scala.annotation.static
-import scala.jdk.CollectionConverters.*
-import io.spicelabs.goatrodeo.util.Config
-import scala.util.Try
-import java.util.regex.Pattern
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.util.Config
+
+import java.nio.file.Paths
+import java.util.regex.Pattern
+import scala.annotation.static
+import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 class GoatRodeoBuilder {
   private val log = Logger(classOf[GoatRodeoBuilder])
