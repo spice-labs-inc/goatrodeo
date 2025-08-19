@@ -466,7 +466,8 @@ object FileWalker {
 
   def withinTempDir[T](f: Path => T): T = {
     val (del, dir) = threadTempDir.get() match {
-      case None    => true -> Files.createTempDirectory("goatrodeo_temp_dir")
+      case None | null =>
+        true -> Files.createTempDirectory("goatrodeo_temp_dir")
       case Some(p) => false -> p
     }
 

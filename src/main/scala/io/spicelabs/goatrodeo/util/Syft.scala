@@ -5,6 +5,7 @@ import io.spicelabs.goatrodeo.omnibor.*
 import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.ToProcess.logger
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -52,20 +53,24 @@ object Syft {
       tempDir: Path
   ): Option[SyftResult] = {
     if (hasSyft) {
-      val targetFile = artfiact.forceFile(tempDir)
-      val pb = ProcessBuilder(
-        List(
-          "syft",
-          "scan",
-          f"file:${targetFile.getName()}",
-          "--output",
-          "syft-json"
-        )*
-      ).directory(targetFile.getCanonicalFile().getParentFile())
-      val ret = SyftResult(pb, targetFile.getCanonicalPath())
-      ret.go()
+      Try {
+        val targetFile = artfiact.forceFile(tempDir)
+        val pb = ProcessBuilder(
+          List(
+            "syft",
+            "scan",
+            f"file:${targetFile.getName()}",
+            "--output",
+            "syft-json"
+          )*
+        ).directory(targetFile.getCanonicalFile().getParentFile())
+        logger.info(f"Kicking off Syft for ${targetFile}")
+        val ret = SyftResult(pb, targetFile.getCanonicalPath())
+        ret.go()
+        ret
+      }.toOption
 
-      Some(ret)
+      // Some(ret)
     } else None
 
   }

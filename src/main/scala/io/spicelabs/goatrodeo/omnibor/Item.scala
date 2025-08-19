@@ -257,7 +257,8 @@ case class Item(
         val augmentedFileNames = filenames.flatMap(name =>
           maybeParent match {
             case Some(parent)
-                if baseFileNames.size > 1 || (baseFileNames.size == 1 && !baseFileNames.contains(name)) =>
+                if baseFileNames.size > 1 || (baseFileNames.size == 1 && !baseFileNames
+                  .contains(name)) =>
               Vector(name, f"${parent}/${name}")
             case _ => Vector(name)
           }
