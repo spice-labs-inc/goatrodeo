@@ -16,10 +16,12 @@ package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
+import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeSet
@@ -107,6 +109,30 @@ trait Storage {
     *   the purls
     */
   def purls(): TreeSet[String]
+
+  def emitRootsToDir(dir: File): Unit = {
+    dir.mkdirs()
+    val fileName = f"roots_${System.currentTimeMillis()}.json"
+    val file = new File(dir, fileName)
+    val rootItems = for {
+      key <- keys().toVector
+      item <- read(key) if item.isRoot()
+    } yield item.identifier
+
+    Files.writeString(file.toPath(), Json.encode(rootItems).toUtf8String)
+  }
+
+  def emitAllItemsToDir(dir: File): Unit = {
+    dir.mkdirs()
+    val fileName = f"items_${System.currentTimeMillis()}.json"
+    val file = new File(dir, fileName)
+    val rootItems = for {
+      key <- keys().toVector
+      item <- read(key)
+    } yield item
+
+    Files.writeString(file.toPath(), Json.encode(rootItems).toUtf8String)
+  }
 }
 
 /** Can the filenames be listed?

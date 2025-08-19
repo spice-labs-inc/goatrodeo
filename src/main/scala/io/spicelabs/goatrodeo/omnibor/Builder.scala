@@ -81,7 +81,7 @@ object Builder {
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
-      preWriteDB: Storage => Boolean = store => true
+      preWriteDB: Vector[Storage => Boolean] = Vector()
   ): Unit = {
     val totalStart = Instant.now()
 
@@ -232,7 +232,7 @@ object Builder {
       writeThreadCnt: AtomicInteger,
       tempDir: Option[File],
       args: Config,
-      preWriteDB: Storage => Boolean = store => true
+      preWriteDB: Vector[Storage => Boolean] = Vector()
   ): Option[Thread] = {
 
     val storage = MemStorage(Some(destDir))
@@ -436,7 +436,9 @@ object Builder {
 
             val writeStart = Instant.now()
 
-            val writeToStorage = preWriteDB(storage)
+            val writeToStorage = preWriteDB.foldLeft(true) {
+              case (writeIt, preWriteFunc) => writeIt & preWriteFunc(storage)
+            }
 
             val ret = storage match {
               case lf: (ListFileNames & Storage)

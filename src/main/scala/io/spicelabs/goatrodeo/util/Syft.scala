@@ -1,16 +1,16 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.omnibor.*
+import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
+import io.spicelabs.goatrodeo.omnibor.EdgeType
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import scala.util.Try
-import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
-import io.spicelabs.goatrodeo.omnibor.EdgeType
-import io.spicelabs.goatrodeo.omnibor.*
 
 /** The bridge to Syft https://github.com/anchore/syft
   */

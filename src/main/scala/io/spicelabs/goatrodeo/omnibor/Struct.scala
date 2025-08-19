@@ -40,6 +40,8 @@ object EdgeType {
 
   def isContains(s: String): Boolean = s == contains
 
+  def isContainedByUp(s: String): Boolean = s == containedBy
+
   /** Is the type `AliasTo`
     *
     * @param s

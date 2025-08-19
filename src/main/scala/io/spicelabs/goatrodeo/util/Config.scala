@@ -1,18 +1,18 @@
 package io.spicelabs.goatrodeo.util
 
+import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
+import io.bullet.borer.Json
+import org.apache.commons.io.filefilter.WildcardFileFilter
+import scopt.OParser
+import scopt.OParserBuilder
 
 import java.io.File
+import java.io.FileFilter
 import java.nio.file.Files
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import scopt.OParser
-import scopt.OParserBuilder
-import com.typesafe.scalalogging.Logger
-import io.bullet.borer.Json
-import org.apache.commons.io.filefilter.WildcardFileFilter
-import java.io.FileFilter
 
 /** Command Line Configuration
   *
@@ -39,7 +39,9 @@ case class Config(
     blockList: Option[File] = None,
     maxRecords: Int = 50000,
     tempDir: Option[File] = None,
-    useSyft: Boolean = false
+    useSyft: Boolean = false,
+    dumpRootDir: Option[File] = None,
+    emitJsonDir: Option[File] = None
 ) {
   def getFileListBuilders(): Vector[() => Seq[File]] = {
     build.map(file => () => Helpers.findFiles(file, f => true)) ++ fileList
@@ -57,7 +59,7 @@ case class Config(
 }
 
 object Config {
-    private val logger = Logger(getClass())
+  private val logger = Logger(getClass())
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
   lazy val parser1: OParser[Unit, Config] = {
     import builder._
@@ -132,6 +134,14 @@ object Config {
       opt[File]('o', "out")
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
+      opt[File]("dump-roots")
+        .text(
+          "Make a directory and dump the roots in JSON files in the directory"
+        )
+        .action((x, c) => c.copy(dumpRootDir = Some(x))),
+      opt[File]("dump-json")
+        .text("Make a directory and dump the ADG as JSON in to directory")
+        .action((x, c) => c.copy(emitJsonDir = Some(x))),
       opt[File]("tempdir")
         .text("Where to temporarily store files... should be a RAM disk")
         .action((x, c) => c.copy(tempDir = Some(x))),
