@@ -472,7 +472,7 @@ trait ToProcess {
 }
 
 object ToProcess {
-  val logger: Logger = Logger(getClass())
+  private val logger: Logger = Logger(getClass())
 
   type ByUUID = Map[String, ArtifactWrapper]
   type ByName = Map[String, Vector[ArtifactWrapper]]

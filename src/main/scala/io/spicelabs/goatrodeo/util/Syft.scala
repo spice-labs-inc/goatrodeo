@@ -15,6 +15,7 @@ import scala.util.Try
 /** The bridge to Syft https://github.com/anchore/syft
   */
 object Syft {
+  private val logger = Logger(getClass())
   private lazy val syftMimeTypes = Set(
     "application/zip",
     "application/java-archive",
@@ -52,20 +53,24 @@ object Syft {
       tempDir: Path
   ): Option[SyftResult] = {
     if (hasSyft) {
-      val targetFile = artfiact.forceFile(tempDir)
-      val pb = ProcessBuilder(
-        List(
-          "syft",
-          "scan",
-          f"file:${targetFile.getName()}",
-          "--output",
-          "syft-json"
-        )*
-      ).directory(targetFile.getCanonicalFile().getParentFile())
-      val ret = SyftResult(pb, targetFile.getCanonicalPath())
-      ret.go()
+      Try {
+        val targetFile = artfiact.forceFile(tempDir)
+        val pb = ProcessBuilder(
+          List(
+            "syft",
+            "scan",
+            f"file:${targetFile.getName()}",
+            "--output",
+            "syft-json"
+          )*
+        ).directory(targetFile.getCanonicalFile().getParentFile())
+        logger.info(f"Kicking off Syft for ${targetFile}")
+        val ret = SyftResult(pb, targetFile.getCanonicalPath())
+        ret.go()
+        ret
+      }.toOption
 
-      Some(ret)
+      // Some(ret)
     } else None
 
   }

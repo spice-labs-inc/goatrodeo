@@ -250,7 +250,12 @@ object Builder {
         storage.write(
           tag.gitoid,
           item =>
-            Item(tag.gitoid, TreeSet(EdgeType.tagFrom -> "tags"), None, None),
+            Item(
+              tag.gitoid,
+              TreeSet(EdgeType.tagFrom -> "tags"),
+              Some(ItemTagData.mimeType),
+              Some(ItemTagData(tag.json))
+            ),
           x => "tags"
         )
     }
@@ -400,7 +405,8 @@ object Builder {
               }
               case e: Exception => {
                 logger.error(
-                  f"Failed generic ${toProcess.main} -- ${toProcess.mimeType} ${e}"
+                  f"Failed generic ${toProcess.main} -- ${toProcess.mimeType} ${e}",
+                  e
                 )
                 // Helpers.bailFail()
               }
