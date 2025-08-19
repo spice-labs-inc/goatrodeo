@@ -5,7 +5,6 @@ import io.spicelabs.goatrodeo.omnibor.*
 import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.omnibor.ToProcess.logger
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -16,6 +15,7 @@ import scala.util.Try
 /** The bridge to Syft https://github.com/anchore/syft
   */
 object Syft {
+  private val logger = Logger(getClass())
   private lazy val syftMimeTypes = Set(
     "application/zip",
     "application/java-archive",
