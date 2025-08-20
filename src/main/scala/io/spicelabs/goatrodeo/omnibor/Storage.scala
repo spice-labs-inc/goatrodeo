@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+import java.io.FileOutputStream
+import java.io.BufferedOutputStream
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -114,6 +116,7 @@ trait Storage {
     dir.mkdirs()
     val fileName = f"roots_${System.currentTimeMillis()}.json"
     val file = new File(dir, fileName)
+    Storage.logger.info(f"About to dump roots to ${file}")
     val rootItems = for {
       key <- keys().toVector
       item <- read(key) if item.isRoot()
@@ -126,12 +129,24 @@ trait Storage {
     dir.mkdirs()
     val fileName = f"items_${System.currentTimeMillis()}.json"
     val file = new File(dir, fileName)
+    Storage.logger.info(f"About to emit all items as JSON to ${file}")
+    val fos = new FileOutputStream(file)
+    val bos = new BufferedOutputStream(fos)
+    bos.write("[\n".getBytes("UTF-8"))
     val rootItems = for {
-      key <- keys().toVector
+      (key, idx) <- keys().toVector.zipWithIndex
       item <- read(key)
-    } yield item
+    } {
+      if (idx != 0) {
+        bos.write(",\n".getBytes("UTF-8"))
+      }
+      bos.write(Json.encode(item).toByteArray)
 
-    Files.writeString(file.toPath(), Json.encode(rootItems).toUtf8String)
+    }
+
+    bos.write("]\n".getBytes("UTF-8"))
+    bos.flush()
+    bos.close()
   }
 }
 
@@ -165,6 +180,7 @@ trait ListFileNames extends Storage {
 /** A helper/companion to Storage
   */
 object Storage {
+  private val logger = Logger(getClass())
 
   /** Based on criteria, return the appropriate storage instance
     *
