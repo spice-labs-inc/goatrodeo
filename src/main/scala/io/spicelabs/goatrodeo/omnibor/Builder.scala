@@ -244,17 +244,21 @@ object Builder {
         storage.write(
           "tags",
           item =>
-            Item("tags", TreeSet(EdgeType.tagTo -> tag.gitoid), None, None),
+            Some(
+              Item("tags", TreeSet(EdgeType.tagTo -> tag.gitoid), None, None)
+            ),
           item => "set up tags"
         )
         storage.write(
           tag.gitoid,
           item =>
-            Item(
-              tag.gitoid,
-              TreeSet(EdgeType.tagFrom -> "tags"),
-              Some(ItemTagData.mimeType),
-              Some(ItemTagData(tag.json))
+            Some(
+              Item(
+                tag.gitoid,
+                TreeSet(EdgeType.tagFrom -> "tags"),
+                Some(ItemTagData.mimeType),
+                Some(ItemTagData(tag.json))
+              )
             ),
           x => "tags"
         )

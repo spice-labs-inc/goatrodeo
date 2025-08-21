@@ -127,14 +127,54 @@ case class Item(
     *   the updated item
     */
   def createOrUpdateInStore(store: Storage, context: Item => String): Item = {
-    store.write(
-      identifier,
-      {
-        case None        => this
-        case Some(other) => this.merge(other)
-      },
-      context
-    )
+    store
+      .write(
+        identifier,
+        {
+          case None        => Some(this)
+          case Some(other) => Some(this.merge(other))
+        },
+        context
+      )
+      .get // we know we just created an item
+  }
+
+  def updateBackReferences(store: Storage, parentScope: ParentScope): Item = {
+    this
+      .buildListOfReferencesForAliasFromBuiltFromContainedBy()
+      .foreach { case (aliasType, itemNeedingAlias) =>
+        store.write(
+          itemNeedingAlias,
+          {
+            case Some(item) =>
+              Some(
+                item.copy(connections =
+                  item.connections + (aliasType -> this.identifier)
+                )
+              )
+            case None =>
+              Some(
+                Item(
+                  itemNeedingAlias,
+                  // noopLocationReference,
+                  TreeSet(aliasType -> this.identifier),
+                  None,
+                  None
+                )
+              )
+          },
+          item =>
+            f"Updating alias reference ${itemNeedingAlias} ${item.bodyAsItemMetaData match {
+                case None       => ""
+                case Some(body) => f"files ${body.fileNames}"
+              }} alias name ${aliasType} for item ${this.identifier}${this.bodyAsItemMetaData match {
+                case None       => ""
+                case Some(body) => f" files ${body.fileNames}"
+              }}, parent scope ${parentScope.parentScopeInformation()}"
+        )
+
+      }
+    this
   }
 
   /** Make a list of all the gitoids that this Item contains
@@ -228,9 +268,10 @@ case class Item(
     *   the enhanced `Item`
     */
   def enhanceWithMetadata(
-      maybeParent: Option[GitOID],
-      extra: TreeMap[String, TreeSet[StringOrPair]],
-      filenames: Seq[String] = Vector()
+      maybeParent: Option[GitOID] = None,
+      extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap(),
+      filenames: Seq[String] = Vector(),
+      mimeTypes: Seq[String] = Vector()
   ): Item = {
     this.copy(
       bodyMimeType = this.bodyMimeType match {
@@ -266,7 +307,8 @@ case class Item(
 
         base.copy(
           fileNames = base.fileNames ++ augmentedFileNames,
-          extra = base.extra ++ extra
+          extra = base.extra ++ extra,
+          mimeType = base.mimeType ++ TreeSet(mimeTypes*)
         )
 
       })

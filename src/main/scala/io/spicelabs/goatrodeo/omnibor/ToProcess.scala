@@ -106,7 +106,9 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
   def finalAugmentation(
       artifact: ArtifactWrapper,
       item: Item,
-      marker: PM
+      marker: PM,
+      parentScope: ParentScope,
+      store: Storage
   ): (Item, ME)
 
   /** Called after processing childred at a particular state. This will allow
@@ -355,7 +357,13 @@ trait ToProcess {
 
               // do final augmentation (e.g., mapping source to classes)
               val (item4, state4) =
-                state3.finalAugmentation(artifact, itemScope3, marker)
+                state3.finalAugmentation(
+                  artifact,
+                  itemScope3,
+                  marker,
+                  parentScope,
+                  store
+                )
 
               val itemScope4 =
                 parentScope.finalAugmentation(store, artifact, item4)
@@ -374,16 +382,20 @@ trait ToProcess {
                     itemNeedingAlias,
                     {
                       case Some(item) =>
-                        item.copy(connections =
-                          item.connections + (aliasType -> itemScope4.identifier)
+                        Some(
+                          item.copy(connections =
+                            item.connections + (aliasType -> itemScope4.identifier)
+                          )
                         )
                       case None =>
-                        Item(
-                          itemNeedingAlias,
-                          // noopLocationReference,
-                          TreeSet(aliasType -> itemScope4.identifier),
-                          None,
-                          None
+                        Some(
+                          Item(
+                            itemNeedingAlias,
+                            // noopLocationReference,
+                            TreeSet(aliasType -> itemScope4.identifier),
+                            None,
+                            None
+                          )
                         )
                     },
                     item =>
@@ -399,19 +411,21 @@ trait ToProcess {
                 }
 
               // write
-              val answerItem = store.write(
-                itemScope4.identifier,
-                {
-                  case None            => itemScope4
-                  case Some(otherItem) => otherItem.merge(itemScope4)
-                },
-                item =>
-                  f"Writing ${itemScope4.identifier}, ${item.body match {
-                      case None => ""
-                      case Some(body) =>
-                        f"gitoid:sha1 ${item.connections.map(_._2).filter(_.startsWith("gitoid:blob:sha1"))}"
-                    }} parent scope ${parentScope.parentScopeInformation()}"
-              )
+              val answerItem = store
+                .write(
+                  itemScope4.identifier,
+                  {
+                    case None            => Some(itemScope4)
+                    case Some(otherItem) => Some(otherItem.merge(itemScope4))
+                  },
+                  item =>
+                    f"Writing ${itemScope4.identifier}, ${item.body match {
+                        case None => ""
+                        case Some(body) =>
+                          f"gitoid:sha1 ${item.connections.map(_._2).filter(_.startsWith("gitoid:blob:sha1"))}"
+                      }} parent scope ${parentScope.parentScopeInformation()}"
+                )
+                .get // we know we just wrote an item
 
               // update purls
               purls.foreach(p => store.addPurl(p))

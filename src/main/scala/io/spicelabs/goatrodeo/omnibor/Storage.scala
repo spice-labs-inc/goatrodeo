@@ -20,14 +20,14 @@ import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
-import java.io.FileOutputStream
-import java.io.BufferedOutputStream
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -67,9 +67,9 @@ trait Storage {
     */
   def write(
       path: String,
-      opr: Option[Item] => Item,
+      opr: Option[Item] => Option[Item],
       context: Item => String
-  ): Item
+  ): Option[Item]
 
   /** Release the backing store or close files or commit the database.
     */
@@ -265,9 +265,9 @@ class MemStorage(val targetDir: Option[File])
 
   override def write(
       path: String,
-      opr: Option[Item] => Item,
+      opr: Option[Item] => Option[Item],
       context: Item => String
-  ): Item = {
+  ): Option[Item] = {
     val (lock, waiters) = sync.synchronized {
       val theLock = Option(locks.get(path)) match {
         case Some(lock) => lock
@@ -294,14 +294,19 @@ class MemStorage(val targetDir: Option[File])
         if (
           waiters >= contentionThreshold && waiters % contentionThreshold == 0
         ) {
-          logger.info(
-            f"Lock contention for ${path} waiting ${waiters} context ${context(updated)}"
-          )
+          for { updatedItem <- updated } {
+            logger.info(
+              f"Lock contention for ${path} waiting ${waiters} context ${context(updatedItem)}"
+            )
+          }
         }
 
         dbSync.synchronized {
-          val newVal = db.get() + (path -> updated)
-          db.set(newVal)
+
+          for { updatedItem <- updated } {
+            val newVal = db.get() + (path -> updatedItem)
+            db.set(newVal)
+          }
           updated
         }
       }

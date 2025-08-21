@@ -169,7 +169,9 @@ case class MavenState(
   override def finalAugmentation(
       artifact: ArtifactWrapper,
       item: Item,
-      marker: MavenMarkers
+      marker: MavenMarkers,
+      parentScope: ParentScope,
+      store: Storage
   ): (Item, MavenState) = item -> this
 
   override def postChildProcessing(

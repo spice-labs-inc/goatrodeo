@@ -63,6 +63,8 @@ sealed trait ArtifactWrapper {
       ArtifactWrapper.mimeTypeFor(stream, this.path())
   }
 
+  def isRealFile(): Boolean = false
+
   def mimeType: String = _mimeType
 
   protected def getTikaInputStream(): TikaInputStream
@@ -203,7 +205,7 @@ final case class FileWrapper(
     tempDir: Option[File],
     finishedFunc: File => Unit = f => ()
 ) extends ArtifactWrapper {
-
+  override def isRealFile(): Boolean = true
   override protected def getTikaInputStream(): TikaInputStream = {
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, thePath)
