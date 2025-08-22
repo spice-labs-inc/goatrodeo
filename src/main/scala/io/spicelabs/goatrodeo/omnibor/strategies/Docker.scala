@@ -138,6 +138,8 @@ case class DockerState(
         parentScope.scopeFor(),
         {
           case Some(parentItem) =>
+            val thePurls = computePurls(info)
+            thePurls.foreach(store.addPurl(_))
             Some(
               parentItem
                 .enhanceWithMetadata(
@@ -151,7 +153,7 @@ case class DockerState(
                     )
                   )
                 )
-                .enhanceItemWithPurls(computePurls(info))
+                .enhanceItemWithPurls(thePurls)
                 .updateBackReferences(store, parentScope)
             )
           case None => None

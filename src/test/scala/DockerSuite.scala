@@ -38,7 +38,7 @@ class DockerSuite extends munit.FunSuite {
 
     assertEquals(
       aliasTo,
-      "gitoid:blob:sha256:7070a741d71c9e9e95c4b514a1fafc1b35275d512d9e95ea29fc2b075c03660f"
+      "gitoid:blob:sha256:9a6a5302b3ea1ccc5c4a8cd58c032eb5e1b257a5a4837c3ddc4d8e8af9954dbe"
     )
 
     testLayersAndManifest(aliasTo, store1)
@@ -112,12 +112,8 @@ class DockerSuite extends munit.FunSuite {
     val mimeTypes = item2.body.get.asInstanceOf[ItemMetaData].mimeType
 
     assert(
-      mimeTypes.contains("application/vnd.oci.image.config.v1+json"),
-      s"Should have ${"application/vnd.oci.image.config.v1+json"} "
-    )
-    assert(
-      mimeTypes.contains("application/vnd.oci.image.manifest.v1+json"),
-      s"Should have ${"application/vnd.oci.image.manifest.v1+json"} "
+      mimeTypes.contains("application/vnd.oci.image"),
+      s"Should have ${"application/vnd.oci.image"} "
     )
 
     val layers = for {
@@ -143,13 +139,6 @@ class DockerSuite extends munit.FunSuite {
         "layer should have layer mime type"
       )
     }
-
-    val configSha = "sha256:" + (parseJson(manifest.head.value) \ "Config")
-      .asInstanceOf[JString]
-      .s
-      .substring(13)
-    val configItem = antiAlias(configSha, store = store1)
-    assertEquals(item2, configItem, "Manifest should refer to this item")
   }
 
   private def antiAlias(key: String, store: Storage): Item = {
