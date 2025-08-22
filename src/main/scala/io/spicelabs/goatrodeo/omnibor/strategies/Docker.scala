@@ -5,7 +5,7 @@ import com.github.packageurl.PackageURLBuilder
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
-import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.Storage
@@ -37,58 +37,65 @@ case class DockerState(
       marker: DockerMarkers
   ): DockerState = this
 
+  private def computePurls(info: ManifestInfo): Vector[PackageURL] = {
+    val purls = for {
+      // get "RepoTags" which should be an Array of tags
+      case JArray(tags) <- info.manifestConfig \ "RepoTags"
+
+      // for each of the found tags
+      case JString(tag) <- tags
+    } yield {
+      val (base, version) = tag.lastIndexOf(":") match {
+        case x if x > 0 => (tag.substring(0, x), Some(tag.substring(x + 1)))
+        case _          => (tag, None)
+      }
+
+      val (namespace, path) = base.split("/").toList match {
+        case Nil                    => ??? /// this should never happen
+        case blob :: Nil            => (None, blob)
+        case path :: subPath :: Nil => (None, f"${path}/${subPath}")
+        case namespace :: pathAndSubpath =>
+          (
+            Some(namespace),
+            pathAndSubpath.reduceLeft { case (a, b) =>
+              a + "/" + b
+            }
+          )
+      }
+
+      // construct a Docker Package URL based on the pURL examples
+      // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
+      val withName = PackageURLBuilder
+        .aPackageURL()
+        .withType("docker")
+        .withName(path)
+
+      val withVersion = version match {
+        case Some(v) => withName.withVersion(v)
+        case None    => withName
+      }
+
+      val withNamespace = namespace match {
+        case Some(ns) => withVersion.withNamespace(ns)
+        case None     => withVersion
+      }
+
+      withNamespace.build()
+    }
+
+    purls.toVector
+  }
+
   override def getPurls(
       artifact: ArtifactWrapper,
       item: Item,
       marker: DockerMarkers
   ): (Vector[PackageURL], DockerState) = marker match {
     case DockerMarkers.Config(info) =>
-      val purls = for {
-        // get "RepoTags" which should be an Array of tags
-        case JArray(tags) <- info.manifestConfig \ "RepoTags"
+      val purls = computePurls(info)
 
-        // for each of the found tags
-        case JString(tag) <- tags
-      } yield {
-        val (base, version) = tag.lastIndexOf(":") match {
-          case x if x > 0 => (tag.substring(0, x), Some(tag.substring(x + 1)))
-          case _          => (tag, None)
-        }
-
-        val (namespace, path) = base.split("/").toList match {
-          case Nil                    => ??? /// this should never happen
-          case blob :: Nil            => (None, blob)
-          case path :: subPath :: Nil => (None, f"${path}/${subPath}")
-          case namespace :: pathAndSubpath =>
-            (
-              Some(namespace),
-              pathAndSubpath.reduceLeft { case (a, b) =>
-                a + "/" + b
-              }
-            )
-        }
-
-        // construct a Docker Package URL based on the pURL examples
-        // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
-        val withName = PackageURLBuilder
-          .aPackageURL()
-          .withType("docker")
-          .withName(path)
-
-        val withVersion = version match {
-          case Some(v) => withName.withVersion(v)
-          case None    => withName
-        }
-
-        val withNamespace = namespace match {
-          case Some(ns) => withVersion.withNamespace(ns)
-          case None     => withVersion
-        }
-
-        withNamespace.build()
-      }
-
-      purls.toVector -> this
+      // purls.toVector -> this
+      Vector.empty -> this
     case _ => Vector.empty -> this
   }
 
@@ -112,65 +119,53 @@ case class DockerState(
   override def finalAugmentation(
       artifact: ArtifactWrapper,
       item: Item,
-      marker: DockerMarkers
+      marker: DockerMarkers,
+      parentScope: ParentScope,
+      store: Storage
   ): (Item, DockerState) = marker match {
     case DockerMarkers.Layer(hash) =>
-      val updatedItem = item.body match {
-        case None =>
-          item.copy(body =
-            Some(
-              ItemMetaData(
-                TreeSet(),
-                TreeSet("application/vnd.oci.image.layer.v1.tar"),
-                0,
-                TreeMap()
-              )
-            )
-          )
-        case Some(md: ItemMetaData) =>
-          item.copy(body =
-            Some(
-              md.copy(mimeType =
-                md.mimeType + "application/vnd.oci.image.layer.v1.tar"
-              )
-            )
-          )
-        case _ => item
-      }
+      val updatedItem = item.enhanceWithMetadata(mimeTypes =
+        Vector("application/vnd.oci.image.layer.v1.tar")
+      )
+
       // Associate the item's hash with the item's gitoid/identifier
       updatedItem -> this.copy(layerToGitoidMapping =
         this.layerToGitoidMapping + (hash -> updatedItem.identifier)
       )
 
     case DockerMarkers.Config(info) =>
-      val updatedItem = item.body match {
-        case None =>
-          item.copy(body =
+      store.write(
+        parentScope.scopeFor(),
+        {
+          case Some(parentItem) =>
+            val thePurls = computePurls(info)
+            thePurls.foreach(store.addPurl(_))
             Some(
-              ItemMetaData(
-                TreeSet(),
-                TreeSet(
-                  "application/vnd.oci.image.config.v1+json",
-                  "application/vnd.oci.image.manifest.v1+json"
-                ),
-                0,
-                TreeMap()
-              )
-            )
-          )
-        case Some(md: ItemMetaData) =>
-          item.copy(body =
-            Some(
-              md.copy(mimeType =
-                md.mimeType ++ TreeSet(
-                  "application/vnd.oci.image.config.v1+json",
-                  "application/vnd.oci.image.manifest.v1+json"
+              parentItem
+                .enhanceWithMetadata(
+                  mimeTypes = Vector("application/vnd.oci.image"),
+                  extra = TreeMap(
+                    "docker_config" -> TreeSet(
+                      StringOrPair(pretty(render(info.configJson)))
+                    ),
+                    "docker_manifest" -> TreeSet(
+                      StringOrPair(pretty(render(info.manifestConfig)))
+                    )
+                  )
                 )
-              )
+                .enhanceItemWithPurls(thePurls)
+                .updateBackReferences(store, parentScope)
             )
-          )
-        case _ => item
-      }
+          case None => None
+        },
+        _.identifier
+      )
+      val updatedItem = item.enhanceWithMetadata(mimeTypes =
+        Vector(
+          "application/vnd.oci.image.config.v1+json",
+          "application/vnd.oci.image.manifest.v1+json"
+        )
+      )
 
       // for config, make sure it contains all the layers
       // and the layers will have a containedBy reference

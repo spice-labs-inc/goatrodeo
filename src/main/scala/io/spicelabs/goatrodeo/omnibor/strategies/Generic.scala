@@ -2,6 +2,7 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
@@ -53,7 +54,9 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
   override def finalAugmentation(
       artifact: ArtifactWrapper,
       item: Item,
-      marker: SingleMarker
+      marker: SingleMarker,
+      parentScope: ParentScope,
+      store: Storage
   ): (Item, GenericFileState) = item -> this
 
   override def postChildProcessing(

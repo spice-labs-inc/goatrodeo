@@ -64,7 +64,7 @@ object Syft {
             "syft-json"
           )*
         ).directory(targetFile.getCanonicalFile().getParentFile())
-        logger.info(f"Kicking off Syft for ${targetFile}")
+        logger.debug(f"Kicking off Syft for ${targetFile}")
         val ret = SyftResult(pb, targetFile.getCanonicalPath())
         ret.go()
         ret
@@ -92,7 +92,6 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
   def go(): Unit = {
     Thread(
       () => {
-        SyftResult.logger.info("Started Go thread")
         doBackground()
       },
       f"Syft ${dir}"
