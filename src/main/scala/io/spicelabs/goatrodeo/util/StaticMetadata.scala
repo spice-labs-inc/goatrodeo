@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.util
 
+import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.*
 import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
@@ -60,6 +61,10 @@ object StaticMetadata {
             "syft",
             "scan",
             f"file:${targetFile.getName()}",
+            "--enrich",
+            "all",
+            "--scope",
+            "all-layers",
             "--output",
             "syft-json"
           )*
@@ -120,7 +125,10 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
       case Some((str, json)) => {
 
         val files = Map((for {
-          case JArray(files) <- json \ "files"
+          files <- (json \ "files" match {
+            case JArray(arr) => List(arr)
+            case _           => List()
+          })
           file <- files
           case JString(id) <- file \ "id"
           case JArray(digests) <- file \ "digests"
@@ -130,7 +138,10 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
         } yield id -> f"${algo}:${value}")*)
 
         val relatationships = Map((for {
-          case JArray(rels) <- json \ "artifactRelationships"
+          rels <- (json \ "artifactRelationships" match {
+            case JArray(arr) => List(arr)
+            case _           => List()
+          })
           rel <- rels
           case JString(parent) <- rel \ "parent"
           case JString(child) <- rel \ "child"
@@ -173,7 +184,11 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
           val purlAugment = for {
             digest <- digests
             purl <- purls
-          } yield ConnectionAugmentation(digest, (EdgeType.aliasFrom, purl))
+          } yield ConnectionAugmentation(
+            digest,
+            (EdgeType.aliasFrom, purl),
+            PackageURL(purl)
+          )
           val artifactStr = pretty(render(artifact match {
             case JObject(obj) => JObject(obj.filter(_._1 != "id"))
             case v            => v
@@ -189,12 +204,16 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
           extra ++ purlAugment
         }).toVector.flatten
 
-        (digestedAugmentations).foldLeft(Map()) { case (map, item) =>
+        val ret = (digestedAugmentations).foldLeft(
+          Map[String, Vector[Augmentation]]()
+        ) { case (map, item) =>
           map.get(item.hashValue) match {
             case None    => map + (item.hashValue -> Vector(item))
             case Some(v) => map + (item.hashValue -> (v :+ item))
           }
         }
+
+        ret
       }
     }
   }
@@ -227,6 +246,7 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
 
         if (myProcess.exitValue() == 0) {
           answer = Try {
+
             val theBytes = bos.toByteArray()
             val str = String(theBytes, "UTF-8")
             val jsonBase = parse(str)

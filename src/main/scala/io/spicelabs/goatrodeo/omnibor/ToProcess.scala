@@ -189,11 +189,13 @@ abstract class ParentScope(
     val mine = if (this.augmentationByHash.isEmpty) { Vector() }
     else {
 
-      for {
+      val mine2 = for {
         hash <- hashes
         augs <- this.augmentationByHash.get(hash).toVector
         aug <- augs
       } yield aug
+
+      mine2
     }
 
     mine ++ (for {
@@ -312,8 +314,9 @@ trait ToProcess {
                 .map(_._2)
               val augmentations = parentScope.itemAugmentationByHashes(aliases)
               val item = augmentations.foldLeft(itemRaw) { case (item, aug) =>
-                aug.augment(item)
+                aug.augment(item, store)
               }
+
               val state = orgState.beginProcessing(artifact, item, marker)
               val itemScope1 =
                 parentScope.beginProcessing(store, artifact, item)
@@ -375,8 +378,10 @@ trait ToProcess {
               // this is *only* for the the pre-merged `Item`
               // why? The post merge `Item` has a lot of back-references
               // we do not need to update these as it'll only cause thrash
-              itemScope4
+              val backref = itemScope4
                 .buildListOfReferencesForAliasFromBuiltFromContainedBy()
+
+              backref
                 .foreach { case (aliasType, itemNeedingAlias) =>
                   store.write(
                     itemNeedingAlias,

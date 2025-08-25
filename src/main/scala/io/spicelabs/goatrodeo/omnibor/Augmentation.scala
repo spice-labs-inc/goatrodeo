@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
 
+import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeMap
@@ -8,7 +9,7 @@ import scala.collection.immutable.TreeSet
 /** Data that augments an Item
   */
 sealed trait Augmentation {
-  def augment(item: Item): Item
+  def augment(item: Item, store: Storage): Item
   def hashValue: String
 }
 
@@ -24,7 +25,7 @@ final case class TopLevelExtraAugmentation(
     name: String,
     data: StringOrPair
 ) extends Augmentation {
-  def augment(item: Item): Item = {
+  def augment(item: Item, store: Storage): Item = {
     item.bodyMimeType match {
       case None | Some(ItemMetaData.mimeType) =>
         item.copy(
@@ -65,9 +66,11 @@ final case class TopLevelExtraAugmentation(
   */
 final case class ConnectionAugmentation(
     hashValue: String,
-    connection: (String, String)
+    connection: (String, String),
+    pURL: PackageURL
 ) extends Augmentation {
-  def augment(item: Item): Item = {
+  def augment(item: Item, store: Storage): Item = {
+    store.addPurl(pURL)
     item.copy(connections = item.connections + connection)
   }
 }
@@ -86,7 +89,7 @@ final case class ExtraAugmentation(
     name: String,
     data: StringOrPair
 ) extends Augmentation {
-  def augment(item: Item): Item = {
+  def augment(item: Item, store: Storage): Item = {
     item.bodyMimeType match {
       case None | Some(ItemMetaData.mimeType) =>
         item.copy(
