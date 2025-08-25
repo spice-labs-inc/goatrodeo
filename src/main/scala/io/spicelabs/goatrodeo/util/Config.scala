@@ -39,7 +39,7 @@ case class Config(
     blockList: Option[File] = None,
     maxRecords: Int = 50000,
     tempDir: Option[File] = None,
-    useSyft: Boolean = false,
+    useStaticMetadata: Boolean = false,
     dumpRootDir: Option[File] = None,
     emitJsonDir: Option[File] = None
 ) {
@@ -79,11 +79,11 @@ object Config {
               .filter(f => f.exists())
           )
         ),
-      opt[Boolean]("syft")
+      opt[Boolean]("static-metadata")
         .text(
           "Enhance metadata with Syft (must install https://github.com/anchore/syft)"
         )
-        .action((x, c) => c.copy(useSyft = x)),
+        .action((x, c) => c.copy(useStaticMetadata = x)),
       opt[String]("tag")
         .text(
           "Tag all top level artifacts (files) with the current date and the text of the tag"

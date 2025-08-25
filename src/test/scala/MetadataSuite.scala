@@ -12,31 +12,33 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 import io.spicelabs.goatrodeo.util.FileWrapper
-import io.spicelabs.goatrodeo.util.Syft
+import io.spicelabs.goatrodeo.util.StaticMetadata
 import org.json4s.*
 
 import java.io.File
-class SyftSuite extends munit.FunSuite {
-  test("Syft works") {
-    if (Syft.hasSyft) {
+class MetadataSuite extends munit.FunSuite {
+  test("Metadata collections works") {
+    if (StaticMetadata.hasSyft) {
       val file = File("test_data/jar_test/slf4j-simple-1.6.1.jar")
       val fileWrapper =
         FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
-      val runner = Syft.runSyftFor(fileWrapper, file.toPath())
+      val runner =
+        StaticMetadata.runStaticMetadataGather(fileWrapper, file.toPath())
       val (str, json) = runner.get.runForMillis(100000).get
 
-      assert(str.length() > 400, s"Syft answer too small ${str}")
+      assert(str.length() > 400, s"Metadata answer too small ${str}")
     } else {
       assert(true)
     }
   }
 
-  test("Syft works on nested stuff") {
-    if (Syft.hasSyft) {
+  test("Metadata collections works on nested stuff") {
+    if (StaticMetadata.hasSyft) {
       val file = File("test_data/nested.tar")
       val fileWrapper =
         FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
-      val runner = Syft.runSyftFor(fileWrapper, file.toPath())
+      val runner =
+        StaticMetadata.runStaticMetadataGather(fileWrapper, file.toPath())
       val (str, json) = runner.get.runForMillis(100000).get
 
       // val artifacts =

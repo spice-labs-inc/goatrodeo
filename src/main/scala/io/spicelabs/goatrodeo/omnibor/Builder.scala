@@ -306,8 +306,8 @@ object Builder {
               // build the package
 
               val byHash: Map[String, Vector[Augmentation]] =
-                if (args.useSyft) {
-                  toProcess.runSyft()
+                if (args.useStaticMetadata) {
+                  toProcess.runStaticMetadataGather()
                 } else {
                   Map()
                 }

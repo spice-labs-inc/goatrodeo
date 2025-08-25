@@ -169,7 +169,7 @@ class MySuite extends munit.FunSuite {
 
     val store = ToProcess.buildGraphFromArtifactWrapper(
       nested,
-      args = Config(useSyft = true)
+      args = Config(useStaticMetadata = true)
     )
 
     val gitoids = store.gitoidKeys()
@@ -177,7 +177,7 @@ class MySuite extends munit.FunSuite {
 
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
 
-    if (Syft.hasSyft) { // only run the Syft tests if Syft is installed
+    if (StaticMetadata.hasSyft) { // only run the Static Metadata tests if Syft is installed
       {
         // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
         val item = store
@@ -198,7 +198,10 @@ class MySuite extends munit.FunSuite {
         assert(purls.length == 1, s"should be a purl ${purls} on log4j")
 
         assert(
-          item.bodyAsItemMetaData.get.extra.get("syft-artifact").get.size == 1,
+          item.bodyAsItemMetaData.get.extra
+            .get("static-metadata-artifact")
+            .get
+            .size == 1,
           "Should have one augmentation on log4j"
         )
       }
@@ -227,7 +230,10 @@ class MySuite extends munit.FunSuite {
         )
 
         assert(
-          item.bodyAsItemMetaData.get.extra.get("syft-artifact").get.size == 1,
+          item.bodyAsItemMetaData.get.extra
+            .get("static-metadata-artifact")
+            .get
+            .size == 1,
           "Should have one augmentation on tk"
         )
       }

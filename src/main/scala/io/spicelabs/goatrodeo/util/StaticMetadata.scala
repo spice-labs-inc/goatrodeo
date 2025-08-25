@@ -14,9 +14,9 @@ import scala.util.Try
 
 /** The bridge to Syft https://github.com/anchore/syft
   */
-object Syft {
+object StaticMetadata {
   private val logger = Logger(getClass())
-  private lazy val syftMimeTypes = Set(
+  private lazy val staticMetadataMimeTypes = Set(
     "application/zip",
     "application/java-archive",
     "application/vnd.android.package-archive",
@@ -29,13 +29,13 @@ object Syft {
     "application/zstd"
   )
 
-  /** Is the artifact a container that Syft knowns how to process?
+  /** Is the artifact a container that this module how to process?
     *
     * @param artifact
     * @return
     */
   def isContainer(artifact: ArtifactWrapper): Boolean = {
-    syftMimeTypes.contains(artifact.mimeType)
+    staticMetadataMimeTypes.contains(artifact.mimeType)
   }
 
   lazy val hasSyft: Boolean = {
@@ -48,10 +48,10 @@ object Syft {
     }.toOption == Some(true)
   }
 
-  def runSyftFor(
+  def runStaticMetadataGather(
       artfiact: ArtifactWrapper,
       tempDir: Path
-  ): Option[SyftResult] = {
+  ): Option[StaticMetadataResult] = {
     if (hasSyft) {
       Try {
         val targetFile = artfiact.forceFile(tempDir)
@@ -64,8 +64,7 @@ object Syft {
             "syft-json"
           )*
         ).directory(targetFile.getCanonicalFile().getParentFile())
-        logger.debug(f"Kicking off Syft for ${targetFile}")
-        val ret = SyftResult(pb, targetFile.getCanonicalPath())
+        val ret = StaticMetadataResult(pb, targetFile.getCanonicalPath())
         ret.go()
         ret
       }.toOption
@@ -76,11 +75,11 @@ object Syft {
   }
 }
 
-object SyftResult {
+object StaticMetadataResult {
   private val logger = Logger(this.getClass())
 }
 
-class SyftResult(private val process: ProcessBuilder, dir: String) {
+class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
   val startedAt = System.currentTimeMillis()
   @volatile private var running = false
   @volatile private var answer: Option[(String, org.json4s.JValue)] = None
@@ -94,7 +93,7 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
       () => {
         doBackground()
       },
-      f"Syft ${dir}"
+      f"Metadata Gather ${dir}"
     ).start()
     this.synchronized {
       while (!running) {
@@ -183,7 +182,7 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
           val extra =
             for { digest <- digests } yield ExtraAugmentation(
               digest,
-              "syft-artifact",
+              "static-metadata-artifact",
               StringOrPair("application/json", artifactStr)
             )
 
@@ -244,7 +243,8 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
           }.toOption
         }
       } catch {
-        case e: Throwable => SyftResult.logger.error("Failed to read", e)
+        case e: Throwable =>
+          StaticMetadataResult.logger.error("Failed to read", e)
 
       } finally {
         processExitCode = Some(myProcess.exitValue())
@@ -257,7 +257,8 @@ class SyftResult(private val process: ProcessBuilder, dir: String) {
       }
 
     } catch {
-      case e: Throwable => SyftResult.logger.error("Failed to read", e)
+      case e: Throwable =>
+        StaticMetadataResult.logger.error("Failed to read", e)
 
     }
   }

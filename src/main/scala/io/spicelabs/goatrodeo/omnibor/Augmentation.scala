@@ -15,7 +15,7 @@ sealed trait Augmentation {
 /** Something that augments the `ItemMetaData` `extra` field
   *
   * @param name
-  *   the name (e.g., "syft-all")
+  *   the name (e.g., "static-metadata-all")
   * @param data
   *   the information to store in the extra field
   */
