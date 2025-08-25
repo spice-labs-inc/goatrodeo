@@ -9,7 +9,7 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Syft
+import io.spicelabs.goatrodeo.util.StaticMetadata
 
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -251,12 +251,12 @@ trait ToProcess {
     */
   def getElementsToProcess(): (Seq[(ArtifactWrapper, MarkerType)], StateType)
 
-  def runSyft(): Map[String, Vector[Augmentation]] = {
+  def runStaticMetadataGather(): Map[String, Vector[Augmentation]] = {
     FileWalker.withinTempDir { tempDir =>
       {
         val augmentation: Seq[Map[String, Vector[Augmentation]]] = for {
           (wrapper, _) <- getElementsToProcess()._1
-          it <- Syft.runSyftFor(wrapper, tempDir).toList
+          it <- StaticMetadata.runStaticMetadataGather(wrapper, tempDir).toList
           answer <- it.runForMillis(120L * 1000 * 60) // 120 minutes
 
         } yield it.buildAugmentation()
@@ -684,8 +684,8 @@ object ToProcess {
   ): Storage = {
 
     for { individual <- toProcess } {
-      val augmentation = if (args.useSyft) {
-        individual.runSyft()
+      val augmentation = if (args.useStaticMetadata) {
+        individual.runStaticMetadataGather()
       } else Map()
 
       individual.process(

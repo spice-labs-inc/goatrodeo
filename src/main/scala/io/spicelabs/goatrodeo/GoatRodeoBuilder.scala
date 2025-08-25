@@ -88,8 +88,8 @@ class GoatRodeoBuilder {
     this
   }
 
-  def withSyft(b: Boolean): GoatRodeoBuilder = {
-    config = config.copy(useSyft = b)
+  def withStatisMetadata(b: Boolean): GoatRodeoBuilder = {
+    config = config.copy(useStaticMetadata = b)
     this
   }
 
