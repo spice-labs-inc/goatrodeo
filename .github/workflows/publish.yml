@@ -220,6 +220,8 @@ jobs:
     needs: [publish-jars, publish-to-central, docker-image]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check deployment status
         id: deployment-status
