@@ -1,4 +1,4 @@
-name: Publish Goatrodeo: Maven Central + GitHub Packages + Docker Hub + Scan
+name: Scala Build, Publish, and CLI Scan # goatrodeo 
 
 on:
   push:
