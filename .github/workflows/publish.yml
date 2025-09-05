@@ -22,6 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Determine ref (tag) for this run
         id: ref
         shell: bash
@@ -31,6 +32,7 @@ jobs:
           else
             echo "tag_name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
+
       - name: Check ancestry
         id: check
         shell: bash
@@ -69,6 +71,8 @@ jobs:
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
           github-token: ${{ github.token }}
+          channel-id: C09DD79KQ8Y   # <— hardcoded channel ID
+        continue-on-error: true
 
       - name: Checkout with LFS
         uses: actions/checkout@v4
@@ -209,10 +213,13 @@ jobs:
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Download fat JAR from GitHub Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -221,11 +228,13 @@ jobs:
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/octet-stream" \
             "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${{ needs.publish-jars.outputs.version }}/goatrodeo_3-${{ needs.publish-jars.outputs.version }}-fat.jar"
+
       - name: Docker Hub login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
+
       - name: Compute Docker tags (semver + sha)
         id: meta
         uses: docker/metadata-action@v5
@@ -238,6 +247,7 @@ jobs:
             type=semver,pattern={{major}},value=${{ needs.publish-jars.outputs.version }}
           flavor: |
             latest=false
+
       - name: Build & push multi-arch image
         id: build
         uses: docker/build-push-action@v6
@@ -246,9 +256,10 @@ jobs:
           file: Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
-          provenance: false
+          provenance: false         # provenance goes via GitHub Attestations
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
       - name: Verify SHA tag exists (eventual consistency)
         shell: bash
         run: |
@@ -260,6 +271,7 @@ jobs:
             echo "Waiting for SHA tag to be visible ($i/10)..."; sleep 6
           done
           exit 1
+
       - name: Resolve image digest for provenance
         id: digest
         shell: bash
@@ -267,6 +279,7 @@ jobs:
           RAW="$(docker buildx imagetools inspect ${{ env.IMAGE_REPO }}:sha-${{ github.sha }} --raw)"
           DIGEST="$(printf "%s" "$RAW" | jq -r '.manifests[0].digest // .digest')"
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
       - name: Attest build provenance (GitHub Attestations)
         uses: actions/attest-build-provenance@v2
         with:
@@ -294,6 +307,7 @@ jobs:
             } catch {
               core.setOutput('prerelease', 'false')
             }
+
       - name: Mirror sha tag → :latest with skopeo
         if: steps.meta.outputs.prerelease == 'false'
         run: |
@@ -323,6 +337,7 @@ jobs:
           curl -fL -o "target/goatrodeo_3-${VERSION}-fat.jar" \
             -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
             "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/goatrodeo_3-${VERSION}-fat.jar"
+
       - name: Extract image (OCI layout from Docker Hub)
         uses: spice-labs-inc/action-extract-image@v1
         with:
@@ -330,6 +345,7 @@ jobs:
           image_name: ${{ env.IMAGE_REPO }}
           tag: sha-${{ github.sha }}
           path: target
+
       - name: Index and upload ADG (Spice-Labs CLI)
         uses: spice-labs-inc/action-spice-labs-cli-scan@v3
         with:
@@ -360,7 +376,20 @@ jobs:
             if [ "$DOCKER_STATUS" != "success" ]; then MESSAGE="$MESSAGE Docker build/push failed."; else MESSAGE="$MESSAGE Docker build/push succeeded."; fi
             echo "message=$MESSAGE" >> $GITHUB_OUTPUT
           fi
-      - name: Notify deployment result
+
+      - name: Resolve Slack target
+        id: slack-target
+        shell: bash
+        run: |
+          CH="${{ needs.publish-jars.outputs.release_channel_id }}"
+          TS="${{ needs.publish-jars.outputs.release_timestamp }}"
+          # Fallback to the hardcoded channel ID if no thread/channel from earlier step
+          [ -z "$CH" ] && CH="C09DD79KQ8Y"
+          echo "channel_id=$CH" >> "$GITHUB_OUTPUT"
+          echo "thread_ts=$TS"  >> "$GITHUB_OUTPUT"
+
+      - name: Notify deployment result (threaded if available)
+        if: ${{ steps.slack-target.outputs.channel_id != '' }}
         uses: spice-labs-inc/action-release-notification@main
         with:
           type: ${{ steps.deployment-status.outputs.overall_status == 'success' && 'deployment-success' || 'deployment-failure' }}
@@ -368,5 +397,10 @@ jobs:
           username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
           workflow-name: Release
           environment: production
-          thread-ts: ${{ needs.publish-jars.outputs.release_timestamp }}
-          channel-id: ${{ needs.publish-jars.outputs.release_channel_id }}
+          channel-id: ${{ steps.slack-target.outputs.channel_id }}
+          thread-ts: ${{ steps.slack-target.outputs.thread_ts }}
+        continue-on-error: true
+
+      - name: Skip Slack notify (no channel configured)
+        if: ${{ steps.slack-target.outputs.channel_id == '' }}
+        run: echo "No Slack channel available — skipping Slack notify"
