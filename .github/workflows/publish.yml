@@ -1,17 +1,41 @@
-name: Publish package to Maven Central, Github Packages, and Container Image to Docker Hub
+name: Publish Goatrodeo: Maven Central + GitHub Packages + Docker Hub + Scan
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: [ "v*.*.*" ]         # semantic tag releases
+  workflow_dispatch: {}
 
 env:
-  IMAGE_NAME: ${{ github.repository }}
-  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+  IMAGE_REPO: spicelabs/goatrodeo
   PLATFORMS: linux/amd64,linux/arm64
 
 jobs:
+  verify-main:
+    name: Verify tag commit is on main
+    runs-on: ubuntu-24.04
+    outputs:
+      on_main: ${{ steps.check.outputs.on_main }}
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check ancestry
+        id: check
+        shell: bash
+        run: |
+          git fetch origin main --depth=1
+          TAG_SHA="${GITHUB_SHA}"
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/main"; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-jars:
-    name: Publish JARs to GitHub (Maven Central temporarily disabled)
+    name: Publish JARs to GitHub Packages
+    needs: verify-main
+    if: ${{ github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/tags/v') && needs.verify-main.outputs.on_main == 'true') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -21,9 +45,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       release_timestamp: ${{ steps.release-notification.outputs.timestamp }}
       release_channel_id: ${{ steps.release-notification.outputs.channel_id }}
-
     steps:
-      - name: Notify release
+      - name: Notify release (start thread)
         id: release-notification
         uses: spice-labs-inc/action-release-notification@main
         with:
@@ -31,6 +54,7 @@ jobs:
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
           github-token: ${{ github.token }}
+
       - name: Checkout with LFS
         uses: actions/checkout@v4
         with:
@@ -39,25 +63,23 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'sbt'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "sbt"
 
       - name: Set up SBT
         uses: sbt/setup-sbt@v1
 
-      - name: Derive and validate version
+      - name: Derive and validate version (from tag)
         id: version
         shell: bash
         run: |
-          raw_version="${GITHUB_REF#refs/tags/v}"
-          if [[ ! "$raw_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag format: $raw_version. Must be v<major>.<minor>.<patch>." >&2
-            exit 1
-          fi
-          echo "projectVersion=$raw_version" >> "$GITHUB_ENV"
-          echo "version=$raw_version" >> "$GITHUB_OUTPUT"
+          raw="${GITHUB_REF#refs/tags/v}"
+          [[ "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid semver: $raw"; exit 1; }
+          echo "projectVersion=$raw" >> "$GITHUB_ENV"
+          echo "version=$raw" >> "$GITHUB_OUTPUT"
 
+      # Publish standard + fat jars to GitHub Packages (as in your original workflow)
       - name: Publish standard and fat JARs to GitHub Packages
         run: |
           SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
@@ -67,12 +89,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_TARGET: github
 
-      
-
   publish-to-central:
-    name: Re-publish Goatrodeo to Maven Central
-    runs-on: ubuntu-24.04
+    name: Re-publish to Maven Central
     needs: publish-jars
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: read
@@ -80,13 +100,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java (Maven)
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
-      
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
+
       - name: Write settings.xml for Central
         run: |
           mkdir -p ~/.m2
@@ -105,7 +125,6 @@ jobs:
       - name: Import GPG key
         run: |
           echo "${{ secrets.MAVEN_CENTRAL_GPG_PRIVATE_KEY }}" | gpg --batch --import
-
 
       - name: Set project version from tag
         run: |
@@ -138,7 +157,6 @@ jobs:
       - name: Inject real dependencies block into fake pom.xml
         run: |
           set -e
-
           VERSION="${{ needs.publish-jars.outputs.version }}"
           REAL_POM="maven/target/external/goatrodeo_3-${VERSION}.pom"
           FAKE_POM="maven/pom.xml"
@@ -148,8 +166,7 @@ jobs:
             {print}
           ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
 
-
-      - name: Publish to Maven Central (staging only)
+      - name: Publish to Maven Central (staging)
         run: |
           cd maven
           mvn --batch-mode deploy
@@ -157,27 +174,24 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}
 
   docker-image:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-24.04
+    name: Build & push Docker image (Docker Hub)
     needs: publish-jars
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
+      id-token: write           # for GitHub Attestations
       attestations: write
-      id-token: write
-
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          platforms: ${{ env.PLATFORMS }}
 
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Fat JAR from GitHub Packages
+      - name: Download fat JAR from GitHub Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -186,79 +200,153 @@ jobs:
             -H "Accept: application/octet-stream" \
             "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${{ needs.publish-jars.outputs.version }}/goatrodeo_3-${{ needs.publish-jars.outputs.version }}-fat.jar"
 
-      - name: Extract Metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: spicelabs/goatrodeo
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-          flavor: |
-            latest=auto
-
-      - name: Log in to Docker Hub
+      - name: Docker Hub login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Compute Docker tags (semver + sha)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_REPO }}
+          tags: |
+            type=raw,value=sha-${{ github.sha }}
+            type=semver,pattern={{version}},value=${{ needs.publish-jars.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.publish-jars.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.publish-jars.outputs.version }}
+          flavor: |
+            latest=false
+
+      - name: Build & push multi-arch image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
-          platforms: ${{ env.PLATFORMS }}
+          file: Dockerfile
           push: true
-          provenance: mode=max
-          sbom: true
+          platforms: ${{ env.PLATFORMS }}
+          # Avoid pushing OCI referrers; add provenance separately via GitHub Attestations.
+          provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Verify SHA tag exists (eventual consistency)
+        shell: bash
+        run: |
+          for i in {1..10}; do
+            if docker buildx imagetools inspect ${{ env.IMAGE_REPO }}:sha-${{ github.sha }} >/dev/null 2>&1; then
+              echo "Found ${{ env.IMAGE_REPO }}:sha-${{ github.sha }}"
+              exit 0
+            fi
+            echo "Waiting for SHA tag to be visible ($i/10)..."; sleep 6
+          done
+          exit 1
+
+      - name: Resolve image digest for provenance
+        id: digest
+        shell: bash
+        run: |
+          RAW="$(docker buildx imagetools inspect ${{ env.IMAGE_REPO }}:sha-${{ github.sha }} --raw)"
+          DIGEST="$(printf "%s" "$RAW" | jq -r '.manifests[0].digest // .digest')"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance (GitHub Attestations)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: docker.io/${{ env.IMAGE_REPO }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+
+  tag-latest:
+    name: Tag :latest (only if not prerelease)
+    needs: docker-image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Determine prerelease (if Release exists)
+        id: meta
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = process.env.GITHUB_REF.replace('refs/tags/','')
+            try {
+              const { data } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner, repo: context.repo.repo, tag
+              })
+              core.setOutput('prerelease', String(Boolean(data.prerelease)))
+            } catch {
+              core.setOutput('prerelease', 'false') // no Release → treat as not prerelease
+            }
+
+      - name: Mirror sha tag → :latest with skopeo
+        if: steps.meta.outputs.prerelease == 'false'
+        run: |
+          docker run --rm quay.io/skopeo/stable:latest copy \
+            --src-creds "${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_TOKEN }}" \
+            --dest-creds "${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_TOKEN }}" \
+            docker://${{ env.IMAGE_REPO }}:sha-${{ github.sha }} \
+            docker://${{ env.IMAGE_REPO }}:latest
+
+  extract-adg:
+    name: Compliance scan (exact image + JARs)
+    needs: docker-image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create target/ and download artifacts for scanning
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.publish-jars.outputs.version }}
+        run: |
+          mkdir -p target
+          curl -fL -o "target/goatrodeo_3-${VERSION}.jar" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+            "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/goatrodeo_3-${VERSION}.jar"
+          curl -fL -o "target/goatrodeo_3-${VERSION}.pom" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+            "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/goatrodeo_3-${VERSION}.pom"
+          curl -fL -o "target/goatrodeo_3-${VERSION}-fat.jar" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+            "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/goatrodeo_3-${VERSION}-fat.jar"
+
+      - name: Extract image (OCI layout from Docker Hub)
+        uses: spice-labs-inc/action-extract-image@v1
+        with:
+          registry: docker.io
+          image_name: ${{ env.IMAGE_REPO }}
+          tag: sha-${{ github.sha }}
+          path: target
+
+      - name: Index and upload ADG (Spice-Labs CLI)
+        uses: spice-labs-inc/action-spice-labs-cli-scan@v3
+        with:
+          spice_pass: ${{ secrets.SPICE_PASS }}
+          file_path: ${{ github.workspace }}/target
+          tag: goatrodeo
 
   notify:
     needs: [publish-jars, publish-to-central, docker-image]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - name: Check deployment status
+      - name: Build deployment result message
         id: deployment-status
         shell: bash
         run: |
-          # Check job outcomes
           JARS_STATUS="${{ needs.publish-jars.result }}"
           CENTRAL_STATUS="${{ needs.publish-to-central.result }}"
           DOCKER_STATUS="${{ needs.docker-image.result }}"
-          
-          # Determine overall success
-          if [ "$JARS_STATUS" == "success" ] && [ "$CENTRAL_STATUS" == "success" ] && [ "$DOCKER_STATUS" == "success" ]; then
+          if [ "$JARS_STATUS" = "success" ] && [ "$CENTRAL_STATUS" = "success" ] && [ "$DOCKER_STATUS" = "success" ]; then
             echo "overall_status=success" >> $GITHUB_OUTPUT
             echo "message=✅ All components published successfully!" >> $GITHUB_OUTPUT
           else
             echo "overall_status=failure" >> $GITHUB_OUTPUT
-            
-            # Build detailed failure message
             MESSAGE="❌ Publishing failed:"
-            if [ "$JARS_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ SBT JAR publishing failed."
-            else
-              MESSAGE="$MESSAGE ✅ SBT JAR publishing succeeded."
-            fi
-            
-            if [ "$CENTRAL_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ Maven Central publishing failed."
-            else
-              MESSAGE="$MESSAGE ✅ Maven Central publishing succeeded."
-            fi
-            
-            if [ "$DOCKER_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ Docker build/push failed."
-            else
-              MESSAGE="$MESSAGE ✅ Docker build/push succeeded."
-            fi
-            
+            if [ "$JARS_STATUS" != "success" ]; then MESSAGE="$MESSAGE ❌ SBT JAR publishing failed."; else MESSAGE="$MESSAGE ✅ SBT JAR publishing succeeded."; fi
+            if [ "$CENTRAL_STATUS" != "success" ]; then MESSAGE="$MESSAGE ❌ Maven Central publishing failed."; else MESSAGE="$MESSAGE ✅ Maven Central publishing succeeded."; fi
+            if [ "$DOCKER_STATUS" != "success" ]; then MESSAGE="$MESSAGE ❌ Docker build/push failed."; else MESSAGE="$MESSAGE ✅ Docker build/push succeeded."; fi
             echo "message=$MESSAGE" >> $GITHUB_OUTPUT
           fi
 
@@ -272,3 +360,4 @@ jobs:
           environment: production
           thread-ts: ${{ needs.publish-jars.outputs.release_timestamp }}
           channel-id: ${{ needs.publish-jars.outputs.release_channel_id }}
+
