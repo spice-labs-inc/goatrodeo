@@ -23,10 +23,6 @@ jobs:
   publish-jars:
     name: Publish JARs to GitHub (Maven Central temporarily disabled)
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_timestamp: ${{ steps.release-notification.outputs.timestamp }}
