@@ -1,8 +1,12 @@
-name: Publish package to Maven Central, Github Packages, and Container Image to Docker Hub
+name: Publish package to Maven Central, GitHub Packages, and Container Image to Docker Hub
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
+      - mj/cli-scan
+    tags:
+      - "v*.*.*"
 
 env:
   IMAGE_NAME: ${{ github.repository }}
