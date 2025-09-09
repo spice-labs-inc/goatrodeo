@@ -13,6 +13,12 @@ env:
   DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
   PLATFORMS: linux/amd64,linux/arm64
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
 jobs:
   publish-jars:
     name: Publish JARs to GitHub (Maven Central temporarily disabled)
