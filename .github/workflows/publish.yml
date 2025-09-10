@@ -95,14 +95,30 @@ jobs:
             echo "version=0.0.0-SNAPSHOT" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build and publish JARs to GitHub Packages
-        run: |
-          SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
-            "set ThisBuild / version := \"${{ env.projectVersion }}\"" \
-            +publish
+      - name: Build and (conditionally) publish JARs to GitHub Packages
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           PUBLISH_TARGET: github
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+
+          if [[ "${{ steps.guard.outputs.is_tag }}" == "true" ]]; then
+            POM_URL="https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/goatrodeo_3-${VERSION}.pom"
+            if curl -sfI -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" "$POM_URL" >/dev/null; then
+              echo "Artifacts for ${VERSION} already exist in GitHub Packages — skipping publish"
+            else
+              SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
+                "set ThisBuild / version := \"${{ env.projectVersion }}\"" \
+                +publish
+            fi
+          else
+            # Branch build: compile to produce target/ for the scan, but don't publish
+            SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
+              "set ThisBuild / version := \"${{ env.projectVersion }}\"" \
+              +package
+          fi
 
       - name: Scan built artifacts with Spice-Labs CLI
         if: always()
