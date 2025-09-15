@@ -4,7 +4,7 @@ Thank you for your interest in this project. We welcome all kinds of contributio
 
 ---
 
-### Reporting Bugs
+## Reporting Bugs
 
 Please include:
 - A clear, descriptive title
@@ -17,7 +17,7 @@ Open a [new issue](../../issues/new) to report the problem.
 
 ---
 
-### Suggesting Features
+## Suggesting Features
 
 Please include:
 - A summary of the problem you are trying to solve
@@ -28,7 +28,7 @@ Open a [new issue](../../issues/new) to make the suggestion.
 
 ---
 
-### Making Code Contributions
+## Making Code Contributions
 
 Follow the coding style used in the project:
 - The project has linters and formatters configured, so use them
@@ -45,14 +45,14 @@ Follow the coding style used in the project:
 
 ---
 
-### Tests and CI
+## Tests and CI
 
 - Run the tests and linters against your changes
 - Reach out if you are unsure how to run the tests
 
 ---
 
-### Opening a Pull Request
+## Opening a Pull Request
 
 - Open your pull request against the `next` branch. We integrate changes into `next` before cutting releases to `main` and creating tagged releases
 - Use the pull request template as a guide. Explain why you are making changes as clearly as you can
@@ -62,7 +62,7 @@ Follow the coding style used in the project:
 
 ---
 
-### Collaborating and Reviewing
+## Collaborating and Reviewing
 
 We use pull request reviews to discuss changes:
 - Code improvements or simplifications
@@ -73,13 +73,13 @@ We use pull request reviews to discuss changes:
 
 ---
 
-### Licensing
+## Licensing
 
 All contributions must be compatible with the project’s [license](LICENSE.txt), and you must have the legal right to contribute them. By submitting code, you agree to license it under the same terms.
 
 ---
 
-### Thank You!
+## Thank You!
 
 Thank you for contributing. Whether you are fixing a typo, suggesting a feature, or rewriting a core component, your contribution helps and is greatly appreciated.  
 
