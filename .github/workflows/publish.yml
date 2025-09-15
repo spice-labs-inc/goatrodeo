@@ -1,92 +1,157 @@
-name: Publish package to Maven Central, Github Packages, and Container Image to Docker Hub
+name: Publish package to Maven Central, GitHub Packages, and Container Image to Docker Hub  # goatrodeo
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
+      - mj/cli-workflow     # remove before merging
+    tags:
+      - "v*.*.*"
 
 env:
-  IMAGE_NAME: ${{ github.repository }}
-  DOCKERHUB_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+  REPO: ${{ github.event.repository.name }}
   PLATFORMS: linux/amd64,linux/arm64
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
 jobs:
-  publish-jars:
-    name: Publish JARs to GitHub (Maven Central temporarily disabled)
+  build_and_scan_branch:
+    name: Build (branch) and scan artifacts
+    if: ${{ github.ref_type == 'branch' }}
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      release_timestamp: ${{ steps.release-notification.outputs.timestamp }}
-      release_channel_id: ${{ steps.release-notification.outputs.channel_id }}
-
-    steps:
-      - name: Notify release
-        id: release-notification
-        uses: spice-labs-inc/action-release-notification@main
-        with:
-          type: release
-          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
-          github-token: ${{ github.token }}
-      - name: Checkout with LFS
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'sbt'
-
-      - name: Set up SBT
-        uses: sbt/setup-sbt@v1
-
-      - name: Derive and validate version
-        id: version
-        shell: bash
-        run: |
-          raw_version="${GITHUB_REF#refs/tags/v}"
-          if [[ ! "$raw_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag format: $raw_version. Must be v<major>.<minor>.<patch>." >&2
-            exit 1
-          fi
-          echo "projectVersion=$raw_version" >> "$GITHUB_ENV"
-          echo "version=$raw_version" >> "$GITHUB_OUTPUT"
-
-      - name: Publish standard and fat JARs to GitHub Packages
-        run: |
-          SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
-            "set ThisBuild / version := \"${{ env.projectVersion }}\"" \
-            +publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISH_TARGET: github
-
-      
-
-  publish-to-central:
-    name: Re-publish Goatrodeo to Maven Central
-    runs-on: ubuntu-24.04
-    needs: publish-jars
-    permissions:
-      contents: read
-      packages: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "sbt"
+
+      - name: Set up SBT
+        uses: sbt/setup-sbt@v1
+
+      - name: Build for scan (no publish on branches)
+        env:
+          SBT_OPTS: "-Xmx8G -Duser.timezone=GMT"
+        run: sbt +package
+
+      - name: Run Spice-Labs CLI scan (branch build)
+        uses: spice-labs-inc/action-spice-labs-cli-scan@v3
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          file_path: "${{ github.workspace }}"
+          tag: "${{ github.event.repository.name }}"
+
+  release_publish_jars:
+    name: Publish JARs to GitHub Packages (tags only)
+    if: ${{ github.ref_type == 'tag' }}
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_timestamp: ${{ steps.release_notification.outputs.timestamp }}
+      release_channel_id: ${{ steps.release_notification.outputs.channel_id }}
+    steps:
+      - name: Notify release
+        id: release_notification
+        continue-on-error: true
+        uses: spice-labs-inc/action-release-notification@main
+        with:
+          type: release
+          slack-bot-token: "${{ secrets.SLACK_BOT_TOKEN }}"
+          username-mapping: "${{ secrets.GH_SLACK_USERNAME_MAPPING }}"
+          github-token: "${{ github.token }}"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate and extract version from tag
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not a semantic version tag (vX.Y.Z): ${GITHUB_REF}" >&2
+            exit 1
+          fi
+
+      - name: Ensure tag commit is on main (public release gate)
+        id: on_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "sbt"
+
+      - name: Set up SBT
+        uses: sbt/setup-sbt@v1
+
+      - name: Build and (conditionally) publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          SBT_OPTS: "-Xmx8G -Duser.timezone=GMT"
+        run: |
+          if [[ "${{ steps.on_main.outputs.ok }}" == "true" ]]; then
+            sbt "set ThisBuild / version := \"${{ steps.version.outputs.version }}\"" +publish
+          else
+            sbt "set ThisBuild / version := \"${{ steps.version.outputs.version }}\"" +package
+          fi
+
+      - name: Upload target/ for scan
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ env.REPO }}-target-${{ github.run_id }}"
+          path: "**/target/**"
+          if-no-files-found: warn
+          retention-days: 7
+
+  release_publish_central:
+    name: Publish to Maven Central (tags on main only)
+    runs-on: ubuntu-24.04
+    needs: release_publish_jars
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tag commit is on main (public release gate)
+        id: on_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
-      
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
+
       - name: Write settings.xml for Central
         run: |
           mkdir -p ~/.m2
@@ -106,66 +171,40 @@ jobs:
         run: |
           echo "${{ secrets.MAVEN_CENTRAL_GPG_PRIVATE_KEY }}" | gpg --batch --import
 
-
       - name: Set project version from tag
         run: |
           mvn -B --file maven/pom.xml \
-              clean versions:set -DnewVersion="${{ needs.publish-jars.outputs.version }}" -DgenerateBackupPoms=false
+              clean versions:set -DnewVersion="${{ needs.release_publish_jars.outputs.version }}" -DgenerateBackupPoms=false
 
-      - name: Create target dir
-        run: mkdir -p maven/target/external
-
-      - name: Download artifacts from GitHub Maven
+      - name: Publish to Maven Central
+        if: ${{ steps.on_main.outputs.ok == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.publish-jars.outputs.version }}
-        run: |
-          ARTIFACTS=(
-            "goatrodeo_3-${VERSION}.jar"
-            "goatrodeo_3-${VERSION}-sources.jar"
-            "goatrodeo_3-${VERSION}-javadoc.jar"
-            "goatrodeo_3-${VERSION}.pom"
-            "goatrodeo_3-${VERSION}-fat.jar"
-          )
-          for file in "${ARTIFACTS[@]}"; do
-            echo "Downloading $file"
-            curl -fL -o "maven/target/external/$file" \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/octet-stream" \
-              "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${VERSION}/${file}"
-          done
-
-      - name: Inject real dependencies block into fake pom.xml
-        run: |
-          set -e
-
-          VERSION="${{ needs.publish-jars.outputs.version }}"
-          REAL_POM="maven/target/external/goatrodeo_3-${VERSION}.pom"
-          FAKE_POM="maven/pom.xml"
-          real_deps=$(awk '/<dependencies>/,/<\/dependencies>/' "$REAL_POM")
-          awk -v repl="$real_deps" '
-            /<!-- @REAL_DEPENDENCIES@ -->/ {print repl; next}
-            {print}
-          ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
-
-
-      - name: Publish to Maven Central (staging only)
+          GPG_PASSPHRASE: "${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}"
         run: |
           cd maven
           mvn --batch-mode deploy
-        env:
-          GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}
 
-  docker-image:
-    name: Build and Push Docker Image
+  release_docker_image:
+    name: Build Docker image and push to Docker Hub (tags on main only)
+    if: ${{ github.ref_type == 'tag' }}
     runs-on: ubuntu-24.04
-    needs: publish-jars
-    permissions:
-      contents: read
-      attestations: write
-      id-token: write
-
+    needs: release_publish_jars
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tag commit is on main (public release gate)
+        id: on_main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -174,101 +213,109 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Log in to Docker Hub
+        if: ${{ steps.on_main.outputs.ok == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          username: "${{ secrets.DOCKER_USERNAME }}"
+          password: "${{ secrets.DOCKER_TOKEN }}"
 
-      - name: Download Fat JAR from GitHub Packages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          curl -fL -o goatrodeo-fat.jar \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "https://maven.pkg.github.com/spice-labs-inc/goatrodeo/io/spicelabs/goatrodeo_3/${{ needs.publish-jars.outputs.version }}/goatrodeo_3-${{ needs.publish-jars.outputs.version }}-fat.jar"
-
-      - name: Extract Metadata (tags, labels) for Docker
+      - name: Extract Docker image metadata (release tags only)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: spicelabs/goatrodeo
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
           flavor: |
-            latest=auto
+            latest=false
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Build and Push Docker Image
+      - name: Build and push Docker image
+        id: build_image
+        if: ${{ steps.on_main.outputs.ok == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: ${{ env.PLATFORMS }}
           push: true
-          provenance: mode=max
+          provenance: true
           sbom: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: "${{ steps.meta.outputs.tags }}"
+          labels: "${{ steps.meta.outputs.labels }}"
+
+      - name: Save OCI tar for scan
+        if: ${{ steps.on_main.outputs.ok == 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/docker
+          IMAGE_TAG="$(echo "${{ steps.meta.outputs.tags }}" | head -n1)"
+          docker pull "$IMAGE_TAG"
+          docker save "$IMAGE_TAG" > "artifacts/docker/${{ env.REPO }}-${{ github.run_id }}.oci.tar"
+
+      - name: Upload OCI artifact
+        if: ${{ steps.on_main.outputs.ok == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ env.REPO }}-oci-${{ github.run_id }}"
+          path: artifacts/docker/*.oci.tar
+          if-no-files-found: error
+          retention-days: 7
+
+  scan_all_artifacts:
+    name: Scan all produced artifacts and upload ADGs
+    runs-on: ubuntu-24.04
+    needs:
+      - release_publish_jars
+      - release_docker_image
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: |
+            ${{ env.REPO }}-target-*
+            ${{ env.REPO }}-oci-*
+          merge-multiple: true
+
+      - name: Run Spice-Labs CLI scan (all artifacts)
+        uses: spice-labs-inc/action-spice-labs-cli-scan@v3
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          file_path: "artifacts"
+          tag: "${{ github.event.repository.name }}"
 
   notify:
-    needs: [publish-jars, publish-to-central, docker-image]
+    needs: [release_publish_jars, release_publish_central, release_docker_image]
     if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    runs-on: ubuntu-24.04
     steps:
       - name: Check deployment status
-        id: deployment-status
+        id: deployment_status
         shell: bash
         run: |
-          # Check job outcomes
-          JARS_STATUS="${{ needs.publish-jars.result }}"
-          CENTRAL_STATUS="${{ needs.publish-to-central.result }}"
-          DOCKER_STATUS="${{ needs.docker-image.result }}"
-          
-          # Determine overall success
-          if [ "$JARS_STATUS" == "success" ] && [ "$CENTRAL_STATUS" == "success" ] && [ "$DOCKER_STATUS" == "success" ]; then
-            echo "overall_status=success" >> $GITHUB_OUTPUT
-            echo "message=✅ All components published successfully!" >> $GITHUB_OUTPUT
+          JARS_STATUS="${{ needs.release_publish_jars.result }}"
+          CENTRAL_STATUS="${{ needs.release_publish_central.result }}"
+          DOCKER_STATUS="${{ needs.release_docker_image.result }}"
+          if [ "$JARS_STATUS" = "success" ] && [ "$CENTRAL_STATUS" = "success" ] && [ "$DOCKER_STATUS" = "success" ]; then
+            echo "overall_status=success" >> "$GITHUB_OUTPUT"
+            echo "message=All components published successfully" >> "$GITHUB_OUTPUT"
           else
-            echo "overall_status=failure" >> $GITHUB_OUTPUT
-            
-            # Build detailed failure message
-            MESSAGE="❌ Publishing failed:"
-            if [ "$JARS_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ SBT JAR publishing failed."
-            else
-              MESSAGE="$MESSAGE ✅ SBT JAR publishing succeeded."
-            fi
-            
-            if [ "$CENTRAL_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ Maven Central publishing failed."
-            else
-              MESSAGE="$MESSAGE ✅ Maven Central publishing succeeded."
-            fi
-            
-            if [ "$DOCKER_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ Docker build/push failed."
-            else
-              MESSAGE="$MESSAGE ✅ Docker build/push succeeded."
-            fi
-            
-            echo "message=$MESSAGE" >> $GITHUB_OUTPUT
+            echo "overall_status=failure" >> "$GITHUB_OUTPUT"
+            MESSAGE="Publishing summary:"
+            MESSAGE="$MESSAGE $([ "$JARS_STATUS" = success ] && echo 'JARs OK' || echo 'JARs FAILED');"
+            MESSAGE="$MESSAGE $([ "$CENTRAL_STATUS" = success ] && echo ' Central OK' || echo ' Central FAILED');"
+            MESSAGE="$MESSAGE $([ "$DOCKER_STATUS" = success ] && echo ' Docker OK' || echo ' Docker FAILED')"
+            echo "message=$MESSAGE" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Notify deployment result
         uses: spice-labs-inc/action-release-notification@main
         with:
-          type: ${{ steps.deployment-status.outputs.overall_status == 'success' && 'deployment-success' || 'deployment-failure' }}
-          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
-          workflow-name: ${{ steps.deployment-status.outputs.overall_status == 'success' && 'Release' || format('Release - {0}', steps.deployment-status.outputs.message) }}
+          type: ${{ steps.deployment_status.outputs.overall_status == 'success' && 'deployment-success' || 'deployment-failure' }}
+          slack-bot-token: "${{ secrets.SLACK_BOT_TOKEN }}"
+          username-mapping: "${{ secrets.GH_SLACK_USERNAME_MAPPING }}"
+          workflow-name: Release
           environment: production
-          thread-ts: ${{ needs.publish-jars.outputs.release_timestamp }}
-          channel-id: ${{ needs.publish-jars.outputs.release_channel_id }}
+          thread-ts: "${{ needs.release_publish_jars.outputs.release_timestamp }}"
+          channel-id: "${{ needs.release_publish_jars.outputs.release_channel_id }}"
