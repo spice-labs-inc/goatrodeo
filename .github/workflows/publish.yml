@@ -1,4 +1,4 @@
-name: Publish package to Maven Central, GitHub Packages, and Container Image to Docker Hub  # goatrodeo
+name: Publish package to Maven Central, GitHub Packages, and Container Image to Docker Hub
 
 on:
   push:
