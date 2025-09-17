@@ -39,7 +39,7 @@ jobs:
       - name: Build for scan (no publish on branches)
         env:
           SBT_OPTS: "-Xmx8G -Duser.timezone=GMT"
-        run: sbt +package
+        run: sbt package
 
       - name: Run Spice-Labs CLI scan (branch build)
         uses: spice-labs-inc/action-spice-labs-cli-scan@v3
@@ -111,9 +111,9 @@ jobs:
           SBT_OPTS: "-Xmx8G -Duser.timezone=GMT"
         run: |
           if [[ "${{ steps.on_main.outputs.ok }}" == "true" ]]; then
-            sbt "set ThisBuild / version := \"${{ steps.version.outputs.version }}\"" +publish
+            sbt "set ThisBuild / version := \"${{ steps.version.outputs.version }}\"" publish
           else
-            sbt "set ThisBuild / version := \"${{ steps.version.outputs.version }}\"" +package
+            sbt "set ThisBuild / version := \"${{ steps.version.outputs.version }}\"" package
           fi
 
       - name: Upload target/ for scan
@@ -243,26 +243,10 @@ jobs:
           tags: "${{ steps.meta.outputs.tags }}"
           labels: "${{ steps.meta.outputs.labels }}"
 
-      - name: Save OCI tar for scan
-        if: ${{ steps.on_main.outputs.ok == 'true' }}
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/docker
-          IMAGE_TAG="$(echo "${{ steps.meta.outputs.tags }}" | head -n1)"
-          docker pull "$IMAGE_TAG"
-          docker save "$IMAGE_TAG" > "artifacts/docker/${{ env.REPO }}-${{ github.run_id }}.oci.tar"
-
-      - name: Upload OCI artifact
-        if: ${{ steps.on_main.outputs.ok == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ env.REPO }}-oci-${{ github.run_id }}"
-          path: artifacts/docker/*.oci.tar
-          if-no-files-found: error
-          retention-days: 7
+      # removed image pull and OCI tar save to keep minimal changes
 
   scan_all_artifacts:
-    name: Scan all produced artifacts and upload ADGs
+    name: Scan produced artifacts and upload ADGs
     runs-on: ubuntu-24.04
     needs:
       - release_publish_jars
@@ -274,10 +258,9 @@ jobs:
           path: artifacts
           pattern: |
             ${{ env.REPO }}-target-*
-            ${{ env.REPO }}-oci-*
           merge-multiple: true
 
-      - name: Run Spice-Labs CLI scan (all artifacts)
+      - name: Run Spice-Labs CLI scan
         uses: spice-labs-inc/action-spice-labs-cli-scan@v3
         with:
           spice_pass: "${{ secrets.SPICE_PASS }}"
@@ -302,8 +285,8 @@ jobs:
           else
             echo "overall_status=failure" >> "$GITHUB_OUTPUT"
             MESSAGE="Publishing summary:"
-            MESSAGE="$MESSAGE $([ "$JARS_STATUS" = success ] && echo 'JARs OK' || echo 'JARs FAILED');"
-            MESSAGE="$MESSAGE $([ "$CENTRAL_STATUS" = success ] && echo ' Central OK' || echo ' Central FAILED');"
+            MESSAGE="$MESSAGE $([ "$JARS_STATUS" = success ] && echo 'JARs OK' || echo 'JARs FAILED')"
+            MESSAGE="$MESSAGE $([ "$CENTRAL_STATUS" = success ] && echo ' Central OK' || echo ' Central FAILED')"
             MESSAGE="$MESSAGE $([ "$DOCKER_STATUS" = success ] && echo ' Docker OK' || echo ' Docker FAILED')"
             echo "message=$MESSAGE" >> "$GITHUB_OUTPUT"
           fi
@@ -318,3 +301,4 @@ jobs:
           environment: production
           thread-ts: "${{ needs.release_publish_jars.outputs.release_timestamp }}"
           channel-id: "${{ needs.release_publish_jars.outputs.release_channel_id }}"
+          
