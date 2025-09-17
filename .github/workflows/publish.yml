@@ -2,6 +2,8 @@ name: Publish package to Maven Central, GitHub Packages, and Container Image to 
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
 
