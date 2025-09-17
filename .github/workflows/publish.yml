@@ -243,8 +243,6 @@ jobs:
           tags: "${{ steps.meta.outputs.tags }}"
           labels: "${{ steps.meta.outputs.labels }}"
 
-      # removed image pull and OCI tar save to keep minimal changes
-
   scan_all_artifacts:
     name: Scan produced artifacts and upload ADGs
     runs-on: ubuntu-24.04
