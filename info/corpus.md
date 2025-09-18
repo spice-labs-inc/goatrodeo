@@ -23,7 +23,7 @@ This also implies that sharding the corpus will be required.
 The OmniBOR Corpus represents a [Graph](https://en.wikipedia.org/wiki/Graph_database) of a
 relationships among Entries. Graph databases are notoriously hard to scale.
 
-## Corpus Access Pattersn
+## Corpus Access Patterns
 
 Thus, the access pattern for the Corpus will be a series of gitoid or pURL or
 other fetch operations. And to determine the composition of a JAR file with 5,000
@@ -71,7 +71,7 @@ non-ASCII characters.
 
 The string `||,||` was chosen as it's unlikely to appear in the URL and it offers the possibility of changing
 the `,` to another character to indicate some other format for the line. While there's no current plan to
-indicate anything other than an Entry, the posibility exists.
+indicate anything other than an Entry, the possibility exists.
 
 The OmniBOR Corpus is stored in sorted order by MD5 hash (the first 32 characters of the line).
 
@@ -99,7 +99,7 @@ of RAM.
 it takes BigTent about 4 seconds to load the index.
 
 On a machine with a fast processor (e.g., Ryzen 9) and NVMe storage, BigTent can serve more than 400
-entries per second, saturating a 1gig NIC. Serving individual Entries is a sub-millisecond operation.
+entries per second, saturating a 1 gig NIC. Serving individual Entries is a sub-millisecond operation.
 
 While BigTent doesn't yet support sharding, the algorithm is a simple addition to BigTent:
 
@@ -130,6 +130,5 @@ case class EntryMetaData(
     filesubtype: Option[String] = None,
     contents: Option[String] = None,
     other: Option[ujson.Value],
-
 )
 ```
