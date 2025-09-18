@@ -67,7 +67,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_TARGET: github
 
-      
+      - name: Index and upload ADG
+        uses: spice-labs-inc/action-spice-labs-cli-scan@v3
+        with:
+          token: ${{ secrets.SPICE_PASS }}
+          input: target
+          tag: ${{ github.event.repository.name }}
 
   publish-to-central:
     name: Re-publish Goatrodeo to Maven Central
