@@ -38,6 +38,7 @@ docker run -ti --rm \
   -b /data/input \
   -o /data/output
 ```
+**Note:** a typical Docker installation will require that this command must be run as root (not recommended), or with an appropriate group configuration. See [here](https://docs.docker.com/engine/install/linux-postinstall/) for more details. 
 
 ---
 
@@ -63,12 +64,12 @@ Run example:
 ```bash
 java -jar target/scala-*/goatrodeo-*-fat.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24
 ```
-
+**Note:** the `-b` flag directs goat rodeo to start searching in a given directory which much exist. Otherwise goatrodeo will exit with an error.
 ---
 
 ### 3️⃣ Use as a Java Library (via Maven)
 
-Add the following to your project's `pom.xml`:
+Add the following to your project's `pom.xml` in the `<dependencies>` section:
 
 ```xml
 <dependency>
