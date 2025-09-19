@@ -54,7 +54,7 @@ to each file/artifact.
 
 ### Strategy Determination
 
-With the collection of all file, Goat Rodeo hands the set of files to different
+With the collection of all files, Goat Rodeo hands the set of files to different
 handlers to choose which of the files the handler chooses to process.
 
 The list is in the `ToProcess` object and it's currently:
@@ -77,8 +77,8 @@ Also note that `GenericFile` should always be last. It takes whatever files the
 others did not select.
 
 The `MavenToProcess` looks for groupings of `pom`, `jar`, `sources`, and `javadocs`. It processes
-these are a unit so that it can pull metadata from the pom file to insert into the `jar` 's ADG,
-associates source file with `.class` file based on the class file's debug information, etc.
+these as a unit so that it can pull metadata from the pom file to insert into the `jar`'s ADG,
+associates a source file with a` `.class` file based on the class file's debug information, etc.
 
 In the future, there may be ways to group files together (e.g., a yaml file associated with an ISO
 that describes the contents of the ISO, a `Dockerfile` associated with a Docker image, etc.)
@@ -93,11 +93,11 @@ the block list (see `--block`), it is discarded. Otherwise it is added to the in
 instance. If there's already a node for the gitoid, the current gitoid is merged into that node.
 The additional hashes are treated as aliases to the node with is identified by it's `gitoid:sha256`.
 
-Each `ArtifactWrapper` is itself is a container is "opened". Containers include `tar`, `zip`, `jar`,
+Each `ArtifactWrapper` itself is a container is "opened". Containers include `tar`, `zip`, `jar`,
 `ISO`, etc. If the `ArtifactWrapper` is compressed (e.g. a `gzipped` file), it is uncompressed and the
 uncompressed file is tested to see if it's a container.
 
-For containers, smaller artifacts, an in-memory `ArtifactWrapper` is created, and for larger artifacts,
+For containers and smaller artifacts, an in-memory `ArtifactWrapper` is created, and for larger artifacts,
 the artifact is copied to a temporary file.
 
 **IMPORTANT** If you specify `--tempdir` the size threshold for in-memory vs. temp file is much lower. Using

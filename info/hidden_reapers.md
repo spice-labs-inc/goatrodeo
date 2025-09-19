@@ -4,7 +4,7 @@ The [Java Virtual Machine](https://en.wikipedia.org/wiki/Java_virtual_machine) (
 and very popular system for running applications, especially in the cloud and also on Android devices
 (technically, Android devices run a clean-room reimplementation of the JVM).
 
-The JVM executes an abstract stack-based machine code ([byte code](https://en.wikipedia.org/wiki/Java_virtual_machine#Bytecode_instructions))
+The JVM executes abstract stack-based machine code ([byte-code](https://en.wikipedia.org/wiki/Java_virtual_machine#Bytecode_instructions))
 the same way on all platforms. Thus, one can author and compile Java and JVM Compatible language
 programs on a Windows machine running an ARM processor and run that code, unmodified, on a Linux 
 machine with an x86 processor. Java's ongoing claim to fame is ["Write Once, Run Anywhere"](https://en.wikipedia.org/wiki/Write_once%2C_run_anywhere).
@@ -381,6 +381,6 @@ The meaning of the fields is as follows:
    the "core...jar" file contains the "ivy-2.4.0.jar" file which contains the `AggregatedRepoDescriptor.class` file, which is a marker file for the vulnerable Ivy 2.4.0 file.
 
 It's possible for you to double-check the results by [Verifying Hidden Reapers](https://hiddenreaper.com/verifying_hidden_reapers.pdf).
-[Spice Labs](https://spicelabs.io) is currently working on an online tool to convert the output of the "Unmasking" tool into addition
+[Spice Labs](https://spicelabs.io) is currently working on an online tool to convert the output of the "Unmasking" tool into additional
 information that identifies the specific vulnerable packages and, if available, lists a version of the package that no longer has the vulnerabilities. 
 
