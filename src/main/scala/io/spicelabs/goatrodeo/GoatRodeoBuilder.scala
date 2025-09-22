@@ -88,7 +88,7 @@ class GoatRodeoBuilder {
     this
   }
 
-  def withStatisMetadata(b: Boolean): GoatRodeoBuilder = {
+  def withStaticMetadata(b: Boolean): GoatRodeoBuilder = {
     config = config.copy(useStaticMetadata = b)
     this
   }

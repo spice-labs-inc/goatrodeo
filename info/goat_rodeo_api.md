@@ -25,7 +25,7 @@ There is a one to one correspondence between the `with` methods and command-line
 - `withBlockList(String b)`
 - `withTempDir(String d)`
 - `withTag(String t)`
-- `withStatisMetadata(Boolean b)`
+- `withStaticMetadata(Boolean b)`
 - `withTagJson(String t)`
 - `withExtraArgs(java.util.Map<String, String> args)`
 - `withExtraArg(String arg, String value)` - possibly an accumulator
