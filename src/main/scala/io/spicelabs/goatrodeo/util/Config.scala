@@ -13,6 +13,7 @@ import java.nio.file.Files
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import io.spicelabs.goatrodeo.util.Config.ExpandFiles.fixTilde
 
 /** Command Line Configuration
   *
@@ -41,7 +42,8 @@ case class Config(
     tempDir: Option[File] = None,
     useStaticMetadata: Boolean = false,
     dumpRootDir: Option[File] = None,
-    emitJsonDir: Option[File] = None
+    emitJsonDir: Option[File] = None,
+    nonexistantDirectories: Vector[File] = Vector()
 ) {
   def getFileListBuilders(): Vector[() => Seq[File]] = {
     build.map(file => () => Helpers.findFiles(file, f => true)) ++ fileList
@@ -73,11 +75,17 @@ object Config {
         .action((x, c) => c.copy(blockList = ExpandFiles(x).headOption)),
       opt[File]('b', "build")
         .text("Build gitoid database from jar files in a directory")
-        .action((x, c) =>
-          c.copy(build =
-            (c.build ++ ExpandFiles(x))
-              .filter(f => f.exists())
-          )
+        .action((x, c) => {
+          val tildeExpand = fixTilde(x)
+          if (!tildeExpand.exists()) {
+            c.copy(nonexistantDirectories = c.nonexistantDirectories :+ x)
+          } else {
+            c.copy(build =
+              (c.build ++ ExpandFiles(x))
+                .filter(f => f.exists()),
+            )
+          }
+        }
         ),
       opt[Boolean]("static-metadata")
         .text(
