@@ -68,7 +68,7 @@ jobs:
           PUBLISH_TARGET: github
 
       - name: Index and upload ADG
-        uses: spice-labs-inc/action-spice-labs-cli-scan@v3
+        uses: spice-labs-inc/action-spice-labs-surveyor@v3
         with:
           spice_pass: "${{ secrets.SPICE_PASS }}"
           file_path: "./target"
