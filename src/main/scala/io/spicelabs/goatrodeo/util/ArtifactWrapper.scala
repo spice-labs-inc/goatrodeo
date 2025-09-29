@@ -19,6 +19,7 @@ import java.nio.file.Path
 import java.util.UUID
 import scala.util.Try
 import scala.util.Using
+import io.spicelabs.cilantro.AssemblyDefinition
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -122,21 +123,7 @@ object ArtifactWrapper {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
       val detected = tika.getDetector.detect(data, metadata)
 
-      val isJson = Try {
-        if (detected == MediaType.TEXT_PLAIN && len < 1000000) {
-          import org.json4s._
-          import org.json4s.native.JsonMethods._
-
-          if (rawData.getPosition() > 0) {
-            rawData.skip(-rawData.getPosition())
-          }
-          val bytes = new String(Helpers.slurpInputNoClose(rawData), "UTF-8")
-          parseOpt(bytes).isDefined
-        } else false
-      }.toOption
-      if (isJson == Some(true)) "application/json"
-      else
-        detected.toString()
+      massageMimeType(fileName, rawData, detected)
     } catch {
       case e: Exception =>
         logger.error(
@@ -144,6 +131,43 @@ object ArtifactWrapper {
           e
         )
         "application/octet-stream"
+    }
+  }
+
+  private def massageMimeType(fileName: String, rawData: TikaInputStream, detected: MediaType): String = {
+    val isJson = Try {
+      if (detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000) {
+        import org.json4s._
+        import org.json4s.native.JsonMethods._
+
+        if (rawData.getPosition() > 0) {
+          rawData.skip(-rawData.getPosition())
+        }
+        val bytes = new String(Helpers.slurpInputNoClose(rawData), "UTF-8")
+        parseOpt(bytes).isDefined
+      } else false
+    }.toOption
+    if (isJson == Some(true))
+      return "application/json"
+    
+    val detectedString = detected.toString()
+    val isDotNet = testForDotNet(fileName, detectedString);
+    if (isDotNet)
+      return "application/x-msdownload; format=pe32-dotnet"
+    detectedString
+  }
+
+  private def testForDotNet(fileName: String, detectedString: String) = {
+    if (detectedString != "application/x-msdownload; format=pe32") {
+      false
+    }
+    else {
+      try {
+        val assembly = AssemblyDefinition.readAssembly(fileName)
+        assembly != null && assembly.mainModule != null
+      } catch {
+        _ => false
+      }
     }
   }
 
