@@ -8,7 +8,6 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
-
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import scala.util.Try
@@ -39,6 +38,26 @@ object StaticMetadata {
     staticMetadataMimeTypes.contains(artifact.mimeType)
   }
 
+  /**
+   * The beginning of a block list... trying `text/ *` to start
+   * 
+   * @param the artifact to test
+   * @return if it should not be processed by Syft
+   */
+  def isBlocked(artifact: ArtifactWrapper): Boolean = {
+    val mime = artifact.mimeType
+
+    // figure out Rust depedencies
+    if (mime == "text/x-dsrc") {
+      false
+    // but otherwise skip text files
+    } else if (mime.startsWith("text/")) {
+    true
+    } else {
+      false
+    }
+  }
+
   lazy val hasSyft: Boolean = {
     Try {
       val process = ProcessBuilder("syft", "--help").start()
@@ -53,7 +72,7 @@ object StaticMetadata {
       artfiact: ArtifactWrapper,
       tempDir: Path
   ): Option[StaticMetadataResult] = {
-    if (hasSyft) {
+    if (hasSyft && !isBlocked(artfiact)) {
       Try {
         val targetFile = artfiact.forceFile(tempDir)
         val pb = ProcessBuilder(
@@ -73,8 +92,6 @@ object StaticMetadata {
         ret.go()
         ret
       }.toOption
-
-      // Some(ret)
     } else None
 
   }
@@ -184,11 +201,22 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
           val purlAugment = for {
             digest <- digests
             purl <- purls
-          } yield ConnectionAugmentation(
-            digest,
-            (EdgeType.aliasFrom, purl),
-            PackageURL(purl)
-          )
+            augmentation <- {
+              try {
+                List(
+                  ConnectionAugmentation(
+                    digest,
+                    (EdgeType.aliasFrom, purl),
+                    PackageURL(purl)
+                  )
+                )
+              } catch {
+                case e: Exception =>
+                  StaticMetadataResult.logger.debug(f"Failed to create Package URL from '${purl}'")
+                  List()
+              }
+            }
+          } yield augmentation
           val artifactStr = pretty(render(artifact match {
             case JObject(obj) => JObject(obj.filter(_._1 != "id"))
             case v            => v
