@@ -122,6 +122,7 @@ lazy val root = project
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
+    libraryDependencies += "io.spicelabs" % "cilantro_3" % "0.1.17",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     assembly / assemblyJarName := s"${projectName}-${version.value}-fat.jar",
     compileOrder := CompileOrder.JavaThenScala,
