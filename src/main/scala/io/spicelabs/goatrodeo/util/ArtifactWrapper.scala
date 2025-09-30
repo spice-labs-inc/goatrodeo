@@ -1,6 +1,7 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.cilantro.AssemblyDefinition
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
@@ -19,7 +20,6 @@ import java.nio.file.Path
 import java.util.UUID
 import scala.util.Try
 import scala.util.Using
-import io.spicelabs.cilantro.AssemblyDefinition
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -134,7 +134,11 @@ object ArtifactWrapper {
     }
   }
 
-  private def massageMimeType(fileName: String, rawData: TikaInputStream, detected: MediaType): String = {
+  private def massageMimeType(
+      fileName: String,
+      rawData: TikaInputStream,
+      detected: MediaType
+  ): String = {
     val isJson = Try {
       if (detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000) {
         import org.json4s._
@@ -149,7 +153,7 @@ object ArtifactWrapper {
     }.toOption
     if (isJson == Some(true))
       return "application/json"
-    
+
     val detectedString = detected.toString()
     val isDotNet = testForDotNet(fileName, detectedString);
     if (isDotNet)
@@ -160,13 +164,12 @@ object ArtifactWrapper {
   private def testForDotNet(fileName: String, detectedString: String) = {
     if (detectedString != "application/x-msdownload; format=pe32") {
       false
-    }
-    else {
+    } else {
       try {
         val assembly = AssemblyDefinition.readAssembly(fileName)
         assembly != null && assembly.mainModule != null
-      } catch {
-        _ => false
+      } catch { _ =>
+        false
       }
     }
   }

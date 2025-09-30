@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
+
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import scala.util.Try
@@ -38,24 +39,15 @@ object StaticMetadata {
     staticMetadataMimeTypes.contains(artifact.mimeType)
   }
 
-  /**
-   * The beginning of a block list... trying `text/ *` to start
-   * 
-   * @param the artifact to test
-   * @return if it should not be processed by Syft
-   */
+  /** The beginning of a block list. Does nothing.
+    *
+    * @param the
+    *   artifact to test
+    * @return
+    *   if it should not be processed by Syft
+    */
   def isBlocked(artifact: ArtifactWrapper): Boolean = {
-    val mime = artifact.mimeType
-
-    // figure out Rust depedencies
-    if (mime == "text/x-dsrc") {
-      false
-    // but otherwise skip text files
-    } else if (mime.startsWith("text/")) {
-    true
-    } else {
-      false
-    }
+    false
   }
 
   lazy val hasSyft: Boolean = {
@@ -212,7 +204,9 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
                 )
               } catch {
                 case e: Exception =>
-                  StaticMetadataResult.logger.debug(f"Failed to create Package URL from '${purl}'")
+                  StaticMetadataResult.logger.debug(
+                    f"Failed to create Package URL from '${purl}'"
+                  )
                   List()
               }
             }

@@ -62,8 +62,12 @@ object Howdy {
     val fileListers = params.getFileListBuilders()
 
     if (!params.nonexistantDirectories.isEmpty) {
-      logger.error("One or more directories in a -b or --build option was not found: ")
-      params.nonexistantDirectories.foreach(f => logger.error(f.getAbsolutePath()))
+      logger.error(
+        "One or more directories in a -b or --build option was not found: "
+      )
+      params.nonexistantDirectories.foreach(f =>
+        logger.error(f.getAbsolutePath())
+      )
       logger.info(OParser.usage(Config.parser1))
       Helpers.bailFail()
       return
