@@ -2,7 +2,7 @@
 
 MIME types are an attempt to assign a category for the content of a stream of data. It is a relatively simple mecxhanism, but it tends to over-simplify content.
 
-Goat rodeo uses (Apache Tika)[https://tika.apache.org/] to classify the content of files, which is does very well, to the limits that are available.
+Goat rodeo uses [Apache Tika](https://tika.apache.org/) to classify the content of files, which is does very well, to the limits that are available.
 
 As such, it is expedient for goat rodeo to be able to make some MIME types more specific than what it provided by Tika. Tika has extensibility which can do that, but there is no direct API and instead uses configurations and external code which look like that are an attack surface.
 

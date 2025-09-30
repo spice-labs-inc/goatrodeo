@@ -17,7 +17,7 @@ In all other cases, it will be excluded.
 
 # Implementation Details
 
-> Some people, when confronted with a problem, think “I know, I'll use regular expressions.”  Now they have two problems. - (Jamie Zawinski, 12 August, 1997)[https://regex.info/blog/2006-09-15/247]
+> Some people, when confronted with a problem, think “I know, I'll use regular expressions.”  Now they have two problems. - [Jamie Zawinski, 12 August, 1997](https://regex.info/blog/2006-09-15/247)
 
 
 The simplest approach to this is to adopt a simple syntax in the form:
