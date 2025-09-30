@@ -39,6 +39,17 @@ object StaticMetadata {
     staticMetadataMimeTypes.contains(artifact.mimeType)
   }
 
+  /** The beginning of a block list. Does nothing.
+    *
+    * @param the
+    *   artifact to test
+    * @return
+    *   if it should not be processed by Syft
+    */
+  def isBlocked(artifact: ArtifactWrapper): Boolean = {
+    false
+  }
+
   lazy val hasSyft: Boolean = {
     Try {
       val process = ProcessBuilder("syft", "--help").start()
@@ -53,7 +64,7 @@ object StaticMetadata {
       artfiact: ArtifactWrapper,
       tempDir: Path
   ): Option[StaticMetadataResult] = {
-    if (hasSyft) {
+    if (hasSyft && !isBlocked(artfiact)) {
       Try {
         val targetFile = artfiact.forceFile(tempDir)
         val pb = ProcessBuilder(
@@ -73,8 +84,6 @@ object StaticMetadata {
         ret.go()
         ret
       }.toOption
-
-      // Some(ret)
     } else None
 
   }
@@ -184,11 +193,24 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
           val purlAugment = for {
             digest <- digests
             purl <- purls
-          } yield ConnectionAugmentation(
-            digest,
-            (EdgeType.aliasFrom, purl),
-            PackageURL(purl)
-          )
+            augmentation <- {
+              try {
+                List(
+                  ConnectionAugmentation(
+                    digest,
+                    (EdgeType.aliasFrom, purl),
+                    PackageURL(purl)
+                  )
+                )
+              } catch {
+                case e: Exception =>
+                  StaticMetadataResult.logger.debug(
+                    f"Failed to create Package URL from '${purl}'"
+                  )
+                  List()
+              }
+            }
+          } yield augmentation
           val artifactStr = pretty(render(artifact match {
             case JObject(obj) => JObject(obj.filter(_._1 != "id"))
             case v            => v

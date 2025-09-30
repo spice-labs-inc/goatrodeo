@@ -3,6 +3,7 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.util.Config.ExpandFiles.fixTilde
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
 import scopt.OParserBuilder
@@ -13,7 +14,6 @@ import java.nio.file.Files
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.Config.ExpandFiles.fixTilde
 
 /** Command Line Configuration
   *
@@ -85,8 +85,7 @@ object Config {
                 .filter(f => f.exists()),
             )
           }
-        }
-        ),
+        }),
       opt[Boolean]("static-metadata")
         .text(
           "Enhance metadata with Syft (must install https://github.com/anchore/syft)"
