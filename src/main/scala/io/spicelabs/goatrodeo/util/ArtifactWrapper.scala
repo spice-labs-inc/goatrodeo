@@ -139,6 +139,7 @@ object ArtifactWrapper {
       rawData: TikaInputStream,
       detected: MediaType
   ): String = {
+    // if you add more changes to this, add to the mime_types.md documentation
     val isJson = Try {
       if (detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000) {
         import org.json4s._
