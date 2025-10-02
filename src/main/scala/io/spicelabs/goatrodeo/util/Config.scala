@@ -14,6 +14,9 @@ import java.nio.file.Files
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import os.ReadablePath
+import scala.io.Source
+import scala.io.BufferedSource
 
 /** Command Line Configuration
   *
@@ -43,7 +46,8 @@ case class Config(
     useStaticMetadata: Boolean = false,
     dumpRootDir: Option[File] = None,
     emitJsonDir: Option[File] = None,
-    nonexistantDirectories: Vector[File] = Vector()
+    nonexistantDirectories: Vector[File] = Vector(),
+    mimeFilter: IncludeExclude = IncludeExclude()
 ) {
   def getFileListBuilders(): Vector[() => Seq[File]] = {
     build.map(file => () => Helpers.findFiles(file, f => true)) ++ fileList
@@ -157,6 +161,12 @@ object Config {
           "How many threads to run (default 4). Should be 2x-3x number of cores"
         )
         .action((t, c) => c.copy(threads = t)),
+      opt[String]("mime-filter")
+        .text("add an include or exclude MIME type filter:\n +mime include mime\n -mime exclude mime\n *regex include mime that matches regex\n /regex exclude mime that matches regex")
+        .action((x, c) => c.copy(mimeFilter = c.mimeFilter :+ x)),
+      opt[File]("mime-filter-file")
+        .text("")
+        .action((f, c) => c.copy(mimeFilter = c.mimeFilter ++ VectorOfStrings(f))),
       opt[Unit]('V', "version")
         .text("print version and exit")
         .action((_, c) => {
@@ -173,6 +183,23 @@ object Config {
         })
     )
   }
+
+  object VectorOfStrings {
+    def apply(in: File): Vector[String] = {
+      var source: BufferedSource = null
+      try {
+        source = Source.fromFile(in.getAbsoluteFile())
+        source.getLines().toVector // getLines() does not include new lines (yay!)
+      } finally {
+        source.close()
+      }
+    }
+    def apply(in: String): Vector[String] = {
+      val f = File(in)
+      apply(f)
+    }
+  }
+
 
   object ExpandFiles {
     def apply(in: File): Vector[File] = {

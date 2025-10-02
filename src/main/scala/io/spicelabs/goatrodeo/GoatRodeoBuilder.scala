@@ -24,6 +24,8 @@ import java.util.regex.Pattern
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import io.spicelabs.goatrodeo.util.IncludeExclude
+import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
 
 class GoatRodeoBuilder {
   private val log = Logger(classOf[GoatRodeoBuilder])
@@ -100,6 +102,16 @@ class GoatRodeoBuilder {
     this
   }
 
+  def withMimeFilter(filter: String): GoatRodeoBuilder = {
+    config = config.copy(mimeFilter = config.mimeFilter :+ filter)
+    this
+  }
+
+  def withMimeFilterFile(f: String): GoatRodeoBuilder = {
+    config = config.copy(mimeFilter = config.mimeFilter ++ VectorOfStrings(f))
+    this
+  }
+
   def withExtraArgs(args: java.util.Map[String, String]): GoatRodeoBuilder = {
     withExtraArgs(args.asScala.toMap)
   }
@@ -123,6 +135,8 @@ class GoatRodeoBuilder {
       case "tempDir"        => withTempDir(value)
       case "tag-json"       => withTagJson(value)
       case "tag"            => withTag(value)
+      case "mimeFilter"     => withMimeFilter(value)
+      case "mimeFilterFile" => withMimeFilterFile(value)
       case unknown =>
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
         this

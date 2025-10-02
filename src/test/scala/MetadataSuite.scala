@@ -16,6 +16,7 @@ import io.spicelabs.goatrodeo.util.StaticMetadata
 import org.json4s.*
 
 import java.io.File
+import io.spicelabs.goatrodeo.util.IncludeExclude
 class MetadataSuite extends munit.FunSuite {
   test("Metadata collections works") {
     if (StaticMetadata.hasSyft) {
@@ -23,7 +24,7 @@ class MetadataSuite extends munit.FunSuite {
       val fileWrapper =
         FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
       val runner =
-        StaticMetadata.runStaticMetadataGather(fileWrapper, file.toPath())
+        StaticMetadata.runStaticMetadataGather(fileWrapper, file.toPath(), IncludeExclude())
       val (str, json) = runner.get.runForMillis(100000).get
 
       assert(str.length() > 400, s"Metadata answer too small ${str}")
@@ -38,7 +39,7 @@ class MetadataSuite extends munit.FunSuite {
       val fileWrapper =
         FileWrapper(file, "slf4j-simple-1.6.1.jar", None, f => ())
       val runner =
-        StaticMetadata.runStaticMetadataGather(fileWrapper, file.toPath())
+        StaticMetadata.runStaticMetadataGather(fileWrapper, file.toPath(), IncludeExclude())
       val (str, json) = runner.get.runForMillis(100000).get
 
       // val artifacts =

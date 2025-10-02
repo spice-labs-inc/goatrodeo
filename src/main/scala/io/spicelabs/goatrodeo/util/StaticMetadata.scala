@@ -46,8 +46,8 @@ object StaticMetadata {
     * @return
     *   if it should not be processed by Syft
     */
-  def isBlocked(artifact: ArtifactWrapper): Boolean = {
-    false
+  def isBlocked(artifact: ArtifactWrapper, mimeFilter: IncludeExclude): Boolean = {
+    !mimeFilter.shouldInclude(artifact.mimeType)
   }
 
   lazy val hasSyft: Boolean = {
@@ -61,12 +61,13 @@ object StaticMetadata {
   }
 
   def runStaticMetadataGather(
-      artfiact: ArtifactWrapper,
-      tempDir: Path
+      artifact: ArtifactWrapper,
+      tempDir: Path,
+      mimeFilter: IncludeExclude
   ): Option[StaticMetadataResult] = {
-    if (hasSyft && !isBlocked(artfiact)) {
+    if (hasSyft && !isBlocked(artifact, mimeFilter)) {
       Try {
-        val targetFile = artfiact.forceFile(tempDir)
+        val targetFile = artifact.forceFile(tempDir)
         val pb = ProcessBuilder(
           List(
             "syft",

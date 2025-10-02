@@ -307,7 +307,7 @@ object Builder {
 
               val byHash: Map[String, Vector[Augmentation]] =
                 if (args.useStaticMetadata) {
-                  toProcess.runStaticMetadataGather()
+                  toProcess.runStaticMetadataGather(args.mimeFilter)
                 } else {
                   Map()
                 }
