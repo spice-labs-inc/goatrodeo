@@ -110,7 +110,7 @@ GoatRodeo.builder()
 | `-V`, `--version`          | Print version and exit. |
 | `--mime-filter`            | Allows artifacts to be filtered using a set of include |
 |                            | and exclude filters. The syntax of a filter is:        |
-|                            | `command-char``filter-text`                           |
+|                            | `<command-char><filter-text>`                           |
 |                            | Command Characters:                                    |
 |                            | `+` include a mime type that matches exactly |
 |                            | `-` exclude a mime type that matches exactly |
