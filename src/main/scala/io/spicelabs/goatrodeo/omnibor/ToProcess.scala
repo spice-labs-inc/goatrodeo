@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import io.spicelabs.goatrodeo.util.IncludeExclude
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -253,12 +254,12 @@ trait ToProcess {
     */
   def getElementsToProcess(): (Seq[(ArtifactWrapper, MarkerType)], StateType)
 
-  def runStaticMetadataGather(): Map[String, Vector[Augmentation]] = {
+  def runStaticMetadataGather(mimeFilter: IncludeExclude): Map[String, Vector[Augmentation]] = {
     FileWalker.withinTempDir { tempDir =>
       {
         val augmentation: Seq[Map[String, Vector[Augmentation]]] = for {
           (wrapper, _) <- getElementsToProcess()._1
-          it <- StaticMetadata.runStaticMetadataGather(wrapper, tempDir).toList
+          it <- StaticMetadata.runStaticMetadataGather(wrapper, tempDir, mimeFilter).toList
           answer <- it.runForMillis(120L * 1000 * 60) // 120 minutes
 
         } yield it.buildAugmentation()
@@ -690,7 +691,7 @@ object ToProcess {
 
     for { individual <- toProcess } {
       val augmentation = if (args.useStaticMetadata) {
-        individual.runStaticMetadataGather()
+        individual.runStaticMetadataGather(args.mimeFilter)
       } else Map()
 
       individual.process(

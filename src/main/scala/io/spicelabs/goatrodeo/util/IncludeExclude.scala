@@ -19,11 +19,29 @@ class IncludeExclude (include: RegexPredicate, exclude: RegexPredicate) {
     def this(incExact: Set[String], incRegex: Vector[Regex], excExact: Set[String], excRegex: Vector[Regex]) = {
         this(RegexPredicate(incExact, incRegex), RegexPredicate(excExact, excRegex))
     }
+
+    def this() = {
+        this(RegexPredicate(Set(), Vector()), RegexPredicate(Set(), Vector()))
+    }
     
     def shouldInclude(candidate: String) = {
         // if the candidate is not in the exclude, it should be included.
         // if the candidate *is* is the exclude, then check to see if it's included
         !exclude.matches(candidate) || include.matches(candidate)
+    }
+
+    def :+ (predicate: String): IncludeExclude = {
+        val (inE, inR, exE, exR) = IncludeExclude.aggregatePredicate(predicate,
+            (include.exact, include.regexes, exclude.exact, exclude.regexes))
+        IncludeExclude(RegexPredicate(inE, inR), RegexPredicate(exE, exR))
+    }
+
+    def ++ (predicates: Iterable[String]): IncludeExclude = {
+        var inex = this
+        for (predicate <- predicates) {
+            inex = inex :+ predicate
+        }
+        inex
     }
 }
 
