@@ -108,6 +108,21 @@ GoatRodeo.builder()
 | `--tempdir <value>`        | Directory for temporary storage (RAM disk recommended). |
 | `-t`, `--threads <value>`  | Number of threads (default: 4). Suggest 2–3× CPU cores. |
 | `-V`, `--version`          | Print version and exit. |
+| `--mime-filter`            | Allows artifacts to be filtered using a set of include |
+|                            | and exclude filters. The syntax of a filter is:        |
+|                            | <command-char><filter-text>                            |
+|                            | Command Characters:                                    |
+|                            | `+` include a mime type that matches exactly |
+|                            | `-` exclude a mime type that matches exactly |
+|                            | `*` include all mime types that match a regular expression |
+|                            | `/` exclude all mime types that match a regular expression |
+|                            | `#` ignore the filter text
+|                            | Exclusion is done before inclusion. This allows a "no, but..." |
+|                            | pattern where you could, say, exclude all audio, but include |
+|                            | wav files. The regular expression uses the [Java syntax](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html). |
+| `--mime-filter-file <value>` | The value is a path to a text file containing mime filters. |
+|                            | Each line contains one mime filter and starts with a command. |
+|                            | Empty lines are ignored. |
 | `-?`, `--help`             | Print help and exit. |
 
 ---
