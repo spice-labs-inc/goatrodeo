@@ -1,7 +1,6 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.cilantro.AssemblyDefinition
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
@@ -106,6 +105,7 @@ object ArtifactWrapper {
   // max in memory size 32MB
   val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
+  private val detectorFactory = TikaDetectorFactory(tika, DotnetDetector())
 
   /** Given an input stream and a filename, get the mime type
     *
@@ -121,8 +121,7 @@ object ArtifactWrapper {
 
       val metadata = new Metadata()
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
-      val detected = tika.getDetector.detect(data, metadata)
-
+      val detected = detectorFactory.toDetector().detect(data, metadata)
       massageMimeType(fileName, rawData, detected)
     } catch {
       case e: Exception =>
@@ -156,23 +155,7 @@ object ArtifactWrapper {
       return "application/json"
 
     val detectedString = detected.toString()
-    val isDotNet = testForDotNet(fileName, detectedString);
-    if (isDotNet)
-      return "application/x-msdownload; format=pe32-dotnet"
     detectedString
-  }
-
-  private def testForDotNet(fileName: String, detectedString: String) = {
-    if (detectedString != "application/x-msdownload; format=pe32") {
-      false
-    } else {
-      try {
-        val assembly = AssemblyDefinition.readAssembly(fileName)
-        assembly != null && assembly.mainModule != null
-      } catch { _ =>
-        false
-      }
-    }
   }
 
   protected def fixPath(p: String): String = {
