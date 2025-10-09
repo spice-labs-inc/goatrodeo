@@ -47,7 +47,8 @@ case class Config(
     dumpRootDir: Option[File] = None,
     emitJsonDir: Option[File] = None,
     nonexistantDirectories: Vector[File] = Vector(),
-    mimeFilter: IncludeExclude = IncludeExclude()
+    mimeFilter: IncludeExclude = IncludeExclude(),
+    filenameFilter: IncludeExclude = IncludeExclude()
 ) {
   def getFileListBuilders(): Vector[() => Seq[File]] = {
     build.map(file => () => Helpers.findFiles(file, f => true)) ++ fileList
@@ -165,8 +166,14 @@ object Config {
         .text("add an include or exclude MIME type filter:\n +mime include mime\n -mime exclude mime\n *regex include mime that matches regex\n /regex exclude mime that matches regex")
         .action((x, c) => c.copy(mimeFilter = c.mimeFilter :+ x)),
       opt[File]("mime-filter-file")
-        .text("")
+        .text("a file of lines, each of which will be treated as a MIME filter")
         .action((f, c) => c.copy(mimeFilter = c.mimeFilter ++ VectorOfStrings(f))),
+      opt[String]("syft-filter")
+        .text("add a regular expression to include or exclude a syft file filter:\n  +file include file\n -file exclude file\n *regex include file that matches regex\n /regex exclude mime that matches regex")
+        .action((x, c) => c.copy(filenameFilter = c.filenameFilter :+ x)),
+      opt[File]("syft-filter-file")
+        .text("a file of lines, each of which will be treated as a syft file filter")
+        .action((f, c) => c.copy(filenameFilter = c.filenameFilter ++ VectorOfStrings(f))),
       opt[Unit]('V', "version")
         .text("print version and exit")
         .action((_, c) => {
