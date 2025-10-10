@@ -14,55 +14,62 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
-import org.apache.tika.detect.Detector
-import java.io.FileInputStream
-import java.io.File
-import java.io.InputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.mime.MediaType
-import org.apache.tika.metadata.TikaCoreProperties
 import io.spicelabs.cilantro.AssemblyDefinition
-import java.io.IOException
+import org.apache.tika.detect.Detector
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
+import org.apache.tika.mime.MediaType
 
-class DotnetDetector extends  Detector {
-    override def detect(input: InputStream, metadata: Metadata): MediaType = {
-        var fs:FileInputStream = null
-        try {
-            fs = FileInputStreamEx.toFileInputStream(input, metadata)
-            val assembly = AssemblyDefinition.readAssembly(fs)
-            assembly != null && assembly.mainModule != null
-            return DotnetDetector.DOTNET_MIME
-        } catch {
-            case _ => return MediaType.OCTET_STREAM
-        } finally {
-            if (fs.isInstanceOf[FileInputStreamEx])
-                fs.close()
-        }
+import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
+
+class DotnetDetector extends Detector {
+  override def detect(input: InputStream, metadata: Metadata): MediaType = {
+    var fs: FileInputStream = null
+    try {
+      fs = FileInputStreamEx.toFileInputStream(input, metadata)
+      val assembly = AssemblyDefinition.readAssembly(fs)
+      assembly != null && assembly.mainModule != null
+      return DotnetDetector.DOTNET_MIME
+    } catch {
+      case _ => return MediaType.OCTET_STREAM
+    } finally {
+      if (fs.isInstanceOf[FileInputStreamEx])
+        fs.close()
     }
+  }
 }
 
 object DotnetDetector {
-    lazy val DOTNET_MIME = {
-        MediaType.parse("application/x-msdownload; format=pe32-dotnet")
-    }
+  lazy val DOTNET_MIME = {
+    MediaType.parse("application/x-msdownload; format=pe32-dotnet")
+  }
 }
 
 class FileInputStreamEx(private val f: File) extends FileInputStream(f) {
-    def this(path: String) = {
-        this(File(path))
-    }
+  def this(path: String) = {
+    this(File(path))
+  }
 }
 
 object FileInputStreamEx {
-    def toFileInputStream(is: InputStream, metadata: Metadata): FileInputStream = {
-        if (is.isInstanceOf[FileInputStream])
-            return is.asInstanceOf[FileInputStream]
-        val path = metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)
-        if (path == null)
-            throw new IllegalArgumentException("metadata data needs the RESOURCE_NAME_KEY set to the path name")
-        val f = File(path)
-        if (!f.exists())
-            throw new IllegalArgumentException(s"RESOURCE_NAME_KEY is set to ${path} but that path doesn't exist")
-        FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY))
-    }
+  def toFileInputStream(
+      is: InputStream,
+      metadata: Metadata
+  ): FileInputStream = {
+    if (is.isInstanceOf[FileInputStream])
+      return is.asInstanceOf[FileInputStream]
+    val path = metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)
+    if (path == null)
+      throw new IllegalArgumentException(
+        "metadata data needs the RESOURCE_NAME_KEY set to the path name"
+      )
+    val f = File(path)
+    if (!f.exists())
+      throw new IllegalArgumentException(
+        s"RESOURCE_NAME_KEY is set to ${path} but that path doesn't exist"
+      )
+    FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY))
+  }
 }

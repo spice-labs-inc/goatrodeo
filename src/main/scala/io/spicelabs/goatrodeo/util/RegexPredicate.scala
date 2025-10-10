@@ -15,8 +15,7 @@ package io.spicelabs.goatrodeo.util
 
 import scala.util.matching.Regex
 
-final case class RegexPredicate(exact: Set[String], regexes: Vector[Regex])
-{
-    def matches(str: String) =
-        exact.contains(str) || regexes.exists((regex) => regex.matches(str))
+final case class RegexPredicate(exact: Set[String], regexes: Vector[Regex]) {
+  def matches(str: String) =
+    exact.contains(str) || regexes.exists((regex) => regex.matches(str))
 }

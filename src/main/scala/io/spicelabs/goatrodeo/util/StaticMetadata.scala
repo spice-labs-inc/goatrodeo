@@ -10,7 +10,7 @@ import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.ByteArrayOutputStream
-import java.nio.file.Path
+import java.nio.file.*
 import scala.util.Try
 
 /** The bridge to Syft https://github.com/anchore/syft
@@ -18,6 +18,54 @@ import scala.util.Try
 object StaticMetadata {
   private val logger = Logger(getClass())
   private lazy val staticMetadataMimeTypes = Set(
+    "application/x-archive",
+    "application/x-cpio",
+    "application/x-shar",
+    "application/x-iso9660-image",
+    "application/x-sbx",
+    "application/x-tar",
+    // compression only
+    "application/x-bzip2",
+    "application/gzip",
+    "application/x-lzip",
+    "application/x-lzma",
+    "application/x-lzop",
+    "application/x-snappy-framed",
+    "application/x-xz",
+    "application/x-compress",
+    "application/zstd",
+    // archiving and compression
+    "application/x-7z-compressed",
+    "application/x-ace-compressed",
+    "application/x-astrotite-afa",
+    "application/x-alz-compressed",
+    "application/vnd.android.package-archive",
+    "application/x-freearc",
+    "application/x-arj",
+    "application/x-b1",
+    "application/vnd.ms-cab-compressed",
+    "application/x-cfs-compressed",
+    "application/x-dar",
+    "application/x-dgc-compressed",
+    "application/x-apple-diskimage",
+    "application/x-gca-compressed",
+    "application/java-archive",
+    "application/x-lzh",
+    "application/x-lzx",
+    "application/x-rar-compressed",
+    "application/x-stuffit",
+    "application/x-stuffitx",
+    "application/x-gtar",
+    "application/x-ms-wim",
+    "application/x-xar",
+    "application/zip",
+    "application/x-zoo",
+    "application/x-executable",
+    "application/x-mach-binary",
+    "application/x-elf",
+    "application/x-sharedlib",
+    "application/vnd.microsoft.portable-executable",
+    "application/x-executable",
     "application/zip",
     "application/java-archive",
     "application/vnd.android.package-archive",
@@ -29,6 +77,137 @@ object StaticMetadata {
     "application/gzip",
     "application/zstd"
   )
+
+  private lazy val globSet = Set(
+    "**/*.app",
+    "**/*.bom",
+    "**/*.bom.*",
+    "**/bom",
+    "**/cabal.project.freeze",
+    "**/Cargo.lock",
+    "**/*.cdx",
+    "**/*.cdx.*",
+    "**/Cellar/*/*/.brew/*.rb",
+    "**/composer.lock",
+    "**/conanfile.txt",
+    "**/conaninfo.txt",
+    "**/conan.lock",
+    "**/conda-meta/*.json",
+    "**/*.deb",
+    "**/DESCRIPTION",
+    "**/*dist-info/METADATA",
+    "**/*DIST-INFO/METADATA",
+    "**/*.dll",
+    "**/doc/linux-modules-*/changelog.Debian.gz",
+    "**/*.ear",
+    "**/*.egg-info",
+    "**/*egg-info/PKG-INFO",
+    "**/*EGG-INFO/PKG-INFO",
+    "**/*.exe",
+    "**/Gemfile.lock",
+    "**/*.gemspec",
+    "**/.github/actions/*/action.yaml",
+    "**/.github/actions/*/action.yml",
+    "**/.github/workflows/*.yaml",
+    "**/.github/workflows/*.yml",
+    "**/go.mod",
+    "**/gradle.lockfile*",
+    "**/*.hpi",
+    "**/installed.json",
+    "**/*.jar",
+    "**/*.jpi",
+    "**/*.kar",
+    "**/kernel",
+    "**/kernel-*",
+    "**/lib/apk/db/installed",
+    "**/lib/dpkg/status",
+    "**/lib/dpkg/status.d/*",
+    "**/lib/modules/**/*.ko",
+    "**/lib/opkg/info/*.control",
+    "**/lib/opkg/status",
+    "**/Library/Taps/*/*/Formula/*.rb",
+    "**/*.lpkg",
+    "**/meta/snap.yaml",
+    "**/mix.lock",
+    "**/*.nar",
+    "**/*opam",
+    "/opt/bitnami/**/.spdx-*.spdx",
+    "**/package.json",
+    "**/package-lock.json",
+    "**/.package.resolved",
+    "**/Package.resolved",
+    "**/packages.lock.json",
+    "**/pack.pl",
+    "**/*.par",
+    "**/php/.registry/.channel.*/*.reg",
+    "**/php/.registry/**/*.reg",
+    "**/Pipfile.lock",
+    "**/pnpm-lock.yaml",
+    "**/Podfile.lock",
+    "**/poetry.lock",
+    "**/pubspec.lock",
+    "**/pubspec.yaml",
+    "**/pubspec.yml",
+    "**/rebar.lock",
+    "**/release",
+    "**/*requirements*.txt",
+    "**/*.rockspec",
+    "**/*.sar",
+    "**/*.sbom",
+    "**/*.sbom.*",
+    "**/sbom",
+    "**/setup.py",
+    "**/snap/manifest.yaml",
+    "**/snap/snapcraft.yaml",
+    "**/*.spdx",
+    "**/*.spdx.*",
+    "**/specifications/**/*.gemspec",
+    "**/stack.yaml",
+    "**/stack.yaml.lock",
+    "**/*.syft.json",
+    "**/*.tar",
+    "**/*.tar.br",
+    "**/*.tar.bz",
+    "**/*.tar.bz2",
+    "**/*.tar.gz",
+    "**/*.tar.lz4",
+    "**/*.tar.sz",
+    "**/*.tar.xz",
+    "**/*.tar.zst",
+    "**/*.tar.zstd",
+    "**/*.tbr",
+    "**/*.tbz",
+    "**/*.tbz2",
+    "**/.terraform.lock.hcl",
+    "**/*.tgz",
+    "**/*.tlz4",
+    "**/*.tsz",
+    "**/*.txz",
+    "**/*.tzst",
+    "**/*.tzstd",
+    "**/usr/share/snappy/dpkg.yaml",
+    "**/uv.lock",
+    "**/var/db/pkg/*/*/CONTENTS",
+    "**/var/lib/pacman/local/**/desc",
+    "**/var/lib/rpmmanifest/container-manifest-2",
+    "**/{var/lib,usr/share,usr/lib/sysimage}/rpm/{Packages,Packages.db,rpmdb.sqlite}",
+    "**/vmlinux",
+    "**/vmlinux-*",
+    "**/vmlinuz",
+    "**/vmlinuz-*",
+    "**/*.war",
+    "**/wp-content/plugins/*/*.php",
+    "**/yarn.lock",
+    "**/*.zip"
+  )
+
+  private lazy val pathMatchers = {
+    val fs = FileSystems.getDefault()
+    for {
+      glob <- globSet.toVector
+      pm <- Try { fs.getPathMatcher(f"glob:${glob}") }.toOption.toVector
+    } yield pm
+  }
 
   /** Is the artifact a container that this module how to process?
     *
@@ -46,8 +225,23 @@ object StaticMetadata {
     * @return
     *   if it should not be processed by Syft
     */
-  def isBlocked(artifact: ArtifactWrapper, mimeFilter: IncludeExclude): Boolean = {
+  def isBlocked(
+      artifact: ArtifactWrapper,
+      mimeFilter: IncludeExclude
+  ): Boolean = {
     !mimeFilter.shouldInclude(artifact.mimeType)
+  }
+
+  def isAllowed(artifact: ArtifactWrapper): Boolean = {
+    staticMetadataMimeTypes.contains(artifact.mimeType) || {
+      artifact match {
+        case fw: FileWrapper => {
+          val path = fw.wrappedFile.toPath
+          pathMatchers.find(pm => pm.matches(path)).isDefined
+        }
+        case _ => false
+      }
+    }
   }
 
   lazy val hasSyft: Boolean = {
@@ -65,26 +259,31 @@ object StaticMetadata {
       tempDir: Path,
       mimeFilter: IncludeExclude
   ): Option[StaticMetadataResult] = {
-    if (hasSyft && !isBlocked(artifact, mimeFilter)) {
-      Try {
-        val targetFile = artifact.forceFile(tempDir)
-        val pb = ProcessBuilder(
-          List(
-            "syft",
-            "scan",
-            f"file:${targetFile.getName()}",
-            "--enrich",
-            "all",
-            "--scope",
-            "all-layers",
-            "--output",
-            "syft-json"
-          )*
-        ).directory(targetFile.getCanonicalFile().getParentFile())
-        val ret = StaticMetadataResult(pb, targetFile.getCanonicalPath())
-        ret.go()
-        ret
-      }.toOption
+    if (hasSyft && isAllowed(artifact) && !isBlocked(artifact, mimeFilter)) {
+      artifact match {
+        case fw: FileWrapper =>
+          Try {
+            val thePath = fw.wrappedFile.getCanonicalPath()
+            // println(s"Syfting ${thePath}")
+            val pb = ProcessBuilder(
+              List(
+                "syft",
+                "scan",
+                f"file:${thePath}",
+                "--enrich",
+                "all",
+                "--scope",
+                "all-layers",
+                "--output",
+                "syft-json"
+              )*
+            )
+            val ret = StaticMetadataResult(pb, thePath)
+            ret.go()
+            ret
+          }.toOption
+        case _ => None
+      }
     } else None
 
   }

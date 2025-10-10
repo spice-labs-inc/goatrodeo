@@ -12,11 +12,10 @@ import java.io.File
 import java.io.FileFilter
 import java.nio.file.Files
 import java.util.regex.Pattern
+import scala.io.BufferedSource
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import os.ReadablePath
-import scala.io.Source
-import scala.io.BufferedSource
 
 /** Command Line Configuration
   *
@@ -163,17 +162,15 @@ object Config {
         )
         .action((t, c) => c.copy(threads = t)),
       opt[String]("mime-filter")
-        .text("add an include or exclude MIME type filter:\n +mime include mime\n -mime exclude mime\n *regex include mime that matches regex\n /regex exclude mime that matches regex")
+        .text(
+          "add an include or exclude MIME type filter:\n +mime include mime\n -mime exclude mime\n *regex include mime that matches regex\n /regex exclude mime that matches regex"
+        )
         .action((x, c) => c.copy(mimeFilter = c.mimeFilter :+ x)),
       opt[File]("mime-filter-file")
         .text("a file of lines, each of which will be treated as a MIME filter")
-        .action((f, c) => c.copy(mimeFilter = c.mimeFilter ++ VectorOfStrings(f))),
-      opt[String]("syft-filter")
-        .text("add a regular expression to include or exclude a syft file filter:\n  +file include file\n -file exclude file\n *regex include file that matches regex\n /regex exclude mime that matches regex")
-        .action((x, c) => c.copy(filenameFilter = c.filenameFilter :+ x)),
-      opt[File]("syft-filter-file")
-        .text("a file of lines, each of which will be treated as a syft file filter")
-        .action((f, c) => c.copy(filenameFilter = c.filenameFilter ++ VectorOfStrings(f))),
+        .action((f, c) =>
+          c.copy(mimeFilter = c.mimeFilter ++ VectorOfStrings(f))
+        ),
       opt[Unit]('V', "version")
         .text("print version and exit")
         .action((_, c) => {
@@ -196,7 +193,9 @@ object Config {
       var source: BufferedSource = null
       try {
         source = Source.fromFile(in.getAbsoluteFile())
-        source.getLines().toVector // getLines() does not include new lines (yay!)
+        source
+          .getLines()
+          .toVector // getLines() does not include new lines (yay!)
       } finally {
         source.close()
       }
@@ -206,7 +205,6 @@ object Config {
       apply(f)
     }
   }
-
 
   object ExpandFiles {
     def apply(in: File): Vector[File] = {
