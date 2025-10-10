@@ -18,14 +18,14 @@ import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
+import io.spicelabs.goatrodeo.util.IncludeExclude
 
 import java.nio.file.Paths
 import java.util.regex.Pattern
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.IncludeExclude
-import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
 
 class GoatRodeoBuilder {
   private val log = Logger(classOf[GoatRodeoBuilder])

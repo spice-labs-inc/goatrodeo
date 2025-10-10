@@ -123,10 +123,6 @@ GoatRodeo.builder()
 | `--mime-filter-file <value>` | The value is a path to a text file containing mime filters. |
 |                            | Each line contains one mime filter and starts with a command. |
 |                            | Empty lines are ignored. |
-| `--syft-filter`            | Allows artifacts targeted for syft to be filtered by file name. |
-|                            | Uses the same syntax as `--mime-filter`                         |
-| `--syft-filter-file <value>` | The value is a path to a text file containing filters for |
-|                            | artifacts targeted for syft |
 | `-?`, `--help`             | Print help and exit. |
 
 ---

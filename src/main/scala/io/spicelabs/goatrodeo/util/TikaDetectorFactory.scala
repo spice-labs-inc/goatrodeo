@@ -15,13 +15,14 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 
 import org.apache.tika.config.TikaConfig
-import org.apache.tika.detect.Detector
-import java.{util => ju}
-import scala.collection.mutable.ArrayBuffer
-import ju.ArrayList
-import scala.jdk.CollectionConverters._
 import org.apache.tika.detect.CompositeDetector
+import org.apache.tika.detect.Detector
 
+import java.util as ju
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters.*
+
+import ju.ArrayList
 
 // notes:
 // if you want to hook into tika's detection process you either need to statically create
@@ -54,60 +55,59 @@ import org.apache.tika.detect.CompositeDetector
 // such that the toDetector method is cached and any subsequent invocations of toDetector() won't interfere with previous
 // invocations.
 
-
 class TikaDetectorFactory(tika: TikaConfig, detectors: Detector*) {
-    private val firstResponders = TikaDetectorFactory.toArrayBuffer(detectors)
-    private val tikaDetector = tika.getDetector()
-    private val finalResponders = ArrayBuffer[Detector]()
-    private var dirty = true
-    private var detector: Detector = null
+  private val firstResponders = TikaDetectorFactory.toArrayBuffer(detectors)
+  private val tikaDetector = tika.getDetector()
+  private val finalResponders = ArrayBuffer[Detector]()
+  private var dirty = true
+  private var detector: Detector = null
 
-    def addFirst(detectors: Detector*) =
-        this.synchronized {
-            firstResponders.addAll(detectors)
-            dirty = true
-        }
-    def clearFirst() =
-        this.synchronized {
-            firstResponders.clear()
-            dirty = true
-        }
-    
-    def addFinal(detectors: Detector*) =
-        this.synchronized {
-            finalResponders.addAll(detectors)
-            dirty = true;
-        }
-    def clearFinal() =
-        this.synchronized {
-            finalResponders.clear()
-            dirty = true
-        }
-    
-    def clearAll() = 
-        this.synchronized {
-            clearFirst()
-            clearFinal()
-            dirty = true
-        }
+  def addFirst(detectors: Detector*) =
+    this.synchronized {
+      firstResponders.addAll(detectors)
+      dirty = true
+    }
+  def clearFirst() =
+    this.synchronized {
+      firstResponders.clear()
+      dirty = true
+    }
 
-    def toDetector(): Detector =
-        this.synchronized {
-            if (dirty) {
-                val detectors: ju.List[Detector] = ArrayList[Detector]()
-                detectors.addAll(firstResponders.asJava)
-                detectors.add(tikaDetector)
-                detectors.addAll(finalResponders.asJava)
-                detector = CompositeDetector(detectors)
-                dirty = false
-            }
-            detector
-        }
+  def addFinal(detectors: Detector*) =
+    this.synchronized {
+      finalResponders.addAll(detectors)
+      dirty = true;
+    }
+  def clearFinal() =
+    this.synchronized {
+      finalResponders.clear()
+      dirty = true
+    }
+
+  def clearAll() =
+    this.synchronized {
+      clearFirst()
+      clearFinal()
+      dirty = true
+    }
+
+  def toDetector(): Detector =
+    this.synchronized {
+      if (dirty) {
+        val detectors: ju.List[Detector] = ArrayList[Detector]()
+        detectors.addAll(firstResponders.asJava)
+        detectors.add(tikaDetector)
+        detectors.addAll(finalResponders.asJava)
+        detector = CompositeDetector(detectors)
+        dirty = false
+      }
+      detector
+    }
 }
 
 object TikaDetectorFactory {
-    def toArrayBuffer(detectors: Seq[Detector]) = {
-        val ab = ArrayBuffer[Detector]()
-        ab.addAll(detectors)
-    }
+  def toArrayBuffer(detectors: Seq[Detector]) = {
+    val ab = ArrayBuffer[Detector]()
+    ab.addAll(detectors)
+  }
 }

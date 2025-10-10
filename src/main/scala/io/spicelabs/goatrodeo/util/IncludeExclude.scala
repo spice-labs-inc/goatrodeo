@@ -15,55 +15,95 @@ package io.spicelabs.goatrodeo.util
 
 import scala.util.matching.Regex
 
-class IncludeExclude (include: RegexPredicate, exclude: RegexPredicate) {
-    def this(incExact: Set[String], incRegex: Vector[Regex], excExact: Set[String], excRegex: Vector[Regex]) = {
-        this(RegexPredicate(incExact, incRegex), RegexPredicate(excExact, excRegex))
-    }
+class IncludeExclude(include: RegexPredicate, exclude: RegexPredicate) {
+  def this(
+      incExact: Set[String],
+      incRegex: Vector[Regex],
+      excExact: Set[String],
+      excRegex: Vector[Regex]
+  ) = {
+    this(RegexPredicate(incExact, incRegex), RegexPredicate(excExact, excRegex))
+  }
 
-    def this() = {
-        this(RegexPredicate(Set(), Vector()), RegexPredicate(Set(), Vector()))
-    }
-    
-    def shouldInclude(candidate: String) = {
-        // if the candidate is not in the exclude, it should be included.
-        // if the candidate *is* is the exclude, then check to see if it's included
-        !exclude.matches(candidate) || include.matches(candidate)
-    }
+  def this() = {
+    this(RegexPredicate(Set(), Vector()), RegexPredicate(Set(), Vector()))
+  }
 
-    def :+ (predicate: String): IncludeExclude = {
-        val (inE, inR, exE, exR) = IncludeExclude.aggregatePredicate(predicate,
-            (include.exact, include.regexes, exclude.exact, exclude.regexes))
-        IncludeExclude(RegexPredicate(inE, inR), RegexPredicate(exE, exR))
-    }
+  def shouldInclude(candidate: String) = {
+    // if the candidate is not in the exclude, it should be included.
+    // if the candidate *is* is the exclude, then check to see if it's included
+    !exclude.matches(candidate) || include.matches(candidate)
+  }
 
-    def ++ (predicates: Iterable[String]): IncludeExclude = {
-        var inex = this
-        for (predicate <- predicates) {
-            inex = inex :+ predicate
-        }
-        inex
+  def :+(predicate: String): IncludeExclude = {
+    val (inE, inR, exE, exR) = IncludeExclude.aggregatePredicate(
+      predicate,
+      (include.exact, include.regexes, exclude.exact, exclude.regexes)
+    )
+    IncludeExclude(RegexPredicate(inE, inR), RegexPredicate(exE, exR))
+  }
+
+  def ++(predicates: Iterable[String]): IncludeExclude = {
+    var inex = this
+    for (predicate <- predicates) {
+      inex = inex :+ predicate
     }
+    inex
+  }
 }
 
 object IncludeExclude {
-    def aggregatePredicate(predicate: String,
-        inc_exc: (incExact: Set[String], incRegex: Vector[Regex], excExact: Set[String], excRegex: Vector[Regex])
-    ): (Set[String], Vector[Regex], Set[String], Vector[Regex]) = {
-        if (predicate.isEmpty()) {
-            return inc_exc
-        }
-        val command = predicate.charAt(0)
-        val pattern = predicate.substring(1)
-        if (pattern.isEmpty()) {
-            return inc_exc
-        }
-        command match {
-            case '#' => inc_exc
-            case '+' => (inc_exc.incExact + pattern, inc_exc.incRegex, inc_exc.excExact, inc_exc.excRegex)
-            case '*' => (inc_exc.incExact, inc_exc.incRegex :+ pattern.r, inc_exc.excExact, inc_exc.excRegex)
-            case '-' => (inc_exc.incExact, inc_exc.incRegex, inc_exc.excExact + pattern, inc_exc.excRegex)
-            case '/' => (inc_exc.incExact, inc_exc.incRegex, inc_exc.excExact, inc_exc.excRegex :+ pattern.r)
-            case _ => throw IllegalArgumentException(s"illegal command '${command}' expecting one of #, +, *, -, /")
-        }
+  def aggregatePredicate(
+      predicate: String,
+      inc_exc: (
+          incExact: Set[String],
+          incRegex: Vector[Regex],
+          excExact: Set[String],
+          excRegex: Vector[Regex]
+      )
+  ): (Set[String], Vector[Regex], Set[String], Vector[Regex]) = {
+    if (predicate.isEmpty()) {
+      return inc_exc
     }
+    val command = predicate.charAt(0)
+    val pattern = predicate.substring(1)
+    if (pattern.isEmpty()) {
+      return inc_exc
+    }
+    command match {
+      case '#' => inc_exc
+      case '+' =>
+        (
+          inc_exc.incExact + pattern,
+          inc_exc.incRegex,
+          inc_exc.excExact,
+          inc_exc.excRegex
+        )
+      case '*' =>
+        (
+          inc_exc.incExact,
+          inc_exc.incRegex :+ pattern.r,
+          inc_exc.excExact,
+          inc_exc.excRegex
+        )
+      case '-' =>
+        (
+          inc_exc.incExact,
+          inc_exc.incRegex,
+          inc_exc.excExact + pattern,
+          inc_exc.excRegex
+        )
+      case '/' =>
+        (
+          inc_exc.incExact,
+          inc_exc.incRegex,
+          inc_exc.excExact,
+          inc_exc.excRegex :+ pattern.r
+        )
+      case _ =>
+        throw IllegalArgumentException(
+          s"illegal command '${command}' expecting one of #, +, *, -, /"
+        )
+    }
+  }
 }

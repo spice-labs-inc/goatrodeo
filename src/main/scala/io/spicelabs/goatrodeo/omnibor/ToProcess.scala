@@ -9,6 +9,7 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
 
 import java.io.File
@@ -17,7 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import io.spicelabs.goatrodeo.util.IncludeExclude
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -254,12 +254,16 @@ trait ToProcess {
     */
   def getElementsToProcess(): (Seq[(ArtifactWrapper, MarkerType)], StateType)
 
-  def runStaticMetadataGather(mimeFilter: IncludeExclude): Map[String, Vector[Augmentation]] = {
+  def runStaticMetadataGather(
+      mimeFilter: IncludeExclude
+  ): Map[String, Vector[Augmentation]] = {
     FileWalker.withinTempDir { tempDir =>
       {
         val augmentation: Seq[Map[String, Vector[Augmentation]]] = for {
           (wrapper, _) <- getElementsToProcess()._1
-          it <- StaticMetadata.runStaticMetadataGather(wrapper, tempDir, mimeFilter).toList
+          it <- StaticMetadata
+            .runStaticMetadataGather(wrapper, tempDir, mimeFilter)
+            .toList
           answer <- it.runForMillis(120L * 1000 * 60) // 120 minutes
 
         } yield it.buildAugmentation()
