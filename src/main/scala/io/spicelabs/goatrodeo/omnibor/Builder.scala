@@ -271,6 +271,8 @@ object Builder {
 
     val batchName = destDir.getName()
 
+    val batchItemCount = AtomicInteger(0)
+
     // fork `threadCnt` threads to do the work
     val threads = for { threadNum <- 0 until threadCnt } yield {
       val t = new Thread(
@@ -294,7 +296,7 @@ object Builder {
 
           var toProcess: ToProcess = null
           while (
-            (cnt.get() - startedRunning) < maxRecords // only run so many items
+            batchItemCount.incrementAndGet() <= maxRecords // only run so many items
             &&
             !dead_?.get() && {
               toProcess = doPoll();
