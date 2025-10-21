@@ -50,7 +50,14 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[PackageURL], DotnetState) = Vector.empty -> this
+  ): (Vector[PackageURL], DotnetState) = {
+    if (fileStm == null) {
+      Vector.empty -> this
+    } else {
+      var purl = PackageURL("nuget", "", assembly.name.name, assembly.name.version.toString(), null, "")
+      Vector(purl) -> this
+    }
+  }
 
   override def getMetadata(
       artifact: ArtifactWrapper,
