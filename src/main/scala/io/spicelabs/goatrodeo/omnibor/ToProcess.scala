@@ -508,6 +508,7 @@ object ToProcess {
       MavenToProcess.computeMavenFiles,
       DockerToProcess.computeDockerFiles,
       Debian.computeDebianFiles,
+      DotnetFile.computeDotnetFiles,
       GenericFile.computeGenericFiles
     )
 

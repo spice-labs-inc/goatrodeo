@@ -4,6 +4,9 @@ import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.File
+import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.util.Config
 
 class DotNetTesting extends munit.FunSuite {
   test("get-me-a-mime") {
@@ -22,4 +25,14 @@ class DotNetTesting extends munit.FunSuite {
     val mime = ArtifactWrapper.mimeTypeFor(input, path)
     assertEquals("application/x-msdownload; format=pe32-dotnet", mime)
   }
+
+test("Can build for a simple dotnet file") {
+    val name = "test_data/Smoke.dll"
+    val wrapper = FileWrapper(File(name), name, None)
+    val store1 =
+      ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+    val gitoid = store1.keys().find(key => key.startsWith("gitoid"))
+    assertEquals("gitoid:blob:sha1:4b71d999259c4f7b593a13df83c4f5d3bbf760a0", gitoid.get)
+  }
+
 }
