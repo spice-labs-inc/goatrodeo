@@ -103,7 +103,7 @@ lazy val root = project
     semanticdbVersion := scalafixSemanticdb.revision,
     libraryDependencies += "org.scala-lang" %% "toolkit" % "0.4.0",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
-    libraryDependencies += "org.apache.bcel" % "bcel" % "6.10.0",
+    libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "commons-io" % "commons-io" % "2.16.1",
@@ -114,7 +114,7 @@ lazy val root = project
     // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
-    libraryDependencies += "org.apache.commons" % "commons-compress" % "1.27.1",
+    libraryDependencies += "org.apache.commons" % "commons-compress" % "1.28.0",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
     libraryDependencies +=
       "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
