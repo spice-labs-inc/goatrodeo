@@ -67,11 +67,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_TARGET: github
 
-      - name: Index and upload ADG
-        uses: spice-labs-inc/action-spice-labs-surveyor@v3
+      - name: Index and Upload ADG
+        uses: spice-labs-inc/action-spice-labs-surveyor@v4
         with:
           spice_pass: "${{ secrets.SPICE_PASS }}"
-          file_path: "./target"
+          input: "./target"
           tag: "${{ github.event.repository.name }}"
 
   publish-to-central:
