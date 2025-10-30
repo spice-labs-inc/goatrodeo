@@ -19,17 +19,17 @@ jobs:
       id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-      release_timestamp: ${{ steps.release-notification.outputs.timestamp }}
-      release_channel_id: ${{ steps.release-notification.outputs.channel_id }}
+      thread-ts: ${{ steps.release-notification.outputs.thread-ts }}
+      channel-id: ${{ steps.release-notification.outputs.channel_id }}
 
     steps:
       - name: Notify release
         id: release-notification
-        uses: spice-labs-inc/action-release-notification@main
+        uses: spice-labs-inc/action-release-notification@v3
         with:
           type: release
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
+          username-mapping: ${{ vars.GH_SLACK_USERNAME_MAPPING }}
           github-token: ${{ github.token }}
       - name: Checkout with LFS
         uses: actions/checkout@v4
@@ -39,9 +39,9 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'sbt'
+          java-version: "21"
+          distribution: "temurin"
+          cache: "sbt"
 
       - name: Set up SBT
         uses: sbt/setup-sbt@v1
@@ -88,10 +88,10 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
-      
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
+
       - name: Write settings.xml for Central
         run: |
           mkdir -p ~/.m2
@@ -110,7 +110,6 @@ jobs:
       - name: Import GPG key
         run: |
           echo "${{ secrets.MAVEN_CENTRAL_GPG_PRIVATE_KEY }}" | gpg --batch --import
-
 
       - name: Set project version from tag
         run: |
@@ -152,7 +151,6 @@ jobs:
             /<!-- @REAL_DEPENDENCIES@ -->/ {print repl; next}
             {print}
           ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
-
 
       - name: Publish to Maven Central (staging only)
         run: |
@@ -236,7 +234,7 @@ jobs:
           JARS_STATUS="${{ needs.publish-jars.result }}"
           CENTRAL_STATUS="${{ needs.publish-to-central.result }}"
           DOCKER_STATUS="${{ needs.docker-image.result }}"
-          
+
           # Determine overall success
           if [ "$JARS_STATUS" == "success" ] && [ "$CENTRAL_STATUS" == "success" ] && [ "$DOCKER_STATUS" == "success" ]; then
             echo "overall_status=success" >> $GITHUB_OUTPUT
@@ -268,12 +266,12 @@ jobs:
           fi
 
       - name: Notify deployment result
-        uses: spice-labs-inc/action-release-notification@main
+        uses: spice-labs-inc/action-release-notification@v3
         with:
           type: ${{ steps.deployment-status.outputs.overall_status == 'success' && 'deployment-success' || 'deployment-failure' }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
-          username-mapping: ${{ secrets.GH_SLACK_USERNAME_MAPPING }}
-          workflow-name: ${{ steps.deployment-status.outputs.overall_status == 'success' && 'Release' || format('Release - {0}', steps.deployment-status.outputs.message) }}
+          username-mapping: ${{ vars.GH_SLACK_USERNAME_MAPPING }}
+          github-token: ${{ github.token }}
           environment: production
-          thread-ts: ${{ needs.publish-jars.outputs.release_timestamp }}
-          channel-id: ${{ needs.publish-jars.outputs.release_channel_id }}
+          thread-ts: ${{ needs.publish-jars.outputs.thread-ts }}
+          channel-id: ${{ needs.publish-jars.outputs.channel-id }}
