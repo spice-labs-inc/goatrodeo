@@ -35,4 +35,12 @@ test("Can build for a simple dotnet file") {
     assertEquals("gitoid:blob:sha1:4b71d999259c4f7b593a13df83c4f5d3bbf760a0", gitoid.get)
   }
 
+  test("mime-from-nupkg") {
+    val path = "test_data/awesomeassertions.9.3.0.nupkg"
+    val metadata = new Metadata()
+    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
+    val input = TikaInputStream.get(File(path), metadata)
+    val mime = ArtifactWrapper.mimeTypeFor(input, path);
+    assertEquals("application/zip", mime)
+  }
 }

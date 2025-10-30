@@ -155,7 +155,24 @@ object ArtifactWrapper {
       return "application/json"
 
     val detectedString = detected.toString()
-    detectedString
+
+    if isNupkg(fileName, detectedString, rawData) == Some(true) then "application/zip"
+    else detectedString
+  }
+
+  def isNupkg(fileName: String, detectedMime: String, rawData: TikaInputStream): Option[Boolean] = {
+    try {
+      if (fileName.endsWith(".nupkg") && detectedMime == "application/x-tika-ooxml" && rawData.getLength() > 4) {
+        if (rawData.getPosition() > 0) {
+          rawData.skip(-rawData.getPosition())
+        }
+        val bytes = rawData.readNBytes(4)
+        return Some(bytes(0) == 0x50 && bytes(1) == 0x4b && bytes(2) == 0x03 && bytes(3) == 0x04)
+      }
+      return Some(false)
+    } catch {
+      _ => None
+    }
   }
 
   protected def fixPath(p: String): String = {
