@@ -21,4 +21,26 @@ Standard tags are defined in MetadataKeyConstants
 | TRADEMARK     | Trademark    | A trademark declaration if available | String e.g. "Splunge is a registered trademark of ByteStyle" |
 | ARTIFACTID    | ArtifactID   | An identifier for the artifact | String |
 | LICENSE       | License      | The lisence for the artifact | String e.g. "This work is openly licensed via CC BY 4.0" |
+| DEPENDENCIES  | Dependencies | A list of the dependencies | String, formatted as JSON. See below. |
+
+
+# Dependencies
+
+If the artifact doesn't have all of its dependencies in hand, it is necessary to provide the information for the relationships between the artifact and its dependencies manually.
+
+This information is formatted as JSON and will look like this:
+```json
+{
+    "dependencies": [
+        {
+            "name": "assembly name of the reference, does not include a file extension",
+            "version": "the version of the assembly usually in the form Maj.Min.Rev",
+            "public_key_token": "the public key token of the assembly, a hex string",
+            "public_key": "the public key of the assembly IF ANY, a hex string"
+        },
+    ]
+}
+```
+The `public_key` entry is optional.
+Entries in the `dependencies` collection are sorted by name.
 
