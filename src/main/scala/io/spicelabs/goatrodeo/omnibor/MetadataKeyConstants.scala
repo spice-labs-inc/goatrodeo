@@ -13,4 +13,5 @@ object MetadataKeyConstants {
   def TRADEMARK = "Trademark"
   def ARTIFACTID = "ArtifactID"
   def LICENSE = "License"
+  def DEPENDENCIES = "Dependencies"
 }
