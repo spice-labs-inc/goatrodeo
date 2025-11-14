@@ -24,6 +24,9 @@ import org.apache.tika.metadata.Metadata
 import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.cilantro.CustomAttribute
 import io.spicelabs.goatrodeo.util.DotnetDetector
+import io.spicelabs.cilantro.AssemblyNameReference
+import scala.collection.mutable.ArrayBuffer
+import io.spicelabs.goatrodeo.util.Helpers
 
 class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
     private var fileStm: FileInputStream = null
@@ -78,7 +81,7 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
       +? assemblyTrademark
       +? assemblyProducer
       +? assemblyDescription
-
+      +? assemblyDependencies
     (tm, this)
   }
 
@@ -159,6 +162,15 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
     var desc = customAttributeArgumentZero("System.Reflection.AssemblyDescriptionAttribute")
     maybeSOP(MetadataKeyConstants.DESCRIPTION, desc)
   }
+
+  def assemblyDependencies: Option[(String, TreeSet[StringOrPair])] = {
+    import DotnetState.formatDeps
+    val refs = assembly.mainModule.assemblyReferences;
+    if (refs.length == 0) return None
+    val deps = formatDeps(refs)
+    maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+  }
+
   override def finalAugmentation(
       artifact: ArtifactWrapper,
       item: Item,
@@ -177,6 +189,36 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
       fileStm = null
     }
     this
+  }
+}
+
+object DotnetState {
+  def formatDeps(deps: ArrayBuffer[AssemblyNameReference]) = {
+    val sortedDeps = deps.sortBy((elem) => elem.name)
+    val sb = StringBuilder("{ \"dependencies\": [ ")
+
+    for i <- 0 until sortedDeps.length do {
+      if (i > 0)
+        sb.append(", ")
+      sb.append(formatDep(sortedDeps(i)))
+    }
+    sb.append(" ] }")
+    sb.toString()
+  }
+
+  def formatDep(dep: AssemblyNameReference) = {
+    val sb = StringBuilder("{ ")
+    sb.append("\"name\": \"").append(dep.name).append("\", ")
+    sb.append("\"version\": \"").append(dep.version.toString()).append("\", ")
+    sb.append("\"public_key_token\": \"").append(Helpers.toHex(dep.publicKeyToken)).append("\"")
+    if (dep.hasPublicKey) {
+      sb.append(", \"public_key\": \"").append(formatPublicKey(dep.publicKey)).append("\"")
+    }
+    sb.append(" }")
+  }
+
+  def formatPublicKey(key: Array[Byte]): String = {
+    Helpers.toHex(key)
   }
 }
 
