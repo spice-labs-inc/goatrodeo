@@ -27,6 +27,9 @@ import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.cilantro.AssemblyNameReference
 import scala.collection.mutable.ArrayBuffer
 import io.spicelabs.goatrodeo.util.Helpers
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
 
 class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
     private var fileStm: FileInputStream = null
@@ -194,31 +197,21 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
 
 object DotnetState {
   def formatDeps(deps: ArrayBuffer[AssemblyNameReference]) = {
-    val sortedDeps = deps.sortBy((elem) => elem.name)
-    val sb = StringBuilder("{ \"dependencies\": [ ")
+    val sortedDeps = deps.sortBy(((elem) => elem.name))
 
-    for i <- 0 until sortedDeps.length do {
-      if (i > 0)
-        sb.append(", ")
-      sb.append(formatDep(sortedDeps(i)))
-    }
-    sb.append(" ] }")
-    sb.toString()
-  }
-
-  def formatDep(dep: AssemblyNameReference) = {
-    val sb = StringBuilder("{ ")
-    sb.append("\"name\": \"").append(dep.name).append("\", ")
-    sb.append("\"version\": \"").append(dep.version.toString()).append("\", ")
-    sb.append("\"public_key_token\": \"").append(Helpers.toHex(dep.publicKeyToken)).append("\"")
-    if (dep.hasPublicKey) {
-      sb.append(", \"public_key\": \"").append(formatPublicKey(dep.publicKey)).append("\"")
-    }
-    sb.append(" }")
-  }
-
-  def formatPublicKey(key: Array[Byte]): String = {
-    Helpers.toHex(key)
+    val json =
+      ("dependencies" ->
+        sortedDeps.map { dep =>
+          var nameVersionToken = ("name" -> dep.name) ~
+          ("version" -> dep.version.toString()) ~
+          ("public_key_token" -> Helpers.toHex(dep.publicKeyToken))
+          if (dep.hasPublicKey) {
+            nameVersionToken = nameVersionToken ~ ("public_key" -> Helpers.toHex(dep.publicKey))
+          }
+          nameVersionToken
+          }
+      )
+    compact(render(json))
   }
 }
 

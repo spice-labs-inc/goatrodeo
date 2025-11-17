@@ -113,6 +113,7 @@ lazy val root = project
 
     // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
+    libraryDependencies += "io.github.json4s" %% "json4s-jackson" % "4.1.0",
     libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.28.0",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",

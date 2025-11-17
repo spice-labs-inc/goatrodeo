@@ -51,6 +51,6 @@ test("Can build for a simple dotnet file") {
     val assembly = AssemblyDefinition.readAssembly(name)
     assert(assembly != null)
     val deps = DotnetState.formatDeps(assembly.mainModule.assemblyReferences)
-    assertEquals(deps, "{ \"dependencies\": [ { \"name\": \"System.Console\", \"version\": \"9.0.0.0\", \"public_key_token\": \"b03f5f7f11d50a3a\" }, { \"name\": \"System.Runtime\", \"version\": \"9.0.0.0\", \"public_key_token\": \"b03f5f7f11d50a3a\" } ] }")
+    assertEquals(deps, "{\"dependencies\":[{\"name\":\"System.Console\",\"version\":\"9.0.0.0\",\"public_key_token\":\"b03f5f7f11d50a3a\"},{\"name\":\"System.Runtime\",\"version\":\"9.0.0.0\",\"public_key_token\":\"b03f5f7f11d50a3a\"}]}")
   }
 }
