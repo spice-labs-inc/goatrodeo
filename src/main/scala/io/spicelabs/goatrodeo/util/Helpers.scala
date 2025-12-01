@@ -246,8 +246,7 @@ object Helpers {
     *   the found files
     */
   def findFiles(
-      root: File,
-      ok: File => Boolean
+      root: File
   ): Vector[File] = {
     val count: AtomicLong = AtomicLong()
     import scala.jdk.CollectionConverters.IteratorHasAsScala
@@ -258,7 +257,7 @@ object Helpers {
         1000,
         (path, info) => {
           val f = path.toFile()
-          if (info.isRegularFile() && ok(f) && !f.getName().startsWith(".")) {
+          if (info.isRegularFile() && !f.getName().startsWith(".")) {
             val curCount = count.addAndGet(1)
             if (curCount % 100000 == 0) {
               logger.info(s"Find Files count ${curCount}")

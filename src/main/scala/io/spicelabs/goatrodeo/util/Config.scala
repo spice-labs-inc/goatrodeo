@@ -50,7 +50,7 @@ case class Config(
     filenameFilter: IncludeExclude = IncludeExclude()
 ) {
   def getFileListBuilders(): Vector[() => Seq[File]] = {
-    build.map(file => () => Helpers.findFiles(file, f => true)) ++ fileList
+    build.map(file => () => Helpers.findFiles(file)) ++ fileList
       .map(f => {
         val fileNames =
           Files
