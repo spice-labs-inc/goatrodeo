@@ -63,7 +63,7 @@ class ADGTests extends munit.FunSuite {
           .getOrElse(25),
         maxRecords = 50000,
         tag = Some(TagInfo("foo", None)),
-        fileListers = Vector(() => Helpers.findFiles(source, f => true)),
+        fileListers = Vector(() => Helpers.findFiles(source)),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
         blockList = None,

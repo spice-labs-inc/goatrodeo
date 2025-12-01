@@ -529,7 +529,7 @@ object ToProcess {
       onFound: ToProcess => Unit = _ => ()
   ): Vector[ToProcess] = {
     val wrappers = Helpers
-      .findFiles(directory, _ => true)
+      .findFiles(directory)
       .map(f => FileWrapper(f, f.getName(), tempDir))
 
     strategiesForArtifacts(wrappers, onFound = onFound, infoMsgs_?)
