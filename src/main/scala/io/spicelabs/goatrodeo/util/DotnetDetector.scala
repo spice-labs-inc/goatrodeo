@@ -23,6 +23,7 @@ import org.apache.tika.mime.MediaType
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
+import org.apache.tika.io.TikaInputStream
 
 class DotnetDetector extends Detector {
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
@@ -66,10 +67,18 @@ object FileInputStreamEx {
         "metadata data needs the RESOURCE_NAME_KEY set to the path name"
       )
     val f = File(path)
-    if (!f.exists())
-      throw new IllegalArgumentException(
-        s"RESOURCE_NAME_KEY is set to ${path} but that path doesn't exist"
-      )
-    FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY))
+    if (!f.exists()) {
+      if (is.isInstanceOf[TikaInputStream]) {
+        val tika = is.asInstanceOf[TikaInputStream]
+        FileInputStreamEx(tika.getPath().toString())
+      } else {
+        throw IllegalArgumentException(
+          "file in metadata doesn't exist; tried to get TikaInputStream - that failed too."
+        )
+      }
+    }
+    else {
+      FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY))
+    }
   }
 }

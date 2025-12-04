@@ -19,6 +19,7 @@ import java.nio.file.Path
 import java.util.UUID
 import scala.util.Try
 import scala.util.Using
+import org.apache.commons.io.FilenameUtils
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -201,12 +202,13 @@ object ArtifactWrapper {
       size: Long,
       data: InputStream,
       tempDir: Option[File],
-      tempPath: Path
+      tempPath: Path,
   ): ArtifactWrapper = {
     val name = fixPath(nominalPath)
+    val forceTempFile = requireTempFile(name)
 
     // a defined temp dir implies a RAM disk... copy everything but the smallest items
-    if (size <= (if (tempDir.isDefined) (64L * 1024L) else maxInMemorySize)) {
+    if (!forceTempFile && size <= (if (tempDir.isDefined) (64L * 1024L) else maxInMemorySize)) {
       val bos = ByteArrayOutputStream()
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
@@ -223,6 +225,14 @@ object ArtifactWrapper {
       fos.flush()
       fos.close()
       FileWrapper(tempFile, name, tempDir = tempDir)
+    }
+  }
+
+  def requireTempFile(name: String): Boolean = {
+    // for .NET assemblies, we'll force a temp file so that cilantro can open them.
+    FilenameUtils.getExtension(name) match {
+      case "dll" | "exe" => true
+      case _ => false
     }
   }
 }

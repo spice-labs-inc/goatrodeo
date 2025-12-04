@@ -30,18 +30,20 @@ import io.spicelabs.goatrodeo.util.Helpers
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+import java.nio.file.Path
+import java.nio.file.Files
 
-class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
-    private var fileStm: FileInputStream = null
-    private var assembly: AssemblyDefinition = null
+class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Option[AssemblyDefinition] = None) extends ProcessingState[SingleMarker, DotnetState] {
     def beginProcessing(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
     ): DotnetState = {
+      var fileStm:FileInputStream = null
       try {
-        fileStm = FileInputStream(artifact.path())
-        assembly = AssemblyDefinition.readAssembly(fileStm)
+        fileStm = streamForArtifact(artifact)
+        val assembly = AssemblyDefinition.readAssembly(fileStm)
+        return DotnetState(Some(fileStm), Some(assembly))
       } catch {
         case _ =>
           if (fileStm != null) {
@@ -57,12 +59,24 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
       item: Item,
       marker: SingleMarker
   ): (Vector[PackageURL], DotnetState) = {
-    if (fileStm == null) {
+    if (fileStmOpt.isEmpty || assemblyOpt.isEmpty) {
       Vector.empty -> this
     } else {
-      var purl = PackageURL("nuget", "", assembly.name.name, assembly.name.version.toString(), null, "")
+      val assembly = assemblyOpt.get
+      val purl = PackageURL("nuget", "", assembly.name.name, assembly.name.version.toString(), null, "")
       Vector(purl) -> this
     }
+  }
+
+
+  private def streamForArtifact(artifact: ArtifactWrapper): FileInputStream = {
+    val tempDir: Path = artifact.tempDir match {
+      case Some(p) =>
+        Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
+      case None => Files.createTempDirectory("goatrodeo_temp_dir")
+    }
+    val file = artifact.forceFile(tempDir)
+    FileInputStream(file)
   }
 
   override def getMetadata(
@@ -99,11 +113,16 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
   // 3. that value should be type String
   // in the event that we get none of those, we return null
   def customAttributeArgumentZero(attrName: String): String = {
+    val assembly = assemblyOpt.get
     if (assembly.hasCustomAttributes) {
-      val attr = assembly.customAttributes.find(at => at.attributeType.fullName == attrName)
-      return attr match {
-        case Some(value) => argZeroValueAsString(value)
-        case None => null
+      try {
+        val attr = assembly.customAttributes.find(at => at.attributeType.fullName == attrName)
+        return attr match {
+          case Some(value) => argZeroValueAsString(value)
+          case None => null
+        }
+      } catch {
+        case _ => return null
       }
     }
     null
@@ -126,22 +145,27 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
 
 
   def assemblyFullName: Option[(String, TreeSet[StringOrPair])] = {
+    val assembly = assemblyOpt.get
     maybeSOP(MetadataKeyConstants.NAME, assembly.fullName)
   }
 
   def assemblyName: Option[(String, TreeSet[StringOrPair])] = {
+    val assembly = assemblyOpt.get
     maybeSOP(MetadataKeyConstants.SIMPLE_NAME, assembly.name.name)
   }
 
   def assemblyVersion: Option[(String, TreeSet[StringOrPair])] = {
+    val assembly = assemblyOpt.get
     maybeSOP(MetadataKeyConstants.VERSION, assembly.name.version.toString())
   }
 
   def assemblyLocale: Option[(String, TreeSet[StringOrPair])] = {
+    val assembly = assemblyOpt.get
     maybeSOP(MetadataKeyConstants.LOCALE, assembly.name.culture)
   }
 
   def assemblyPublicKey: Option[(String, TreeSet[StringOrPair])] = {
+    val assembly = assemblyOpt.get
     var pkStr = if assembly.name.publicKey != null then toHex(assembly.name.publicKey) else null
     maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
   }
@@ -168,6 +192,7 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
 
   def assemblyDependencies: Option[(String, TreeSet[StringOrPair])] = {
     import DotnetState.formatDeps
+    val assembly = assemblyOpt.get
     val refs = assembly.mainModule.assemblyReferences;
     if (refs.length == 0) return None
     val deps = formatDeps(refs)
@@ -187,9 +212,9 @@ class DotnetState extends ProcessingState[SingleMarker, DotnetState] {
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {
-    if (fileStm != null) {
-      fileStm.close()
-      fileStm = null
+    if (fileStmOpt.isDefined) {
+      fileStmOpt.get.close()
+      DotnetState()
     }
     this
   }
