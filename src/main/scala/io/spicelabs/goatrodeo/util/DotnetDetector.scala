@@ -14,8 +14,11 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
+import com.typesafe.scalalogging.Logger
 import io.spicelabs.cilantro.AssemblyDefinition
+import io.spicelabs.goatrodeo.util.FileInputStreamEx.toFileInputStream
 import org.apache.tika.detect.Detector
+import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
 import org.apache.tika.mime.MediaType
@@ -23,21 +26,27 @@ import org.apache.tika.mime.MediaType
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
-import org.apache.tika.io.TikaInputStream
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 class DotnetDetector extends Detector {
+
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
-    var fs: FileInputStream = null
-    try {
-      fs = FileInputStreamEx.toFileInputStream(input, metadata)
-      val assembly = AssemblyDefinition.readAssembly(fs)
-      assembly != null && assembly.mainModule != null
-      return DotnetDetector.DOTNET_MIME
-    } catch {
-      case _ => return MediaType.OCTET_STREAM
-    } finally {
-      if (fs.isInstanceOf[FileInputStreamEx])
-        fs.close()
+    toFileInputStream(input, metadata) match {
+      case Some(fs) =>
+        Try {
+          val assembly = AssemblyDefinition.readAssembly(fs)
+          if (assembly != null && assembly.mainModule != null) {
+            DotnetDetector.DOTNET_MIME
+          } else {
+            MediaType.OCTET_STREAM
+          }
+        } match {
+          case Failure(exception) => MediaType.OCTET_STREAM
+          case Success(value) => value
+        }
+      case None => MediaType.OCTET_STREAM
     }
   }
 }
@@ -55,30 +64,29 @@ class FileInputStreamEx(private val f: File) extends FileInputStream(f) {
 }
 
 object FileInputStreamEx {
+  val log = Logger(classOf[FileInputStreamEx])
   def toFileInputStream(
-      is: InputStream,
-      metadata: Metadata
-  ): FileInputStream = {
+    is: InputStream,
+    metadata: Metadata
+  ): Option[FileInputStream] = {
     if (is.isInstanceOf[FileInputStream])
-      return is.asInstanceOf[FileInputStream]
+      return Some(is.asInstanceOf[FileInputStream])
     val path = metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)
-    if (path == null)
-      throw new IllegalArgumentException(
-        "metadata data needs the RESOURCE_NAME_KEY set to the path name"
-      )
+    if (path == null) {
+      log.error("Metadata data needs the RESOURCE_NAME_KEY set to the path name")
+      return None
+    }
     val f = File(path)
     if (!f.exists()) {
       if (is.isInstanceOf[TikaInputStream]) {
         val tika = is.asInstanceOf[TikaInputStream]
-        FileInputStreamEx(tika.getPath().toString())
+        Some(FileInputStreamEx(tika.getPath().toString()))
       } else {
-        throw IllegalArgumentException(
-          "file in metadata doesn't exist; tried to get TikaInputStream - that failed too."
-        )
+        log.error("file in metadata doesn't exist; tried to get TikaInputStream - that failed too.")
+        None
       }
-    }
-    else {
-      FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY))
+    } else {
+      Some(FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)))
     }
   }
 }
