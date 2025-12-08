@@ -1,6 +1,7 @@
 package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
+import org.apache.commons.io.FilenameUtils
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
@@ -19,7 +20,6 @@ import java.nio.file.Path
 import java.util.UUID
 import scala.util.Try
 import scala.util.Using
-import org.apache.commons.io.FilenameUtils
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -157,22 +157,36 @@ object ArtifactWrapper {
 
     val detectedString = detected.toString()
 
-    if isNupkg(fileName, detectedString, rawData) == Some(true) then "application/zip"
+    if isNupkg(fileName, detectedString, rawData) == Some(true) then
+      "application/zip"
     else detectedString
   }
 
-  def isNupkg(fileName: String, detectedMime: String, rawData: TikaInputStream): Option[Boolean] = {
+  def isNupkg(
+      fileName: String,
+      detectedMime: String,
+      rawData: TikaInputStream
+  ): Option[Boolean] = {
     try {
-      if (fileName.endsWith(".nupkg") && detectedMime == "application/x-tika-ooxml" && rawData.getLength() > 4) {
+      if (
+        fileName.endsWith(
+          ".nupkg"
+        ) && detectedMime == "application/x-tika-ooxml" && rawData
+          .getLength() > 4
+      ) {
         if (rawData.getPosition() > 0) {
           rawData.skip(-rawData.getPosition())
         }
         val bytes = rawData.readNBytes(4)
-        return Some(bytes(0) == 0x50 && bytes(1) == 0x4b && bytes(2) == 0x03 && bytes(3) == 0x04)
+        return Some(
+          bytes(0) == 0x50 && bytes(1) == 0x4b && bytes(2) == 0x03 && bytes(
+            3
+          ) == 0x04
+        )
       }
       return Some(false)
-    } catch {
-      _ => None
+    } catch { _ =>
+      None
     }
   }
 
@@ -202,13 +216,16 @@ object ArtifactWrapper {
       size: Long,
       data: InputStream,
       tempDir: Option[File],
-      tempPath: Path,
+      tempPath: Path
   ): ArtifactWrapper = {
     val name = fixPath(nominalPath)
     val forceTempFile = requireTempFile(name)
 
     // a defined temp dir implies a RAM disk... copy everything but the smallest items
-    if (!forceTempFile && size <= (if (tempDir.isDefined) (64L * 1024L) else maxInMemorySize)) {
+    if (
+      !forceTempFile && size <= (if (tempDir.isDefined) (64L * 1024L)
+                                 else maxInMemorySize)
+    ) {
       val bos = ByteArrayOutputStream()
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
@@ -232,7 +249,7 @@ object ArtifactWrapper {
     // for .NET assemblies, we'll force a temp file so that cilantro can open them.
     FilenameUtils.getExtension(name) match {
       case "dll" | "exe" => true
-      case _ => false
+      case _             => false
     }
   }
 }

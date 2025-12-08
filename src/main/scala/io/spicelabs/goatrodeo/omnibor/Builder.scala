@@ -76,12 +76,13 @@ object Builder {
       tag: Option[TagInfo],
       tempDir: Option[File],
       args: Config,
-      fileListers: Seq[() => Seq[File]],
+      fileListers: Seq[(File, () => Seq[File])],
       ignorePathSet: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
-      preWriteDB: Vector[Storage => Boolean] = Vector()
+      preWriteDB: Vector[Storage => Boolean] = Vector(),
+      fsFilePaths: Boolean = false
   ): Unit = {
     val totalStart = Instant.now()
 
@@ -96,6 +97,7 @@ object Builder {
         finishedFile,
         tempDir,
         runningCnt,
+        fsFilePaths = fsFilePaths,
         dead_? = dead_?
       )
 

@@ -45,12 +45,13 @@ case class Config(
     useStaticMetadata: Boolean = false,
     dumpRootDir: Option[File] = None,
     emitJsonDir: Option[File] = None,
+    fsFilePaths: Boolean = false,
     nonexistantDirectories: Vector[File] = Vector(),
     mimeFilter: IncludeExclude = IncludeExclude(),
     filenameFilter: IncludeExclude = IncludeExclude()
 ) {
-  def getFileListBuilders(): Vector[() => Seq[File]] = {
-    build.map(file => () => Helpers.findFiles(file)) ++ fileList
+  def getFileListBuilders(): Vector[(File, () => Seq[File])] = {
+    build.map(file => (file, () => Helpers.findFiles(file))) ++ fileList
       .map(f => {
         val fileNames =
           Files
@@ -59,7 +60,7 @@ case class Config(
             .toSeq
             .map(fn => new File(fn))
             .filter(_.exists())
-        () => fileNames
+        (f, () => fileNames)
       })
   }
 }
@@ -90,6 +91,9 @@ object Config {
             )
           }
         }),
+      opt[Boolean]("fs-file-paths")
+        .text("Include file paths for items on the filesystem")
+        .action((x, c) => c.copy(fsFilePaths = x)),
       opt[Boolean]("static-metadata")
         .text(
           "Enhance metadata with Syft (must install https://github.com/anchore/syft)"

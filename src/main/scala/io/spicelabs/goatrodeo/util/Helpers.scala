@@ -1241,11 +1241,11 @@ object GitOIDUtils {
 }
 
 object TreeMapExtensions {
-  extension [K, V] (tree: TreeMap[K, V]) {
-    def +? (maybe: Option[(K, V)]): TreeMap[K, V] = {
+  extension [K, V](tree: TreeMap[K, V]) {
+    def +?(maybe: Option[(K, V)]): TreeMap[K, V] = {
       maybe match {
         case Some(elem) => tree + elem
-        case _ => tree
+        case _          => tree
       }
     }
   }
