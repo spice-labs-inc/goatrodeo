@@ -1,7 +1,12 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
+import com.typesafe.scalalogging.Logger
+import io.spicelabs.cilantro.AssemblyDefinition
+import io.spicelabs.cilantro.AssemblyNameReference
+import io.spicelabs.cilantro.CustomAttribute
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
@@ -11,47 +16,49 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import org.json4s.*
+import org.json4s.JsonDSL.*
+import org.json4s.jackson.JsonMethods.*
 
 import java.io.FileInputStream
-
+import java.nio.file.Files
+import java.nio.file.Path
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import io.spicelabs.cilantro.AssemblyDefinition
-import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
-import org.apache.tika.metadata.Metadata
-import io.spicelabs.goatrodeo.util.Helpers.toHex
-import io.spicelabs.cilantro.CustomAttribute
-import io.spicelabs.goatrodeo.util.DotnetDetector
-import io.spicelabs.cilantro.AssemblyNameReference
 import scala.collection.mutable.ArrayBuffer
-import io.spicelabs.goatrodeo.util.Helpers
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
-import java.nio.file.Path
-import java.nio.file.Files
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Option[AssemblyDefinition] = None) extends ProcessingState[SingleMarker, DotnetState] {
+  private val log = Logger(classOf[DotnetState])
     def beginProcessing(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
     ): DotnetState = {
       var fileStm:FileInputStream = null
-      try {
+
+      Try {
         fileStm = streamForArtifact(artifact)
         val assembly = AssemblyDefinition.readAssembly(fileStm)
-        return DotnetState(Some(fileStm), Some(assembly))
-      } catch {
-        case _ =>
+        DotnetState(Some(fileStm), Some(assembly))
+      } match {
+        case Failure(exception) =>
           if (fileStm != null) {
             fileStm.close()
-            fileStm = null
+            log.error(s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}")
+          } else {
+            log.error(s"Unable to open file ${artifact.path()}: ${exception.getMessage()}")
           }
+          this
+        case Success(value) => value
       }
-      this
     }
   
   override def getPurls(
@@ -59,13 +66,12 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
       item: Item,
       marker: SingleMarker
   ): (Vector[PackageURL], DotnetState) = {
-    if (fileStmOpt.isEmpty || assemblyOpt.isEmpty) {
-      Vector.empty -> this
-    } else {
-      val assembly = assemblyOpt.get
-      val purl = PackageURL("nuget", "", assembly.name.name, assembly.name.version.toString(), null, "")
-      Vector(purl) -> this
-    }
+
+    assemblyOpt.map(assembly => PackageURL("nuget", "",
+                                  assembly.name.name,
+                                  assembly.name.version.toString(),
+                                  null,
+                                  "")).toVector -> this
   }
 
 
@@ -102,9 +108,11 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
     (tm, this)
   }
 
-  def maybeSOP(k: String, v: String): Option[(String, TreeSet[StringOrPair])] =
-    if v != null then Some(k, TreeSet[StringOrPair](v))
-    else None
+  def maybeSOP(k: String, v: Option[String]): Option[(String, TreeSet[StringOrPair])] =
+    v match {
+      case Some(str) => Some(k, TreeSet[StringOrPair](str))
+      case None => None
+    }
 
 
   // each of these assembly attributes should
@@ -112,62 +120,72 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
   // 2. have a zeroth constructor argument
   // 3. that value should be type String
   // in the event that we get none of those, we return null
-  def customAttributeArgumentZero(attrName: String): String = {
+  def customAttributeArgumentZero(attrName: String): Option[String] = {
     val assembly = assemblyOpt.get
     if (assembly.hasCustomAttributes) {
       try {
         val attr = assembly.customAttributes.find(at => at.attributeType.fullName == attrName)
         return attr match {
           case Some(value) => argZeroValueAsString(value)
-          case None => null
+          case None => None
         }
       } catch {
-        case _ => return null
+        case _ => return None
       }
     }
-    null
+    None
   }
 
   // custom attributes in .NET may have constructor arguments that are
   // embedded in the assembly. In that case, when the constructor argument is read,
   // there is a certain amount of effort expended to turn it into a rarefied instance
   // this includes the standard value types (ints, bool) as well as strings.
-  def argZeroValueAsString(ca: CustomAttribute): String = {
+  def argZeroValueAsString(ca: CustomAttribute): Option[String] = {
     if (ca.constructorArguments.length == 1) {
       if (ca.constructorArguments(0).value.isInstanceOf[String]) {
         val str = ca.constructorArguments(0).value.asInstanceOf[String]
-        // an empty string is as good as a null for our purposes
-        return if str != null && !str.isEmpty() then str else null
+        // an empty string is as good as None for our purposes
+        return if str != null && !str.isEmpty() then Some(str) else None
       }
     }
-    null
+    None
   }
 
-
   def assemblyFullName: Option[(String, TreeSet[StringOrPair])] = {
-    val assembly = assemblyOpt.get
-    maybeSOP(MetadataKeyConstants.NAME, assembly.fullName)
+    assemblyOpt match {
+      case Some(assembly) => maybeSOP(MetadataKeyConstants.NAME, nullToOption(assembly.fullName))
+      case None => None
+    }
   }
 
   def assemblyName: Option[(String, TreeSet[StringOrPair])] = {
-    val assembly = assemblyOpt.get
-    maybeSOP(MetadataKeyConstants.SIMPLE_NAME, assembly.name.name)
+    assemblyOpt match {
+      case Some(assembly) => maybeSOP(MetadataKeyConstants.SIMPLE_NAME, nullToOption(assembly.name.name))
+      case None => None
+    }
   }
 
   def assemblyVersion: Option[(String, TreeSet[StringOrPair])] = {
-    val assembly = assemblyOpt.get
-    maybeSOP(MetadataKeyConstants.VERSION, assembly.name.version.toString())
+    assemblyOpt match {
+      case Some(assembly) => maybeSOP(MetadataKeyConstants.VERSION, nullToOption(assembly.name.version.toString()))
+      case None => None
+    }
   }
 
   def assemblyLocale: Option[(String, TreeSet[StringOrPair])] = {
-    val assembly = assemblyOpt.get
-    maybeSOP(MetadataKeyConstants.LOCALE, assembly.name.culture)
+    assemblyOpt match {
+      case Some(assembly) => maybeSOP(MetadataKeyConstants.LOCALE, nullToOption(assembly.name.culture))
+      case None => None
+    }    
   }
 
   def assemblyPublicKey: Option[(String, TreeSet[StringOrPair])] = {
-    val assembly = assemblyOpt.get
-    var pkStr = if assembly.name.publicKey != null then toHex(assembly.name.publicKey) else null
-    maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
+    assemblyOpt match {
+      case Some(assembly) =>
+        val pkStr = if assembly.name.publicKey != null then Some(toHex(assembly.name.publicKey)) else None
+        maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
+      case None => None
+    }
   }
 
   def assemblyCopyright: Option[(String, TreeSet[StringOrPair])] = {
@@ -197,6 +215,10 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
     if (refs.length == 0) return None
     val deps = formatDeps(refs)
     maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+  }
+
+  def nullToOption[T](v: T): Option[T] = {
+    if v != null then Some(v) else None
   }
 
   override def finalAugmentation(
@@ -236,7 +258,7 @@ object DotnetState {
           nameVersionToken
           }
       )
-    compact(render(json))
+    Some(compact(render(json)))
   }
 }
 
