@@ -38,6 +38,11 @@ class GoatRodeoBuilder {
     this
   }
 
+  def withFsFilePaths(fp: Boolean): GoatRodeoBuilder = {
+    this.config = this.config.copy(fsFilePaths = fp)
+    this
+  }
+
   def withOutput(o: String): GoatRodeoBuilder = {
     this.config = this.config.copy(out = Some(Paths.get(o).toFile()))
     this

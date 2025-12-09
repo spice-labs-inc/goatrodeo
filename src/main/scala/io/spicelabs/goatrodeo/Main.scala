@@ -185,7 +185,8 @@ object Howdy {
       finishedFile = onFileFinish,
       done = onRunFinish,
       args = params,
-      preWriteDB = preWriteDB
+      preWriteDB = preWriteDB,
+      fsFilePaths = params.fsFilePaths
     )
 
   }

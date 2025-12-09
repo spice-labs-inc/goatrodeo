@@ -1,6 +1,7 @@
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.Config
@@ -34,7 +35,7 @@ class ADGTests extends munit.FunSuite {
   }
 
   test("Build lots of JARs") {
-    val source = File("test_data/download/adg_tests/repo_ea")
+    val source = File("test_data/download/adg_tests")
 
     if (source.isDirectory()) {
 
@@ -63,10 +64,17 @@ class ADGTests extends munit.FunSuite {
           .getOrElse(25),
         maxRecords = 50000,
         tag = Some(TagInfo("foo", None)),
-        fileListers = Vector(() => Helpers.findFiles(source)),
+        fileListers = Vector(
+          (
+            source,
+            () =>
+              Helpers.findFiles(source).filter(!_.getName().endsWith(".tgz"))
+          )
+        ),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
         blockList = None,
+        fsFilePaths = true,
         finishedFile = f => {
           sync.synchronized { captured = captured :+ f }; ()
         },
@@ -88,6 +96,28 @@ class ADGTests extends munit.FunSuite {
               )
             }
           }
+
+          assertEquals(
+            "repo_ea/artio-ilink3-impl-0.144.jar",
+            store
+              .read(
+                store
+                  .read("sha1:ea95ab1f5b392d690443c7087168bd96568366ad")
+                  .get
+                  .connections
+                  .head
+                  ._2
+              )
+              .get
+              .body
+              .get
+              .asInstanceOf[ItemMetaData]
+              .fileNames
+              .toVector
+              .filter(_.endsWith(".jar"))
+              .filter(_.startsWith("repo_ea/"))
+              .head
+          )
 
           store.read("tags") match {
             case Some(tags) => {

@@ -597,37 +597,44 @@ object ToProcess {
   }
 
   def buildQueueOnSeparateThread(
-      fileListers: Seq[() => Seq[File]],
+      fileListers: Seq[(File, () => Seq[File])],
       ignorePathList: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
       tempDir: Option[File],
       count: AtomicInteger,
+      fsFilePaths: Boolean,
       dead_? : AtomicBoolean
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
+
     val buildIt: Runnable = () => {
       try {
         import scala.collection.parallel.CollectionConverters.ImmutableSeqIsParallelizable
         // get all the files
         val allFiles: Vector[ArtifactWrapper] =
-          fileListers
-            .flatMap(fl => fl())
-            .par
-            // canonicalize path
-            .map(f => f.getCanonicalFile())
-            .filter(f => f.exists() && f.isFile())
-            // remove those in ignore list
-            .filter(f => !ignorePathList.contains(f.getPath()))
-            // filter based on regex
-            .filter(f => {
-              val name = f.getName()
-              excludeFileRegex.find(p => p.matcher(name).find()).isEmpty
-            })
-            .toSet // remove duplicates
-            .map(f => FileWrapper(f, f.getName(), tempDir, finishedFile))
-            .toVector
+          (for {
+            (root, fl) <- fileListers
+            basePath = root.getCanonicalPath()
+            basePathLen = basePath.length()
+            file <- fl().par if file.exists() && file.isFile() && !file
+              .getName()
+              .startsWith(".") && !ignorePathList.contains(file.getPath()) && {
+              val name = file.getName()
+              excludeFileRegex.find(p => p.matcher(name).find).isEmpty
+            }
+
+          } yield FileWrapper(
+            file,
+            if (fsFilePaths) {
+              val cp = file.getCanonicalPath()
+              if (cp.startsWith(basePath)) cp.substring(basePathLen + 1)
+              else cp.substring(1)
+            } else file.getName(),
+            tempDir,
+            finishedFile
+          )).toVector
 
         logger.info(f"Found all files, count ${allFiles.length}")
 

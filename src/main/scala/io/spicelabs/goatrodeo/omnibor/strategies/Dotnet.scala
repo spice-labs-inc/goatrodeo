@@ -35,45 +35,58 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Option[AssemblyDefinition] = None) extends ProcessingState[SingleMarker, DotnetState] {
+class DotnetState(
+    fileStmOpt: Option[FileInputStream] = None,
+    assemblyOpt: Option[AssemblyDefinition] = None
+) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
-    def beginProcessing(
+  def beginProcessing(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-    ): DotnetState = {
-      var fileStm:FileInputStream = null
+  ): DotnetState = {
+    var fileStm: FileInputStream = null
 
-      Try {
-        fileStm = streamForArtifact(artifact)
-        val assembly = AssemblyDefinition.readAssembly(fileStm)
-        DotnetState(Some(fileStm), Some(assembly))
-      } match {
-        case Failure(exception) =>
-          if (fileStm != null) {
-            fileStm.close()
-            log.error(s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}")
-          } else {
-            log.error(s"Unable to open file ${artifact.path()}: ${exception.getMessage()}")
-          }
-          this
-        case Success(value) => value
-      }
+    Try {
+      fileStm = streamForArtifact(artifact)
+      val assembly = AssemblyDefinition.readAssembly(fileStm)
+      DotnetState(Some(fileStm), Some(assembly))
+    } match {
+      case Failure(exception) =>
+        if (fileStm != null) {
+          fileStm.close()
+          log.error(
+            s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
+          )
+        } else {
+          log.error(
+            s"Unable to open file ${artifact.path()}: ${exception.getMessage()}"
+          )
+        }
+        this
+      case Success(value) => value
     }
-  
+  }
+
   override def getPurls(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
   ): (Vector[PackageURL], DotnetState) = {
 
-    assemblyOpt.map(assembly => PackageURL("nuget", "",
-                                  assembly.name.name,
-                                  assembly.name.version.toString(),
-                                  null,
-                                  "")).toVector -> this
+    assemblyOpt
+      .map(assembly =>
+        PackageURL(
+          "nuget",
+          "",
+          assembly.name.name,
+          assembly.name.version.toString(),
+          null,
+          ""
+        )
+      )
+      .toVector -> this
   }
-
 
   private def streamForArtifact(artifact: ArtifactWrapper): FileInputStream = {
     val tempDir: Path = artifact.tempDir match {
@@ -108,12 +121,14 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
     (tm, this)
   }
 
-  def maybeSOP(k: String, v: Option[String]): Option[(String, TreeSet[StringOrPair])] =
+  def maybeSOP(
+      k: String,
+      v: Option[String]
+  ): Option[(String, TreeSet[StringOrPair])] =
     v match {
       case Some(str) => Some(k, TreeSet[StringOrPair](str))
-      case None => None
+      case None      => None
     }
-
 
   // each of these assembly attributes should
   // 1. exist
@@ -121,19 +136,18 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
   // 3. that value should be type String
   // in the event that we get none of those, we return null
   def customAttributeArgumentZero(attrName: String): Option[String] = {
-    val assembly = assemblyOpt.get
-    if (assembly.hasCustomAttributes) {
-      try {
-        val attr = assembly.customAttributes.find(at => at.attributeType.fullName == attrName)
-        return attr match {
-          case Some(value) => argZeroValueAsString(value)
-          case None => None
+    for {
+      assembly <- assemblyOpt if assembly.hasCustomAttributes
+      resOption <- Try {
+        assembly.customAttributes.find(at =>
+          at.attributeType.fullName == attrName
+        ) match {
+          case Some(v) => argZeroValueAsString(v)
+          case _       => None
         }
-      } catch {
-        case _ => return None
-      }
-    }
-    None
+      }.toOption
+      res <- resOption
+    } yield res
   }
 
   // custom attributes in .NET may have constructor arguments that are
@@ -141,50 +155,53 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
   // there is a certain amount of effort expended to turn it into a rarefied instance
   // this includes the standard value types (ints, bool) as well as strings.
   def argZeroValueAsString(ca: CustomAttribute): Option[String] = {
-    if (ca.constructorArguments.length == 1) {
-      if (ca.constructorArguments(0).value.isInstanceOf[String]) {
-        val str = ca.constructorArguments(0).value.asInstanceOf[String]
-        // an empty string is as good as None for our purposes
-        return if str != null && !str.isEmpty() then Some(str) else None
-      }
+    ca.constructorArguments.headOption.map(_.value) match {
+      case Some(s: String) if !s.isEmpty => Some(s)
+      case _                             => None
     }
-    None
   }
 
   def assemblyFullName: Option[(String, TreeSet[StringOrPair])] = {
-    assemblyOpt match {
-      case Some(assembly) => maybeSOP(MetadataKeyConstants.NAME, nullToOption(assembly.fullName))
-      case None => None
-    }
+    assemblyOpt.flatMap(assembly =>
+      maybeSOP(MetadataKeyConstants.NAME, Option(assembly.fullName))
+    )
+
   }
 
   def assemblyName: Option[(String, TreeSet[StringOrPair])] = {
-    assemblyOpt match {
-      case Some(assembly) => maybeSOP(MetadataKeyConstants.SIMPLE_NAME, nullToOption(assembly.name.name))
-      case None => None
-    }
+    assemblyOpt.flatMap(assembly =>
+      maybeSOP(
+        MetadataKeyConstants.SIMPLE_NAME,
+        Option(assembly.name.name)
+      )
+    )
   }
 
   def assemblyVersion: Option[(String, TreeSet[StringOrPair])] = {
-    assemblyOpt match {
-      case Some(assembly) => maybeSOP(MetadataKeyConstants.VERSION, nullToOption(assembly.name.version.toString()))
-      case None => None
+    assemblyOpt.flatMap { assembly =>
+      maybeSOP(
+        MetadataKeyConstants.VERSION,
+        Option(assembly.name.version.toString())
+      )
     }
   }
 
   def assemblyLocale: Option[(String, TreeSet[StringOrPair])] = {
-    assemblyOpt match {
-      case Some(assembly) => maybeSOP(MetadataKeyConstants.LOCALE, nullToOption(assembly.name.culture))
-      case None => None
-    }    
+    assemblyOpt.flatMap { assembly =>
+      maybeSOP(
+        MetadataKeyConstants.LOCALE,
+        Option(assembly.name.culture)
+      )
+    }
   }
 
   def assemblyPublicKey: Option[(String, TreeSet[StringOrPair])] = {
-    assemblyOpt match {
-      case Some(assembly) =>
-        val pkStr = if assembly.name.publicKey != null then Some(toHex(assembly.name.publicKey)) else None
-        maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
-      case None => None
+    assemblyOpt.flatMap { assembly =>
+      val pkStr =
+        Option(assembly.name.publicKey).map(pk =>
+          toHex(assembly.name.publicKey)
+        )
+      maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
     }
   }
 
@@ -199,12 +216,16 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
   }
 
   def assemblyProducer: Option[(String, TreeSet[StringOrPair])] = {
-    var pr = customAttributeArgumentZero("System.Reflection.AssemblyTrademarkAttribute")
+    var pr = customAttributeArgumentZero(
+      "System.Reflection.AssemblyTrademarkAttribute"
+    )
     maybeSOP(MetadataKeyConstants.PUBLISHER, pr)
   }
 
   def assemblyDescription: Option[(String, TreeSet[StringOrPair])] = {
-    var desc = customAttributeArgumentZero("System.Reflection.AssemblyDescriptionAttribute")
+    var desc = customAttributeArgumentZero(
+      "System.Reflection.AssemblyDescriptionAttribute"
+    )
     maybeSOP(MetadataKeyConstants.DESCRIPTION, desc)
   }
 
@@ -215,10 +236,6 @@ class DotnetState(fileStmOpt: Option[FileInputStream] = None, assemblyOpt: Optio
     if (refs.length == 0) return None
     val deps = formatDeps(refs)
     maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
-  }
-
-  def nullToOption[T](v: T): Option[T] = {
-    if v != null then Some(v) else None
   }
 
   override def finalAugmentation(
@@ -250,21 +267,21 @@ object DotnetState {
       ("dependencies" ->
         sortedDeps.map { dep =>
           var nameVersionToken = ("name" -> dep.name) ~
-          ("version" -> dep.version.toString()) ~
-          ("public_key_token" -> Helpers.toHex(dep.publicKeyToken))
+            ("version" -> dep.version.toString()) ~
+            ("public_key_token" -> Helpers.toHex(dep.publicKeyToken))
           if (dep.hasPublicKey) {
-            nameVersionToken = nameVersionToken ~ ("public_key" -> Helpers.toHex(dep.publicKey))
+            nameVersionToken =
+              nameVersionToken ~ ("public_key" -> Helpers.toHex(dep.publicKey))
           }
           nameVersionToken
-          }
-      )
+        })
     Some(compact(render(json)))
   }
 }
 
 final case class DotnetFile(file: ArtifactWrapper) extends ToProcess {
 
-  /** Call at the end of successfull completing the operation
+  /** Call at the end of successful completing the operation
     */
   def markSuccessfulCompletion(): Unit = {
     file.finished()
@@ -281,7 +298,7 @@ final case class DotnetFile(file: ArtifactWrapper) extends ToProcess {
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) =
-          Vector(file -> SingleMarker()) -> DotnetState()
+    Vector(file -> SingleMarker()) -> DotnetState()
 }
 
 object DotnetFile {

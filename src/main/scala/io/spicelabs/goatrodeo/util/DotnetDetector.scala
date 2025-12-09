@@ -44,7 +44,7 @@ class DotnetDetector extends Detector {
           }
         } match {
           case Failure(exception) => MediaType.OCTET_STREAM
-          case Success(value) => value
+          case Success(value)     => value
         }
       case None => MediaType.OCTET_STREAM
     }
@@ -58,35 +58,52 @@ object DotnetDetector {
 }
 
 class FileInputStreamEx(private val f: File) extends FileInputStream(f) {
-  def this(path: String) = {
-    this(File(path))
-  }
+  // def this(path: String) = {
+  //   this(File(path))
+  // }
 }
 
 object FileInputStreamEx {
   val log = Logger(classOf[FileInputStreamEx])
   def toFileInputStream(
-    is: InputStream,
-    metadata: Metadata
+      is: InputStream,
+      metadata: Metadata
   ): Option[FileInputStream] = {
-    if (is.isInstanceOf[FileInputStream])
-      return Some(is.asInstanceOf[FileInputStream])
-    val path = metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)
-    if (path == null) {
-      log.error("Metadata data needs the RESOURCE_NAME_KEY set to the path name")
-      return None
-    }
-    val f = File(path)
-    if (!f.exists()) {
-      if (is.isInstanceOf[TikaInputStream]) {
-        val tika = is.asInstanceOf[TikaInputStream]
-        Some(FileInputStreamEx(tika.getPath().toString()))
-      } else {
-        log.error("file in metadata doesn't exist; tried to get TikaInputStream - that failed too.")
-        None
-      }
-    } else {
-      Some(FileInputStreamEx(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)))
+    is match {
+      case fis: FileInputStream => Some(fis)
+      case _ =>
+        val path = metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)
+        if (path == null) {
+          log.error(
+            "Metadata data needs the RESOURCE_NAME_KEY set to the path name"
+          )
+          None
+        } else {
+          val f = File(path)
+
+          if (!f.exists()) {
+            is match {
+              case tis: TikaInputStream if tis.getFile() match {
+                    case null => false
+                    case f    => f.isFile()
+                  } =>
+                Some(FileInputStreamEx(tis.getFile()))
+              case _ =>
+                log.error(
+                  "file in metadata doesn't exist; tried to get TikaInputStream - that failed too."
+                )
+                None
+            }
+          } else if (!f.isFile()) {
+            None
+          } else {
+            Some(
+              FileInputStreamEx(
+                f
+              )
+            )
+          }
+        }
     }
   }
 }
