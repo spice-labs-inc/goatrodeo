@@ -83,7 +83,10 @@ object FileInputStreamEx {
 
           if (!f.exists()) {
             is match {
-              case tis: TikaInputStream if tis.getFile().isFile() =>
+              case tis: TikaInputStream if tis.getFile() match {
+                    case null => false
+                    case f    => f.isFile()
+                  } =>
                 Some(FileInputStreamEx(tis.getFile()))
               case _ =>
                 log.error(

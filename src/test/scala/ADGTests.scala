@@ -1,6 +1,7 @@
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.Config
@@ -11,7 +12,6 @@ import java.io.File
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 
 class ADGTests extends munit.FunSuite {
   test("Unreadable JAR") {
@@ -64,7 +64,13 @@ class ADGTests extends munit.FunSuite {
           .getOrElse(25),
         maxRecords = 50000,
         tag = Some(TagInfo("foo", None)),
-        fileListers = Vector((source, () => Helpers.findFiles(source).filter(!_.getName().endsWith(".tgz")))),
+        fileListers = Vector(
+          (
+            source,
+            () =>
+              Helpers.findFiles(source).filter(!_.getName().endsWith(".tgz"))
+          )
+        ),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
         blockList = None,

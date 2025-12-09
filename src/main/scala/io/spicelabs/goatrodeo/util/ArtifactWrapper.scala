@@ -18,6 +18,8 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 import scala.util.Using
 
@@ -116,7 +118,7 @@ object ArtifactWrapper {
     *   -- the name of the file
     */
   def mimeTypeFor(rawData: TikaInputStream, fileName: String): String = {
-    try {
+    Try {
       val data = rawData
       val len = rawData.getLength()
 
@@ -124,8 +126,9 @@ object ArtifactWrapper {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
       val detected = detectorFactory.toDetector().detect(data, metadata)
       massageMimeType(fileName, rawData, detected)
-    } catch {
-      case e: Exception =>
+    } match {
+      case Success(value) => value
+      case Failure(e) =>
         logger.error(
           f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
           e
@@ -140,7 +143,7 @@ object ArtifactWrapper {
       detected: MediaType
   ): String = {
     // if you add more changes to this, add to the mime_types.md documentation
-    val isJson = Try {
+    Try {
       if (detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000) {
         import org.json4s._
         import org.json4s.native.JsonMethods._
@@ -151,15 +154,12 @@ object ArtifactWrapper {
         val bytes = new String(Helpers.slurpInputNoClose(rawData), "UTF-8")
         parseOpt(bytes).isDefined
       } else false
-    }.toOption
-    if (isJson == Some(true))
-      return "application/json"
-
-    val detectedString = detected.toString()
-
-    if isNupkg(fileName, detectedString, rawData) == Some(true) then
-      "application/zip"
-    else detectedString
+    }.toOption match {
+      case Some(true) => "application/json"
+      case _ if isNupkg(fileName, detected.toString(), rawData) == Some(true) =>
+        "application/zip"
+      case _ => detected.toString()
+    }
   }
 
   def isNupkg(
@@ -167,26 +167,30 @@ object ArtifactWrapper {
       detectedMime: String,
       rawData: TikaInputStream
   ): Option[Boolean] = {
-    try {
+    Try {
       if (
         fileName.endsWith(
           ".nupkg"
         ) && detectedMime == "application/x-tika-ooxml" && rawData
           .getLength() > 4
       ) {
+        // rewind
         if (rawData.getPosition() > 0) {
           rawData.skip(-rawData.getPosition())
         }
         val bytes = rawData.readNBytes(4)
-        return Some(
+        // does it match nupkg header?
+        Some(
           bytes(0) == 0x50 && bytes(1) == 0x4b && bytes(2) == 0x03 && bytes(
             3
           ) == 0x04
         )
-      }
-      return Some(false)
-    } catch { _ =>
-      None
+      } else Some(false)
+    } match {
+      case Success(v) => v
+      case Failure(e) =>
+        logger.error(f"Nupkg detect failure ${e.getMessage()}")
+        None
     }
   }
 

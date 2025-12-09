@@ -629,7 +629,7 @@ object ToProcess {
             file,
             if (fsFilePaths) {
               val cp = file.getCanonicalPath()
-              if (cp.startsWith(basePath)) cp.substring(basePathLen)
+              if (cp.startsWith(basePath)) cp.substring(basePathLen + 1)
               else cp.substring(1)
             } else file.getName(),
             tempDir,

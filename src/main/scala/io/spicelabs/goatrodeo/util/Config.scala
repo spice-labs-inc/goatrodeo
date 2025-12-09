@@ -60,7 +60,7 @@ case class Config(
             .toSeq
             .map(fn => new File(fn))
             .filter(_.exists())
-        (f, () => fileNames)
+        (File(".").getCanonicalFile(), () => fileNames)
       })
   }
 }
