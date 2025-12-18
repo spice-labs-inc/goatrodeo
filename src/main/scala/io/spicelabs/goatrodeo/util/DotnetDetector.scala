@@ -43,8 +43,12 @@ class DotnetDetector extends Detector {
             MediaType.OCTET_STREAM
           }
         } match {
-          case Failure(exception) => MediaType.OCTET_STREAM
-          case Success(value)     => value
+          case Failure(exception) =>
+            FileInputStreamEx.closeIfNeeded(fs)
+            MediaType.OCTET_STREAM
+          case Success(value)     =>
+            FileInputStreamEx.closeIfNeeded(fs)
+            value
         }
       case None => MediaType.OCTET_STREAM
     }
@@ -104,6 +108,13 @@ object FileInputStreamEx {
             )
           }
         }
+    }
+  }
+
+  def closeIfNeeded(fis: FileInputStream) = {
+    fis match {
+      case fex: FileInputStreamEx => fex.close()
+      case _ => ()
     }
   }
 }
