@@ -31,6 +31,7 @@ jobs:
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           username-mapping: ${{ vars.GH_SLACK_USERNAME_MAPPING }}
           github-token: ${{ github.token }}
+
       - name: Checkout with LFS
         uses: actions/checkout@v4
         with:
@@ -71,7 +72,7 @@ jobs:
         uses: spice-labs-inc/action-spice-labs-surveyor@v4
         with:
           spice_pass: "${{ secrets.SPICE_PASS }}"
-          input: "./target"
+          input: "${{ github.workspace }}"
           tag: "${{ github.event.repository.name }}"
 
   publish-to-central:
@@ -207,7 +208,10 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Create image export directory
+        run: mkdir -p target/release
+
+      - name: Build and Push Docker Image (and export locally)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -218,6 +222,15 @@ jobs:
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Save a local copy of the built image under target/release/
+          outputs: type=oci,dest=target/release/goatrodeo-image.tar
+
+      - name: Index and Upload ADG
+        uses: spice-labs-inc/action-spice-labs-surveyor@v4
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          input: "${{ github.workspace }}"
+          tag: "${{ github.event.repository.name }}"
 
   notify:
     needs: [publish-jars, publish-to-central, docker-image]
@@ -241,7 +254,7 @@ jobs:
             echo "message=✅ All components published successfully!" >> $GITHUB_OUTPUT
           else
             echo "overall_status=failure" >> $GITHUB_OUTPUT
-            
+
             # Build detailed failure message
             MESSAGE="❌ Publishing failed:"
             if [ "$JARS_STATUS" != "success" ]; then
@@ -249,19 +262,19 @@ jobs:
             else
               MESSAGE="$MESSAGE ✅ SBT JAR publishing succeeded."
             fi
-            
+
             if [ "$CENTRAL_STATUS" != "success" ]; then
               MESSAGE="$MESSAGE ❌ Maven Central publishing failed."
             else
               MESSAGE="$MESSAGE ✅ Maven Central publishing succeeded."
             fi
-            
+
             if [ "$DOCKER_STATUS" != "success" ]; then
               MESSAGE="$MESSAGE ❌ Docker build/push failed."
             else
               MESSAGE="$MESSAGE ✅ Docker build/push succeeded."
             fi
-            
+
             echo "message=$MESSAGE" >> $GITHUB_OUTPUT
           fi
 
