@@ -30,6 +30,8 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import io.spicelabs.goatrodeo.components.Arguments
+import io.spicelabs.goatrodeo.components.RodeoHost
 
 class Howdy
 
@@ -57,6 +59,8 @@ object Howdy {
 
   @static
   def run(params: Config): Unit = {
+    startComponents(params)
+
     val logger = Logger(getClass())
 
     val fileListers = params.getFileListBuilders()
@@ -114,7 +118,7 @@ object Howdy {
                 out.close()
               } else {
                 logger.error("Failed to process the input.")
-                System.exit(1) // non-zero exit
+                Helpers.exitWrapper(1) // non-zero exit
               }
 
               ()
@@ -189,6 +193,23 @@ object Howdy {
       fsFilePaths = params.fsFilePaths
     )
 
+    Helpers.exitZero()
   }
 
+  @static
+  def startComponents(params: Config) = {
+    val host = RodeoHost.host
+    host.begin()
+    host.exportImport()
+    if (params.printComponentInfo) {
+      host.printComponentInfo()
+      Helpers.exitZero()
+    }
+    if (params.printComponentArgumentInfo) {
+      Arguments.printDescriptions()
+      Helpers.exitZero()
+    }
+    Arguments.processComponentArguments(params.componentArgs)
+    host.completeLoading()
+  }
 }

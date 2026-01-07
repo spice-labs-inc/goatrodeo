@@ -15,10 +15,10 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.components
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.rodeocomponents.APIS.RodeoLogger
 import io.spicelabs.rodeocomponents.RodeoComponent
 import io.spicelabs.rodeocomponents.APIFactory
-import io.spicelabs.rodeocomponents.APIS.RodeoLoggerConstants
+import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
+import io.spicelabs.rodeocomponents.APIS.logging.RodeoLoggerConstants
 
 class LoggingAPI(subscriber: RodeoComponent) extends RodeoLogger {
     private val log = Logger(subscriber.getClass())

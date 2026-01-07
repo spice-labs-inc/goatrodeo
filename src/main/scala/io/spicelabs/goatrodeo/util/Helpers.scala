@@ -49,6 +49,7 @@ import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
 import java.nio.file.FileVisitor
+import io.spicelabs.goatrodeo.components.RodeoHost
 
 type GitOID = String
 
@@ -863,9 +864,17 @@ object Helpers {
     * @return
     */
   def bailFail(): Nothing = {
-    if (Thread.currentThread().getStackTrace().length < 6) System.exit(1)
+    if (Thread.currentThread().getStackTrace().length < 6) exitWrapper(1)
     throw new Exception()
   }
+
+  // shut down the components gracefully
+  def exitWrapper(exitCode: Int): Unit = {
+    RodeoHost.host.end()
+    System.exit(exitCode)
+  }
+
+  def exitZero() = exitWrapper(0)
 
   def readLenAndCBOR[A](
       fc: FileChannel

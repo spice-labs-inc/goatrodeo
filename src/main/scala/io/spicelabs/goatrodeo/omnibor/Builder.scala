@@ -154,7 +154,7 @@ object Builder {
       Thread.sleep(250)
       if (dead_?.get()) {
         logger.error("Died while waiting for any files")
-        System.exit(1)
+        Helpers.exitWrapper(1)
       }
     }
 
