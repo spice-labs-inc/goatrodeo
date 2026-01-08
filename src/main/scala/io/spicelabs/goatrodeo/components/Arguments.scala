@@ -21,6 +21,13 @@ import io.spicelabs.rodeocomponents.RodeoComponent
 import scala.collection.mutable.ArrayBuffer
 import com.typesafe.scalalogging.Logger
 
+/**
+  * This is the implementation of the command line argument API for components.
+  * Command line arguments will be accumulated prior to discovering components. Command line argument listeners will
+  * be called after import and before onLoadingComplete. Therefore component listeners should register during the import step.
+  *
+  * @param name The name of the component that wants to listen to arguments
+  */
 class Arguments(private val name: String) extends RodeoArgumentRegistrar {
     override def register(listener: RodeoArgumentListener): Unit = {
         Arguments.addListener(name, listener)
@@ -32,6 +39,12 @@ object Arguments {
     lazy val logger = Logger(getClass())
     val listeners = ArrayBuffer[(String, RodeoArgumentListener)]()
 
+    /**
+      * Adds an argument listener to the list of existing listeners.
+      *
+      * @param name the name of the component listening
+      * @param listener an interface to call with command line arguments
+      */
     def addListener(name: String, listener: RodeoArgumentListener): Unit = {
         if (listener == null) {
             logger.warn(s"Component $name attempting to register null listener; ignoring")
@@ -55,6 +68,13 @@ object Arguments {
         }       
     }
 
+    // The arguments are held as a map of component name -> Vector[parameters]
+    // parameters is an array of string which does NOT include the component name.
+    // Therefore, if you get the command line argument --component foo,bar,baz, this will
+    // show up in the map as foo -> Vector(Array("bar", "baz"))
+    // If there are multiple arguments (eg, --component foo,bar,baz --component foo,verbose), the
+    // vector will contain multiple entries: foo -> Vector(Array("bar", "baz"), Array("verbose")).
+    // If the same argument appears multiple times, there will be a vector entry for each one.
     def processComponentArguments(arguments: Map[String, Vector[Array[String]]]): Unit = {
         listeners.synchronized {
 
