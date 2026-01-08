@@ -45,15 +45,22 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     private val log = Logger(classOf[RodeoHost])
     private val activeComponents: ArrayBuffer[RodeoComponent] = ArrayBuffer(BuiltInComponent.component)
     private val inactiveComponents: ArrayBuffer[RodeoComponent] = ArrayBuffer()
+    private var hasBegun = false
+    private var hasEnded = false
 
-    def begin() = {
+    def begin(): Unit = {
+        if (hasBegun)
+            return
+        hasBegun = true
         val components = discoverComponents()
         val (active, inactive) = initializeAndfilterComponents(components)
         activeComponents.addAll(active)
         inactiveComponents.addAll(inactive)
     }
 
-    def exportImport() = {
+    def exportImport(): Unit = {
+        if (hasEnded)
+            return
         import RodeoHost.elapsedTime
         log.debug("starting component export")
         val (_, exportTime) = elapsedTime { activeComponents.foreach(comp => comp.exportAPIFactories(this)) }
@@ -61,12 +68,18 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
         activeComponents.foreach(comp => comp.importAPIFactories(this))
     }
 
-    def completeLoading() = {
+    def completeLoading(): Unit = {
+        if (hasEnded)
+            return
         activeComponents.foreach(comp => comp.onLoadingComplete())
     }
 
-    def end() = {
-        activeComponents.foreach(comp => comp.shutDown())
+    def end(): Unit = {
+        if (hasEnded)
+            return
+        if (hasBegun)
+            activeComponents.foreach(comp => comp.shutDown())
+        hasEnded = true
     }
 
     def hasComponent(component: RodeoComponent) = isActiveComponent(component) || isInactiveComponent(component)
@@ -239,6 +252,20 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     private def updateAPI(name: String, publishedAPI: PublishedAPI, subscriber: RodeoComponent) = {
         publishedAPIS.update(name, publishedAPI.copy(subscribers = publishedAPI.subscribers :+ subscriber))
     }
+
+    def printComponentInfo() = {
+        printCompListInfo(activeComponents, "Active")
+        printCompListInfo(inactiveComponents, "Inactive")
+    }
+
+    private def printCompListInfo(comps: ArrayBuffer[RodeoComponent], activeLabel: String) = {
+        if (comps.length > 0) {
+            println(s"$activeLabel components (${comps.length})")
+            activeComponents.foreach((c => {
+                println(s"Component ${c.getIdentity().name()}, published by ${c.getIdentity().publisher()}, compiled against component host version ${c.getComponentVersion()}")
+            }))
+        }
+    }
 }
 
 object RodeoHost {
@@ -264,4 +291,6 @@ object RodeoHost {
         val end = System.nanoTime()
         (ret, end - start)
     }
+
+    lazy val host:RodeoHost = RodeoHost()
 }

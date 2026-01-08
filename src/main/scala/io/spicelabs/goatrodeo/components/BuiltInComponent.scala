@@ -20,7 +20,8 @@ import io.spicelabs.rodeocomponents.APIFactoryReceiver
 import java.lang.Runtime.Version
 import io.spicelabs.rodeocomponents.RodeoEnvironment
 import io.spicelabs.rodeocomponents.APIFactorySource
-import io.spicelabs.rodeocomponents.APIS.RodeoLogger
+import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
+import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentRegistrar
 
 private class BuiltInIdentity extends RodeoIdentity {
     override def name(): String = "GoatRodeoComponent"
@@ -34,6 +35,9 @@ class BuiltInComponent extends RodeoComponent {
     override def getIdentity(): RodeoIdentity = _identity
     override def getComponentVersion(): Version = _version
     override def exportAPIFactories(receiver: APIFactoryReceiver): Unit = {
+        val argRegistrar = ArgumentsFactory()
+        receiver.publishFactory(this, argRegistrar.name(), argRegistrar, classOf[RodeoArgumentRegistrar])
+        
         val logger = LoggingAPIFactory()
         receiver.publishFactory(this, logger.name(), logger, classOf[RodeoLogger])
     }

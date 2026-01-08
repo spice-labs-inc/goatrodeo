@@ -16,6 +16,7 @@ import scala.io.BufferedSource
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import io.spicelabs.goatrodeo.components.Arguments
 
 /** Command Line Configuration
   *
@@ -48,7 +49,10 @@ case class Config(
     fsFilePaths: Boolean = false,
     nonexistantDirectories: Vector[File] = Vector(),
     mimeFilter: IncludeExclude = IncludeExclude(),
-    filenameFilter: IncludeExclude = IncludeExclude()
+    filenameFilter: IncludeExclude = IncludeExclude(),
+    componentArgs: Map[String, Vector[Array[String]]] = Map(),
+    printComponentArgumentInfo: Boolean = false,
+    printComponentInfo: Boolean = false
 ) {
   def getFileListBuilders(): Vector[(File, () => Seq[File])] = {
     build.map(file => (file, () => Helpers.findFiles(file))) ++ fileList
@@ -179,16 +183,36 @@ object Config {
         .text("print version and exit")
         .action((_, c) => {
           logger.info(f"Goat Rodeo version ${hellogoat.BuildInfo}")
-          System.exit(0)
+          Helpers.exitZero()
           c
         }),
       opt[Unit]('?', "help")
         .text("print help and exit")
         .action((_, c) => {
           logger.info(OParser.usage(parser1))
-          System.exit(0)
+          Helpers.exitZero()
           c
-        })
+        }),
+      opt[Seq[String]]("component")
+        .text("pass arguments to a component in the form --component <componentName>[,arg1,arg2...]")
+        .optional()
+        .unbounded()
+        .action((args, c) => {
+          args match {
+            case compName :: compArgs => c.copy(componentArgs = Arguments.addArgs(compName, compArgs.toArray, c.componentArgs))
+            case _ => {
+              logger.info(OParser.usage(parser1))
+              logger.info("--component ")
+              c
+            }
+          }
+        }),
+        opt[Unit]("print-component-info")
+          .text("print component information")
+          .action((_, c) => c.copy(printComponentInfo = true)),
+        opt[Unit]("print-component-arg-help")
+          .text("print component argument help")
+          .action((_, c) => c.copy(printComponentArgumentInfo = true))
     )
   }
 
