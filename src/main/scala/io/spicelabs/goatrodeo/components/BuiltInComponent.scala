@@ -22,6 +22,7 @@ import io.spicelabs.rodeocomponents.RodeoEnvironment
 import io.spicelabs.rodeocomponents.APIFactorySource
 import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
 import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentRegistrar
+import io.spicelabs.rodeocomponents.APIS.purls.PurlAPI
 
 private class BuiltInIdentity extends RodeoIdentity {
     override def name(): String = "GoatRodeoComponent"
@@ -40,6 +41,9 @@ class BuiltInComponent extends RodeoComponent {
         
         val logger = LoggingAPIFactory()
         receiver.publishFactory(this, logger.name(), logger, classOf[RodeoLogger])
+
+        val purls = PurlsAPIFactory()
+        receiver.publishFactory(this, purls.name(), purls, classOf[PurlAPI])
     }
     override def importAPIFactories(factorySource: APIFactorySource): Unit = { }
     override def initialize(): Unit = { }
