@@ -142,6 +142,9 @@ class GoatRodeoBuilder {
       case "tag"            => withTag(value)
       case "mimeFilter"     => withMimeFilter(value)
       case "mimeFilterFile" => withMimeFilterFile(value)
+      case "emitJsonDir" =>
+        config = config.copy(emitJsonDir = Some(Paths.get(value).toFile()))
+        this
       case unknown =>
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
         this
