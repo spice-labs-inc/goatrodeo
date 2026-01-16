@@ -34,10 +34,12 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import java.io.File
 
 class DotnetState(
     fileStmOpt: Option[FileInputStream] = None,
-    assemblyOpt: Option[AssemblyDefinition] = None
+    assemblyOpt: Option[AssemblyDefinition] = None,
+    tempFile: Option[File] = None,
 ) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
   def beginProcessing(
@@ -46,15 +48,19 @@ class DotnetState(
       marker: SingleMarker
   ): DotnetState = {
     var fileStm: FileInputStream = null
+    var file: Option[File] = None
 
     Try {
-      fileStm = streamForArtifact(artifact)
+      val (f, fs) = streamForArtifact(artifact)
+      fileStm = fs
+      file = Some(f)
       val assembly = AssemblyDefinition.readAssembly(fileStm)
-      DotnetState(Some(fileStm), Some(assembly))
+      DotnetState(Some(fileStm), Some(assembly), Some(f))
     } match {
       case Failure(exception) =>
         if (fileStm != null) {
           fileStm.close()
+          file.map(f => Files.deleteIfExists(f.toPath()))
           log.error(
             s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
           )
@@ -88,14 +94,14 @@ class DotnetState(
       .toVector -> this
   }
 
-  private def streamForArtifact(artifact: ArtifactWrapper): FileInputStream = {
+  private def streamForArtifact(artifact: ArtifactWrapper): (File, FileInputStream) = {
     val tempDir: Path = artifact.tempDir match {
       case Some(p) =>
         Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
       case None => Files.createTempDirectory("goatrodeo_temp_dir")
     }
     val file = artifact.forceFile(tempDir)
-    FileInputStream(file)
+    (file, FileInputStream(file))
   }
 
   override def getMetadata(
@@ -251,11 +257,9 @@ class DotnetState(
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {
-    if (fileStmOpt.isDefined) {
-      fileStmOpt.get.close()
-      DotnetState()
-    }
-    this
+    fileStmOpt.map(fs => fs.close())
+    tempFile.map(f => Files.deleteIfExists(f.toPath()))
+    DotnetState()
   }
 }
 
