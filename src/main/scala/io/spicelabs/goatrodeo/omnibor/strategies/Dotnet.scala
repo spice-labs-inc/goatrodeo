@@ -23,7 +23,7 @@ import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.JsonDSL.*
-import org.json4s.jackson.JsonMethods.*
+import org.json4s.native.JsonMethods.*
 
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -36,11 +36,12 @@ import scala.util.Success
 import scala.util.Try
 import java.io.File
 import io.spicelabs.goatrodeo.util.FileWalker
+import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.ByteWrapper
 
 class DotnetState(
-    fileStmOpt: Option[FileInputStream] = None,
     assemblyOpt: Option[AssemblyDefinition] = None,
-    tempFile: Option[File] = None,
+    streamOpt: Option[FileInputStream] = None
 ) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
   def beginProcessing(
@@ -48,30 +49,23 @@ class DotnetState(
       item: Item,
       marker: SingleMarker
   ): DotnetState = {
-    var fileStm: FileInputStream = null
-    var file: Option[File] = None
-
-    Try {
-      val (f, fs) = streamForArtifact(artifact)
-      fileStm = fs
-      file = Some(f)
-      val assembly = AssemblyDefinition.readAssembly(fileStm)
-      DotnetState(Some(fileStm), Some(assembly), Some(f))
-    } match {
-      case Failure(exception) =>
-        if (fileStm != null) {
-          fileStm.close()
-          file.foreach(f => Files.deleteIfExists(f.toPath()))
-          log.error(
-            s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
-          )
-        } else {
-          log.error(
-            s"Unable to open file ${artifact.path()}: ${exception.getMessage()}"
-          )
+    artifact match {
+      case fa: FileWrapper => {
+        Try {
+          val fis = FileInputStream(fa.wrappedFile)
+          DotnetState(Some(AssemblyDefinition.readAssembly(fis)), Some(fis))
+        } match {
+          case Failure(exception) => {
+            log.error(s"unable to open assembly from ${fa.wrappedFile.toString()}: ${exception.getMessage()}")
+            DotnetState()
+          }
+          case Success(value) => value
         }
-        this
-      case Success(value) => value
+      }
+      case _ => {
+        log.error(s"expecting file wrapper for dotnet")
+        DotnetState()
+      }
     }
   }
 
@@ -93,13 +87,6 @@ class DotnetState(
         )
       )
       .toVector -> this
-  }
-
-  private def streamForArtifact(artifact: ArtifactWrapper): (File, FileInputStream) = {
-    FileWalker.withinTempDir(tempDir => {
-      val file = artifact.forceFile(tempDir)
-      (file, FileInputStream(file))
-    })
   }
 
   override def getMetadata(
@@ -129,16 +116,13 @@ class DotnetState(
       k: String,
       v: Option[String]
   ): Option[(String, TreeSet[StringOrPair])] =
-    v match {
-      case Some(str) => Some(k, TreeSet[StringOrPair](str))
-      case None      => None
-    }
+    v.map(str => k -> TreeSet[StringOrPair](str))
 
   // each of these assembly attributes should
   // 1. exist
   // 2. have a zeroth constructor argument
   // 3. that value should be type String
-  // in the event that we get none of those, we return null
+  // in the event that we get none of those, we return None
   def customAttributeArgumentZero(attrName: String): Option[String] = {
     for {
       assembly <- assemblyOpt if assembly.hasCustomAttributes
@@ -255,8 +239,7 @@ class DotnetState(
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {
-    fileStmOpt.foreach(fs => fs.close())
-    tempFile.foreach(f => Files.deleteIfExists(f.toPath()))
+    streamOpt.foreach(fs => fs.close())
     DotnetState()
   }
 }
