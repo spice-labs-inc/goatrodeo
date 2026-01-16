@@ -60,7 +60,7 @@ class DotnetState(
       case Failure(exception) =>
         if (fileStm != null) {
           fileStm.close()
-          file.map(f => Files.deleteIfExists(f.toPath()))
+          file.foreach(f => Files.deleteIfExists(f.toPath()))
           log.error(
             s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
           )
@@ -257,8 +257,8 @@ class DotnetState(
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {
-    fileStmOpt.map(fs => fs.close())
-    tempFile.map(f => Files.deleteIfExists(f.toPath()))
+    fileStmOpt.foreach(fs => fs.close())
+    tempFile.foreach(f => Files.deleteIfExists(f.toPath()))
     DotnetState()
   }
 }
