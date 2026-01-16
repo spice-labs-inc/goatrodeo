@@ -35,6 +35,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import java.io.File
+import io.spicelabs.goatrodeo.util.FileWalker
 
 class DotnetState(
     fileStmOpt: Option[FileInputStream] = None,
@@ -95,13 +96,10 @@ class DotnetState(
   }
 
   private def streamForArtifact(artifact: ArtifactWrapper): (File, FileInputStream) = {
-    val tempDir: Path = artifact.tempDir match {
-      case Some(p) =>
-        Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
-      case None => Files.createTempDirectory("goatrodeo_temp_dir")
-    }
-    val file = artifact.forceFile(tempDir)
-    (file, FileInputStream(file))
+    FileWalker.withinTempDir(tempDir => {
+      val file = artifact.forceFile(tempDir)
+      (file, FileInputStream(file))
+    })
   }
 
   override def getMetadata(
