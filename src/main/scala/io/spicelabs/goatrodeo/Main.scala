@@ -16,6 +16,8 @@ package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
+import io.spicelabs.goatrodeo.components.Arguments
+import io.spicelabs.goatrodeo.components.RodeoHost
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
@@ -30,8 +32,6 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import io.spicelabs.goatrodeo.components.Arguments
-import io.spicelabs.goatrodeo.components.RodeoHost
 
 class Howdy
 

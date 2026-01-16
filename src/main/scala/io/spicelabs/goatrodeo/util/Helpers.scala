@@ -16,6 +16,7 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
+import io.spicelabs.goatrodeo.components.RodeoHost
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.apache.bcel.classfile.ClassParser
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -32,6 +33,7 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.FileVisitResult
+import java.nio.file.FileVisitor
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
@@ -48,8 +50,6 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
-import java.nio.file.FileVisitor
-import io.spicelabs.goatrodeo.components.RodeoHost
 
 type GitOID = String
 
@@ -237,7 +237,7 @@ object Helpers {
     dateFormat.format(new Date())
   }
 
-    private class GoatVisitor extends FileVisitor[Path] {
+  private class GoatVisitor extends FileVisitor[Path] {
     // Steve says: why the switch to Files.walkFileTree?
     // Turns out that this runs between 10 and 30% faster than Files.find.
     // I also tested using the parallel version of Files.find and some code to
@@ -265,11 +265,23 @@ object Helpers {
     private val count: AtomicLong = AtomicLong()
 
     // we care not for directories and file errors, just plow through
-    override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-    override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-    override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+    override def postVisitDirectory(
+        dir: Path,
+        exc: IOException
+    ): FileVisitResult = FileVisitResult.CONTINUE
+    override def preVisitDirectory(
+        dir: Path,
+        attrs: BasicFileAttributes
+    ): FileVisitResult = FileVisitResult.CONTINUE
+    override def visitFileFailed(
+        file: Path,
+        exc: IOException
+    ): FileVisitResult = FileVisitResult.CONTINUE
 
-    override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
+    override def visitFile(
+        path: Path,
+        attrs: BasicFileAttributes
+    ): FileVisitResult = {
       val f = path.toFile()
       if (attrs.isRegularFile() && !f.getName().startsWith(".")) {
         result = result :+ f
@@ -294,7 +306,7 @@ object Helpers {
     */
 
   def findFiles(
-    root: File
+      root: File
   ): Vector[File] = {
     val visitor = new GoatVisitor()
     Files.walkFileTree(root.toPath(), visitor)

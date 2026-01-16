@@ -17,26 +17,22 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.DotnetDetector
+import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.JsonDSL.*
-import org.json4s.jackson.JsonMethods.*
+import org.json4s.native.JsonMethods.*
 
 import java.io.FileInputStream
-import java.nio.file.Files
-import java.nio.file.Path
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable.ArrayBuffer
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.util.Using
 
 class DotnetState(
-    fileStmOpt: Option[FileInputStream] = None,
     assemblyOpt: Option[AssemblyDefinition] = None
 ) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
@@ -45,26 +41,13 @@ class DotnetState(
       item: Item,
       marker: SingleMarker
   ): DotnetState = {
-    var fileStm: FileInputStream = null
 
-    Try {
-      fileStm = streamForArtifact(artifact)
-      val assembly = AssemblyDefinition.readAssembly(fileStm)
-      DotnetState(Some(fileStm), Some(assembly))
-    } match {
-      case Failure(exception) =>
-        if (fileStm != null) {
-          fileStm.close()
-          log.error(
-            s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
-          )
-        } else {
-          log.error(
-            s"Unable to open file ${artifact.path()}: ${exception.getMessage()}"
-          )
+    artifact match {
+      case fa: FileWrapper =>
+        Using.resource(FileInputStream(fa.wrappedFile)) { fis =>
+          DotnetState(Some(AssemblyDefinition.readAssembly(fis)))
         }
-        this
-      case Success(value) => value
+      case _ => throw new Exception("Expecting file wrapper for Dotnetstate")
     }
   }
 
@@ -86,16 +69,6 @@ class DotnetState(
         )
       )
       .toVector -> this
-  }
-
-  private def streamForArtifact(artifact: ArtifactWrapper): FileInputStream = {
-    val tempDir: Path = artifact.tempDir match {
-      case Some(p) =>
-        Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
-      case None => Files.createTempDirectory("goatrodeo_temp_dir")
-    }
-    val file = artifact.forceFile(tempDir)
-    FileInputStream(file)
   }
 
   override def getMetadata(
@@ -125,28 +98,21 @@ class DotnetState(
       k: String,
       v: Option[String]
   ): Option[(String, TreeSet[StringOrPair])] =
-    v match {
-      case Some(str) => Some(k, TreeSet[StringOrPair](str))
-      case None      => None
-    }
+    v.map(str => k -> TreeSet[StringOrPair](str))
 
   // each of these assembly attributes should
   // 1. exist
   // 2. have a zeroth constructor argument
   // 3. that value should be type String
-  // in the event that we get none of those, we return null
+  // in the event that we get none of those, we return None
   def customAttributeArgumentZero(attrName: String): Option[String] = {
     for {
       assembly <- assemblyOpt if assembly.hasCustomAttributes
-      resOption <- Try {
-        assembly.customAttributes.find(at =>
-          at.attributeType.fullName == attrName
-        ) match {
-          case Some(v) => argZeroValueAsString(v)
-          case _       => None
-        }
-      }.toOption
-      res <- resOption
+      customAttrs <- Option(assembly.customAttributes)
+      attr <- customAttrs
+        .find(at => at.attributeType.fullName == attrName)
+        .headOption
+      res <- argZeroValueAsString(attr)
     } yield res
   }
 
@@ -155,10 +121,16 @@ class DotnetState(
   // there is a certain amount of effort expended to turn it into a rarefied instance
   // this includes the standard value types (ints, bool) as well as strings.
   def argZeroValueAsString(ca: CustomAttribute): Option[String] = {
-    ca.constructorArguments.headOption.map(_.value) match {
-      case Some(s: String) if !s.isEmpty => Some(s)
-      case _                             => None
+    def asString(in: Any): Option[String] = {
+in match {
+  case s: String if !s.isEmpty() => Some(s)
+  case _ => None
+}
     }
+    for {
+      first <- ca.constructorArguments.headOption
+      case str: String <-asString(first.value)
+    } yield str
   }
 
   def assemblyFullName: Option[(String, TreeSet[StringOrPair])] = {
@@ -233,9 +205,11 @@ class DotnetState(
     import DotnetState.formatDeps
     val assembly = assemblyOpt.get
     val refs = assembly.mainModule.assemblyReferences;
-    if (refs.length == 0) return None
-    val deps = formatDeps(refs)
-    maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+    if (refs.length == 0) { None }
+    else {
+      val deps = formatDeps(refs)
+      maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+    }
   }
 
   override def finalAugmentation(
@@ -251,10 +225,6 @@ class DotnetState(
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {
-    if (fileStmOpt.isDefined) {
-      fileStmOpt.get.close()
-      DotnetState()
-    }
     this
   }
 }
