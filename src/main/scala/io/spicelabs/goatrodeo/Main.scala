@@ -193,7 +193,7 @@ object Howdy {
       fsFilePaths = params.fsFilePaths
     )
 
-    Helpers.exitZero()
+    RodeoHost.host.end()
   }
 
   @static
