@@ -126,6 +126,16 @@ class DotnetState(
   def customAttributeArgumentZero(attrName: String): Option[String] = {
     for {
       assembly <- assemblyOpt if assembly.hasCustomAttributes
+      // Steve says: DO NOT REMOVE THIS TRY.
+      // what's going on here that requires a Try?
+      // cilantro has code that lets us extract attributes and their
+      // associated data, however, the contents of these can be
+      // super complicated and requires code that is not (yet) ported.
+      // We don't actually care about these complicated cases for what we
+      // need. Unfortunately, a more graceful test is not possible/practical
+      // for this.
+      // See this issue: https://github.com/spice-labs-inc/goatrodeo/issues/209
+      // for more information.
       resOption <- Try {
         assembly.customAttributes.find(at =>
           at.attributeType.fullName == attrName
