@@ -233,8 +233,8 @@ Apache License 2.0 — see [LICENSE.txt](LICENSE.txt)
 
 <div align="center">
 
-**Built with ❤️ by [Spice Labs](https://spicelabs.io)**
+**[Spice Labs](https://spicelabs.io)**
 
-[Website](https://spicelabs.io) · [Twitter](https://twitter.com/saborlabs) · [LinkedIn](https://www.linkedin.com/company/spice-labs-inc)
+[Website](https://spicelabs.io) · [LinkedIn](https://www.linkedin.com/company/spice-labs-inc)
 
 </div>
