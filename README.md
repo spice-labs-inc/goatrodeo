@@ -38,7 +38,7 @@ Goat Rodeo is an open-source tool that analyzes software artifacts and builds **
 
 | | Feature | Description |
 |---|---------|-------------|
-| 📦 | **Multi-format Support** | JAR, WAR, EAR, TAR, ZIP, DEB, APK, Docker images, ISO, .NET assemblies |
+| 📦 | **Multi-format Support** | JAR, WAR, EAR, TAR, ZIP, DEB, APK, Docker images, ISO, NuGet packages (.nupkg), .NET assemblies |
 | 🔍 | **Deep Inspection** | Recursively unpacks nested archives (JAR inside TAR inside ISO) |
 | ⚡ | **Parallel Processing** | Multi-threaded analysis for large artifact sets |
 | 🔗 | **Bidirectional Graph** | Query both "what contains X" and "what does X contain" |
@@ -59,6 +59,8 @@ docker run --rm \
   spicelabs/goatrodeo:latest \
   -b /input -o /output
 ```
+
+> **Note:** Docker typically requires root privileges or membership in the `docker` group. See [Docker post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/) for configuration details.
 
 ### Option 2: Download Release
 

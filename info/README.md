@@ -168,6 +168,15 @@ Internal architecture for contributors and extenders:
 - Testing guide
 - Performance considerations
 
+### [Resource Handling](resource_handling.md)
+How Goat Rodeo manages system resources:
+- Temporary directory lifecycle (`withinArchiveStream`, `withinTempDir`)
+- Memory vs. disk decisions for artifact content
+- Stream management with `withStream`
+- The `finished()` callback pattern
+- Error handling and cleanup guarantees
+- Debugging resource issues
+
 ---
 
 ## File Index
@@ -183,6 +192,7 @@ Internal architecture for contributors and extenders:
 | [hidden_reapers.md](hidden_reapers.md) | Finding hidden vulnerabilities |
 | [metadata_tags.md](metadata_tags.md) | Standard metadata field definitions |
 | [mime_types.md](mime_types.md) | MIME type detection and handling |
+| [resource_handling.md](resource_handling.md) | Temp files, streams, and resource cleanup |
 
 ---
 

@@ -89,9 +89,13 @@ case class ByteWrapper(...)    // In-memory bytes
 ```
 
 **Design decisions:**
-- Files < 100KB (or < 25KB with tempdir) kept in memory
+- Files ≤ 64KB (when tempdir is configured) kept in memory
+- Files ≤ 32MB (when no tempdir) kept in memory
 - Larger files written to temp directory
+- .NET assemblies (.dll, .exe) always written to temp files regardless of size (for cilantro processing)
 - MIME detection via Apache Tika
+
+> See [`ArtifactWrapper.newWrapper()`](../src/main/scala/io/spicelabs/goatrodeo/util/ArtifactWrapper.scala) at lines 233-265 for the size threshold implementation.
 
 ### 2. ToProcess (`omnibor/ToProcess.scala`)
 
@@ -179,6 +183,7 @@ object FileWalker {
 
 **Supported formats:**
 - ZIP, JAR, WAR, EAR (via `ZipInputStream`)
+- NuGet packages (.nupkg) — detected as ZIP via magic bytes (see [`ArtifactWrapper.isNupkg()`](../src/main/scala/io/spicelabs/goatrodeo/util/ArtifactWrapper.scala) at lines 180-210)
 - TAR, TAR.GZ, TAR.BZ2 (via Commons Compress)
 - AR, DEB (via Commons Compress)
 - ISO (via PalantirIsoReader)
