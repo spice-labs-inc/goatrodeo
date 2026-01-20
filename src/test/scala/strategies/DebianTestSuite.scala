@@ -36,12 +36,14 @@ class DebianTestSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -111,14 +113,18 @@ class DebianTestSuite extends munit.FunSuite {
     val debFile = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     if (debFile.exists()) {
       // This file path contains ubuntu
-      val wrapper = FileWrapper(debFile, "ubuntu/tk8.6_8.6.14-1build1_amd64.deb", None)
+      val wrapper =
+        FileWrapper(debFile, "ubuntu/tk8.6_8.6.14-1build1_amd64.deb", None)
       val result = Debian.computePurl(wrapper)
 
       if (result.isDefined) {
         val (purl, _) = result.get
         if (purl.isDefined) {
           // Should detect ubuntu in path
-          assert(purl.get.getNamespace() == "ubuntu" || purl.get.getNamespace() == "debian")
+          assert(
+            purl.get.getNamespace() == "ubuntu" || purl.get
+              .getNamespace() == "debian"
+          )
         }
       }
     }
@@ -200,7 +206,9 @@ class DebianTestSuite extends munit.FunSuite {
     }
   }
 
-  test("Debian.getElementsToProcess - returns single element with SingleMarker") {
+  test(
+    "Debian.getElementsToProcess - returns single element with SingleMarker"
+  ) {
     val artifact = ByteWrapper(Array[Byte](), "test.deb", None)
     val tp = Debian(artifact)
 
@@ -218,7 +226,8 @@ class DebianTestSuite extends munit.FunSuite {
       val byUUID = Map(wrapper.uuid -> wrapper)
       val byName = Map(debFile.getName() -> Vector(wrapper))
 
-      val (toProcess, revisedByUUID, revisedByName, name) = Debian.computeDebianFiles(byUUID, byName)
+      val (toProcess, revisedByUUID, revisedByName, name) =
+        Debian.computeDebianFiles(byUUID, byName)
 
       assertEquals(name, "Debian")
       assertEquals(toProcess.length, 1)
@@ -234,7 +243,8 @@ class DebianTestSuite extends munit.FunSuite {
     val byUUID = Map(wrapper.uuid -> wrapper)
     val byName = Map("test.txt" -> Vector(wrapper))
 
-    val (toProcess, revisedByUUID, _, name) = Debian.computeDebianFiles(byUUID, byName)
+    val (toProcess, revisedByUUID, _, name) =
+      Debian.computeDebianFiles(byUUID, byName)
 
     assertEquals(name, "Debian")
     assert(toProcess.isEmpty)
@@ -271,7 +281,8 @@ class DebianTestSuite extends munit.FunSuite {
     val debFile = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     if (debFile.exists()) {
       val wrapper = FileWrapper(debFile, debFile.getName(), None)
-      val store = ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      val store =
+        ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
 
       // Should have purls
       val purls = store.purls()

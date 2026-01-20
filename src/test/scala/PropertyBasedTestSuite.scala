@@ -15,12 +15,11 @@ limitations under the License. */
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
-import io.spicelabs.goatrodeo.util.RegexPredicate
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -32,9 +31,9 @@ import scala.collection.immutable.TreeSet
 
 /** Property-based tests using ScalaCheck.
   *
-  * These tests verify invariants that should hold for ALL possible inputs,
-  * not just a handful of examples. This catches edge cases that example-based
-  * tests miss.
+  * These tests verify invariants that should hold for ALL possible inputs, not
+  * just a handful of examples. This catches edge cases that example-based tests
+  * miss.
   *
   * As a snarky principal engineer once said: "Unit tests are cute. Property
   * tests are insurance."
@@ -108,7 +107,8 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     extra <- genExtra
   } yield ItemMetaData(
     fileNames = if (fileNames.isEmpty) TreeSet("default.txt") else fileNames,
-    mimeType = if (mimeTypes.isEmpty) TreeSet("application/octet-stream") else mimeTypes,
+    mimeType =
+      if (mimeTypes.isEmpty) TreeSet("application/octet-stream") else mimeTypes,
     fileSize = fileSize,
     extra = extra
   )
@@ -134,7 +134,8 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     identifier <- genGitOID
     connections <- Gen.listOf(genEdge).map(l => TreeSet(l.take(5)*))
     hasMetadata <- Gen.oneOf(true, false)
-    metadata <- if (hasMetadata) genItemMetaData.map(Some(_)) else Gen.const(None)
+    metadata <-
+      if (hasMetadata) genItemMetaData.map(Some(_)) else Gen.const(None)
   } yield Item(
     identifier = identifier,
     connections = connections,
@@ -143,7 +144,8 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   )
 
   /** Generate byte arrays */
-  val genByteArray: Gen[Array[Byte]] = Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+  val genByteArray: Gen[Array[Byte]] =
+    Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
 
   /** Generate non-empty byte arrays */
   val genNonEmptyByteArray: Gen[Array[Byte]] =
@@ -162,7 +164,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
       val decoded = Item.decode(encoded)
 
       decoded.isSuccess && decoded.get.identifier == item.identifier &&
-        decoded.get.connections == item.connections
+      decoded.get.connections == item.connections
     }
   }
 
@@ -189,9 +191,9 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
       decoded.isSuccess && {
         val decodedMeta = decoded.get.bodyAsItemMetaData
         decodedMeta.isDefined &&
-          decodedMeta.get.fileNames == metadata.fileNames &&
-          decodedMeta.get.mimeType == metadata.mimeType &&
-          decodedMeta.get.fileSize == metadata.fileSize
+        decodedMeta.get.fileNames == metadata.fileNames &&
+        decodedMeta.get.mimeType == metadata.mimeType &&
+        decodedMeta.get.fileSize == metadata.fileSize
       }
     }
   }
@@ -242,7 +244,9 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     }
   }
 
-  property("Different inputs produce different hashes (with high probability)") {
+  property(
+    "Different inputs produce different hashes (with high probability)"
+  ) {
     forAll(genNonEmptyByteArray, genNonEmptyByteArray) { (bytes1, bytes2) =>
       // Only check if inputs are actually different
       if (!bytes1.sameElements(bytes2)) {
@@ -297,8 +301,9 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   // ==================== Long/Byte Array Conversion Tests ====================
 
   property("byteArrayToLong63Bits always returns non-negative") {
-    forAll(Gen.containerOfN[Array, Byte](8, Arbitrary.arbByte.arbitrary)) { bytes =>
-      Helpers.byteArrayToLong63Bits(bytes) >= 0
+    forAll(Gen.containerOfN[Array, Byte](8, Arbitrary.arbByte.arbitrary)) {
+      bytes =>
+        Helpers.byteArrayToLong63Bits(bytes) >= 0
     }
   }
 
@@ -327,7 +332,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
       // All MIME types from both should be present
       a.mimeType.subsetOf(merged.mimeType) &&
-        b.mimeType.subsetOf(merged.mimeType)
+      b.mimeType.subsetOf(merged.mimeType)
     }
   }
 
@@ -384,8 +389,10 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   property("Item merge combines connections") {
     forAll(genItem) { item =>
-      val extraConnection = (EdgeType.aliasFrom, "gitoid:blob:sha256:" + "b" * 64)
-      val itemWithExtra = item.copy(connections = item.connections + extraConnection)
+      val extraConnection =
+        (EdgeType.aliasFrom, "gitoid:blob:sha256:" + "b" * 64)
+      val itemWithExtra =
+        item.copy(connections = item.connections + extraConnection)
       val merged = item.merge(itemWithExtra)
 
       merged.connections.contains(extraConnection)

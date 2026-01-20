@@ -13,16 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.github.packageurl.PackageURLBuilder
-import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
-import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import io.spicelabs.goatrodeo.util.Helpers
 
-import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -33,26 +29,33 @@ class ItemTestSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
-  def createItemWithConnections(id: String, connections: TreeSet[(String, String)]): Item = {
+  def createItemWithConnections(
+      id: String,
+      connections: TreeSet[(String, String)]
+  ): Item = {
     Item(
       id,
       connections,
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -122,7 +125,11 @@ class ItemTestSuite extends munit.FunSuite {
     val container = Some("gitoid:blob:sha256:parent123")
     val item = Item.itemFrom(wrapper, container)
 
-    assert(item.connections.exists(e => e._1 == EdgeType.containedBy && e._2 == container.get))
+    assert(
+      item.connections.exists(e =>
+        e._1 == EdgeType.containedBy && e._2 == container.get
+      )
+    )
   }
 
   test("Item.itemFrom - includes all hash aliases") {
@@ -170,8 +177,10 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.isRoot - returns false for item with containedBy") {
-    val connections = TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
-    val item = createItemWithConnections("gitoid:blob:sha256:abc123", connections)
+    val connections =
+      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
+    val item =
+      createItemWithConnections("gitoid:blob:sha256:abc123", connections)
     assert(!item.isRoot())
   }
 
@@ -209,7 +218,8 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("buildListOfReferences - returns contains for containedBy") {
-    val connections = TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
+    val connections =
+      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
     val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
@@ -239,8 +249,10 @@ class ItemTestSuite extends munit.FunSuite {
   // ==================== merge Tests ====================
 
   test("Item.merge - merges connections") {
-    val item1 = createItemWithConnections("id", TreeSet(EdgeType.aliasFrom -> "a"))
-    val item2 = createItemWithConnections("id", TreeSet(EdgeType.aliasFrom -> "b"))
+    val item1 =
+      createItemWithConnections("id", TreeSet(EdgeType.aliasFrom -> "a"))
+    val item2 =
+      createItemWithConnections("id", TreeSet(EdgeType.aliasFrom -> "b"))
 
     val merged = item1.merge(item2)
     assert(merged.connections.contains(EdgeType.aliasFrom -> "a"))
@@ -310,7 +322,8 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceItemWithPurls - adds purl connections") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val purl = PackageURLBuilder.aPackageURL()
+    val purl = PackageURLBuilder
+      .aPackageURL()
       .withType("deb")
       .withNamespace("debian")
       .withName("artifact")
@@ -324,7 +337,8 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceItemWithPurls - adds purl to filenames") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val purl = PackageURLBuilder.aPackageURL()
+    val purl = PackageURLBuilder
+      .aPackageURL()
       .withType("deb")
       .withNamespace("debian")
       .withName("artifact")
@@ -344,13 +358,15 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceItemWithPurls - handles multiple purls") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val purl1 = PackageURLBuilder.aPackageURL()
+    val purl1 = PackageURLBuilder
+      .aPackageURL()
       .withType("deb")
       .withNamespace("ubuntu")
       .withName("artifact1")
       .withVersion("1.0")
       .build()
-    val purl2 = PackageURLBuilder.aPackageURL()
+    val purl2 = PackageURLBuilder
+      .aPackageURL()
       .withType("npm")
       .withName("package")
       .withVersion("2.0")
@@ -363,7 +379,8 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceItemWithPurls - creates body if none exists") {
     val item = Item("id", TreeSet(), None, None)
-    val purl = PackageURLBuilder.aPackageURL()
+    val purl = PackageURLBuilder
+      .aPackageURL()
       .withType("deb")
       .withNamespace("debian")
       .withName("artifact")
@@ -415,7 +432,10 @@ class ItemTestSuite extends munit.FunSuite {
     )
 
     val parent = Some("gitoid:blob:sha256:parent123")
-    val enhanced = item.enhanceWithMetadata(maybeParent = parent, filenames = Seq("newfile.txt"))
+    val enhanced = item.enhanceWithMetadata(
+      maybeParent = parent,
+      filenames = Seq("newfile.txt")
+    )
     val fileNames = enhanced.bodyAsItemMetaData.get.fileNames
     // Should include parent-qualified filename
     assert(fileNames.exists(_.contains("parent123")))
@@ -447,7 +467,14 @@ class ItemTestSuite extends munit.FunSuite {
       "gitoid:blob:sha256:abc123",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("include.java", "exclude.txt"), TreeSet(), 100, TreeMap()))
+      Some(
+        ItemMetaData(
+          TreeSet("include.java", "exclude.txt"),
+          TreeSet(),
+          100,
+          TreeMap()
+        )
+      )
     )
 
     val map = Item.itemsToFilenameGitOIDMap(Seq(item), _.endsWith(".java"))
@@ -460,13 +487,22 @@ class ItemTestSuite extends munit.FunSuite {
       "gitoid:blob:sha256:abc123",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file.java"), TreeSet("text/x-java-source"), 100, TreeMap()))
+      Some(
+        ItemMetaData(
+          TreeSet("file.java"),
+          TreeSet("text/x-java-source"),
+          100,
+          TreeMap()
+        )
+      )
     )
     val item2 = Item(
       "gitoid:blob:sha256:def456",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file.txt"), TreeSet("text/plain"), 100, TreeMap()))
+      Some(
+        ItemMetaData(TreeSet("file.txt"), TreeSet("text/plain"), 100, TreeMap())
+      )
     )
 
     val map = Item.itemsToFilenameGitOIDMap(

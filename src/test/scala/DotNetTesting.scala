@@ -25,12 +25,14 @@ class DotNetTesting extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
   test("get-me-a-mime") {
@@ -150,7 +152,9 @@ class DotNetTesting extends munit.FunSuite {
     // formatDeps does not handle null, it will throw NullPointerException
     // Use asInstanceOf to bypass explicit-nulls type checking for this edge case test
     intercept[NullPointerException] {
-      DotnetState.formatDeps(null.asInstanceOf[ArrayBuffer[AssemblyNameReference]])
+      DotnetState.formatDeps(
+        null.asInstanceOf[ArrayBuffer[AssemblyNameReference]]
+      )
     }
   }
 
@@ -208,7 +212,8 @@ class DotNetTesting extends munit.FunSuite {
       val byUUID = Map(wrapper.uuid -> wrapper)
       val byName = Map(dllFile.getName() -> Vector(wrapper))
 
-      val (toProcess, revisedByUUID, _, name) = DotnetFile.computeDotnetFiles(byUUID, byName)
+      val (toProcess, revisedByUUID, _, name) =
+        DotnetFile.computeDotnetFiles(byUUID, byName)
 
       assertEquals(name, "Dotnet")
       assertEquals(toProcess.length, 1)
@@ -222,7 +227,8 @@ class DotNetTesting extends munit.FunSuite {
     val byUUID = Map(wrapper.uuid -> wrapper)
     val byName = Map("test.txt" -> Vector(wrapper))
 
-    val (toProcess, revisedByUUID, _, name) = DotnetFile.computeDotnetFiles(byUUID, byName)
+    val (toProcess, revisedByUUID, _, name) =
+      DotnetFile.computeDotnetFiles(byUUID, byName)
 
     assertEquals(name, "Dotnet")
     assert(toProcess.isEmpty)

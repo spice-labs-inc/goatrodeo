@@ -3,6 +3,7 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.components.Arguments
 import io.spicelabs.goatrodeo.util.Config.ExpandFiles.fixTilde
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
@@ -16,7 +17,6 @@ import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.Using
-import io.spicelabs.goatrodeo.components.Arguments
 
 /** Command line configuration for the Goat Rodeo application.
   *
@@ -95,9 +95,9 @@ case class Config(
 
   /** Build a list of file list builders from the configuration.
     *
-    * Returns tuples of (base directory, function to get files).
-    * For `build` directories, finds all files recursively.
-    * For `fileList` files, reads file paths from each line.
+    * Returns tuples of (base directory, function to get files). For `build`
+    * directories, finds all files recursively. For `fileList` files, reads file
+    * paths from each line.
     *
     * @return
     *   a Vector of tuples containing the base directory and a function that
@@ -251,12 +251,17 @@ object Config {
           c
         }),
       opt[Seq[String]]("component")
-        .text("pass arguments to a component in the form --component <componentName>[,arg1,arg2...]")
+        .text(
+          "pass arguments to a component in the form --component <componentName>[,arg1,arg2...]"
+        )
         .optional()
         .unbounded()
         .action((args, c) => {
           args match {
-            case compName :: compArgs => c.copy(componentArgs = Arguments.addArgs(compName, compArgs.toArray, c.componentArgs))
+            case compName :: compArgs =>
+              c.copy(componentArgs =
+                Arguments.addArgs(compName, compArgs.toArray, c.componentArgs)
+              )
             case _ => {
               logger.info(OParser.usage(parser1))
               logger.info("--component ")
@@ -264,19 +269,19 @@ object Config {
             }
           }
         }),
-        opt[Unit]("print-component-info")
-          .text("print component information")
-          .action((_, c) => c.copy(printComponentInfo = true)),
-        opt[Unit]("print-component-arg-help")
-          .text("print component argument help")
-          .action((_, c) => c.copy(printComponentArgumentInfo = true))
+      opt[Unit]("print-component-info")
+        .text("print component information")
+        .action((_, c) => c.copy(printComponentInfo = true)),
+      opt[Unit]("print-component-arg-help")
+        .text("print component argument help")
+        .action((_, c) => c.copy(printComponentArgumentInfo = true))
     )
   }
 
   /** Utility object for reading files into Vectors of Strings.
     *
-    * Each line of the file becomes one element in the Vector.
-    * Newlines are not included in the resulting strings.
+    * Each line of the file becomes one element in the Vector. Newlines are not
+    * included in the resulting strings.
     */
   object VectorOfStrings {
 
@@ -294,6 +299,7 @@ object Config {
           .toVector // getLines() does not include new lines (yay!)
       }
     }
+
     /** Read a file by path and return its lines as a Vector of Strings.
       *
       * @param in
@@ -307,7 +313,8 @@ object Config {
     }
   }
 
-  /** Utility object for expanding file paths, supporting wildcards and tilde expansion.
+  /** Utility object for expanding file paths, supporting wildcards and tilde
+    * expansion.
     *
     * Provides methods to:
     *   - Expand tilde (~) to the user's home directory
@@ -317,8 +324,8 @@ object Config {
 
     /** Expand a file path, supporting wildcards in the filename.
       *
-      * If the file doesn't exist, returns a Vector containing just the input file.
-      * If the file exists, expands any wildcards in the filename portion.
+      * If the file doesn't exist, returns a Vector containing just the input
+      * file. If the file exists, expands any wildcards in the filename portion.
       *
       * @param in
       *   the file to expand
@@ -359,7 +366,8 @@ object Config {
           Some(ret)
       }
 
-    /** Expand tilde (~) at the start of a file path to the user's home directory.
+    /** Expand tilde (~) at the start of a file path to the user's home
+      * directory.
       *
       * @param in
       *   the file whose path may contain a leading tilde

@@ -29,9 +29,9 @@ import scala.util.Try
 
 /** A fluent builder for programmatically configuring and running Goat Rodeo.
   *
-  * This builder provides a Java-friendly API for configuring Goat Rodeo
-  * without using the command-line interface. All configuration methods
-  * return `this` to enable method chaining.
+  * This builder provides a Java-friendly API for configuring Goat Rodeo without
+  * using the command-line interface. All configuration methods return `this` to
+  * enable method chaining.
   *
   * Example usage:
   * {{{

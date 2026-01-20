@@ -8,7 +8,6 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerMarkers
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerState
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
-import io.spicelabs.goatrodeo.omnibor.strategies.ManifestInfo
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
@@ -27,12 +26,14 @@ class DockerSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -200,7 +201,8 @@ class DockerSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = DockerState(Map())
 
-    val (purls, _) = state.getPurls(artifact, item, DockerMarkers.Layer("sha256:abc"))
+    val (purls, _) =
+      state.getPurls(artifact, item, DockerMarkers.Layer("sha256:abc"))
     assert(purls.isEmpty)
   }
 
@@ -209,7 +211,8 @@ class DockerSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = DockerState(Map())
 
-    val (metadata, _) = state.getMetadata(artifact, item, DockerMarkers.Manifest)
+    val (metadata, _) =
+      state.getMetadata(artifact, item, DockerMarkers.Manifest)
     assert(metadata.isEmpty)
   }
 
@@ -218,7 +221,8 @@ class DockerSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = DockerState(Map())
 
-    val (metadata, _) = state.getMetadata(artifact, item, DockerMarkers.Layer("sha256:abc"))
+    val (metadata, _) =
+      state.getMetadata(artifact, item, DockerMarkers.Layer("sha256:abc"))
     assert(metadata.isEmpty)
   }
 
@@ -226,7 +230,8 @@ class DockerSuite extends munit.FunSuite {
     val storage = MemStorage(None)
     val state = DockerState(Map())
 
-    val newState = state.postChildProcessing(None, storage, DockerMarkers.Manifest)
+    val newState =
+      state.postChildProcessing(None, storage, DockerMarkers.Manifest)
     assertEquals(newState, state)
   }
 
@@ -240,7 +245,8 @@ class DockerSuite extends munit.FunSuite {
   }
 
   test("DockerToProcess.mimeType - returns manifest mime type") {
-    val manifest = ByteWrapper("""[{}]""".getBytes("UTF-8"), "manifest.json", None)
+    val manifest =
+      ByteWrapper("""[{}]""".getBytes("UTF-8"), "manifest.json", None)
     val tp = DockerToProcess(manifest, List(), Map())
 
     assertEquals(tp.mimeType, "application/json")
@@ -260,18 +266,21 @@ class DockerSuite extends munit.FunSuite {
     val byUUID = Map(artifact.uuid -> artifact)
     val byName = Map("other.txt" -> Vector(artifact))
 
-    val (toProcess, _, _, name) = DockerToProcess.computeDockerFiles(byUUID, byName)
+    val (toProcess, _, _, name) =
+      DockerToProcess.computeDockerFiles(byUUID, byName)
 
     assertEquals(name, "Docker")
     assert(toProcess.isEmpty)
   }
 
   test("computeDockerFiles - handles invalid JSON manifest") {
-    val manifest = ByteWrapper("not json".getBytes("UTF-8"), "manifest.json", None)
+    val manifest =
+      ByteWrapper("not json".getBytes("UTF-8"), "manifest.json", None)
     val byUUID = Map(manifest.uuid -> manifest)
     val byName = Map("manifest.json" -> Vector(manifest))
 
-    val (toProcess, _, _, _) = DockerToProcess.computeDockerFiles(byUUID, byName)
+    val (toProcess, _, _, _) =
+      DockerToProcess.computeDockerFiles(byUUID, byName)
 
     assert(toProcess.isEmpty)
   }
@@ -281,7 +290,8 @@ class DockerSuite extends munit.FunSuite {
     val byUUID = Map(manifest.uuid -> manifest)
     val byName = Map("manifest.json" -> Vector(manifest))
 
-    val (toProcess, _, _, _) = DockerToProcess.computeDockerFiles(byUUID, byName)
+    val (toProcess, _, _, _) =
+      DockerToProcess.computeDockerFiles(byUUID, byName)
 
     // Empty array should result in no processing
     assert(toProcess.isEmpty)
@@ -298,7 +308,7 @@ class DockerSuite extends munit.FunSuite {
     val marker = DockerMarkers.Layer("sha256:abc123")
     marker match {
       case DockerMarkers.Layer(hash) => assertEquals(hash, "sha256:abc123")
-      case _ => fail("Expected Layer marker")
+      case _                         => fail("Expected Layer marker")
     }
   }
 }

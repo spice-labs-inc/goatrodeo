@@ -29,8 +29,10 @@ import scala.language.implicitConversions
   *
   * Edge types define the relationships between Items:
   *   - `aliasFrom`/`aliasTo`: Alternate identifiers (e.g., sha1, sha512 hashes)
-  *   - `containedBy`/`contains`: Container relationships (e.g., JAR contains class files)
-  *   - `builtFrom`/`buildsTo`: Build relationships (e.g., class file built from source)
+  *   - `containedBy`/`contains`: Container relationships (e.g., JAR contains
+  *     class files)
+  *   - `builtFrom`/`buildsTo`: Build relationships (e.g., class file built from
+  *     source)
   *   - `tagFrom`/`tagTo`: Tag relationships for metadata tagging
   *
   * The `:down` and `:up` suffixes indicate direction:
@@ -81,7 +83,8 @@ object EdgeType {
     s == aliasTo
   }
 
-  /** Test if the edge type represents a downward direction (to contained items).
+  /** Test if the edge type represents a downward direction (to contained
+    * items).
     *
     * @param s
     *   the edge type string
@@ -161,7 +164,9 @@ type Edge = (String, String)
   */
 sealed trait StringOrPair {
 
-  /** Get the main value (the string for StringOf, the second string for PairOf). */
+  /** Get the main value (the string for StringOf, the second string for
+    * PairOf).
+    */
   def value: String
 
   /** Get the MIME type if this is a PairOf. */
@@ -243,8 +248,8 @@ object StringOrPair {
 
 /** Metadata associated with an Item in the Artifact Dependency Graph.
   *
-  * Contains information about the artifact such as filenames, MIME types,
-  * file size, and additional metadata (extra).
+  * Contains information about the artifact such as filenames, MIME types, file
+  * size, and additional metadata (extra).
   *
   * @param fileNames
   *   the filenames associated with this artifact (may include paths or pURLs)

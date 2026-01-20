@@ -15,10 +15,11 @@ package io.spicelabs.goatrodeo.util
 
 import scala.util.matching.Regex
 
-/** A predicate that matches strings by exact equality or regex pattern matching.
+/** A predicate that matches strings by exact equality or regex pattern
+  * matching.
   *
-  * This is used by [[IncludeExclude]] to determine whether items match
-  * include or exclude criteria.
+  * This is used by [[IncludeExclude]] to determine whether items match include
+  * or exclude criteria.
   *
   * @param exact
   *   a set of strings that match exactly

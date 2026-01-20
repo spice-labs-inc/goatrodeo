@@ -28,8 +28,8 @@ import scala.xml.XML
 
 /** Markers for different Maven/JVM artifact types.
   *
-  * Each marker identifies the type of artifact being processed within
-  * a Maven package bundle (JAR + POM + sources + javadocs).
+  * Each marker identifies the type of artifact being processed within a Maven
+  * package bundle (JAR + POM + sources + javadocs).
   */
 enum MavenMarkers extends ProcessingMarker {
 
@@ -264,8 +264,8 @@ case class MavenState(
 
 /** A Maven package bundle to process.
   *
-  * Represents a complete Maven package including the main JAR and
-  * optional POM, sources, and JavaDoc artifacts.
+  * Represents a complete Maven package including the main JAR and optional POM,
+  * sources, and JavaDoc artifacts.
   *
   * @param jar
   *   the main JAR artifact (required)
@@ -320,15 +320,16 @@ object MavenToProcess {
 
   /** Identify and group Maven artifacts from a collection of files.
     *
-    * Finds JARs and matches them with their associated POM, sources,
-    * and JavaDoc artifacts based on naming conventions.
+    * Finds JARs and matches them with their associated POM, sources, and
+    * JavaDoc artifacts based on naming conventions.
     *
     * @param byUUID
     *   artifacts indexed by UUID
     * @param byName
     *   artifacts indexed by filename
     * @return
-    *   tuple of (ToProcess items, remaining UUID map, remaining name map, strategy name)
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
     */
   def computeMavenFiles(
       byUUID: ToProcess.ByUUID,

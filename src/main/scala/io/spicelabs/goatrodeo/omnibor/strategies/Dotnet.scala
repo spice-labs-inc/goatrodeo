@@ -334,15 +334,16 @@ object DotnetFile {
 
   /** Identify .NET assemblies from a collection of files.
     *
-    * Finds files with the .NET MIME type and creates DotnetFile
-    * ToProcess instances for them.
+    * Finds files with the .NET MIME type and creates DotnetFile ToProcess
+    * instances for them.
     *
     * @param byUUID
     *   artifacts indexed by UUID
     * @param byName
     *   artifacts indexed by filename
     * @return
-    *   tuple of (ToProcess items, remaining UUID map, remaining name map, strategy name)
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
     */
   def computeDotnetFiles(
       byUUID: ToProcess.ByUUID,

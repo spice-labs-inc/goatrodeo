@@ -16,7 +16,6 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
-import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
 import io.spicelabs.goatrodeo.util.ByteWrapper
@@ -36,12 +35,14 @@ class ToProcessTestSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -54,7 +55,8 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   test("ParentScope.forAndWith - links to parent scope") {
     val parentScope = ParentScope.forAndWith("parent-id", None, Map())
-    val childScope = ParentScope.forAndWith("child-id", Some(parentScope), Map())
+    val childScope =
+      ParentScope.forAndWith("child-id", Some(parentScope), Map())
 
     assertEquals(childScope.parentOfParentScope(), Some(parentScope))
   }
@@ -68,7 +70,8 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   test("ParentScope.parentScopeInformation - includes parent info") {
     val parentScope = ParentScope.forAndWith("parent-id", None, Map())
-    val childScope = ParentScope.forAndWith("child-id", Some(parentScope), Map())
+    val childScope =
+      ParentScope.forAndWith("child-id", Some(parentScope), Map())
 
     val info = childScope.parentScopeInformation()
     assert(info.contains("child-id"))
@@ -95,7 +98,8 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   test("strategiesForArtifacts - creates strategies for text files") {
     val artifact = ByteWrapper("hello".getBytes("UTF-8"), "test.txt", None)
-    val result = ToProcess.strategiesForArtifacts(Vector(artifact), _ => (), false)
+    val result =
+      ToProcess.strategiesForArtifacts(Vector(artifact), _ => (), false)
 
     assertEquals(result.length, 1)
     assert(result.head.isInstanceOf[GenericFile])
@@ -113,7 +117,8 @@ class ToProcessTestSuite extends munit.FunSuite {
     val txt = ByteWrapper("text".getBytes("UTF-8"), "file.txt", None)
     val bin = ByteWrapper(Array[Byte](0, 1, 2), "file.bin", None)
 
-    val result = ToProcess.strategiesForArtifacts(Vector(txt, bin), _ => (), false)
+    val result =
+      ToProcess.strategiesForArtifacts(Vector(txt, bin), _ => (), false)
     assertEquals(result.length, 2)
   }
 
@@ -176,7 +181,8 @@ class ToProcessTestSuite extends munit.FunSuite {
       val toProcess = Vector(GenericFile(artifact))
       val storage = MemStorage(Some(tempDir))
 
-      val result = ToProcess.buildGraphForToProcess(toProcess, storage, Config())
+      val result =
+        ToProcess.buildGraphForToProcess(toProcess, storage, Config())
 
       assertEquals(result.destDirectory(), Some(tempDir))
     } finally {
@@ -210,7 +216,8 @@ class ToProcessTestSuite extends munit.FunSuite {
   test("buildGraphFromArtifactWrapper - builds from single artifact") {
     val artifact = ByteWrapper("hello".getBytes("UTF-8"), "test.txt", None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(artifact, args = Config())
+    val store =
+      ToProcess.buildGraphFromArtifactWrapper(artifact, args = Config())
 
     assert(store.size() > 0)
   }
@@ -218,7 +225,8 @@ class ToProcessTestSuite extends munit.FunSuite {
   test("buildGraphFromArtifactWrapper - generates gitoids") {
     val artifact = ByteWrapper("hello".getBytes("UTF-8"), "test.txt", None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(artifact, args = Config())
+    val store =
+      ToProcess.buildGraphFromArtifactWrapper(artifact, args = Config())
 
     val hasGitoid = store.keys().exists(_.startsWith("gitoid:"))
     assert(hasGitoid)
@@ -298,7 +306,8 @@ class ToProcessTestSuite extends munit.FunSuite {
 
     // Process again with that gitoid blocked
     val store2 = MemStorage(None)
-    val tp2 = GenericFile(ByteWrapper("hello".getBytes("UTF-8"), "test.txt", None))
+    val tp2 =
+      GenericFile(ByteWrapper("hello".getBytes("UTF-8"), "test.txt", None))
     val result2 = tp2.process(
       None,
       store2,
@@ -324,7 +333,8 @@ class ToProcessTestSuite extends munit.FunSuite {
     val jarFile = new File("test_data/log4j-core-2.22.1.jar")
     if (jarFile.exists()) {
       val wrapper = FileWrapper(jarFile, jarFile.getName(), None)
-      val store = ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      val store =
+        ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
 
       assert(store.size() > 0)
       assert(store.keys().exists(_.startsWith("gitoid:")))
@@ -335,7 +345,8 @@ class ToProcessTestSuite extends munit.FunSuite {
     val debFile = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     if (debFile.exists()) {
       val wrapper = FileWrapper(debFile, debFile.getName(), None)
-      val store = ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      val store =
+        ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
 
       assert(store.size() > 0)
       assert(store.purls().nonEmpty)
@@ -346,7 +357,8 @@ class ToProcessTestSuite extends munit.FunSuite {
     val nestedFile = new File("test_data/nested.tar")
     if (nestedFile.exists()) {
       val wrapper = FileWrapper(nestedFile, nestedFile.getName(), None)
-      val store = ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      val store =
+        ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
 
       // Should have processed contents
       assert(store.size() > 1)

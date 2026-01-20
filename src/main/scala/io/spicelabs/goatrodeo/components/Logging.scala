@@ -15,22 +15,25 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.components
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.rodeocomponents.RodeoComponent
 import io.spicelabs.rodeocomponents.APIFactory
 import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
 import io.spicelabs.rodeocomponents.APIS.logging.RodeoLoggerConstants
+import io.spicelabs.rodeocomponents.RodeoComponent
 
 class LoggingAPI(subscriber: RodeoComponent) extends RodeoLogger {
-    private val log = Logger(subscriber.getClass())
-    override def release() = { }
-    override def debug(message: String): Unit = log.debug(message)
-    override def error(message: String): Unit = log.error(message)
-    override def error(message: String, cause: Throwable): Unit = log.error(message, cause)
-    override def info(message: String): Unit = log.info(message)
-    override def warn(message: String): Unit = log.warn(message)
+  private val log = Logger(subscriber.getClass())
+  override def release() = {}
+  override def debug(message: String): Unit = log.debug(message)
+  override def error(message: String): Unit = log.error(message)
+  override def error(message: String, cause: Throwable): Unit =
+    log.error(message, cause)
+  override def info(message: String): Unit = log.info(message)
+  override def warn(message: String): Unit = log.warn(message)
 }
 
 class LoggingAPIFactory extends APIFactory[RodeoLogger] {
-    override def buildAPI(subscriber: RodeoComponent): RodeoLogger = LoggingAPI(subscriber)
-    override def name(): String = RodeoLoggerConstants.NAME
+  override def buildAPI(subscriber: RodeoComponent): RodeoLogger = LoggingAPI(
+    subscriber
+  )
+  override def name(): String = RodeoLoggerConstants.NAME
 }

@@ -44,12 +44,14 @@ class MavenTestSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -183,7 +185,8 @@ class MavenTestSuite extends munit.FunSuite {
         <version>2.0.0</version>
     </parent>
 </project>"""
-    val artifact = ByteWrapper(pomWithParent.getBytes("UTF-8"), "test.pom", None)
+    val artifact =
+      ByteWrapper(pomWithParent.getBytes("UTF-8"), "test.pom", None)
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
@@ -233,7 +236,8 @@ class MavenTestSuite extends munit.FunSuite {
 
     val state = MavenState()
     val kids = Some(Vector(sourceItem.identifier))
-    val newState = state.postChildProcessing(kids, storage, MavenMarkers.Sources)
+    val newState =
+      state.postChildProcessing(kids, storage, MavenMarkers.Sources)
 
     assert(newState.sources.nonEmpty)
     assert(newState.sourceGitoids.contains("Source.java"))
@@ -263,7 +267,12 @@ class MavenTestSuite extends munit.FunSuite {
     val srcArtifact = ByteWrapper(Array[Byte](), "test-sources.jar", None)
     val docArtifact = ByteWrapper(Array[Byte](), "test-javadoc.jar", None)
 
-    val tp = MavenToProcess(jarArtifact, Some(pomArtifact), Some(srcArtifact), Some(docArtifact))
+    val tp = MavenToProcess(
+      jarArtifact,
+      Some(pomArtifact),
+      Some(srcArtifact),
+      Some(docArtifact)
+    )
     assertEquals(tp.itemCnt, 4)
   }
 
@@ -284,11 +293,24 @@ class MavenTestSuite extends munit.FunSuite {
     val srcArtifact = ByteWrapper(Array[Byte](), "test-sources.jar", None)
     val docArtifact = ByteWrapper(Array[Byte](), "test-javadoc.jar", None)
 
-    val tp = MavenToProcess(jarArtifact, Some(pomArtifact), Some(srcArtifact), Some(docArtifact))
+    val tp = MavenToProcess(
+      jarArtifact,
+      Some(pomArtifact),
+      Some(srcArtifact),
+      Some(docArtifact)
+    )
     val (elements, _) = tp.getElementsToProcess()
 
     val markers = elements.map(_._2)
-    assertEquals(markers, Seq(MavenMarkers.POM, MavenMarkers.Sources, MavenMarkers.JavaDocs, MavenMarkers.JAR))
+    assertEquals(
+      markers,
+      Seq(
+        MavenMarkers.POM,
+        MavenMarkers.Sources,
+        MavenMarkers.JavaDocs,
+        MavenMarkers.JAR
+      )
+    )
   }
 
   test("MavenToProcess.main - returns jar path") {
@@ -307,7 +329,9 @@ class MavenTestSuite extends munit.FunSuite {
     }
   }
 
-  test("MavenToProcess.markSuccessfulCompletion - calls finished on all artifacts") {
+  test(
+    "MavenToProcess.markSuccessfulCompletion - calls finished on all artifacts"
+  ) {
     var finishedCount = 0
     val jarBytes = Array[Byte]()
     val jarArtifact = ByteWrapper(jarBytes, "test.jar", None)
@@ -321,7 +345,8 @@ class MavenTestSuite extends munit.FunSuite {
   // ==================== computeMavenFiles Tests ====================
 
   test("computeMavenFiles - matches jar files") {
-    val jarArtifact = ByteWrapper(Array[Byte](0x50, 0x4b, 0x03, 0x04), "test.jar", None)
+    val jarArtifact =
+      ByteWrapper(Array[Byte](0x50, 0x4b, 0x03, 0x04), "test.jar", None)
 
     // Simulate ByteWrapper returning correct mime type
     val tempDir = Files.createTempDirectory("maventest")
@@ -330,7 +355,12 @@ class MavenTestSuite extends munit.FunSuite {
       val pomFile = new java.io.File(tempDir.toFile(), "test.pom")
 
       // Create minimal valid JAR (just zip header)
-      Helpers.writeOverFile(jarFile, Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))
+      Helpers.writeOverFile(
+        jarFile,
+        Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x00)
+      )
       Helpers.writeOverFile(pomFile, pomXml)
 
       val jarWrapper = FileWrapper(jarFile, "test.jar", None)
@@ -345,7 +375,8 @@ class MavenTestSuite extends munit.FunSuite {
         "test.pom" -> Vector(pomWrapper)
       )
 
-      val (toProcess, _, _, name) = MavenToProcess.computeMavenFiles(byUUID, byName)
+      val (toProcess, _, _, name) =
+        MavenToProcess.computeMavenFiles(byUUID, byName)
 
       assertEquals(name, "Maven")
     } finally {
@@ -359,7 +390,9 @@ class MavenTestSuite extends munit.FunSuite {
       val mainJar = new java.io.File(tempDir.toFile(), "test.jar")
       val sourcesJar = new java.io.File(tempDir.toFile(), "test-sources.jar")
 
-      val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+      val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00,
+        0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
       Helpers.writeOverFile(mainJar, jarHeader)
       Helpers.writeOverFile(sourcesJar, jarHeader)
 
@@ -375,7 +408,8 @@ class MavenTestSuite extends munit.FunSuite {
         "test-sources.jar" -> Vector(srcWrapper)
       )
 
-      val (toProcess, revisedByUUID, revisedByName, _) = MavenToProcess.computeMavenFiles(byUUID, byName)
+      val (toProcess, revisedByUUID, revisedByName, _) =
+        MavenToProcess.computeMavenFiles(byUUID, byName)
 
       // Sources jar should be associated with main jar, not a separate entry
       if (toProcess.nonEmpty) {
@@ -392,7 +426,9 @@ class MavenTestSuite extends munit.FunSuite {
     val tempDir = Files.createTempDirectory("mavenwar")
     try {
       val warFile = new java.io.File(tempDir.toFile(), "test.war")
-      val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+      val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00,
+        0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
       Helpers.writeOverFile(warFile, jarHeader)
 
       val warWrapper = FileWrapper(warFile, "test.war", None)
@@ -400,7 +436,8 @@ class MavenTestSuite extends munit.FunSuite {
       val byUUID = Map(warWrapper.uuid -> warWrapper)
       val byName = Map("test.war" -> Vector(warWrapper))
 
-      val (toProcess, _, _, name) = MavenToProcess.computeMavenFiles(byUUID, byName)
+      val (toProcess, _, _, name) =
+        MavenToProcess.computeMavenFiles(byUUID, byName)
 
       assertEquals(name, "Maven")
     } finally {

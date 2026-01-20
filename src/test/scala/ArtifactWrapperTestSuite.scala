@@ -16,13 +16,13 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 class ArtifactWrapperTestSuite extends munit.FunSuite {
 
@@ -159,7 +159,13 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "small content".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper("test.txt", data.length, input, None, tempDir)
+      val wrapper = ArtifactWrapper.newWrapper(
+        "test.txt",
+        data.length,
+        input,
+        None,
+        tempDir
+      )
       assert(wrapper.isInstanceOf[ByteWrapper])
       assertEquals(wrapper.size(), data.length.toLong)
     } finally {
@@ -174,7 +180,8 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       val largeSize = ArtifactWrapper.maxInMemorySize + 1000
       val data = new Array[Byte](largeSize.toInt)
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper("large.bin", largeSize, input, None, tempDir)
+      val wrapper =
+        ArtifactWrapper.newWrapper("large.bin", largeSize, input, None, tempDir)
       assert(wrapper.isInstanceOf[FileWrapper])
       assertEquals(wrapper.size(), largeSize)
     } finally {
@@ -187,7 +194,13 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "test".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper("./path/file.txt", data.length, input, None, tempDir)
+      val wrapper = ArtifactWrapper.newWrapper(
+        "./path/file.txt",
+        data.length,
+        input,
+        None,
+        tempDir
+      )
       assertEquals(wrapper.path(), "path/file.txt")
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -199,7 +212,13 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "test".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper("/path/file.txt", data.length, input, None, tempDir)
+      val wrapper = ArtifactWrapper.newWrapper(
+        "/path/file.txt",
+        data.length,
+        input,
+        None,
+        tempDir
+      )
       assertEquals(wrapper.path(), "path/file.txt")
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -211,7 +230,13 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "test".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper("../path/file.txt", data.length, input, None, tempDir)
+      val wrapper = ArtifactWrapper.newWrapper(
+        "../path/file.txt",
+        data.length,
+        input,
+        None,
+        tempDir
+      )
       assertEquals(wrapper.path(), "path/file.txt")
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -333,7 +358,11 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, nupkgFile.getName())
       val input = TikaInputStream.get(nupkgFile.toPath(), metadata)
       try {
-        val result = ArtifactWrapper.isNupkg(nupkgFile.getName(), "application/x-tika-ooxml", input)
+        val result = ArtifactWrapper.isNupkg(
+          nupkgFile.getName(),
+          "application/x-tika-ooxml",
+          input
+        )
         assertEquals(result, Some(true))
       } finally {
         input.close()
@@ -348,7 +377,11 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, jarFile.getName())
       val input = TikaInputStream.get(jarFile.toPath(), metadata)
       try {
-        val result = ArtifactWrapper.isNupkg(jarFile.getName(), "application/java-archive", input)
+        val result = ArtifactWrapper.isNupkg(
+          jarFile.getName(),
+          "application/java-archive",
+          input
+        )
         assertEquals(result, Some(false))
       } finally {
         input.close()
@@ -377,7 +410,8 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     val tempDir = Files.createTempDirectory("zerolengthtest")
     try {
       val input = new ByteArrayInputStream(Array[Byte]())
-      val wrapper = ArtifactWrapper.newWrapper("empty.txt", 0, input, None, tempDir)
+      val wrapper =
+        ArtifactWrapper.newWrapper("empty.txt", 0, input, None, tempDir)
       assertEquals(wrapper.size(), 0L)
     } finally {
       Helpers.deleteDirectory(tempDir)

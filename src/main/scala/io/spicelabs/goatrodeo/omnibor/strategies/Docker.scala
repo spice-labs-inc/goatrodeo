@@ -23,8 +23,8 @@ import scala.collection.immutable.TreeSet
 
 /** Markers for different Docker/OCI image component types.
   *
-  * Each marker identifies the type of artifact being processed within
-  * a Docker image (manifest, layers, config).
+  * Each marker identifies the type of artifact being processed within a Docker
+  * image (manifest, layers, config).
   */
 enum DockerMarkers extends ProcessingMarker {
 
@@ -48,8 +48,8 @@ enum DockerMarkers extends ProcessingMarker {
 
 /** State maintained during Docker image processing.
   *
-  * Tracks layer-to-GitOID mappings for establishing "contains"
-  * relationships between config and layers.
+  * Tracks layer-to-GitOID mappings for establishing "contains" relationships
+  * between config and layers.
   *
   * @param layerToGitoidMapping
   *   map of layer SHA256 hashes to their GitOIDs
@@ -223,8 +223,8 @@ case class DockerState(
 
 /** A Docker/OCI image to process.
   *
-  * Represents a complete Docker image including the manifest, config,
-  * and all layer tarballs.
+  * Represents a complete Docker image including the manifest, config, and all
+  * layer tarballs.
   *
   * @param manifest
   *   the manifest.json artifact
@@ -275,15 +275,16 @@ object DockerToProcess {
 
   /** Identify and group Docker image components from a collection of files.
     *
-    * Looks for manifest.json and associated config and layer files
-    * to construct a complete Docker image for processing.
+    * Looks for manifest.json and associated config and layer files to construct
+    * a complete Docker image for processing.
     *
     * @param byUUID
     *   artifacts indexed by UUID
     * @param byName
     *   artifacts indexed by filename
     * @return
-    *   tuple of (ToProcess items, remaining UUID map, remaining name map, strategy name)
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
     */
   def computeDockerFiles(
       byUUID: ToProcess.ByUUID,

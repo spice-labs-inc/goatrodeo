@@ -26,17 +26,22 @@ import scala.collection.immutable.TreeSet
 
 class GraphManagerTestSuite extends munit.FunSuite {
 
-  def createTestItem(id: String, connections: TreeSet[(String, String)] = TreeSet()): Item = {
+  def createTestItem(
+      id: String,
+      connections: TreeSet[(String, String)] = TreeSet()
+  ): Item = {
     Item(
       id,
       connections,
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -55,7 +60,10 @@ class GraphManagerTestSuite extends munit.FunSuite {
   }
 
   test("GraphManager.Consts - TargetMaxFileSize is 15GB") {
-    assertEquals(GraphManager.Consts.TargetMaxFileSize, 15L * 1024L * 1024L * 1024L)
+    assertEquals(
+      GraphManager.Consts.TargetMaxFileSize,
+      15L * 1024L * 1024L * 1024L
+    )
   }
 
   // ==================== writeEntries Tests ====================
@@ -64,24 +72,37 @@ class GraphManagerTestSuite extends munit.FunSuite {
     val tempDir = Files.createTempDirectory("writeentries").toFile()
     try {
       val items = Vector(
-        createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
-        createTestItem("gitoid:blob:sha256:1111111122222222333333334444444455555555666666667777777788888888")
+        createTestItem(
+          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+        ),
+        createTestItem(
+          "gitoid:blob:sha256:1111111122222222333333334444444455555555666666667777777788888888"
+        )
       )
 
-      val (dataAndIndex, clusterFile) = GraphManager.writeEntries(tempDir, items.iterator)
+      val (dataAndIndex, clusterFile) =
+        GraphManager.writeEntries(tempDir, items.iterator)
 
       // Check that cluster file was created
       assert(clusterFile.exists(), "Cluster file should exist")
-      assert(clusterFile.getName().endsWith(".grc"), "Cluster file should have .grc extension")
+      assert(
+        clusterFile.getName().endsWith(".grc"),
+        "Cluster file should have .grc extension"
+      )
 
       // Check that data and index files were created
-      assert(dataAndIndex.nonEmpty, "Should have at least one data/index file pair")
+      assert(
+        dataAndIndex.nonEmpty,
+        "Should have at least one data/index file pair"
+      )
       for (dif <- dataAndIndex) {
         val dataFileName = f"${Helpers.toHex(dif.dataFile)}.grd"
         val indexFileName = f"${Helpers.toHex(dif.indexFile)}.gri"
-        assert(new java.io.File(tempDir, dataFileName).exists() ||
-          tempDir.listFiles().exists(_.getName().endsWith(".grd")),
-          "Data file should exist")
+        assert(
+          new java.io.File(tempDir, dataFileName).exists() ||
+            tempDir.listFiles().exists(_.getName().endsWith(".grd")),
+          "Data file should exist"
+        )
       }
     } finally {
       Helpers.deleteDirectory(tempDir.toPath())
@@ -91,15 +112,26 @@ class GraphManagerTestSuite extends munit.FunSuite {
   test("writeEntries - creates history.jsonl file") {
     val tempDir = Files.createTempDirectory("historytest").toFile()
     try {
-      val items = Vector(createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"))
+      val items = Vector(
+        createTestItem(
+          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+        )
+      )
       GraphManager.writeEntries(tempDir, items.iterator)
 
       val historyFile = new java.io.File(tempDir, "history.jsonl")
       assert(historyFile.exists(), "history.jsonl should exist")
-      val content = new String(Files.readAllBytes(historyFile.toPath()), "UTF-8")
+      val content =
+        new String(Files.readAllBytes(historyFile.toPath()), "UTF-8")
       assert(content.contains("date"), "History should contain date")
-      assert(content.contains("goat_rodeo_version"), "History should contain version")
-      assert(content.contains("cluster_name"), "History should contain cluster name")
+      assert(
+        content.contains("goat_rodeo_version"),
+        "History should contain version"
+      )
+      assert(
+        content.contains("cluster_name"),
+        "History should contain cluster name"
+      )
     } finally {
       Helpers.deleteDirectory(tempDir.toPath())
     }
@@ -109,9 +141,13 @@ class GraphManagerTestSuite extends munit.FunSuite {
     val tempDir = Files.createTempDirectory("emptyiterator").toFile()
     try {
       val items = Vector[Item]()
-      val (dataAndIndex, clusterFile) = GraphManager.writeEntries(tempDir, items.iterator)
+      val (dataAndIndex, clusterFile) =
+        GraphManager.writeEntries(tempDir, items.iterator)
 
-      assert(clusterFile.exists(), "Cluster file should exist even for empty input")
+      assert(
+        clusterFile.exists(),
+        "Cluster file should exist even for empty input"
+      )
     } finally {
       Helpers.deleteDirectory(tempDir.toPath())
     }
@@ -120,8 +156,13 @@ class GraphManagerTestSuite extends munit.FunSuite {
   test("writeEntries - handles single item") {
     val tempDir = Files.createTempDirectory("singleitem").toFile()
     try {
-      val items = Vector(createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"))
-      val (dataAndIndex, clusterFile) = GraphManager.writeEntries(tempDir, items.iterator)
+      val items = Vector(
+        createTestItem(
+          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+        )
+      )
+      val (dataAndIndex, clusterFile) =
+        GraphManager.writeEntries(tempDir, items.iterator)
 
       assert(clusterFile.exists())
       assertEquals(dataAndIndex.length, 1)
@@ -137,8 +178,14 @@ class GraphManagerTestSuite extends munit.FunSuite {
         EdgeType.aliasFrom -> "sha256:alias1",
         EdgeType.containedBy -> "gitoid:blob:sha256:parent"
       )
-      val items = Vector(createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111", connections))
-      val (dataAndIndex, clusterFile) = GraphManager.writeEntries(tempDir, items.iterator)
+      val items = Vector(
+        createTestItem(
+          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+          connections
+        )
+      )
+      val (dataAndIndex, clusterFile) =
+        GraphManager.writeEntries(tempDir, items.iterator)
 
       assert(clusterFile.exists())
     } finally {
@@ -151,7 +198,11 @@ class GraphManagerTestSuite extends munit.FunSuite {
   test("GRDWalker.open - reads valid GRD file") {
     val tempDir = Files.createTempDirectory("walkeropen").toFile()
     try {
-      val items = Vector(createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"))
+      val items = Vector(
+        createTestItem(
+          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+        )
+      )
       val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, items.iterator)
 
       // Find the GRD file
@@ -174,7 +225,9 @@ class GraphManagerTestSuite extends munit.FunSuite {
   test("GRDWalker.readNext - reads items from GRD file") {
     val tempDir = Files.createTempDirectory("walkerread").toFile()
     try {
-      val item = createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111")
+      val item = createTestItem(
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+      )
       val items = Vector(item)
       val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, items.iterator)
 
@@ -205,7 +258,8 @@ class GraphManagerTestSuite extends munit.FunSuite {
         None,
         None
       )
-      val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
+      val (dataAndIndex, _) =
+        GraphManager.writeEntries(tempDir, Vector(item).iterator)
 
       val grdFiles = tempDir.listFiles().filter(_.getName().endsWith(".grd"))
       assert(grdFiles.nonEmpty, "Should create .grd file")
@@ -224,7 +278,8 @@ class GraphManagerTestSuite extends munit.FunSuite {
         None,
         None
       )
-      val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
+      val (dataAndIndex, _) =
+        GraphManager.writeEntries(tempDir, Vector(item).iterator)
 
       val grdFiles = tempDir.listFiles().filter(_.getName().endsWith(".grd"))
       assert(grdFiles.nonEmpty, "Should create .grd file")
@@ -245,7 +300,8 @@ class GraphManagerTestSuite extends munit.FunSuite {
         None,
         None
       )
-      val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
+      val (dataAndIndex, _) =
+        GraphManager.writeEntries(tempDir, Vector(item).iterator)
 
       val grdFiles = tempDir.listFiles().filter(_.getName().endsWith(".grd"))
       assert(grdFiles.nonEmpty, "Should create .grd file")
@@ -261,8 +317,12 @@ class GraphManagerTestSuite extends munit.FunSuite {
         EdgeType.aliasFrom -> "sha256:hash1",
         EdgeType.containedBy -> "gitoid:blob:sha256:parent123"
       )
-      val item = createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111", connections)
-      val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
+      val item = createTestItem(
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        connections
+      )
+      val (dataAndIndex, _) =
+        GraphManager.writeEntries(tempDir, Vector(item).iterator)
 
       val grdFiles = tempDir.listFiles().filter(_.getName().endsWith(".grd"))
       val channel = new FileInputStream(grdFiles.head).getChannel()
@@ -283,8 +343,11 @@ class GraphManagerTestSuite extends munit.FunSuite {
   test("writeEntries and GRDWalker - round-trip preserves metadata") {
     val tempDir = Files.createTempDirectory("roundtrip3").toFile()
     try {
-      val item = createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111")
-      val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
+      val item = createTestItem(
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+      )
+      val (dataAndIndex, _) =
+        GraphManager.writeEntries(tempDir, Vector(item).iterator)
 
       val grdFiles = tempDir.listFiles().filter(_.getName().endsWith(".grd"))
       val channel = new FileInputStream(grdFiles.head).getChannel()
@@ -331,7 +394,11 @@ class GraphManagerTestSuite extends munit.FunSuite {
   test("DataAndIndexFiles - contains valid file hashes") {
     val tempDir = Files.createTempDirectory("dataindexfiles").toFile()
     try {
-      val items = Vector(createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"))
+      val items = Vector(
+        createTestItem(
+          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+        )
+      )
       val (dataAndIndex, _) = GraphManager.writeEntries(tempDir, items.iterator)
 
       for (dif <- dataAndIndex) {

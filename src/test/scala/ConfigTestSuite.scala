@@ -16,7 +16,6 @@ import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Config.ExpandFiles
 import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.IncludeExclude
 
 import java.io.File
 import java.nio.file.Files
@@ -109,7 +108,10 @@ class ConfigTestSuite extends munit.FunSuite {
 
       // Create a file list file
       val fileListFile = new File(tempDir, "filelist.txt")
-      Helpers.writeOverFile(fileListFile, s"${testFile1.getAbsolutePath()}\n${testFile2.getAbsolutePath()}")
+      Helpers.writeOverFile(
+        fileListFile,
+        s"${testFile1.getAbsolutePath()}\n${testFile2.getAbsolutePath()}"
+      )
 
       val config = Config(fileList = Vector(fileListFile))
       val builders = config.getFileListBuilders()
@@ -129,7 +131,10 @@ class ConfigTestSuite extends munit.FunSuite {
       Helpers.writeOverFile(testFile, "content")
 
       val fileListFile = new File(tempDir, "filelist.txt")
-      Helpers.writeOverFile(fileListFile, s"${testFile.getAbsolutePath()}\n/nonexistent/file.txt")
+      Helpers.writeOverFile(
+        fileListFile,
+        s"${testFile.getAbsolutePath()}\n/nonexistent/file.txt"
+      )
 
       val config = Config(fileList = Vector(fileListFile))
       val builders = config.getFileListBuilders()
@@ -298,7 +303,8 @@ class ConfigTestSuite extends munit.FunSuite {
     import java.util.regex.Pattern
 
     val pattern = ".*\\.html$"
-    val config = Config(exclude = Vector((pattern, Try(Pattern.compile(pattern)))))
+    val config =
+      Config(exclude = Vector((pattern, Try(Pattern.compile(pattern)))))
 
     assertEquals(config.exclude.length, 1)
     assertEquals(config.exclude.head._1, pattern)

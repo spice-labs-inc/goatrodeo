@@ -20,7 +20,6 @@ import io.spicelabs.goatrodeo.omnibor.ItemTagData
 import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -244,15 +243,27 @@ class StructTestSuite extends munit.FunSuite {
 
   test("ItemMetaData.merge - merges extra") {
     // Must have non-empty fileNames for merge to work
-    val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
-    val b = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+    val a = ItemMetaData(
+      TreeSet("file.txt"),
+      TreeSet(),
+      100,
+      TreeMap("key1" -> TreeSet(StringOrPair("val1")))
+    )
+    val b = ItemMetaData(
+      TreeSet("file.txt"),
+      TreeSet(),
+      100,
+      TreeMap("key2" -> TreeSet(StringOrPair("val2")))
+    )
 
     val merged = a.merge(b, () => Vector(), () => Vector())
     assert(merged.extra.contains("key1"))
     assert(merged.extra.contains("key2"))
   }
 
-  test("ItemMetaData.merge - creates gitoid-qualified filenames for duplicates") {
+  test(
+    "ItemMetaData.merge - creates gitoid-qualified filenames for duplicates"
+  ) {
     val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, TreeMap())
     val b = ItemMetaData(TreeSet("other.txt"), TreeSet(), 100, TreeMap())
 
@@ -363,13 +374,15 @@ class StructTestSuite extends munit.FunSuite {
 
   test("IndexLoc.Chain - contains vector of IndexLocs") {
     import io.spicelabs.goatrodeo.omnibor.IndexLoc
-    val chainLoc = IndexLoc.Chain(Vector(
-      IndexLoc.Loc(1L, 2L),
-      IndexLoc.Loc(3L, 4L)
-    ))
+    val chainLoc = IndexLoc.Chain(
+      Vector(
+        IndexLoc.Loc(1L, 2L),
+        IndexLoc.Loc(3L, 4L)
+      )
+    )
     chainLoc match {
       case IndexLoc.Chain(chain) => assertEquals(chain.length, 2)
-      case _ => fail("Expected IndexLoc.Chain")
+      case _                     => fail("Expected IndexLoc.Chain")
     }
   }
 

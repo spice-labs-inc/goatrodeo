@@ -229,15 +229,16 @@ object Debian {
 
   /** Identify Debian packages from a collection of files.
     *
-    * Finds files with MIME type "application/x-debian-package"
-    * and creates Debian ToProcess instances for them.
+    * Finds files with MIME type "application/x-debian-package" and creates
+    * Debian ToProcess instances for them.
     *
     * @param byUUID
     *   artifacts indexed by UUID
     * @param byName
     *   artifacts indexed by filename
     * @return
-    *   tuple of (ToProcess items, remaining UUID map, remaining name map, strategy name)
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
     */
   def computeDebianFiles(
       byUUID: ToProcess.ByUUID,

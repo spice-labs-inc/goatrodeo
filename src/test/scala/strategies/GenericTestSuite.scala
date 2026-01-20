@@ -32,12 +32,14 @@ class GenericTestSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(id),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(id),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -101,7 +103,9 @@ class GenericTestSuite extends munit.FunSuite {
     assertEquals(tp.mimeType, "text/plain")
   }
 
-  test("GenericFile.getElementsToProcess - returns single element with SingleMarker") {
+  test(
+    "GenericFile.getElementsToProcess - returns single element with SingleMarker"
+  ) {
     val artifact = ByteWrapper(Array[Byte](), "test.txt", None)
     val tp = GenericFile(artifact)
 
@@ -132,7 +136,8 @@ class GenericTestSuite extends munit.FunSuite {
       "file2.txt" -> Vector(artifact2)
     )
 
-    val (toProcess, revisedByUUID, revisedByName, name) = GenericFile.computeGenericFiles(byUUID, byName)
+    val (toProcess, revisedByUUID, revisedByName, name) =
+      GenericFile.computeGenericFiles(byUUID, byName)
 
     assertEquals(name, "Generic")
     assertEquals(toProcess.length, 2)
@@ -153,7 +158,8 @@ class GenericTestSuite extends munit.FunSuite {
     val byUUID = Map[String, ByteWrapper]()
     val byName = Map[String, Vector[ByteWrapper]]()
 
-    val (toProcess, revisedByUUID, revisedByName, _) = GenericFile.computeGenericFiles(byUUID, byName)
+    val (toProcess, revisedByUUID, revisedByName, _) =
+      GenericFile.computeGenericFiles(byUUID, byName)
 
     assert(toProcess.isEmpty)
     assert(revisedByUUID.isEmpty)

@@ -31,7 +31,8 @@ import scala.util.Try
   *   - GRI (Goat Rodeo Index): Contains an index for looking up Items by hash
   *   - GRC (Goat Rodeo Cluster): Metadata about a set of GRD/GRI files
   *
-  * Files are named by their SHA256 hash (as a hex string) with the appropriate extension.
+  * Files are named by their SHA256 hash (as a hex string) with the appropriate
+  * extension.
   */
 object GraphManager {
   private val logger: Logger = Logger(getClass())
@@ -42,10 +43,12 @@ object GraphManager {
     /** Magic number at the start of GRD (data) files: 0x00BE1100 ("Bell"). */
     val DataFileMagicNumber: Int = 0x00be1100 // Bell
 
-    /** Magic number at the start of GRI (index) files: 0x54154170 ("Shishitō"). */
+    /** Magic number at the start of GRI (index) files: 0x54154170 ("Shishitō").
+      */
     val IndexFileMagicNumber: Int = 0x54154170 // Shishitō
 
-    /** Magic number at the start of GRC (cluster) files: 0xBA4A4A ("Banana"). */
+    /** Magic number at the start of GRC (cluster) files: 0xBA4A4A ("Banana").
+      */
     val ClusterFileMagicNumber: Int = 0xba4a4a // Banana
 
     /** Target maximum file size (15 GB) before starting a new data file. */
@@ -199,10 +202,10 @@ object GraphManager {
   /** Write a collection of Items to GRD/GRI/GRC files.
     *
     * This is the main entry point for persisting Items to disk. It:
-    *   1. Writes Items to GRD data files (splitting at TargetMaxFileSize)
-    *   2. Creates GRI index files for each GRD file
-    *   3. Creates a GRC cluster file referencing all GRD/GRI files
-    *   4. Writes a history.jsonl file with build metadata
+    *   1. Writes Items to GRD data files (splitting at TargetMaxFileSize) 2.
+    *      Creates GRI index files for each GRD file 3. Creates a GRC cluster
+    *      file referencing all GRD/GRI files 4. Writes a history.jsonl file
+    *      with build metadata
     *
     * @param targetDirectory
     *   the directory to write files to
@@ -310,9 +313,9 @@ object GraphManager {
 
 /** A walker for reading Items from a GRD (Goat Rodeo Data) file.
   *
-  * Provides sequential access to Items stored in a GRD file.
-  * Use `open()` to validate the file and read the envelope,
-  * then `readNext()` or `items()` to iterate through Items.
+  * Provides sequential access to Items stored in a GRD file. Use `open()` to
+  * validate the file and read the envelope, then `readNext()` or `items()` to
+  * iterate through Items.
   *
   * @param source
   *   the FileChannel to read from

@@ -176,7 +176,8 @@ class IncExcTesting extends munit.FunSuite {
   }
 
   test("IncludeExclude - ++ operator chains multiple predicates") {
-    val includer = IncludeExclude() ++ Vector("+allowed", "-forbidden", "/temp.*")
+    val includer =
+      IncludeExclude() ++ Vector("+allowed", "-forbidden", "/temp.*")
     assert(includer.shouldInclude("allowed"))
     assert(!includer.shouldInclude("forbidden"))
     assert(!includer.shouldInclude("temporary"))
@@ -215,7 +216,8 @@ class IncExcTesting extends munit.FunSuite {
   }
 
   test("RegexPredicate - matches with regex only") {
-    val predicate = RegexPredicate(Set[String](), Vector("foo\\d+".r, "bar.*".r))
+    val predicate =
+      RegexPredicate(Set[String](), Vector("foo\\d+".r, "bar.*".r))
     assert(predicate.matches("foo123"))
     assert(predicate.matches("bar"))
     assert(predicate.matches("barbaz"))

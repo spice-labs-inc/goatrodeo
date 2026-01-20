@@ -18,7 +18,6 @@ import io.spicelabs.goatrodeo.util.Helpers
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
@@ -164,13 +163,31 @@ class HelpersTestSuite extends munit.FunSuite {
   }
 
   test("byteArrayToLong63Bits - converts bytes to long") {
-    val bytes = Array[Byte](0x18, 0x12, 0x10, 0xf8.toByte, 0xf9.toByte, 0xc7.toByte, 0x79, 0xc2.toByte)
+    val bytes = Array[Byte](
+      0x18,
+      0x12,
+      0x10,
+      0xf8.toByte,
+      0xf9.toByte,
+      0xc7.toByte,
+      0x79,
+      0xc2.toByte
+    )
     val result = Helpers.byteArrayToLong63Bits(bytes)
     assertEquals(Helpers.toHex(result), "181210f8f9c779c2")
   }
 
   test("byteArrayToLong63Bits - clears high bit") {
-    val bytes = Array[Byte](0xff.toByte, 0xff.toByte, 0xff.toByte, 0xff.toByte, 0xff.toByte, 0xff.toByte, 0xff.toByte, 0xff.toByte)
+    val bytes = Array[Byte](
+      0xff.toByte,
+      0xff.toByte,
+      0xff.toByte,
+      0xff.toByte,
+      0xff.toByte,
+      0xff.toByte,
+      0xff.toByte,
+      0xff.toByte
+    )
     val result = Helpers.byteArrayToLong63Bits(bytes)
     assert(result >= 0, "Result should be non-negative")
   }
@@ -453,14 +470,14 @@ class HelpersTestSuite extends munit.FunSuite {
     val tempFile = Files.createTempFile("shortmaxtest", ".bin").toFile()
     try {
       val writer = FileChannel.open(tempFile.toPath(), StandardOpenOption.WRITE)
-      Helpers.writeShort(writer, 0xFFFF)
+      Helpers.writeShort(writer, 0xffff)
       writer.close()
 
       val reader = FileChannel.open(tempFile.toPath(), StandardOpenOption.READ)
       val result = Helpers.readShort(reader)
       reader.close()
 
-      assertEquals(result, 0xFFFF)
+      assertEquals(result, 0xffff)
     } finally {
       tempFile.delete()
     }
@@ -570,8 +587,10 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges disjoint maps") {
-    val a: TreeMap[String, TreeSet[StringOrPair]] = TreeMap("key1" -> TreeSet(StringOrPair("val1")))
-    val b: TreeMap[String, TreeSet[StringOrPair]] = TreeMap("key2" -> TreeSet(StringOrPair("val2")))
+    val a: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap("key1" -> TreeSet(StringOrPair("val1")))
+    val b: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap("key2" -> TreeSet(StringOrPair("val2")))
     val result = Helpers.mergeTreeMaps(a, b)
     assertEquals(result.size, 2)
     assert(result.contains("key1"))
@@ -579,8 +598,10 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges overlapping keys") {
-    val a: TreeMap[String, TreeSet[StringOrPair]] = TreeMap("key" -> TreeSet(StringOrPair("val1")))
-    val b: TreeMap[String, TreeSet[StringOrPair]] = TreeMap("key" -> TreeSet(StringOrPair("val2")))
+    val a: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap("key" -> TreeSet(StringOrPair("val1")))
+    val b: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap("key" -> TreeSet(StringOrPair("val2")))
     val result = Helpers.mergeTreeMaps(a, b)
     assertEquals(result.size, 1)
     assertEquals(result("key").size, 2)
@@ -588,7 +609,8 @@ Long-Value: This is a very long value that continues
 
   test("mergeTreeMaps - handles empty maps") {
     val a: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()
-    val b: TreeMap[String, TreeSet[StringOrPair]] = TreeMap("key" -> TreeSet(StringOrPair("val")))
+    val b: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap("key" -> TreeSet(StringOrPair("val")))
     val result = Helpers.mergeTreeMaps(a, b)
     assertEquals(result.size, 1)
   }
@@ -617,7 +639,10 @@ Long-Value: This is a very long value that continues
   test("randomBytes - returns different values each call") {
     val result1 = Helpers.randomBytes(16)
     val result2 = Helpers.randomBytes(16)
-    assert(result1.toSeq != result2.toSeq, "Should return different random bytes")
+    assert(
+      result1.toSeq != result2.toSeq,
+      "Should return different random bytes"
+    )
   }
 
   // ==================== Utility Tests ====================

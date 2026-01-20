@@ -20,7 +20,6 @@ import io.spicelabs.goatrodeo.util.GitOIDUtils.ObjectType
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.ByteArrayInputStream
-import java.io.File
 import java.nio.file.Files
 
 class GitOIDUtilsTestSuite extends munit.FunSuite {
@@ -28,22 +27,28 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
   // ==================== urlToFileName Tests ====================
 
   test("urlToFileName - parses full gitoid URL") {
-    val uri = "gitoid:blob:sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
+    val uri =
+      "gitoid:blob:sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
     val (first, second, rest) = GitOIDUtils.urlToFileName(uri)
     assertEquals(first, "880")
     assertEquals(second, "485")
-    assertEquals(rest, "f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a")
+    assertEquals(
+      rest,
+      "f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
+    )
   }
 
   test("urlToFileName - parses partial URL without gitoid prefix") {
-    val uri = "blob:sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
+    val uri =
+      "blob:sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
     val (first, second, rest) = GitOIDUtils.urlToFileName(uri)
     assertEquals(first, "880")
     assertEquals(second, "485")
   }
 
   test("urlToFileName - parses URL with sha256 prefix only") {
-    val uri = ":sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
+    val uri =
+      ":sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
     val (first, second, rest) = GitOIDUtils.urlToFileName(uri)
     assertEquals(first, "880")
     assertEquals(second, "485")
@@ -54,7 +59,10 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
     val (first, second, rest) = GitOIDUtils.urlToFileName(uri)
     assertEquals(first, "880")
     assertEquals(second, "485")
-    assertEquals(rest, "f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a")
+    assertEquals(
+      rest,
+      "f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a"
+    )
   }
 
   // ==================== ObjectType Tests ====================
@@ -171,7 +179,8 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
     val input = "test"
     val bytes = input.getBytes("UTF-8")
     val stream = new ByteArrayInputStream(bytes)
-    val result = GitOIDUtils.url(stream, bytes.length, HashType.SHA256, ObjectType.Tree)
+    val result =
+      GitOIDUtils.url(stream, bytes.length, HashType.SHA256, ObjectType.Tree)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 

@@ -114,7 +114,8 @@ sealed trait ArtifactWrapper {
   }
 }
 
-/** Companion object for ArtifactWrapper with factory methods and MIME type detection.
+/** Companion object for ArtifactWrapper with factory methods and MIME type
+  * detection.
   */
 object ArtifactWrapper {
   private val logger = Logger(getClass())
@@ -263,10 +264,11 @@ object ArtifactWrapper {
     }
   }
 
-  /** Determine if a file must be written to a temp file rather than kept in memory.
+  /** Determine if a file must be written to a temp file rather than kept in
+    * memory.
     *
-    * Some file types (like .NET assemblies) require actual files on disk
-    * for processing by external tools.
+    * Some file types (like .NET assemblies) require actual files on disk for
+    * processing by external tools.
     *
     * @param name
     *   the filename to check

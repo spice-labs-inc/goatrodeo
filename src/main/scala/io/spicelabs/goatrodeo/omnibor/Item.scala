@@ -19,12 +19,13 @@ import scala.util.Try
 
 /** Represents a node in the Artifact Dependency Graph (ADG).
   *
-  * An Item is the core data structure in OmniBOR/Goat Rodeo, representing a single
-  * artifact identified by its GitOID. Items can have connections to other Items
-  * (edges in the graph) and can carry metadata about the artifact.
+  * An Item is the core data structure in OmniBOR/Goat Rodeo, representing a
+  * single artifact identified by its GitOID. Items can have connections to
+  * other Items (edges in the graph) and can carry metadata about the artifact.
   *
   * @param identifier
-  *   the GitOID that uniquely identifies this Item (e.g., "gitoid:blob:sha256:...")
+  *   the GitOID that uniquely identifies this Item (e.g.,
+  *   "gitoid:blob:sha256:...")
   * @param connections
   *   edges to other Items, represented as (edge type, target GitOID) pairs
   * @param bodyMimeType
@@ -358,7 +359,9 @@ case class Item(
   }
 }
 
-/** Companion object for Item providing factory methods, CBOR codecs, and utilities. */
+/** Companion object for Item providing factory methods, CBOR codecs, and
+  * utilities.
+  */
 object Item {
   protected val logger: Logger = Logger(getClass())
 

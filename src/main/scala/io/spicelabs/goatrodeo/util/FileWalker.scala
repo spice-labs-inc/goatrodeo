@@ -512,8 +512,8 @@ object FileWalker {
   /** Execute a function within a temporary directory context.
     *
     * If already within a withinArchiveStream call, reuses that temp directory.
-    * Otherwise, creates a new temporary directory that is cleaned up after
-    * the function completes.
+    * Otherwise, creates a new temporary directory that is cleaned up after the
+    * function completes.
     *
     * @param f
     *   the function to execute with the temp directory path

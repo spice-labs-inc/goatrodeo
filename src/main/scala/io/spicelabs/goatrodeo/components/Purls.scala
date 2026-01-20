@@ -14,16 +14,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.rodeocomponents.APIS.purls.*
 import com.github.packageurl.PackageURL
 import com.github.packageurl.PackageURLBuilder
 import io.spicelabs.rodeocomponents.APIFactory
+import io.spicelabs.rodeocomponents.APIS.purls.*
 import io.spicelabs.rodeocomponents.RodeoComponent
+
 import java.net.MalformedURLException
-import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
-
+import scala.util.Try
 
 // Steve sez:
 // This is the set of classes needed to expose the PackageURL api to components.
@@ -35,11 +35,12 @@ import scala.util.Success
 // PurlAdapter - an adapter onto a PackageURL
 
 // adapter onto PackageURL to hide the implementation from components
-class PurlAdapter(val purl: PackageURL) extends Purl {
-}
+class PurlAdapter(val purl: PackageURL) extends Purl {}
 
 // factory for making purls
-class LocalPurlFactory(builder: PackageURLBuilder = PackageURLBuilder.aPackageURL()) extends  PurlFactory {
+class LocalPurlFactory(
+    builder: PackageURLBuilder = PackageURLBuilder.aPackageURL()
+) extends PurlFactory {
   override def withSubpath(subpath: String): PurlFactory = {
     LocalPurlFactory(builder.withSubpath(subpath))
   }
@@ -66,12 +67,13 @@ class LocalPurlFactory(builder: PackageURLBuilder = PackageURLBuilder.aPackageUR
 
   override def toPurl(): Purl = {
     Try {
-        PurlAdapter(builder.build())
+      PurlAdapter(builder.build())
     } match {
-        // we expose this as a MalformedURLException so there doesn't need to
-        // be a component dependency onto MalformedPackagedURLException
-        case Failure(exception) => throw MalformedURLException(exception.getMessage())
-        case Success(value) => value
+      // we expose this as a MalformedURLException so there doesn't need to
+      // be a component dependency onto MalformedPackagedURLException
+      case Failure(exception) =>
+        throw MalformedURLException(exception.getMessage())
+      case Success(value) => value
     }
   }
 }
@@ -83,17 +85,16 @@ class Purls extends PurlAPI {
     LocalPurlFactory()
   }
 
-  override def release(): Unit = {
-
-  }
+  override def release(): Unit = {}
 }
 
 // API factory uses a singleton - don't need anything more
 class PurlsAPIFactory extends APIFactory[PurlAPI] {
-  override def buildAPI(subscriber: RodeoComponent): Purls = PurlsAPIFactory.theAPI
+  override def buildAPI(subscriber: RodeoComponent): Purls =
+    PurlsAPIFactory.theAPI
   override def name(): String = PurlAPIConstants.NAME
 }
 
 object PurlsAPIFactory {
-    lazy val theAPI = Purls()
+  lazy val theAPI = Purls()
 }

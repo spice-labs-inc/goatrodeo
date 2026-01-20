@@ -171,7 +171,10 @@ class PURLHelpersTestSuite extends munit.FunSuite {
     )
 
     assertEquals(purl.getQualifiers().get("type"), "pom")
-    assertEquals(purl.getQualifiers().get("repository_url"), "https://repo.example.com")
+    assertEquals(
+      purl.getQualifiers().get("repository_url"),
+      "https://repo.example.com"
+    )
   }
 
   // ==================== buildPackageURL - Debian Tests ====================

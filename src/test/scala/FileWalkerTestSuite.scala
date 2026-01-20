@@ -15,10 +15,8 @@ limitations under the License. */
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
-import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.BufferedInputStream
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -180,7 +178,12 @@ class FileWalkerTestSuite extends munit.FunSuite {
   }
 
   test("notCompressed - returns true for APK files") {
-    assert(FileWalker.notCompressed("app.apk", "application/vnd.android.package-archive"))
+    assert(
+      FileWalker.notCompressed(
+        "app.apk",
+        "application/vnd.android.package-archive"
+      )
+    )
   }
 
   test("notCompressed - returns false for gzip") {
@@ -288,7 +291,8 @@ class FileWalkerTestSuite extends munit.FunSuite {
   }
 
   test("withinArchiveStream - handles corrupt archive gracefully") {
-    val corruptData = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00)
+    val corruptData =
+      Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00)
     val wrapper = ByteWrapper(corruptData, "corrupt.zip", None)
 
     val result = FileWalker.withinArchiveStream(wrapper) { files =>

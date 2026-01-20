@@ -97,7 +97,8 @@ class IncludeExclude(include: RegexPredicate, exclude: RegexPredicate) {
 /** Companion object for IncludeExclude with utility methods. */
 object IncludeExclude {
 
-  /** Parse a predicate string and add it to the appropriate include/exclude collection.
+  /** Parse a predicate string and add it to the appropriate include/exclude
+    * collection.
     *
     * Predicate syntax:
     *   - `+pattern` - add to include exact matches
@@ -110,7 +111,8 @@ object IncludeExclude {
     * @param predicate
     *   the predicate string to parse
     * @param inc_exc
-    *   the current state of (include exact, include regex, exclude exact, exclude regex)
+    *   the current state of (include exact, include regex, exclude exact,
+    *   exclude regex)
     * @return
     *   the updated tuple with the predicate applied
     * @throws IllegalArgumentException

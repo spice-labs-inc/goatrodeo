@@ -18,9 +18,9 @@ import scala.collection.immutable.TreeSet
 
 /** State for generic file processing.
   *
-  * A no-op state used for files that don't match any specific strategy
-  * (Maven, Docker, Debian, .NET). All methods return unchanged state
-  * with no additional metadata or package URLs.
+  * A no-op state used for files that don't match any specific strategy (Maven,
+  * Docker, Debian, .NET). All methods return unchanged state with no additional
+  * metadata or package URLs.
   */
 class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
 
@@ -110,15 +110,16 @@ object GenericFile {
 
   /** Convert all remaining artifacts to generic files.
     *
-    * This is typically the last strategy applied, consuming all
-    * artifacts not matched by other strategies (Maven, Docker, etc.).
+    * This is typically the last strategy applied, consuming all artifacts not
+    * matched by other strategies (Maven, Docker, etc.).
     *
     * @param byUUID
     *   artifacts indexed by UUID
     * @param byName
     *   artifacts indexed by filename
     * @return
-    *   tuple of (ToProcess items, empty UUID map, empty name map, strategy name)
+    *   tuple of (ToProcess items, empty UUID map, empty name map, strategy
+    *   name)
     */
   def computeGenericFiles(
       byUUID: ToProcess.ByUUID,

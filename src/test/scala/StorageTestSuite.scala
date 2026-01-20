@@ -13,14 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import com.github.packageurl.PackageURLBuilder
-import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.util.Helpers
 
-import java.io.File
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -32,12 +30,14 @@ class StorageTestSuite extends munit.FunSuite {
       id,
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(
-        fileNames = TreeSet(fileNames.toSeq*),
-        mimeType = TreeSet("application/octet-stream"),
-        fileSize = 100,
-        extra = TreeMap()
-      ))
+      Some(
+        ItemMetaData(
+          fileNames = TreeSet(fileNames.toSeq*),
+          mimeType = TreeSet("application/octet-stream"),
+          fileSize = 100,
+          extra = TreeMap()
+        )
+      )
     )
   }
 
@@ -83,10 +83,14 @@ class StorageTestSuite extends munit.FunSuite {
     val item2 = createTestItem("id", Set("file2"))
 
     storage.write("id", _ => Some(item1), _ => "")
-    storage.write("id", {
-      case Some(existing) => Some(existing.merge(item2))
-      case None           => Some(item2)
-    }, _ => "")
+    storage.write(
+      "id",
+      {
+        case Some(existing) => Some(existing.merge(item2))
+        case None           => Some(item2)
+      },
+      _ => ""
+    )
 
     val result = storage.read("id")
     assert(result.isDefined)
@@ -151,9 +155,21 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - gitoidKeys returns only gitoid keys") {
     val storage = MemStorage(None)
-    storage.write("gitoid:blob:sha256:abc123", _ => Some(createTestItem("gitoid:blob:sha256:abc123")), _ => "")
-    storage.write("sha256:def456", _ => Some(createTestItem("sha256:def456")), _ => "")
-    storage.write("pkg:maven/group/artifact@1.0", _ => Some(createTestItem("pkg:maven/group/artifact@1.0")), _ => "")
+    storage.write(
+      "gitoid:blob:sha256:abc123",
+      _ => Some(createTestItem("gitoid:blob:sha256:abc123")),
+      _ => ""
+    )
+    storage.write(
+      "sha256:def456",
+      _ => Some(createTestItem("sha256:def456")),
+      _ => ""
+    )
+    storage.write(
+      "pkg:maven/group/artifact@1.0",
+      _ => Some(createTestItem("pkg:maven/group/artifact@1.0")),
+      _ => ""
+    )
 
     val gitoids = storage.gitoidKeys()
     assertEquals(gitoids.size, 1)
@@ -164,7 +180,11 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - gitoidKeys returns empty for no gitoids") {
     val storage = MemStorage(None)
-    storage.write("sha256:abc123", _ => Some(createTestItem("sha256:abc123")), _ => "")
+    storage.write(
+      "sha256:abc123",
+      _ => Some(createTestItem("sha256:abc123")),
+      _ => ""
+    )
     val gitoids = storage.gitoidKeys()
     assertEquals(gitoids.size, 0)
   }
@@ -173,7 +193,8 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - addPurl adds package URL") {
     val storage = MemStorage(None)
-    val purl = PackageURLBuilder.aPackageURL()
+    val purl = PackageURLBuilder
+      .aPackageURL()
       .withType("maven")
       .withNamespace("org.example")
       .withName("artifact")
@@ -189,13 +210,15 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - purls returns all added purls") {
     val storage = MemStorage(None)
-    val purl1 = PackageURLBuilder.aPackageURL()
+    val purl1 = PackageURLBuilder
+      .aPackageURL()
       .withType("deb")
       .withNamespace("ubuntu")
       .withName("artifact1")
       .withVersion("1.0")
       .build()
-    val purl2 = PackageURLBuilder.aPackageURL()
+    val purl2 = PackageURLBuilder
+      .aPackageURL()
       .withType("npm")
       .withName("package")
       .withVersion("2.0")
@@ -210,7 +233,8 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - purls deduplicates identical purls") {
     val storage = MemStorage(None)
-    val purl = PackageURLBuilder.aPackageURL()
+    val purl = PackageURLBuilder
+      .aPackageURL()
       .withType("deb")
       .withNamespace("debian")
       .withName("artifact")
@@ -282,12 +306,20 @@ class StorageTestSuite extends munit.FunSuite {
     val threads = (1 to 10).map { i =>
       new Thread(() => {
         for (_ <- 1 to 100) {
-          storage.write("concurrent-key", {
-            case Some(existing) =>
-              val meta = existing.bodyAsItemMetaData.get
-              Some(existing.copy(body = Some(meta.copy(fileSize = meta.fileSize + 1))))
-            case None => Some(createTestItem("concurrent-key"))
-          }, _ => "")
+          storage.write(
+            "concurrent-key",
+            {
+              case Some(existing) =>
+                val meta = existing.bodyAsItemMetaData.get
+                Some(
+                  existing.copy(body =
+                    Some(meta.copy(fileSize = meta.fileSize + 1))
+                  )
+                )
+              case None => Some(createTestItem("concurrent-key"))
+            },
+            _ => ""
+          )
         }
       })
     }
@@ -322,10 +354,14 @@ class StorageTestSuite extends munit.FunSuite {
 
     val writeThread = new Thread(() => {
       for (_ <- 1 to 100) {
-        storage.write("rw-key", {
-          case Some(existing) => Some(existing)
-          case None           => Some(createTestItem("rw-key"))
-        }, _ => "")
+        storage.write(
+          "rw-key",
+          {
+            case Some(existing) => Some(existing)
+            case None           => Some(createTestItem("rw-key"))
+          },
+          _ => ""
+        )
       }
     })
 
