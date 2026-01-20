@@ -1,4 +1,4 @@
-/* Copyright 2025 Spice Labs, Inc. & Contributors
+/* Copyright 2025-2026 Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
