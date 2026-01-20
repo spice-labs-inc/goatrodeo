@@ -24,6 +24,15 @@ import java.nio.file.StandardOpenOption
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
+import org.apache.commons.compress.archivers.ArchiveEntry
+import org.apache.commons.compress.archivers.ArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
+
 class HelpersTestSuite extends munit.FunSuite {
 
   // ==================== Hash Functions Tests ====================
@@ -692,5 +701,282 @@ Long-Value: This is a very long value that continues
   test("javaClassMimeTypes - contains expected mime types") {
     assert(Helpers.javaClassMimeTypes.contains("application/java-vm"))
     assert(Helpers.javaClassMimeTypes.contains("application/x-java-class"))
+  }
+
+  // ==================== iteratorFor Tests ====================
+  // Tests for the functional Iterator implementation using
+  // Iterator.continually().takeWhile().flatten
+
+  /** Helper to create a ZIP archive with the given entries */
+  private def createZipArchive(
+      entries: Seq[(String, Array[Byte], Boolean)]
+  ): Array[Byte] = {
+    val baos = new ByteArrayOutputStream()
+    val zipOut = new ZipArchiveOutputStream(baos)
+    entries.foreach { case (name, content, isDirectory) =>
+      val entry = new ZipArchiveEntry(name)
+      if (isDirectory) {
+        entry.setSize(0)
+      }
+      zipOut.putArchiveEntry(entry)
+      if (!isDirectory) {
+        zipOut.write(content)
+      }
+      zipOut.closeArchiveEntry()
+    }
+    zipOut.close()
+    baos.toByteArray
+  }
+
+  /** Helper to create a TAR archive with the given entries */
+  private def createTarArchive(
+      entries: Seq[(String, Array[Byte], Boolean)]
+  ): Array[Byte] = {
+    val baos = new ByteArrayOutputStream()
+    val tarOut = new TarArchiveOutputStream(baos)
+    entries.foreach { case (name, content, isDirectory) =>
+      val entry = new TarArchiveEntry(name)
+      if (isDirectory) {
+        entry.setSize(0)
+      } else {
+        entry.setSize(content.length)
+      }
+      tarOut.putArchiveEntry(entry)
+      if (!isDirectory) {
+        tarOut.write(content)
+      }
+      tarOut.closeArchiveEntry()
+    }
+    tarOut.close()
+    baos.toByteArray
+  }
+
+  /** Helper to open a ZIP archive for iteration */
+  private def openZipForIteration(
+      data: Array[Byte]
+  ): ArchiveInputStream[ArchiveEntry] = {
+    new ZipArchiveInputStream(new ByteArrayInputStream(data))
+      .asInstanceOf[ArchiveInputStream[ArchiveEntry]]
+  }
+
+  /** Helper to open a TAR archive for iteration */
+  private def openTarForIteration(
+      data: Array[Byte]
+  ): ArchiveInputStream[ArchiveEntry] = {
+    new TarArchiveInputStream(new ByteArrayInputStream(data))
+      .asInstanceOf[ArchiveInputStream[ArchiveEntry]]
+  }
+
+  test("iteratorFor - empty ZIP archive returns empty iterator") {
+    val zipData = createZipArchive(Seq.empty)
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 0)
+    zipInput.close()
+  }
+
+  test("iteratorFor - single file entry in ZIP archive") {
+    val content = "hello world".getBytes("UTF-8")
+    val zipData = createZipArchive(Seq(("test.txt", content, false)))
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 1)
+    assertEquals(entries.head.getName, "test.txt")
+    assert(!entries.head.isDirectory)
+    zipInput.close()
+  }
+
+  test("iteratorFor - multiple file entries in ZIP archive") {
+    val zipData = createZipArchive(
+      Seq(
+        ("file1.txt", "content1".getBytes("UTF-8"), false),
+        ("file2.txt", "content2".getBytes("UTF-8"), false),
+        ("file3.txt", "content3".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 3)
+    assertEquals(entries.map(_.getName).toList, List("file1.txt", "file2.txt", "file3.txt"))
+    zipInput.close()
+  }
+
+  test("iteratorFor - directory entries in ZIP archive") {
+    val zipData = createZipArchive(
+      Seq(
+        ("dir/", Array.empty[Byte], true),
+        ("dir/file.txt", "content".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 2)
+    assert(entries.head.isDirectory)
+    assert(!entries(1).isDirectory)
+    zipInput.close()
+  }
+
+  test("iteratorFor - mixed entries with nested directories in ZIP") {
+    val zipData = createZipArchive(
+      Seq(
+        ("root.txt", "root content".getBytes("UTF-8"), false),
+        ("dir1/", Array.empty[Byte], true),
+        ("dir1/file1.txt", "content1".getBytes("UTF-8"), false),
+        ("dir1/dir2/", Array.empty[Byte], true),
+        ("dir1/dir2/file2.txt", "content2".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 5)
+    assertEquals(
+      entries.map(_.getName).toList,
+      List("root.txt", "dir1/", "dir1/file1.txt", "dir1/dir2/", "dir1/dir2/file2.txt")
+    )
+    zipInput.close()
+  }
+
+  test("iteratorFor - iterator is consumed only once") {
+    val zipData = createZipArchive(
+      Seq(
+        ("file1.txt", "content1".getBytes("UTF-8"), false),
+        ("file2.txt", "content2".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+
+    // First consumption
+    val first = iterator.toList
+    assertEquals(first.length, 2)
+
+    // Second call on same iterator should be empty (iterator exhausted)
+    val second = iterator.toList
+    assertEquals(second.length, 0)
+    zipInput.close()
+  }
+
+  test("iteratorFor - can be converted to Vector") {
+    val zipData = createZipArchive(
+      Seq(
+        ("a.txt", "a".getBytes("UTF-8"), false),
+        ("b.txt", "b".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val vector = iterator.toVector
+    assertEquals(vector.length, 2)
+    assertEquals(vector.map(_.getName).toVector, Vector("a.txt", "b.txt"))
+    zipInput.close()
+  }
+
+  test("iteratorFor - works with filter operations") {
+    val zipData = createZipArchive(
+      Seq(
+        ("dir/", Array.empty[Byte], true),
+        ("file1.txt", "content1".getBytes("UTF-8"), false),
+        ("subdir/", Array.empty[Byte], true),
+        ("file2.txt", "content2".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val filesOnly = iterator.filter(!_.isDirectory).toList
+    assertEquals(filesOnly.length, 2)
+    assertEquals(filesOnly.map(_.getName).toList, List("file1.txt", "file2.txt"))
+    zipInput.close()
+  }
+
+  test("iteratorFor - works with map operations") {
+    val zipData = createZipArchive(
+      Seq(
+        ("file1.txt", "content1".getBytes("UTF-8"), false),
+        ("file2.txt", "content2".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val names = iterator.map(_.getName).toList
+    assertEquals(names, List("file1.txt", "file2.txt"))
+    zipInput.close()
+  }
+
+  test("iteratorFor - empty TAR archive returns empty iterator") {
+    val tarData = createTarArchive(Seq.empty)
+    val tarInput = openTarForIteration(tarData)
+    val iterator = Helpers.iteratorFor(tarInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 0)
+    tarInput.close()
+  }
+
+  test("iteratorFor - multiple entries in TAR archive") {
+    val tarData = createTarArchive(
+      Seq(
+        ("file1.txt", "content1".getBytes("UTF-8"), false),
+        ("file2.txt", "content2".getBytes("UTF-8"), false),
+        ("file3.txt", "content3".getBytes("UTF-8"), false)
+      )
+    )
+    val tarInput = openTarForIteration(tarData)
+    val iterator = Helpers.iteratorFor(tarInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 3)
+    assertEquals(entries.map(_.getName).toList, List("file1.txt", "file2.txt", "file3.txt"))
+    tarInput.close()
+  }
+
+  test("iteratorFor - large number of entries") {
+    val entries = (1 to 100).map { i =>
+      (s"file$i.txt", s"content$i".getBytes("UTF-8"), false)
+    }
+    val zipData = createZipArchive(entries)
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val result = iterator.toList
+    assertEquals(result.length, 100)
+    assertEquals(result.head.getName, "file1.txt")
+    assertEquals(result.last.getName, "file100.txt")
+    zipInput.close()
+  }
+
+  test("iteratorFor - hasNext is idempotent before next") {
+    val zipData = createZipArchive(
+      Seq(
+        ("file1.txt", "content".getBytes("UTF-8"), false)
+      )
+    )
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+
+    // Multiple hasNext calls should not advance the iterator
+    assert(iterator.hasNext)
+    assert(iterator.hasNext)
+    assert(iterator.hasNext)
+
+    val entry = iterator.next()
+    assertEquals(entry.getName, "file1.txt")
+
+    // After consuming, hasNext should be false
+    assert(!iterator.hasNext)
+    zipInput.close()
+  }
+
+  test("iteratorFor - entries preserve size information") {
+    val content = "hello world with some content".getBytes("UTF-8")
+    val zipData = createZipArchive(Seq(("test.txt", content, false)))
+    val zipInput = openZipForIteration(zipData)
+    val iterator = Helpers.iteratorFor(zipInput)
+    val entries = iterator.toList
+    assertEquals(entries.length, 1)
+    // ZIP entries report size after being read
+    assertEquals(entries.head.getName, "test.txt")
+    zipInput.close()
   }
 }

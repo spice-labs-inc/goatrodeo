@@ -23,4 +23,4 @@ At present there are two post-processing operations that refine MIME types:
 
 ## Future Work
 
-If Goat Rodeo adds a component model, MIME type transmogrifiers could be made extensible.
+MIME type transmogrifiers could be made extensible.
