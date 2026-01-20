@@ -56,7 +56,7 @@ class DotnetDetector extends Detector {
 }
 
 object DotnetDetector {
-  lazy val DOTNET_MIME = {
+  lazy val DOTNET_MIME: MediaType = {
     MediaType.parse("application/x-msdownload; format=pe32-dotnet")
   }
 }

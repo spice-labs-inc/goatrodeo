@@ -2,8 +2,14 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.strategies.DockerMarkers
+import io.spicelabs.goatrodeo.omnibor.strategies.DockerState
+import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
+import io.spicelabs.goatrodeo.omnibor.strategies.ManifestInfo
+import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import org.json4s.*
@@ -15,6 +21,20 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 class DockerSuite extends munit.FunSuite {
   val logger = Logger(getClass())
+
+  def createTestItem(id: String): Item = {
+    Item(
+      id,
+      TreeSet(),
+      Some(ItemMetaData.mimeType),
+      Some(ItemMetaData(
+        fileNames = TreeSet(id),
+        mimeType = TreeSet("application/octet-stream"),
+        fileSize = 100,
+        extra = TreeMap()
+      ))
+    )
+  }
 
   test("Can build for a simple Docker file") {
     val name = "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
@@ -148,5 +168,137 @@ class DockerSuite extends munit.FunSuite {
       .headOption
       .get
     store.read(aliasTo).get
+  }
+
+  // ==================== DockerState Tests ====================
+
+  test("DockerState - begins with empty layer mapping") {
+    val state = DockerState(Map())
+    assert(state.layerToGitoidMapping.isEmpty)
+  }
+
+  test("DockerState.beginProcessing - returns same state") {
+    val artifact = ByteWrapper(Array[Byte](), "test.tar", None)
+    val item = createTestItem("test-id")
+    val state = DockerState(Map())
+
+    val newState = state.beginProcessing(artifact, item, DockerMarkers.Manifest)
+    assertEquals(newState, state)
+  }
+
+  test("DockerState.getPurls - returns empty for Manifest marker") {
+    val artifact = ByteWrapper(Array[Byte](), "manifest.json", None)
+    val item = createTestItem("test-id")
+    val state = DockerState(Map())
+
+    val (purls, _) = state.getPurls(artifact, item, DockerMarkers.Manifest)
+    assert(purls.isEmpty)
+  }
+
+  test("DockerState.getPurls - returns empty for Layer marker") {
+    val artifact = ByteWrapper(Array[Byte](), "layer.tar", None)
+    val item = createTestItem("test-id")
+    val state = DockerState(Map())
+
+    val (purls, _) = state.getPurls(artifact, item, DockerMarkers.Layer("sha256:abc"))
+    assert(purls.isEmpty)
+  }
+
+  test("DockerState.getMetadata - returns empty for Manifest marker") {
+    val artifact = ByteWrapper(Array[Byte](), "manifest.json", None)
+    val item = createTestItem("test-id")
+    val state = DockerState(Map())
+
+    val (metadata, _) = state.getMetadata(artifact, item, DockerMarkers.Manifest)
+    assert(metadata.isEmpty)
+  }
+
+  test("DockerState.getMetadata - returns empty for Layer marker") {
+    val artifact = ByteWrapper(Array[Byte](), "layer.tar", None)
+    val item = createTestItem("test-id")
+    val state = DockerState(Map())
+
+    val (metadata, _) = state.getMetadata(artifact, item, DockerMarkers.Layer("sha256:abc"))
+    assert(metadata.isEmpty)
+  }
+
+  test("DockerState.postChildProcessing - returns same state") {
+    val storage = MemStorage(None)
+    val state = DockerState(Map())
+
+    val newState = state.postChildProcessing(None, storage, DockerMarkers.Manifest)
+    assertEquals(newState, state)
+  }
+
+  // ==================== DockerToProcess Tests ====================
+
+  test("DockerToProcess.itemCnt - calculates total items") {
+    val manifest = ByteWrapper(Array[Byte](), "manifest.json", None)
+    val tp = DockerToProcess(manifest, List(), Map())
+
+    assertEquals(tp.itemCnt, 1) // just manifest, no config, no layers
+  }
+
+  test("DockerToProcess.mimeType - returns manifest mime type") {
+    val manifest = ByteWrapper("""[{}]""".getBytes("UTF-8"), "manifest.json", None)
+    val tp = DockerToProcess(manifest, List(), Map())
+
+    assertEquals(tp.mimeType, "application/json")
+  }
+
+  test("DockerToProcess.main - includes manifest path") {
+    val manifest = ByteWrapper(Array[Byte](), "path/manifest.json", None)
+    val tp = DockerToProcess(manifest, List(), Map())
+
+    assert(tp.main.contains("path/manifest.json"))
+  }
+
+  // ==================== computeDockerFiles Edge Cases ====================
+
+  test("computeDockerFiles - returns empty for no manifest.json") {
+    val artifact = ByteWrapper(Array[Byte](), "other.txt", None)
+    val byUUID = Map(artifact.uuid -> artifact)
+    val byName = Map("other.txt" -> Vector(artifact))
+
+    val (toProcess, _, _, name) = DockerToProcess.computeDockerFiles(byUUID, byName)
+
+    assertEquals(name, "Docker")
+    assert(toProcess.isEmpty)
+  }
+
+  test("computeDockerFiles - handles invalid JSON manifest") {
+    val manifest = ByteWrapper("not json".getBytes("UTF-8"), "manifest.json", None)
+    val byUUID = Map(manifest.uuid -> manifest)
+    val byName = Map("manifest.json" -> Vector(manifest))
+
+    val (toProcess, _, _, _) = DockerToProcess.computeDockerFiles(byUUID, byName)
+
+    assert(toProcess.isEmpty)
+  }
+
+  test("computeDockerFiles - handles empty JSON array manifest") {
+    val manifest = ByteWrapper("[]".getBytes("UTF-8"), "manifest.json", None)
+    val byUUID = Map(manifest.uuid -> manifest)
+    val byName = Map("manifest.json" -> Vector(manifest))
+
+    val (toProcess, _, _, _) = DockerToProcess.computeDockerFiles(byUUID, byName)
+
+    // Empty array should result in no processing
+    assert(toProcess.isEmpty)
+  }
+
+  // ==================== DockerMarkers Tests ====================
+
+  test("DockerMarkers.Manifest - exists") {
+    val marker = DockerMarkers.Manifest
+    assert(marker != null)
+  }
+
+  test("DockerMarkers.Layer - stores hash") {
+    val marker = DockerMarkers.Layer("sha256:abc123")
+    marker match {
+      case DockerMarkers.Layer(hash) => assertEquals(hash, "sha256:abc123")
+      case _ => fail("Expected Layer marker")
+    }
   }
 }

@@ -1,5 +1,7 @@
 # Metadata Tags
 
+> **Navigation:** [Documentation Index](README.md) | [Corpus Format](corpus.md) | [Architecture](architecture.md)
+
 Attaching metadata to a processed file can be useful for categorizing and searching for particular patterns across data sets.
 As such, it's useful to have a standard set of names for the tags that are associated with a piece of metadata.
 

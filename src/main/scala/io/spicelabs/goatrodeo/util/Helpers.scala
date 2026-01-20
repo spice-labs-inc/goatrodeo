@@ -51,9 +51,22 @@ import scala.util.Try
 import java.nio.file.FileVisitor
 import io.spicelabs.goatrodeo.components.RodeoHost
 
+/** Type alias for Git Object Identifiers (GitOIDs).
+  * A GitOID is a content-addressable identifier based on Git's object hashing scheme.
+  */
 type GitOID = String
 
-/** A bunch of helpers/utilities
+/** A collection of utility functions for file I/O, hashing, byte manipulation,
+  * and various helper operations used throughout the Goat Rodeo project.
+  *
+  * This object provides:
+  *   - Cryptographic hash functions (MD5, SHA1, SHA256, SHA512)
+  *   - Byte array and hex string conversion utilities
+  *   - File and stream I/O operations
+  *   - Directory traversal and file discovery
+  *   - Binary data read/write operations for FileChannel
+  *   - JAR manifest parsing
+  *   - Random number generation using SecureRandom
   */
 object Helpers {
   private val logger: Logger = Logger(getClass())
@@ -339,6 +352,13 @@ object Helpers {
     toHex(computeMD5(stringToInputStream(in)))
   }
 
+  /** Convert a String to an InputStream using UTF-8 encoding.
+    *
+    * @param str
+    *   the String to convert
+    * @return
+    *   an InputStream containing the UTF-8 encoded bytes of the string
+    */
   def stringToInputStream(str: String): InputStream = {
     new ByteArrayInputStream(str.getBytes("UTF-8"))
   }
@@ -535,16 +555,10 @@ object Helpers {
   def iteratorFor(
       archive: ArchiveInputStream[ArchiveEntry]
   ): Iterator[ArchiveEntry] = {
-    new Iterator[ArchiveEntry] {
-      var last: ArchiveEntry = null
-      override def hasNext: Boolean = {
-        last = archive.getNextEntry()
-        last != null
-      }
-
-      override def next(): ArchiveEntry = last
-
-    }
+    Iterator
+      .continually(Option(archive.getNextEntry()))
+      .takeWhile(_.isDefined)
+      .flatten
   }
 
   /** Recursively delete a directory
@@ -602,6 +616,13 @@ object Helpers {
     }
   }
 
+  /** Convert a hexadecimal character to its integer value.
+    *
+    * @param c
+    *   a hex character ('0'-'9', 'a'-'f', or 'A'-'F')
+    * @return
+    *   the integer value (0-15), or 0 for invalid characters
+    */
   @inline def charToBin(c: Char): Int = {
     c match {
       case '0'       => 0
@@ -624,6 +645,13 @@ object Helpers {
     }
   }
 
+  /** Convert an integer value (0-15) to its lowercase hexadecimal character.
+    *
+    * @param b
+    *   a byte value in the range 0-15
+    * @return
+    *   the corresponding hex character ('0'-'9' or 'a'-'f')
+    */
   @inline def hexChar(b: Byte): Char = {
     b match {
       case 0  => '0'
@@ -666,11 +694,26 @@ object Helpers {
     sb.toString()
   }
 
+  /** Convert a Long value to a hexadecimal string.
+    *
+    * @param id
+    *   the Long value to convert
+    * @return
+    *   the 16-character hexadecimal representation
+    */
   def toHex(id: Long): String = {
     val bb = ByteBuffer.allocate(8)
     toHex(bb.putLong(id).position(0).array())
   }
 
+  /** Convert the first 8 bytes of a byte array to a 63-bit positive Long.
+    * The high bit is masked to ensure a non-negative result.
+    *
+    * @param bytes
+    *   the byte array (first 8 bytes are used)
+    * @return
+    *   a non-negative Long value
+    */
   def byteArrayToLong63Bits(bytes: Array[Byte]): Long = {
     val toDo = new Array[Byte](8)
 
@@ -762,6 +805,13 @@ object Helpers {
     cnt
   }
 
+  /** Slurp the contents of an InputStream and return as a UTF-8 String.
+    *
+    * @param what
+    *   the InputStream to read
+    * @return
+    *   the contents as a UTF-8 decoded String
+    */
   def slurpInputToString(what: InputStream): String = {
     new String(slurpInput(what), "UTF-8")
   }
@@ -910,6 +960,15 @@ object Helpers {
   private val allFiles: AtomicReference[Map[String, TreeSet[String]]] =
     new AtomicReference(Map())
 
+  /** Get the cached set of filenames in the parent directory of the given file.
+    * Results are cached to improve performance when multiple files in the same
+    * directory are queried.
+    *
+    * @param in
+    *   a File whose parent directory's contents will be returned
+    * @return
+    *   a TreeSet of filenames (not paths) in the parent directory
+    */
   def filesForParent(in: File): TreeSet[String] = {
     val parentFile = in.getAbsoluteFile().getParentFile()
     val parentStr = parentFile.getAbsolutePath()
@@ -923,11 +982,27 @@ object Helpers {
     }
   }
 
+  /** Format an integer with locale-specific grouping separators.
+    *
+    * @param in
+    *   the integer to format
+    * @return
+    *   the formatted string (e.g., "1,234,567")
+    */
   def formatInt(in: Int): String = {
     NumberFormat.getInstance().format(in)
 
   }
 
+  /** Recursively find all files under a directory.
+    *
+    * @param root
+    *   the root directory to search
+    * @param start
+    *   an optional starting vector of files to append to
+    * @return
+    *   a Vector containing all files found recursively
+    */
   def findAllFiles(root: File, start: Vector[File] = Vector()): Vector[File] = {
     var base = start
     if (root.isDirectory()) {
@@ -944,10 +1019,25 @@ object Helpers {
     } else base
   }
 
+  /** Format a Long with locale-specific grouping separators.
+    *
+    * @param in
+    *   the Long to format
+    * @return
+    *   the formatted string (e.g., "1,234,567,890")
+    */
   def formatInt(in: Long): String = {
     NumberFormat.getInstance().format(in)
   }
 
+  /** Find the source JAR file corresponding to a given JAR file.
+    * Looks for a file with "-sources.jar" suffix in the same directory.
+    *
+    * @param like
+    *   the JAR file to find sources for
+    * @return
+    *   Some(sourceFile) if found, None otherwise
+    */
   def findSrcFile(like: File): Option[File] = {
     val name = like.getName()
     val myNameIsh = name.substring(0, name.length() - 4)
@@ -965,6 +1055,13 @@ object Helpers {
 
   }
 
+  /** Read a 2-byte unsigned short from a FileChannel.
+    *
+    * @param reader
+    *   the FileChannel to read from
+    * @return
+    *   the unsigned short value as an Int (0-65535)
+    */
   def readShort(reader: FileChannel): Int = {
     val bytes = ByteBuffer.allocate(2)
     reader.read(bytes)
@@ -972,6 +1069,13 @@ object Helpers {
     bytes.position(0).getShort().toInt & 0xffff
   }
 
+  /** Read a 4-byte signed integer from a FileChannel.
+    *
+    * @param reader
+    *   the FileChannel to read from
+    * @return
+    *   the signed integer value
+    */
   def readInt(reader: FileChannel): Int = {
     val bytes = ByteBuffer.allocate(4)
     reader.read(bytes)
@@ -979,6 +1083,13 @@ object Helpers {
     bytes.position(0).getInt()
   }
 
+  /** Read an 8-byte signed long from a FileChannel.
+    *
+    * @param reader
+    *   the FileChannel to read from
+    * @return
+    *   the signed long value
+    */
   def readLong(reader: FileChannel): Long = {
     val bytes = ByteBuffer.allocate(8) // new Array[Byte](8)
     reader.read(bytes)
@@ -986,24 +1097,54 @@ object Helpers {
     byteBuffer.position(0).getLong()
   }
 
+  /** Write a 2-byte unsigned short to a FileChannel.
+    *
+    * @param writer
+    *   the FileChannel to write to
+    * @param num
+    *   the value to write (only lower 16 bits are used)
+    */
   def writeShort(writer: FileChannel, num: Int): Unit = {
     val bytes = ByteBuffer.allocate(2)
     bytes.putShort((num & 0xffff).toShort).flip()
     val len = writer.write(bytes)
   }
 
+  /** Write a 4-byte signed integer to a FileChannel.
+    *
+    * @param writer
+    *   the FileChannel to write to
+    * @param num
+    *   the integer value to write
+    */
   def writeInt(writer: FileChannel, num: Int): Unit = {
     val bytes = ByteBuffer.allocate(4).putInt(num).flip()
     writer.write(bytes)
   }
 
+  /** Write an 8-byte signed long to a FileChannel.
+    *
+    * @param writer
+    *   the FileChannel to write to
+    * @param num
+    *   the long value to write
+    */
   def writeLong(writer: FileChannel, num: Long): Unit = {
     val bytes = ByteBuffer.allocate(8).putLong(num).flip()
     writer.write(bytes)
   }
 }
 
-/** A set of helpers to manage GitOIDs
+/** A set of utilities for computing and manipulating Git Object Identifiers (GitOIDs).
+  *
+  * GitOIDs are content-addressable identifiers compatible with Git's object model.
+  * This object provides functions to:
+  *   - Compute GitOIDs using various hash algorithms (SHA1, SHA256)
+  *   - Generate GitOID URLs in the gitoid:// URI scheme
+  *   - Build Merkle trees from collections of GitOIDs
+  *   - Compute multiple hash types for an artifact
+  *
+  * @see [[https://www.iana.org/assignments/uri-schemes/prov/gitoid GitOID URI Scheme]]
   */
 object GitOIDUtils {
 
@@ -1277,8 +1418,26 @@ object GitOIDUtils {
   }
 }
 
+/** Extension methods for TreeMap to support optional operations.
+  */
 object TreeMapExtensions {
+
+  /** Extension methods for TreeMap.
+    *
+    * @tparam K
+    *   the key type
+    * @tparam V
+    *   the value type
+    */
   extension [K, V](tree: TreeMap[K, V]) {
+
+    /** Conditionally add an element to the TreeMap if the Option is Some.
+      *
+      * @param maybe
+      *   an optional key-value pair to add
+      * @return
+      *   the TreeMap with the element added (if Some), or unchanged (if None)
+      */
     def +?(maybe: Option[(K, V)]): TreeMap[K, V] = {
       maybe match {
         case Some(elem) => tree + elem

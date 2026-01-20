@@ -1,76 +1,89 @@
+<div align="center">
+
 # Goat Rodeo
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.spicelabs/goatrodeo_3?label=Maven%20Central)](https://central.sonatype.com/artifact/io.spicelabs/goatrodeo_3)
-[![GitHub Release](https://img.shields.io/github/v/release/spice-labs-inc/goatrodeo?label=GitHub%20Release)](https://github.com/spice-labs-inc/goatrodeo/releases)
-[![GitHub Package](https://img.shields.io/badge/GitHub-Packages-blue?logo=github)](https://github.com/spice-labs-inc/goatrodeo/packages/)
-[![Docker Image Version (latest by date)](https://img.shields.io/docker/v/spicelabs/goatrodeo?sort=date&label=Docker%20Hub)](https://hub.docker.com/r/spicelabs/goatrodeo)
+**Build Artifact Dependency Graphs for Software Supply Chain Transparency**
 
-**Goat Rodeo** is an open-source tool from [Spice Labs](https://spicelabs.io) that constructs **Artifact Dependency Graphs (ADGs)** from software artifacts using [OmniBOR](https://omnibor.io) content-addressable identifiers. It can be run standalone or as part of the [Spice Labs CLI](https://github.com/spice-labs-inc/spice-labs-cli).
+[![Maven Central](https://img.shields.io/maven-central/v/io.spicelabs/goatrodeo_3?label=Maven%20Central&logo=apache-maven)](https://central.sonatype.com/artifact/io.spicelabs/goatrodeo_3)
+[![GitHub Release](https://img.shields.io/github/v/release/spice-labs-inc/goatrodeo?label=Release&logo=github)](https://github.com/spice-labs-inc/goatrodeo/releases)
+[![Docker](https://img.shields.io/docker/v/spicelabs/goatrodeo?sort=date&label=Docker&logo=docker)](https://hub.docker.com/r/spicelabs/goatrodeo)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.txt)
+[![CI](https://img.shields.io/github/actions/workflow/status/spice-labs-inc/goatrodeo/ci.yml?label=CI&logo=github-actions)](https://github.com/spice-labs-inc/goatrodeo/actions)
 
-Supported artifact types include: `TAR`, `ZIP`, `JAR`, `class` files, `ISO`, `AR`, `cpio`, and Docker images.
+[Getting Started](#-getting-started) · [Documentation](info/README.md) · [Contributing](CONTRIBUTING.md) · [Community](#-community)
 
----
-
-## 🧠 What It Does
-
-Given a starting directory, Goat Rodeo recursively scans and processes its contents to generate:
-
-- A **Gitoid database** of artifacts
-- An **ADG (Artifact Dependency Graph)** in JSON format
-- An optional **ingestion log** for tracking processed files
-
-The ADG represents relationships between software components, enabling deep insights for supply chain visibility, reproducibility, and security analysis.
+</div>
 
 ---
 
-## 📦 How to Use Goat Rodeo
+## What is Goat Rodeo?
 
-You can use Goat Rodeo in one of three ways:
+Goat Rodeo is an open-source tool that analyzes software artifacts and builds **Artifact Dependency Graphs (ADGs)** using [OmniBOR](https://omnibor.io) content-addressable identifiers. It answers questions like:
 
-### 1️⃣ Run as a Docker Image
+- *"What components are inside this JAR/Docker image/package?"*
+- *"Which artifacts share this vulnerable library?"*
+- *"Where did this binary come from?"*
 
-```bash
-docker run -ti --rm \
-  -v ~/tmp/goat_rodeo/data/input:/data/input \
-  -v ~/tmp/goat_rodeo/data/output:/data/output \
-  -u $(id -u):$(id -g) \
-  spicelabs/goatrodeo:latest \
-  -b /data/input \
-  -o /data/output
 ```
-**Note:** a typical Docker installation will require that this command must be run as root (not recommended), or with an appropriate group configuration. See [here](https://docs.docker.com/engine/install/linux-postinstall/) for more details. 
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│   Artifacts │ ──▶  │ Goat Rodeo  │ ──▶  │     ADG     │
+│  JAR/DEB/   │      │  Analysis   │      │   Database  │
+│  Docker/... │      │             │      │  (.grd/gri) │
+└─────────────┘      └─────────────┘      └─────────────┘
+```
 
 ---
 
-### 2️⃣ Build and Run as a Java Program
+## Features
 
-**Requirements:** Git LFS, Java 21+, Scala 3, and `sbt`
+| | Feature | Description |
+|---|---------|-------------|
+| 📦 | **Multi-format Support** | JAR, WAR, EAR, TAR, ZIP, DEB, APK, Docker images, ISO, .NET assemblies |
+| 🔍 | **Deep Inspection** | Recursively unpacks nested archives (JAR inside TAR inside ISO) |
+| ⚡ | **Parallel Processing** | Multi-threaded analysis for large artifact sets |
+| 🔗 | **Bidirectional Graph** | Query both "what contains X" and "what does X contain" |
+| 🛡️ | **Hidden Reaper Detection** | Find vulnerabilities hidden from traditional SCA tools |
+| 📊 | **pURL Support** | Generates Package URLs for ecosystem compatibility |
+| 🔌 | **Embeddable** | Use as CLI tool, Docker container, or Java/Scala library |
+
+---
+
+## Getting Started
+
+### Option 1: Docker (Recommended)
 
 ```bash
-git lfs install
+docker run --rm \
+  -v /path/to/artifacts:/input:ro \
+  -v /path/to/output:/output \
+  spicelabs/goatrodeo:latest \
+  -b /input -o /output
+```
+
+### Option 2: Download Release
+
+```bash
+# Download latest release
+curl -LO https://github.com/spice-labs-inc/goatrodeo/releases/latest/download/goatrodeo-fat.jar
+
+# Run
+java -jar goatrodeo-fat.jar -b /path/to/artifacts -o /path/to/output
+```
+
+### Option 3: Build from Source
+
+```bash
 git clone https://github.com/spice-labs-inc/goatrodeo.git
 cd goatrodeo
 sbt assembly
+java -jar target/scala-3.7.4/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
 ```
 
-Produces fat JAR at:
+> **Requirements:** Java 21+, Git LFS
 
-```
-target/scala-3.7.2/goatrodeo-0.0.1-SNAPSHOT-fat.jar
-```
+### Option 4: As a Library
 
-Run example:
-
-```bash
-java -jar target/scala-*/goatrodeo-*-fat.jar -b ~/.m2 -o /tmp/gitoidcorpus -t 24
-```
-**Note:** the `-b` flag directs goat rodeo to start searching in a given directory which much exist. Otherwise goatrodeo will exit with an error.
----
-
-### 3️⃣ Use as a Java Library (via Maven)
-
-Add the following to your project's `pom.xml` in the `<dependencies>` section:
-
+**Maven:**
 ```xml
 <dependency>
   <groupId>io.spicelabs</groupId>
@@ -79,84 +92,149 @@ Add the following to your project's `pom.xml` in the `<dependencies>` section:
 </dependency>
 ```
 
-Example usage:
+**Gradle:**
+```groovy
+implementation 'io.spicelabs:goatrodeo_3:0.8.4'
+```
 
+**Usage:**
 ```java
+import io.spicelabs.goatrodeo.GoatRodeo;
+
 GoatRodeo.builder()
-  .withPayload("/path/to/artifacts")
-  .withOutput("/path/to/output")
-  .withThreads(8)
-  .withMaxRecords(100000)
-  .run();
+    .withPayload("/path/to/artifacts")
+    .withOutput("/path/to/output")
+    .withThreads(8)
+    .run();
 ```
 
 ---
 
-## 🛠️ CLI Options
-
-| Option                      | Description |
-|----------------------------|-------------|
-| `--block <value>`          | Gitoid block list. Skips common gitoids like license files. |
-| `-b`, `--build <value>`    | Build gitoid database from directory of JAR files. |
-| `--tag <value>`            | Tag top-level artifacts with a label and timestamp. |
-| `--ingested <value>`       | Append successfully processed files to this file. |
-| `--ignore <value>`         | File containing paths to skip (e.g., previously processed). |
-| `--file-list <value>`      | File containing list of specific files to process. |
-| `--exclude-pattern <value>`| Regex pattern to exclude files (e.g., `html$`). |
-| `--maxrecords <value>`     | Max records to process at once (default: 50,000). |
-| `-o`, `--out <value>`      | Output directory for gitoid database and results. |
-| `--tempdir <value>`        | Directory for temporary storage (RAM disk recommended). |
-| `-t`, `--threads <value>`  | Number of threads (default: 4). Suggest 2–3× CPU cores. |
-| `-V`, `--version`          | Print version and exit. |
-| `--mime-filter <value>`    | Allows artifacts to be filtered using a set of include |
-|                            | and exclude filters. The syntax of a filter is:        |
-|                            | `<command-char><filter-text>`                           |
-|                            | Command Characters:                                    |
-|                            | `+` include a mime type that matches exactly |
-|                            | `-` exclude a mime type that matches exactly |
-|                            | `*` include all mime types that match a regular expression |
-|                            | `/` exclude all mime types that match a regular expression |
-|                            | `#` ignore the filter text
-|                            | Exclusion is done before inclusion. This allows a "no, but..." |
-|                            | pattern where you could, say, exclude all audio, but include |
-|                            | wav files. The regular expression uses the [Java syntax](https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html). |
-| `--mime-filter-file <value>` | The value is a path to a text file containing mime filters. |
-|                            | Each line contains one mime filter and starts with a command. |
-|                            | Empty lines are ignored. |
-| `-?`, `--help`             | Print help and exit. |
-
----
-
-## 🚀 Release and Maintenance
-
-### Releasing a New Version
-
-1. **Create a GitHub Release**
-   - Tag it with `v0.x.y`
-   - Triggers GitHub Actions to publish to:
-     - GitHub Packages
-     - Maven Central
-
-2. **Monitor Maven Central**
-   - [central.sonatype.com → Deployments](https://central.sonatype.com)
-   - Publishing may take ~40 minutes
-
-3. **Verify via Maven**:
+## CLI Reference
 
 ```bash
-mvn dependency:get -Dartifact=io.spicelabs:goatrodeo_3:0.8.4
+goatrodeo [OPTIONS]
 ```
 
-Published artifacts:
+### Essential Options
 
-- [GitHub Releases](https://github.com/spice-labs-inc/goatrodeo/releases)
-- [GitHub Packages](https://github.com/spice-labs-inc/goatrodeo/packages)
-- [Maven Central](https://central.sonatype.com/artifact/io.spicelabs/goatrodeo_3)
-- [Docker Hub](https://hub.docker.com/r/spicelabs/goatrodeo)
+| Option | Description |
+|--------|-------------|
+| `-b, --build <dir>` | Directory containing artifacts to analyze |
+| `-o, --out <dir>` | Output directory for ADG database |
+| `-t, --threads <n>` | Parallel threads (default: 4) |
+
+### Filtering
+
+| Option | Description |
+|--------|-------------|
+| `--file-list <file>` | Only process files listed here |
+| `--ignore <file>` | Skip paths listed here |
+| `--exclude-pattern <regex>` | Exclude matching files |
+| `--mime-filter <filter>` | Filter by MIME type (`+include`, `-exclude`) |
+
+### Advanced
+
+| Option | Description |
+|--------|-------------|
+| `--maxrecords <n>` | Batch size (default: 50,000) |
+| `--tempdir <dir>` | Temp storage (RAM disk recommended) |
+| `--tag <name>` | Tag this run for later identification |
+| `--block <file>` | Skip known/common GitOIDs |
+
+<details>
+<summary><b>Performance Tips</b></summary>
+
+For large artifact sets (10,000+ files):
+
+1. **Use a RAM disk** for temp files:
+   ```bash
+   sudo mount -t tmpfs -o size=25G tmpfs /mnt/ramdisk
+   goatrodeo -b /artifacts -o /output --tempdir /mnt/ramdisk
+   ```
+
+2. **Match threads to CPU cores** (or fewer if memory-constrained)
+
+3. **Tune batch size** with `--maxrecords` based on available RAM
+
+See [Performance Tuning Guide](info/goat_rodeo_operation.md#tuning-for-performance) for details.
+
+</details>
 
 ---
 
-## 📜 License
+## Documentation
 
-Apache License 2.0  
-© 2025 [Spice Labs, Inc.](https://spicelabs.io) & Contributors
+| Document | Description |
+|----------|-------------|
+| 📖 [Documentation Index](info/README.md) | Complete documentation hub |
+| ⚙️ [How It Works](info/goat_rodeo_operation.md) | Processing pipeline & tuning |
+| 🔧 [API Reference](info/goat_rodeo_api.md) | Library integration guide |
+| 🏗️ [Architecture](info/architecture.md) | Internals for contributors |
+| 🛡️ [Hidden Reapers](info/hidden_reapers.md) | Finding hidden vulnerabilities |
+
+---
+
+## Use Cases
+
+### Software Composition Analysis
+Identify all components in your artifacts, even those not declared in manifests or build files.
+
+### Vulnerability Detection
+Find [Hidden Reapers](info/hidden_reapers.md) — vulnerabilities that traditional SCA tools miss because dependencies were copied rather than declared.
+
+### License Compliance
+Trace every component back to its source to ensure license obligations are met.
+
+### Supply Chain Security
+Build a cryptographic inventory of your software supply chain with content-addressable identifiers.
+
+---
+
+## Community
+
+- 💬 **Chat:** [Matrix #spice-labs](https://matrix.to/#/#spice-labs:matrix.org)
+- 🐛 **Issues:** [GitHub Issues](https://github.com/spice-labs-inc/goatrodeo/issues)
+- 📣 **Discussions:** [GitHub Discussions](https://github.com/spice-labs-inc/goatrodeo/discussions)
+
+---
+
+## Contributing
+
+We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details.
+
+```bash
+# Clone with LFS support
+git lfs install
+git clone https://github.com/spice-labs-inc/goatrodeo.git
+
+# Run tests
+cd goatrodeo
+sbt test
+
+# Submit a PR against the `next` branch
+```
+
+---
+
+## Related Projects
+
+- [OmniBOR](https://omnibor.io) — The specification for artifact identifiers
+- [Spice Labs CLI](https://github.com/spice-labs-inc/spice-labs-cli) — Full Spice Labs toolchain
+- [BigTent](https://gitlab.com/spicelabs1/bigtent) — ADG serving infrastructure
+
+---
+
+## License
+
+Apache License 2.0 — see [LICENSE.txt](LICENSE.txt)
+
+---
+
+<div align="center">
+
+**Built with ❤️ by [Spice Labs](https://spicelabs.io)**
+
+[Website](https://spicelabs.io) · [Twitter](https://twitter.com/saborlabs) · [LinkedIn](https://www.linkedin.com/company/spice-labs-inc)
+
+</div>

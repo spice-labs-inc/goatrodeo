@@ -294,15 +294,16 @@ object Builder {
           // if the channel is closed/empty, `None` will be
           // returned, handle it gracefully
 
-          var toProcess: ToProcess = null
+          var toProcessOpt: Option[ToProcess] = None
           while (
             (cnt.get() - startedRunning) < maxRecords // only run so many items
             &&
             !dead_?.get() && {
-              toProcess = doPoll();
-              toProcess
-            } != null
+              toProcessOpt = Option(doPoll())
+              toProcessOpt.isDefined
+            }
           ) {
+            val toProcess = toProcessOpt.get
             val localStart = Instant.now()
             try {
               // build the package

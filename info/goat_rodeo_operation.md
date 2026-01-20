@@ -1,4 +1,6 @@
-# How Goat Rodeo works
+# How Goat Rodeo Works
+
+> **Navigation:** [Documentation Index](README.md) | [API Reference](goat_rodeo_api.md) | [Architecture](architecture.md)
 
 When Goat Rodeo builds a set of Artifact Dependency Graphs (ADGs) from
 a series of files, it goes through a series of steps and each step

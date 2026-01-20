@@ -21,10 +21,30 @@ import java.util.zip.ZipFile
 import scala.util.Try
 import scala.util.Using
 
+/** Actions that can be taken while walking files in an archive.
+  */
 enum FileAction {
+
+  /** Skip diving into the current artifact (don't process its contents). */
   case SkipDive
+
+  /** End the file walk immediately. */
   case End
 }
+
+/** Utilities for traversing and extracting files from various archive formats.
+  *
+  * FileWalker provides functionality to:
+  *   - Detect archive types (ZIP, JAR, TAR, TAR.GZ, ISO, DEB, etc.)
+  *   - Extract and iterate over contents of archives
+  *   - Handle nested archives recursively
+  *   - Create temporary files for archive content processing
+  *
+  * Supported archive formats include:
+  *   - ZIP-based: ZIP, JAR, WAR, Android APK
+  *   - TAR-based: TAR, TAR.GZ, TAR.BZ2
+  *   - Other: ISO9660, DEB (Debian packages)
+  */
 object FileWalker {
   val logger: Logger = Logger(getClass())
 
@@ -313,9 +333,25 @@ object FileWalker {
     // "application/x-gtar"
   )
 
+  /** Check if an artifact is definitely not an archive based on MIME type.
+    *
+    * @param in
+    *   the artifact to check
+    * @return
+    *   true if this is definitely not an archive
+    */
   def notArchive(in: ArtifactWrapper): Boolean =
     notArchive(in.path(), in.mimeType)
 
+  /** Check if a file is definitely not an archive based on MIME type and path.
+    *
+    * @param path
+    *   the file path
+    * @param mimeType
+    *   the MIME type of the file
+    * @return
+    *   true if this is definitely not an archive
+    */
   def notArchive(path: String, mimeType: String): Boolean = {
     mimeType.startsWith("text/") ||
     mimeType.startsWith("image/") ||
@@ -323,6 +359,15 @@ object FileWalker {
     (mimeType == "application/zip" && path.endsWith(".xpi"))
   }
 
+  /** Check if a file is definitely not compressed based on MIME type and path.
+    *
+    * @param path
+    *   the file path
+    * @param mimeType
+    *   the MIME type of the file
+    * @return
+    *   true if this is definitely not a compressed file
+    */
   def notCompressed(path: String, mimeType: String): Boolean = {
     mimeType.startsWith("text/") ||
     mimeType.startsWith("image/") ||
@@ -464,6 +509,19 @@ object FileWalker {
     }
   }
 
+  /** Execute a function within a temporary directory context.
+    *
+    * If already within a withinArchiveStream call, reuses that temp directory.
+    * Otherwise, creates a new temporary directory that is cleaned up after
+    * the function completes.
+    *
+    * @param f
+    *   the function to execute with the temp directory path
+    * @tparam T
+    *   the return type of the function
+    * @return
+    *   the result of the function
+    */
   def withinTempDir[T](f: Path => T): T = {
     val (del, dir) = threadTempDir.get() match {
       case Some(p) => false -> p

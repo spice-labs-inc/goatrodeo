@@ -1,4 +1,6 @@
-# Looking for Vulnerable Artifacts hidden in other Artifacts: Hidden Reapers
+# Hidden Reapers: Finding Vulnerable Artifacts
+
+> **Navigation:** [Documentation Index](README.md) | [How It Works](goat_rodeo_operation.md) | [Main README](../README.md)
 
 The [Java Virtual Machine](https://en.wikipedia.org/wiki/Java_virtual_machine) (JVM) is a seasoned
 and very popular system for running applications, especially in the cloud and also on Android devices

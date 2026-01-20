@@ -12,23 +12,61 @@ import java.io.File
 import java.io.FileFilter
 import java.nio.file.Files
 import java.util.regex.Pattern
-import scala.io.BufferedSource
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import scala.util.Using
 import io.spicelabs.goatrodeo.components.Arguments
 
-/** Command Line Configuration
+/** Command line configuration for the Goat Rodeo application.
   *
-  * @param analyze
-  *   -- analyze a file against the GC (GitOID Corpus)
+  * This case class holds all the configuration options that can be specified
+  * via command line arguments when running the application.
+  *
   * @param out
-  *   -- the place to output either the analysis or the results of the build
+  *   the output directory for the file-system based GitOID storage
   * @param build
-  *   -- build a GitOID Corpus based on JAR files found in the directory
+  *   directories to scan for files to build the GitOID corpus from
+  * @param ingested
+  *   optional file to append successfully ingested files to
+  * @param ignore
+  *   files containing paths to ignore (e.g., previously processed files)
+  * @param fileList
+  *   files containing lists of files to process
+  * @param tag
+  *   optional tag for top-level artifacts with the current date
+  * @param exclude
+  *   regex patterns for excluding files from processing
   * @param threads
-  *   -- the number of threads for the build -- default 4... typically 4x the
-  *   number of physical CPUs
+  *   number of parallel threads for processing (default 4)
+  * @param tagJson
+  *   optional JSON to include as part of the tag
+  * @param blockList
+  *   file containing GitOIDs to skip (e.g., common license files)
+  * @param maxRecords
+  *   maximum number of records to process at once (default 50000)
+  * @param tempDir
+  *   directory for temporary files (ideally a RAM disk)
+  * @param useStaticMetadata
+  *   whether to enhance metadata using Syft
+  * @param dumpRootDir
+  *   optional directory to dump root items as JSON
+  * @param emitJsonDir
+  *   optional directory to dump the ADG as JSON
+  * @param fsFilePaths
+  *   whether to include filesystem file paths in items
+  * @param nonexistantDirectories
+  *   directories that were specified but don't exist
+  * @param mimeFilter
+  *   include/exclude filter for MIME types
+  * @param filenameFilter
+  *   include/exclude filter for filenames
+  * @param componentArgs
+  *   arguments to pass to components
+  * @param printComponentArgumentInfo
+  *   whether to print component argument help
+  * @param printComponentInfo
+  *   whether to print component information
   */
 case class Config(
     out: Option[File] = None,
@@ -54,6 +92,17 @@ case class Config(
     printComponentArgumentInfo: Boolean = false,
     printComponentInfo: Boolean = false
 ) {
+
+  /** Build a list of file list builders from the configuration.
+    *
+    * Returns tuples of (base directory, function to get files).
+    * For `build` directories, finds all files recursively.
+    * For `fileList` files, reads file paths from each line.
+    *
+    * @return
+    *   a Vector of tuples containing the base directory and a function that
+    *   returns the files to process
+    */
   def getFileListBuilders(): Vector[(File, () => Seq[File])] = {
     build.map(file => (file, () => Helpers.findFiles(file))) ++ fileList
       .map(f => {
@@ -69,9 +118,17 @@ case class Config(
   }
 }
 
+/** Companion object for Config providing command line argument parsing.
+  *
+  * Uses scopt for parsing command line arguments into a Config instance.
+  */
 object Config {
   private val logger = Logger(getClass())
+
+  /** The scopt parser builder instance. */
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
+
+  /** The command line argument parser definition. */
   lazy val parser1: OParser[Unit, Config] = {
     import builder._
     OParser.sequence(
@@ -216,25 +273,58 @@ object Config {
     )
   }
 
+  /** Utility object for reading files into Vectors of Strings.
+    *
+    * Each line of the file becomes one element in the Vector.
+    * Newlines are not included in the resulting strings.
+    */
   object VectorOfStrings {
+
+    /** Read a file and return its lines as a Vector of Strings.
+      *
+      * @param in
+      *   the file to read
+      * @return
+      *   a Vector containing each line of the file
+      */
     def apply(in: File): Vector[String] = {
-      var source: BufferedSource = null
-      try {
-        source = Source.fromFile(in.getAbsoluteFile())
+      Using.resource(Source.fromFile(in.getAbsoluteFile())) { source =>
         source
           .getLines()
           .toVector // getLines() does not include new lines (yay!)
-      } finally {
-        source.close()
       }
     }
+    /** Read a file by path and return its lines as a Vector of Strings.
+      *
+      * @param in
+      *   the path to the file to read
+      * @return
+      *   a Vector containing each line of the file
+      */
     def apply(in: String): Vector[String] = {
       val f = File(in)
       apply(f)
     }
   }
 
+  /** Utility object for expanding file paths, supporting wildcards and tilde expansion.
+    *
+    * Provides methods to:
+    *   - Expand tilde (~) to the user's home directory
+    *   - Expand wildcard patterns to matching files
+    */
   object ExpandFiles {
+
+    /** Expand a file path, supporting wildcards in the filename.
+      *
+      * If the file doesn't exist, returns a Vector containing just the input file.
+      * If the file exists, expands any wildcards in the filename portion.
+      *
+      * @param in
+      *   the file to expand
+      * @return
+      *   a Vector of matching files, or just the input if it doesn't exist
+      */
     def apply(in: File): Vector[File] = {
 
       val fixed = fixTilde(in)
@@ -269,6 +359,14 @@ object Config {
           Some(ret)
       }
 
+    /** Expand tilde (~) at the start of a file path to the user's home directory.
+      *
+      * @param in
+      *   the file whose path may contain a leading tilde
+      * @return
+      *   a new File with ~ replaced by the home directory, or the original file
+      *   if it doesn't start with ~/
+      */
     def fixTilde(in: File): File = {
       if (in.getPath().startsWith("~" + File.separator)) {
         val path = System.getProperty("user.home") + in.getPath().substring(1)

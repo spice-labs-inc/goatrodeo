@@ -24,17 +24,41 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import scala.util.Try
 
-/** Manage many parts of persisting/retrieving the graph information
+/** Manages persistence and retrieval of Artifact Dependency Graph (ADG) data.
+  *
+  * The graph data is stored in three types of files:
+  *   - GRD (Goat Rodeo Data): Contains CBOR-encoded Item data
+  *   - GRI (Goat Rodeo Index): Contains an index for looking up Items by hash
+  *   - GRC (Goat Rodeo Cluster): Metadata about a set of GRD/GRI files
+  *
+  * Files are named by their SHA256 hash (as a hex string) with the appropriate extension.
   */
 object GraphManager {
   private val logger: Logger = Logger(getClass())
+
+  /** Constants for file format magic numbers and limits. */
   object Consts {
+
+    /** Magic number at the start of GRD (data) files: 0x00BE1100 ("Bell"). */
     val DataFileMagicNumber: Int = 0x00be1100 // Bell
+
+    /** Magic number at the start of GRI (index) files: 0x54154170 ("Shishitō"). */
     val IndexFileMagicNumber: Int = 0x54154170 // Shishitō
+
+    /** Magic number at the start of GRC (cluster) files: 0xBA4A4A ("Banana"). */
     val ClusterFileMagicNumber: Int = 0xba4a4a // Banana
+
+    /** Target maximum file size (15 GB) before starting a new data file. */
     val TargetMaxFileSize: Long = 15L * 1024L * 1024L * 1024L // 15G
   }
 
+  /** Holds the SHA256 hashes (as Long) of a paired data and index file.
+    *
+    * @param dataFile
+    *   the hash of the GRD data file
+    * @param indexFile
+    *   the hash of the GRI index file
+    */
   case class DataAndIndexFiles(dataFile: Long, indexFile: Long)
   private def writeABlock(
       targetDirectory: File,
@@ -172,6 +196,21 @@ object GraphManager {
     DataAndIndexFiles(sha256Long, indexSha256Long)
   }
 
+  /** Write a collection of Items to GRD/GRI/GRC files.
+    *
+    * This is the main entry point for persisting Items to disk. It:
+    *   1. Writes Items to GRD data files (splitting at TargetMaxFileSize)
+    *   2. Creates GRI index files for each GRD file
+    *   3. Creates a GRC cluster file referencing all GRD/GRI files
+    *   4. Writes a history.jsonl file with build metadata
+    *
+    * @param targetDirectory
+    *   the directory to write files to
+    * @param entries
+    *   the Items to write
+    * @return
+    *   a tuple of (list of data/index file pairs, the cluster file)
+    */
   def writeEntries(
       targetDirectory: File,
       entries: Iterator[Item]
@@ -269,7 +308,24 @@ object GraphManager {
 
 }
 
+/** A walker for reading Items from a GRD (Goat Rodeo Data) file.
+  *
+  * Provides sequential access to Items stored in a GRD file.
+  * Use `open()` to validate the file and read the envelope,
+  * then `readNext()` or `items()` to iterate through Items.
+  *
+  * @param source
+  *   the FileChannel to read from
+  */
 class GRDWalker(source: FileChannel) {
+
+  /** Open the GRD file and read its envelope.
+    *
+    * Validates the magic number and reads the DataFileEnvelope.
+    *
+    * @return
+    *   a Try containing the envelope on success, or an error on failure
+    */
   def open(): Try[DataFileEnvelope] = {
     val magic_? = Helpers.readInt(source)
     if (magic_? != GraphManager.Consts.DataFileMagicNumber) {
@@ -286,6 +342,11 @@ class GRDWalker(source: FileChannel) {
     DataFileEnvelope.decode(ba.position(0).array())
   }
 
+  /** Read the next Item from the file.
+    *
+    * @return
+    *   Some(item) if there is another Item, None if at end of file
+    */
   def readNext(): Option[Item] = {
     if (source.position() == source.size()) {
       None
@@ -304,6 +365,13 @@ class GRDWalker(source: FileChannel) {
     }
   }
 
+  /** Get an Iterator over all Items in the file.
+    *
+    * Note: The file must have been opened with `open()` first.
+    *
+    * @return
+    *   an Iterator that yields each Item in the file
+    */
   def items(): Iterator[Item] = {
     var nextItem = readNext()
     new Iterator[Item] {

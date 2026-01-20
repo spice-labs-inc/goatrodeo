@@ -35,6 +35,19 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+/** State maintained during .NET assembly processing.
+  *
+  * Parses .NET PE/COFF assemblies using Cilantro to extract:
+  *   - Assembly name, version, locale, public key
+  *   - NuGet package URLs
+  *   - Assembly metadata (copyright, trademark, description)
+  *   - Assembly dependencies
+  *
+  * @param fileStmOpt
+  *   the optional file stream (kept open during processing)
+  * @param assemblyOpt
+  *   the optional parsed AssemblyDefinition
+  */
 class DotnetState(
     fileStmOpt: Option[FileInputStream] = None,
     assemblyOpt: Option[AssemblyDefinition] = None
@@ -45,23 +58,24 @@ class DotnetState(
       item: Item,
       marker: SingleMarker
   ): DotnetState = {
-    var fileStm: FileInputStream = null
+    var fileStmOpt: Option[FileInputStream] = None
 
     Try {
-      fileStm = streamForArtifact(artifact)
-      val assembly = AssemblyDefinition.readAssembly(fileStm)
-      DotnetState(Some(fileStm), Some(assembly))
+      fileStmOpt = Some(streamForArtifact(artifact))
+      val assembly = AssemblyDefinition.readAssembly(fileStmOpt.get)
+      DotnetState(fileStmOpt, Some(assembly))
     } match {
       case Failure(exception) =>
-        if (fileStm != null) {
-          fileStm.close()
-          log.error(
-            s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
-          )
-        } else {
-          log.error(
-            s"Unable to open file ${artifact.path()}: ${exception.getMessage()}"
-          )
+        fileStmOpt match {
+          case Some(fileStm) =>
+            fileStm.close()
+            log.error(
+              s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
+            )
+          case None =>
+            log.error(
+              s"Unable to open file ${artifact.path()}: ${exception.getMessage()}"
+            )
         }
         this
       case Success(value) => value
@@ -259,7 +273,16 @@ class DotnetState(
   }
 }
 
+/** Companion object with utility methods for DotnetState. */
 object DotnetState {
+
+  /** Format assembly dependencies as a JSON string.
+    *
+    * @param deps
+    *   the assembly name references (dependencies)
+    * @return
+    *   optional JSON string containing dependency information
+    */
   def formatDeps(deps: ArrayBuffer[AssemblyNameReference]) = {
     val sortedDeps = deps.sortBy(((elem) => elem.name))
 
@@ -279,6 +302,11 @@ object DotnetState {
   }
 }
 
+/** A .NET assembly file (.dll or .exe) to process.
+  *
+  * @param file
+  *   the .NET assembly artifact
+  */
 final case class DotnetFile(file: ArtifactWrapper) extends ToProcess {
 
   /** Call at the end of successful completing the operation
@@ -301,7 +329,21 @@ final case class DotnetFile(file: ArtifactWrapper) extends ToProcess {
     Vector(file -> SingleMarker()) -> DotnetState()
 }
 
+/** Factory methods for creating .NET assembly processing strategies. */
 object DotnetFile {
+
+  /** Identify .NET assemblies from a collection of files.
+    *
+    * Finds files with the .NET MIME type and creates DotnetFile
+    * ToProcess instances for them.
+    *
+    * @param byUUID
+    *   artifacts indexed by UUID
+    * @param byName
+    *   artifacts indexed by filename
+    * @return
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map, strategy name)
+    */
   def computeDotnetFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
