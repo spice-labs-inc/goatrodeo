@@ -24,7 +24,6 @@ import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
 
-
 // Steve sez:
 // This is the set of classes needed to expose the PackageURL api to components.
 // There are 4 pieces to make this work. For biggest to smallest:
@@ -35,11 +34,12 @@ import scala.util.Success
 // PurlAdapter - an adapter onto a PackageURL
 
 // adapter onto PackageURL to hide the implementation from components
-class PurlAdapter(val purl: PackageURL) extends Purl {
-}
+class PurlAdapter(val purl: PackageURL) extends Purl {}
 
 // factory for making purls
-class LocalPurlFactory(builder: PackageURLBuilder = PackageURLBuilder.aPackageURL()) extends  PurlFactory {
+class LocalPurlFactory(
+    builder: PackageURLBuilder = PackageURLBuilder.aPackageURL()
+) extends PurlFactory {
   override def withSubpath(subpath: String): PurlFactory = {
     LocalPurlFactory(builder.withSubpath(subpath))
   }
@@ -66,12 +66,13 @@ class LocalPurlFactory(builder: PackageURLBuilder = PackageURLBuilder.aPackageUR
 
   override def toPurl(): Purl = {
     Try {
-        PurlAdapter(builder.build())
+      PurlAdapter(builder.build())
     } match {
-        // we expose this as a MalformedURLException so there doesn't need to
-        // be a component dependency onto MalformedPackagedURLException
-        case Failure(exception) => throw MalformedURLException(exception.getMessage())
-        case Success(value) => value
+      // we expose this as a MalformedURLException so there doesn't need to
+      // be a component dependency onto MalformedPackagedURLException
+      case Failure(exception) =>
+        throw MalformedURLException(exception.getMessage())
+      case Success(value) => value
     }
   }
 }
@@ -83,17 +84,16 @@ class Purls extends PurlAPI {
     LocalPurlFactory()
   }
 
-  override def release(): Unit = {
-
-  }
+  override def release(): Unit = {}
 }
 
 // API factory uses a singleton - don't need anything more
 class PurlsAPIFactory extends APIFactory[PurlAPI] {
-  override def buildAPI(subscriber: RodeoComponent): Purls = PurlsAPIFactory.theAPI
+  override def buildAPI(subscriber: RodeoComponent): Purls =
+    PurlsAPIFactory.theAPI
   override def name(): String = PurlAPIConstants.NAME
 }
 
 object PurlsAPIFactory {
-    lazy val theAPI = Purls()
+  lazy val theAPI = Purls()
 }

@@ -237,7 +237,7 @@ object Helpers {
     dateFormat.format(new Date())
   }
 
-    private class GoatVisitor extends FileVisitor[Path] {
+  private class GoatVisitor extends FileVisitor[Path] {
     // Steve says: why the switch to Files.walkFileTree?
     // Turns out that this runs between 10 and 30% faster than Files.find.
     // I also tested using the parallel version of Files.find and some code to
@@ -265,11 +265,23 @@ object Helpers {
     private val count: AtomicLong = AtomicLong()
 
     // we care not for directories and file errors, just plow through
-    override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-    override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-    override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+    override def postVisitDirectory(
+        dir: Path,
+        exc: IOException
+    ): FileVisitResult = FileVisitResult.CONTINUE
+    override def preVisitDirectory(
+        dir: Path,
+        attrs: BasicFileAttributes
+    ): FileVisitResult = FileVisitResult.CONTINUE
+    override def visitFileFailed(
+        file: Path,
+        exc: IOException
+    ): FileVisitResult = FileVisitResult.CONTINUE
 
-    override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
+    override def visitFile(
+        path: Path,
+        attrs: BasicFileAttributes
+    ): FileVisitResult = {
       val f = path.toFile()
       if (attrs.isRegularFile() && !f.getName().startsWith(".")) {
         result = result :+ f
@@ -294,7 +306,7 @@ object Helpers {
     */
 
   def findFiles(
-    root: File
+      root: File
   ): Vector[File] = {
     val visitor = new GoatVisitor()
     Files.walkFileTree(root.toPath(), visitor)

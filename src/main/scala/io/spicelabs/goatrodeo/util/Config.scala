@@ -194,12 +194,17 @@ object Config {
           c
         }),
       opt[Seq[String]]("component")
-        .text("pass arguments to a component in the form --component <componentName>[,arg1,arg2...]")
+        .text(
+          "pass arguments to a component in the form --component <componentName>[,arg1,arg2...]"
+        )
         .optional()
         .unbounded()
         .action((args, c) => {
           args match {
-            case compName :: compArgs => c.copy(componentArgs = Arguments.addArgs(compName, compArgs.toArray, c.componentArgs))
+            case compName :: compArgs =>
+              c.copy(componentArgs =
+                Arguments.addArgs(compName, compArgs.toArray, c.componentArgs)
+              )
             case _ => {
               logger.info(OParser.usage(parser1))
               logger.info("--component ")
@@ -207,12 +212,12 @@ object Config {
             }
           }
         }),
-        opt[Unit]("print-component-info")
-          .text("print component information")
-          .action((_, c) => c.copy(printComponentInfo = true)),
-        opt[Unit]("print-component-arg-help")
-          .text("print component argument help")
-          .action((_, c) => c.copy(printComponentArgumentInfo = true))
+      opt[Unit]("print-component-info")
+        .text("print component information")
+        .action((_, c) => c.copy(printComponentInfo = true)),
+      opt[Unit]("print-component-arg-help")
+        .text("print component argument help")
+        .action((_, c) => c.copy(printComponentArgumentInfo = true))
     )
   }
 
