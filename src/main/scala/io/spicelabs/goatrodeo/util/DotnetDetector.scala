@@ -33,7 +33,11 @@ import scala.util.Try
 class DotnetDetector extends Detector {
 
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
-    toFileInputStream(input, metadata) match {
+    import DotnetDetector.isPE32
+    // bail quick if not your very basic PE32
+    if (!isPE32(input))
+      MediaType.OCTET_STREAM
+    else toFileInputStream(input, metadata) match {
       case Some(fs) =>
         Try {
           val assembly = AssemblyDefinition.readAssembly(fs)
@@ -58,6 +62,30 @@ class DotnetDetector extends Detector {
 object DotnetDetector {
   lazy val DOTNET_MIME = {
     MediaType.parse("application/x-msdownload; format=pe32-dotnet")
+  }
+
+  // the first 2 bytes of a PE file is M (0x4d) and Z (0x5a)
+  // This can be extended to jump to the formal PE header, but that
+  // involves:
+  // Skipping forward 58 bytes
+  // reading a little endian 4 byte int (offset to PE header)
+  // Skipping to that offset if it's "sane"
+  // reading a little endian 4 byte int
+  // checking to see if it matches 0x00004550
+  private def isPE32(input: InputStream): Boolean = {
+    input.mark(1024)
+    Try {
+      val b0 = input.read()
+      val b1 = input.read()
+      b0 == 0x4d && b1 == 0x5a
+    } match {
+      case Failure(exception) =>
+        input.reset() 
+        false
+      case Success(value) =>
+        input.reset()
+        true
+    }
   }
 }
 
@@ -87,11 +115,21 @@ object FileInputStreamEx {
 
           if (!f.exists()) {
             is match {
-              case tis: TikaInputStream if tis.getFile() match {
-                    case null => false
-                    case f    => f.isFile()
-                  } =>
-                Some(FileInputStreamEx(tis.getFile()))
+              case tis: TikaInputStream => {
+                saferGetFile(tis) match {
+                  case Some(f) =>
+                    if (f.isFile()) {
+                      Some(FileInputStreamEx(f))
+                    } else {
+                      log.error("TikaInputStream is not a file")
+                      None
+                    }
+                  case None => {
+                    log.error("Unable to get a file from TikaInputStream")
+                    None
+                  }
+                }
+              }
               case _ =>
                 log.error(
                   "file in metadata doesn't exist; tried to get TikaInputStream - that failed too."
@@ -108,6 +146,20 @@ object FileInputStreamEx {
             )
           }
         }
+    }
+  }
+
+  private def saferGetFile(tis: TikaInputStream): Option[File] = {
+    Try {
+      tis.getFile()
+    } match {
+      case Failure(exception) => {
+        log.error(
+          s"failure to get file from TikaInputStream: ${exception.getMessage()}"
+        )
+        None
+      }
+      case Success(f) => Some(f)
     }
   }
 
