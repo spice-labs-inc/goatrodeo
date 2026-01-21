@@ -56,7 +56,9 @@ class DotnetState(
           DotnetState(Some(AssemblyDefinition.readAssembly(fis)), Some(fis))
         } match {
           case Failure(exception) => {
-            log.error(s"unable to open assembly from ${fa.wrappedFile.toString()}: ${exception.getMessage()}")
+            log.error(
+              s"unable to open assembly from ${fa.wrappedFile.toString()}: ${exception.getMessage()}"
+            )
             DotnetState()
           }
           case Success(value) => value
