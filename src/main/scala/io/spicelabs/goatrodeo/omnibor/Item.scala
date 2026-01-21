@@ -17,6 +17,22 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
 
+/** Represents a node in the Artifact Dependency Graph (ADG).
+  *
+  * An Item is the core data structure in OmniBOR/Goat Rodeo, representing a
+  * single artifact identified by its GitOID. Items can have connections to
+  * other Items (edges in the graph) and can carry metadata about the artifact.
+  *
+  * @param identifier
+  *   the GitOID that uniquely identifies this Item (e.g.,
+  *   "gitoid:blob:sha256:...")
+  * @param connections
+  *   edges to other Items, represented as (edge type, target GitOID) pairs
+  * @param bodyMimeType
+  *   the MIME type of the body, typically "application/vnd.cc.goatrodeo"
+  * @param body
+  *   optional metadata about this Item (either ItemMetaData or ItemTagData)
+  */
 case class Item(
     identifier: String,
     // reference: LocationReference,
@@ -24,8 +40,19 @@ case class Item(
     @key("body_mime_type") bodyMimeType: Option[String],
     body: Option[ItemMetaData | ItemTagData]
 ) {
+
+  /** Encode this Item to CBOR format.
+    *
+    * @return
+    *   the CBOR-encoded bytes
+    */
   def encodeCBOR(): Array[Byte] = cachedCBOR
 
+  /** Get the body as ItemMetaData if it is of that type.
+    *
+    * @return
+    *   Some(ItemMetaData) if the body is ItemMetaData, None otherwise
+    */
   def bodyAsItemMetaData: Option[ItemMetaData] = body match {
     case Some(b: ItemMetaData) => Some(b)
     case _                     => None
@@ -45,10 +72,23 @@ case class Item(
 
   private lazy val md5 = Helpers.computeMD5(identifier)
 
+  /** Lazily cached CBOR-encoded representation of this Item. */
   lazy val cachedCBOR: Array[Byte] = Cbor.encode(this).toByteArray
 
+  /** Get the MD5 hash of this Item's identifier.
+    *
+    * @return
+    *   the 16-byte MD5 hash
+    */
   def identifierMD5(): Array[Byte] = md5
 
+  /** Compare this Item's MD5 hash with another Item's for ordering.
+    *
+    * @param that
+    *   the other Item to compare
+    * @return
+    *   true if this Item's hash is lexicographically less than the other's
+    */
   def cmpMd5(that: Item): Boolean = {
     val myHash = Helpers.md5hashHex(identifier)
     val thatHash = Helpers.md5hashHex(that.identifier)
@@ -177,7 +217,10 @@ case class Item(
     this
   }
 
-  /** Make a list of all the gitoids that this Item contains
+  /** Get a list of all GitOIDs that this Item contains.
+    *
+    * @return
+    *   a Vector of GitOIDs from "contains" edges
     */
   def listContains(): Vector[String] = {
     this.connections.toVector.filter(v => EdgeType.isContains(v._1)).map(_._2)
@@ -316,6 +359,9 @@ case class Item(
   }
 }
 
+/** Companion object for Item providing factory methods, CBOR codecs, and
+  * utilities.
+  */
 object Item {
   protected val logger: Logger = Logger(getClass())
 
@@ -404,7 +450,10 @@ object Item {
         else this
     }
 
+  /** A no-op location reference (0, 0) used as a placeholder. */
   val noopLocationReference: LocationReference = (0L, 0L)
+
+  /** CBOR encoder for Item. */
   given Encoder[Item] = {
 
     import io.bullet.borer.Dom
@@ -431,6 +480,7 @@ object Item {
     }
   }
 
+  /** CBOR decoder for Item. */
   given Decoder[Item] = {
     new Decoder[Item] {
       import io.bullet.borer.Dom
@@ -475,11 +525,23 @@ object Item {
     }
   }
 
+  /** Decode an Item from CBOR bytes.
+    *
+    * @param bytes
+    *   the CBOR-encoded bytes
+    * @return
+    *   a Try containing the decoded Item or an error
+    */
   def decode(bytes: Array[Byte]): Try[Item] = {
     Cbor.decode(bytes).to[Item].valueTry
   }
 }
 
-/** Information about how to tag an ADG
+/** Information about how to tag an ADG.
+  *
+  * @param name
+  *   the tag name
+  * @param extra
+  *   optional additional JSON/CBOR data to include with the tag
   */
 case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])

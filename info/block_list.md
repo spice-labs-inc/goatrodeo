@@ -1,10 +1,12 @@
-## Include/Exlude management
+# MIME Type Filtering (Include/Exclude)
 
-# Justification
+> **Navigation:** [Documentation Index](README.md) | [How It Works](goat_rodeo_operation.md) | [MIME Types](mime_types.md)
+
+## Overview
 
 It will be the case that clients of goat rodeo may wish to exclude or include MIME types of files queued for processing. Rather than depending on a static list or static code, this can be managed with a list of items or patterns to include or exclude that can be specified on the command line or through the configuration builder API.
 
-# Large Scale Process
+## How It Works
 
 The process will follow a "no, but..." model.
 
@@ -15,7 +17,7 @@ The include/exclude list will be aggregated and MIME types will be processed in 
 
 In all other cases, it will be excluded.
 
-# Implementation Details
+## Syntax
 
 > Some people, when confronted with a problem, think “I know, I'll use regular expressions.”  Now they have two problems. - [Jamie Zawinski, 12 August, 1997](https://regex.info/blog/2006-09-15/247)
 

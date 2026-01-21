@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
 
-/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
+/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,22 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.language.implicitConversions
 
+/** Constants and predicates for edge types in the Artifact Dependency Graph.
+  *
+  * Edge types define the relationships between Items:
+  *   - `aliasFrom`/`aliasTo`: Alternate identifiers (e.g., sha1, sha512 hashes)
+  *   - `containedBy`/`contains`: Container relationships (e.g., JAR contains
+  *     class files)
+  *   - `builtFrom`/`buildsTo`: Build relationships (e.g., class file built from
+  *     source)
+  *   - `tagFrom`/`tagTo`: Tag relationships for metadata tagging
+  *
+  * The `:down` and `:up` suffixes indicate direction:
+  *   - `:down` - from container to contained
+  *   - `:up` - from contained to container
+  *   - `:from` - source of alias/build
+  *   - `:to` - target of alias/build
+  */
 object EdgeType {
 
   /** Is the type `AliasFrom`
@@ -38,8 +54,22 @@ object EdgeType {
     s == aliasFrom
   }
 
+  /** Test if the edge type is "contains" (container to contained).
+    *
+    * @param s
+    *   the edge type string
+    * @return
+    *   true if this is a "contains" edge
+    */
   def isContains(s: String): Boolean = s == contains
 
+  /** Test if the edge type is "containedBy" (contained to container).
+    *
+    * @param s
+    *   the edge type string
+    * @return
+    *   true if this is a "containedBy" edge
+    */
   def isContainedByUp(s: String): Boolean = s == containedBy
 
   /** Is the type `AliasTo`
@@ -53,6 +83,14 @@ object EdgeType {
     s == aliasTo
   }
 
+  /** Test if the edge type represents a downward direction (to contained
+    * items).
+    *
+    * @param s
+    *   the edge type string
+    * @return
+    *   true if the edge ends with ":down"
+    */
   def isDown(s: String): Boolean = {
     s.endsWith(down)
   }
@@ -79,35 +117,84 @@ object EdgeType {
     s == buildsTo
   }
 
+  /** Edge suffix for "to" direction. */
   val to = ":to"
+
+  /** Edge suffix for "from" direction. */
   val from = ":from"
+
+  /** Edge suffix for downward direction (to contained). */
   val down = ":down"
+
+  /** Edge suffix for upward direction (to container). */
   val up = ":up"
 
+  /** Edge type for "contained by" relationship (points to container). */
   val containedBy = "contained:up";
+
+  /** Edge type for "contains" relationship (points to contained). */
   val contains = "contained:down";
+
+  /** Edge type for "alias to" relationship. */
   val aliasTo = "alias:to";
+
+  /** Edge type for "alias from" relationship. */
   val aliasFrom = "alias:from";
+
+  /** Edge type for "builds to" relationship (points to built artifact). */
   val buildsTo = "build:up"
+
+  /** Edge type for "built from" relationship (points to source). */
   val builtFrom = "build:down"
+
+  /** Edge type for "tag from" relationship. */
   val tagFrom = "tag:from"
+
+  /** Edge type for "tag to" relationship. */
   val tagTo = "tag:to"
 }
 
+/** Type alias for an edge in the graph: (edge type, target GitOID). */
 type Edge = (String, String)
 
+/** A value that can be either a simple String or a (mime type, value) pair.
+  *
+  * Used in ItemMetaData.extra to store additional information that may have
+  * associated MIME types (e.g., manifest content with "text/maven-manifest").
+  */
 sealed trait StringOrPair {
+
+  /** Get the main value (the string for StringOf, the second string for
+    * PairOf).
+    */
   def value: String
+
+  /** Get the MIME type if this is a PairOf. */
   def mimeType: Option[String] = None
 }
+
+/** A StringOrPair containing just a simple string value.
+  *
+  * @param s
+  *   the string value
+  */
 final case class StringOf(s: String) extends StringOrPair {
   def value = s
 }
+
+/** A StringOrPair containing a MIME type and a value.
+  *
+  * @param s1
+  *   the MIME type
+  * @param s2
+  *   the value
+  */
 final case class PairOf(s1: String, s2: String) extends StringOrPair {
   def value = s2
   override def mimeType: Option[String] = Some(s1)
 }
 
+/** Factory methods and codecs for StringOrPair. */
 object StringOrPair {
   def apply(s: String): StringOrPair = StringOf(s)
   def apply(s1: String, s2: String): StringOrPair =
@@ -159,12 +246,28 @@ object StringOrPair {
   }
 }
 
+/** Metadata associated with an Item in the Artifact Dependency Graph.
+  *
+  * Contains information about the artifact such as filenames, MIME types, file
+  * size, and additional metadata (extra).
+  *
+  * @param fileNames
+  *   the filenames associated with this artifact (may include paths or pURLs)
+  * @param mimeType
+  *   the MIME types of this artifact
+  * @param fileSize
+  *   the size of the artifact in bytes
+  * @param extra
+  *   additional metadata as a map from keys to sets of values
+  */
 case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
     @key("file_size") fileSize: Long,
     extra: TreeMap[String, TreeSet[StringOrPair]]
 ) {
+
+  /** Encode this metadata to CBOR format. */
   def encodeCBOR(): Array[Byte] = Cbor.encode(this).toByteArray
 
   /** Merge two metadata instances. If the filenames will only contain one name
@@ -213,7 +316,10 @@ case class ItemMetaData(
   }
 }
 
+/** Companion object for ItemMetaData with MIME type constant and codecs. */
 object ItemMetaData {
+
+  /** The MIME type for ItemMetaData bodies. */
   val mimeType = "application/vnd.cc.goatrodeo"
 
   given Encoder[ItemMetaData] = {
@@ -227,7 +333,10 @@ object ItemMetaData {
   }
 }
 
+/** Companion object for ItemTagData with MIME type constant and codecs. */
 object ItemTagData {
+
+  /** The MIME type for ItemTagData bodies. */
   val mimeType = "application/vnd.cc.goatrodeo.tag"
 
   given Encoder[ItemTagData] = {
@@ -241,7 +350,20 @@ object ItemTagData {
   }
 }
 
+/** Tag data associated with an Item for tagging and tracking purposes.
+  *
+  * @param tag
+  *   the tag data as a CBOR DOM element
+  */
 case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
+
+  /** Merge this tag data with another ItemTagData.
+    *
+    * @param other
+    *   the other tag data to merge
+    * @return
+    *   a new ItemTagData with merged content
+    */
   def merge(other: ItemTagData): ItemTagData = {
 
     // Merge logic for Dom.Element
@@ -264,11 +386,39 @@ case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
   }
 }
 
+/** Type alias for a location reference: (offset, file position). */
 type LocationReference = (Long, Long)
 
+/** An index location in the GRI (index) file.
+  *
+  * Used to locate Items within the binary GRD (data) files.
+  */
 enum IndexLoc {
+
+  /** A direct location with an offset within a specific data file.
+    *
+    * @param offset
+    *   the byte offset within the file
+    * @param fileHash
+    *   the hash of the data file
+    */
   case Loc(offset: Long, fileHash: Long)
+
+  /** A chain of locations for items that span multiple files.
+    *
+    * @param chain
+    *   the vector of locations
+    */
   case Chain(chain: Vector[IndexLoc])
 }
 
+/** Offset information for locating an Item by its identifier hash.
+  *
+  * @param hashHi
+  *   high 64 bits of the identifier MD5 hash
+  * @param hashLow
+  *   low 64 bits of the identifier MD5 hash
+  * @param loc
+  *   the location where the Item data can be found
+  */
 case class ItemOffset(hashHi: Long, hashLow: Long, loc: IndexLoc)

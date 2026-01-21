@@ -1,19 +1,18 @@
 package io.spicelabs.goatrodeo.components.testing
 
+import io.spicelabs.goatrodeo.components.PurlAdapter
 import io.spicelabs.goatrodeo.components.RodeoHost
-import io.spicelabs.rodeocomponents.RodeoComponent
 import io.spicelabs.rodeocomponents.APIFactoryReceiver
 import io.spicelabs.rodeocomponents.APIFactorySource
-import io.spicelabs.rodeocomponents.RodeoIdentity
-import java.lang.Runtime.Version
-import io.spicelabs.rodeocomponents.RodeoEnvironment
-import io.spicelabs.rodeocomponents.APIS.purls.PurlAPIConstants
 import io.spicelabs.rodeocomponents.APIS.purls.PurlAPI
-import java.util.Optional
-import scala.jdk.OptionConverters.*
-import io.spicelabs.goatrodeo.components.PurlAdapter
+import io.spicelabs.rodeocomponents.APIS.purls.PurlAPIConstants
+import io.spicelabs.rodeocomponents.RodeoComponent
+import io.spicelabs.rodeocomponents.RodeoEnvironment
+import io.spicelabs.rodeocomponents.RodeoIdentity
+
+import java.lang.Runtime.Version
 import java.net.MalformedURLException
-import io.spicelabs.goatrodeo.components.testing.PurlComponent.exMessage
+import scala.jdk.OptionConverters.*
 
 class SimpleIdentity(private val _name: String, private val _publisher: String)
     extends RodeoIdentity {

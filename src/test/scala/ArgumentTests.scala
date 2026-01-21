@@ -1,5 +1,5 @@
-import scopt.OParser
 import io.spicelabs.goatrodeo.util.Config
+import scopt.OParser
 
 class ArgumentTests extends munit.FunSuite {
   test("component-arg-simplest") {

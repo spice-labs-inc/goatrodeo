@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.components
 
-/* Copyright 2025 David Pollak, Steve Hawley Spice Labs, Inc. & Contributors
+/* Copyright 2025-2026 David Pollak, Steve Hawley, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.rodeocomponents.APIS.purls.*
 import com.github.packageurl.PackageURL
 import com.github.packageurl.PackageURLBuilder
 import io.spicelabs.rodeocomponents.APIFactory
+import io.spicelabs.rodeocomponents.APIS.purls.*
 import io.spicelabs.rodeocomponents.RodeoComponent
+
 import java.net.MalformedURLException
-import scala.util.Try
 import scala.util.Failure
 import scala.util.Success
+import scala.util.Try
 
 // Steve sez:
 // This is the set of classes needed to expose the PackageURL api to components.

@@ -26,13 +26,41 @@ import scala.util.Try
 import scala.xml.NodeSeq
 import scala.xml.XML
 
+/** Markers for different Maven/JVM artifact types.
+  *
+  * Each marker identifies the type of artifact being processed within a Maven
+  * package bundle (JAR + POM + sources + javadocs).
+  */
 enum MavenMarkers extends ProcessingMarker {
+
+  /** A POM (Project Object Model) XML file. */
   case POM
+
+  /** A JAR (Java Archive) file containing compiled classes. */
   case JAR
+
+  /** A sources JAR containing Java source files. */
   case Sources
+
+  /** A JavaDoc JAR containing API documentation. */
   case JavaDocs
 }
 
+/** State maintained during Maven artifact processing.
+  *
+  * Tracks POM file content and source file mappings to enable:
+  *   - Package URL generation from POM metadata
+  *   - Source-to-class file mapping for "built from" relationships
+  *
+  * @param pomFile
+  *   the raw POM file content as a string
+  * @param pomXml
+  *   the parsed POM XML
+  * @param sources
+  *   map of source filenames to their Items
+  * @param sourceGitoids
+  *   map of source filenames to their GitOIDs
+  */
 case class MavenState(
     pomFile: String = "",
     pomXml: NodeSeq = NodeSeq.Empty,
@@ -234,6 +262,20 @@ case class MavenState(
 
 }
 
+/** A Maven package bundle to process.
+  *
+  * Represents a complete Maven package including the main JAR and optional POM,
+  * sources, and JavaDoc artifacts.
+  *
+  * @param jar
+  *   the main JAR artifact (required)
+  * @param pom
+  *   the optional POM file
+  * @param source
+  *   the optional sources JAR
+  * @param javaDoc
+  *   the optional JavaDoc JAR
+  */
 final case class MavenToProcess(
     jar: ArtifactWrapper,
     pom: Option[ArtifactWrapper],
@@ -272,8 +314,23 @@ final case class MavenToProcess(
 
 }
 
+/** Factory methods for creating Maven processing strategies. */
 object MavenToProcess {
   val logger: Logger = Logger(getClass())
+
+  /** Identify and group Maven artifacts from a collection of files.
+    *
+    * Finds JARs and matches them with their associated POM, sources, and
+    * JavaDoc artifacts based on naming conventions.
+    *
+    * @param byUUID
+    *   artifacts indexed by UUID
+    * @param byName
+    *   artifacts indexed by filename
+    * @return
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
+    */
   def computeMavenFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName

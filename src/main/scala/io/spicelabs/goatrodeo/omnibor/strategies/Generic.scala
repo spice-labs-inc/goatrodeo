@@ -16,6 +16,12 @@ import io.spicelabs.goatrodeo.util.GitOID
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
+/** State for generic file processing.
+  *
+  * A no-op state used for files that don't match any specific strategy (Maven,
+  * Docker, Debian, .NET). All methods return unchanged state with no additional
+  * metadata or package URLs.
+  */
 class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
 
   /** Call the state object at the beginning of processing an ArtfactWrapper
@@ -67,6 +73,15 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
 
 }
 
+/** A generic file to process.
+  *
+  * Used as a fallback for files that don't match any specific strategy.
+  * Generates basic Item entries with GitOID and MIME type but no
+  * ecosystem-specific metadata or package URLs.
+  *
+  * @param file
+  *   the artifact to process
+  */
 final case class GenericFile(file: ArtifactWrapper) extends ToProcess {
 
   /** Call at the end of successfull completing the operation
@@ -90,7 +105,22 @@ final case class GenericFile(file: ArtifactWrapper) extends ToProcess {
 
 }
 
+/** Factory methods for creating generic file processing strategies. */
 object GenericFile {
+
+  /** Convert all remaining artifacts to generic files.
+    *
+    * This is typically the last strategy applied, consuming all artifacts not
+    * matched by other strategies (Maven, Docker, etc.).
+    *
+    * @param byUUID
+    *   artifacts indexed by UUID
+    * @param byName
+    *   artifacts indexed by filename
+    * @return
+    *   tuple of (ToProcess items, empty UUID map, empty name map, strategy
+    *   name)
+    */
   def computeGenericFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName

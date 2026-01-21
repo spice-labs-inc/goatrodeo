@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
+/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@ package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
+import io.spicelabs.goatrodeo.components.Arguments
+import io.spicelabs.goatrodeo.components.RodeoHost
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
@@ -30,12 +32,24 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import io.spicelabs.goatrodeo.components.Arguments
-import io.spicelabs.goatrodeo.components.RodeoHost
 
+/** Marker class for the main entry point. */
 class Howdy
 
-/** The `main` class
+/** The main entry point for the Goat Rodeo CLI application.
+  *
+  * Goat Rodeo is a tool for building Artifact Dependency Graphs (ADGs) using
+  * the OmniBOR specification. It processes software artifacts (JARs, DEBs,
+  * Docker images, .NET assemblies, etc.) to generate content-addressable GitOID
+  * identifiers and track relationships between artifacts.
+  *
+  * Usage:
+  * {{{
+  * goatrodeo --build /path/to/artifacts --out /path/to/output
+  * }}}
+  *
+  * @see
+  *   [[https://omnibor.io/ OmniBOR Specification]]
   */
 object Howdy {
   private val logger = Logger(getClass())
@@ -46,6 +60,9 @@ object Howdy {
     *   an array of command line paramets
     */
   def main(args: Array[String]): Unit = {
+    logger.info(
+      f"Goat Rodeo version ${hellogoat.BuildInfo.version} (commit: ${hellogoat.BuildInfo.commit})"
+    )
 
     // parse the CLI params
     val parsed = OParser.parse(Config.parser1, args, Config())
@@ -57,6 +74,16 @@ object Howdy {
     }
   }
 
+  /** Run the Goat Rodeo builder with the given configuration.
+    *
+    * This is the main processing method that:
+    *   1. Validates configuration parameters 2. Sets up file ingestion tracking
+    *      if requested 3. Processes files to build the ADG 4. Outputs results
+    *      to the specified directory
+    *
+    * @param params
+    *   the configuration parameters
+    */
   @static
   def run(params: Config): Unit = {
     startComponents(params)
@@ -196,6 +223,14 @@ object Howdy {
     RodeoHost.host.end()
   }
 
+  /** Initialize and start the component system.
+    *
+    * Starts the RodeoHost component runtime, processes component arguments, and
+    * optionally prints component information.
+    *
+    * @param params
+    *   the configuration parameters containing component settings
+    */
   @static
   def startComponents(params: Config) = {
     val host = RodeoHost.host

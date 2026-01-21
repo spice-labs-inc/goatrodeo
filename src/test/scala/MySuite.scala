@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
+/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -301,7 +301,7 @@ class MySuite extends munit.FunSuite {
 
   test("calculate mime type for class file") {
     val classFileName =
-      "target/scala-3.7.2/classes/io/spicelabs/goatrodeo/Howdy.class"
+      "target/scala-3.7.4/classes/io/spicelabs/goatrodeo/Howdy.class"
 
     val f = new File(classFileName)
     val metadata = new Metadata()

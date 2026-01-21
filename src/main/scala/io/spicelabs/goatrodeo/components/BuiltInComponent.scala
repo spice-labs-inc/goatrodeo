@@ -1,4 +1,4 @@
-/* Copyright 2025 David Pollak, Steve Hawley Spice Labs, Inc. & Contributors
+/* Copyright 2025-2026 David Pollak, Steve Hawley, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,16 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.components
 
-import io.spicelabs.rodeocomponents.RodeoComponent
-import io.spicelabs.rodeocomponents.RodeoIdentity
 import io.spicelabs.rodeocomponents.APIFactoryReceiver
-import java.lang.Runtime.Version
-import io.spicelabs.rodeocomponents.RodeoEnvironment
 import io.spicelabs.rodeocomponents.APIFactorySource
-import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
 import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentRegistrar
+import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
 import io.spicelabs.rodeocomponents.APIS.purls.PurlAPI
+import io.spicelabs.rodeocomponents.RodeoComponent
+import io.spicelabs.rodeocomponents.RodeoEnvironment
+import io.spicelabs.rodeocomponents.RodeoIdentity
+
+import java.lang.Runtime.Version
 
 private class BuiltInIdentity extends RodeoIdentity {
   override def name(): String = "GoatRodeoComponent"

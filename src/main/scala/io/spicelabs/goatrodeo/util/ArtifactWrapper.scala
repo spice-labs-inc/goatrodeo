@@ -43,6 +43,17 @@ sealed trait ArtifactWrapper {
     */
   protected def asStream(): InputStream
 
+  /** Execute a function with an InputStream to this artifact's content.
+    *
+    * The stream is automatically closed after the function completes.
+    *
+    * @param f
+    *   the function to execute with the stream
+    * @tparam T
+    *   the return type of the function
+    * @return
+    *   the result of the function
+    */
   def withStream[T](f: InputStream => T): T = {
     Using.resource(asStream()) { stream =>
       f(stream)
@@ -50,6 +61,11 @@ sealed trait ArtifactWrapper {
   }
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
+    * or the name of the artifact if it was extracted from a container (Zip,
+    * TAR, etc.).
+    *
+    * The path may be removed in certain cases. This is just a name and should
+    * not be considered a path to the file on local storage
     *
     * @return
     */
@@ -74,7 +90,7 @@ sealed trait ArtifactWrapper {
 
   lazy val uuid: String = UUID.randomUUID().toString()
 
-  /** Get the name for the file irregarless of the path
+  /** Get the name for the file irregardless of the path
     */
   lazy val filenameWithNoPath: String = (new File(path())).getName()
 
@@ -103,9 +119,13 @@ sealed trait ArtifactWrapper {
   }
 }
 
+/** Companion object for ArtifactWrapper with factory methods and MIME type
+  * detection.
+  */
 object ArtifactWrapper {
   private val logger = Logger(getClass())
-  // max in memory size 32MB
+
+  /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
   private val detectorFactory = TikaDetectorFactory(tika, DotnetDetector())
@@ -249,6 +269,17 @@ object ArtifactWrapper {
     }
   }
 
+  /** Determine if a file must be written to a temp file rather than kept in
+    * memory.
+    *
+    * Some file types (like .NET assemblies) require actual files on disk for
+    * processing by external tools.
+    *
+    * @param name
+    *   the filename to check
+    * @return
+    *   true if the file must be a temp file, false if it can be in memory
+    */
   def requireTempFile(name: String): Boolean = {
     // for .NET assemblies, we'll force a temp file so that cilantro can open them.
     FilenameUtils.getExtension(name) match {
@@ -258,6 +289,17 @@ object ArtifactWrapper {
   }
 }
 
+/** An ArtifactWrapper backed by an actual file on disk.
+  *
+  * @param wrappedFile
+  *   the actual File on disk
+  * @param thePath
+  *   the logical path of this artifact (may differ from wrappedFile's path)
+  * @param tempDir
+  *   optional temp directory for creating temporary files
+  * @param finishedFunc
+  *   callback function called when processing is complete
+  */
 final case class FileWrapper(
     wrappedFile: File,
     thePath: String,
@@ -290,12 +332,34 @@ final case class FileWrapper(
   def finished(): Unit = finishedFunc(wrappedFile)
 }
 
+/** Companion object for FileWrapper with factory methods. */
 object FileWrapper {
+
+  /** Create a FileWrapper from a file path.
+    *
+    * @param name
+    *   the path to the file
+    * @param tempDir
+    *   optional temp directory for creating temporary files
+    * @return
+    *   a FileWrapper for the specified file
+    */
   def fromName(name: String, tempDir: Option[File]): FileWrapper = {
     FileWrapper(new File(name), name, tempDir = tempDir)
   }
 }
 
+/** An ArtifactWrapper backed by an in-memory byte array.
+  *
+  * Used for small files or archive contents that can be held in memory.
+  *
+  * @param bytes
+  *   the byte content of this artifact
+  * @param fileName
+  *   the logical filename of this artifact
+  * @param tempDir
+  *   optional temp directory for creating temporary files
+  */
 final case class ByteWrapper(
     bytes: Array[Byte],
     fileName: String,

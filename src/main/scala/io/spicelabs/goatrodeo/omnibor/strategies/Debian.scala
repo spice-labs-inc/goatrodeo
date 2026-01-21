@@ -22,6 +22,15 @@ import java.io.InputStreamReader
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
+/** State maintained during Debian package processing.
+  *
+  * Extracts metadata from the DEB control file to generate:
+  *   - Package URLs (pURL) for package identification
+  *   - Metadata including package, version, architecture, etc.
+  *
+  * @param artifact
+  *   the DEB artifact to extract metadata from
+  */
 class DebianState(artifact: ArtifactWrapper)
     extends ProcessingState[SingleMarker, DebianState] {
 
@@ -80,6 +89,11 @@ class DebianState(artifact: ArtifactWrapper)
 
 }
 
+/** A Debian package (.deb) to process.
+  *
+  * @param deb
+  *   the DEB artifact
+  */
 final case class Debian(deb: ArtifactWrapper) extends ToProcess {
 
   /** Call at the end of successfull completing the operation
@@ -100,8 +114,20 @@ final case class Debian(deb: ArtifactWrapper) extends ToProcess {
     Vector(deb -> SingleMarker()) -> DebianState(deb)
 }
 
+/** Factory methods and utilities for Debian package processing. */
 object Debian {
 
+  /** Extract package URL and metadata from a DEB file.
+    *
+    * Parses the control.tar file inside the DEB to extract:
+    *   - Package name, version, architecture
+    *   - All control file fields as metadata
+    *
+    * @param f
+    *   the DEB artifact
+    * @return
+    *   optional tuple of (pURL, metadata map)
+    */
   def computePurl(
       f: ArtifactWrapper
   ): Option[(Option[PackageURL], TreeMap[String, TreeSet[StringOrPair]])] = {
@@ -201,6 +227,19 @@ object Debian {
     } else None
   }
 
+  /** Identify Debian packages from a collection of files.
+    *
+    * Finds files with MIME type "application/x-debian-package" and creates
+    * Debian ToProcess instances for them.
+    *
+    * @param byUUID
+    *   artifacts indexed by UUID
+    * @param byName
+    *   artifacts indexed by filename
+    * @return
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
+    */
   def computeDebianFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName

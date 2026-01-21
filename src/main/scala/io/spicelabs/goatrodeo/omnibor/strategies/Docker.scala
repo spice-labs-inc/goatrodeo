@@ -21,12 +21,39 @@ import org.json4s.native.JsonMethods.*
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
+/** Markers for different Docker/OCI image component types.
+  *
+  * Each marker identifies the type of artifact being processed within a Docker
+  * image (manifest, layers, config).
+  */
 enum DockerMarkers extends ProcessingMarker {
+
+  /** The manifest.json file listing all image configurations. */
   case Manifest
+
+  /** A layer tarball containing filesystem changes.
+    *
+    * @param hash
+    *   the SHA256 hash of the layer
+    */
   case Layer(hash: String)
+
+  /** The configuration JSON for an image.
+    *
+    * @param info
+    *   the parsed manifest information
+    */
   case Config(info: ManifestInfo)
 }
 
+/** State maintained during Docker image processing.
+  *
+  * Tracks layer-to-GitOID mappings for establishing "contains" relationships
+  * between config and layers.
+  *
+  * @param layerToGitoidMapping
+  *   map of layer SHA256 hashes to their GitOIDs
+  */
 case class DockerState(
     layerToGitoidMapping: Map[String, String]
 ) extends ProcessingState[DockerMarkers, DockerState] {
@@ -194,6 +221,18 @@ case class DockerState(
 
 }
 
+/** A Docker/OCI image to process.
+  *
+  * Represents a complete Docker image including the manifest, config, and all
+  * layer tarballs.
+  *
+  * @param manifest
+  *   the manifest.json artifact
+  * @param config
+  *   list of configuration files with their parsed info
+  * @param layers
+  *   map of layer hashes to their artifacts
+  */
 final case class DockerToProcess(
     manifest: ArtifactWrapper,
     config: List[ManifestInfo],
@@ -227,9 +266,26 @@ final case class DockerToProcess(
 
 }
 
+/** Factory methods for creating Docker image processing strategies. */
 object DockerToProcess {
+
+  /** MIME type for JSON files. */
   val jsonMimeType = "application/json"
   private val logger: Logger = Logger(getClass())
+
+  /** Identify and group Docker image components from a collection of files.
+    *
+    * Looks for manifest.json and associated config and layer files to construct
+    * a complete Docker image for processing.
+    *
+    * @param byUUID
+    *   artifacts indexed by UUID
+    * @param byName
+    *   artifacts indexed by filename
+    * @return
+    *   tuple of (ToProcess items, remaining UUID map, remaining name map,
+    *   strategy name)
+    */
   def computeDockerFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
@@ -334,6 +390,21 @@ object DockerToProcess {
   }
 }
 
+/** Parsed information about a Docker image manifest entry.
+  *
+  * @param manifest
+  *   the manifest.json artifact
+  * @param manifestConfig
+  *   the JSON for this manifest entry
+  * @param configHash
+  *   the SHA256 hash of the config file
+  * @param configFile
+  *   the config JSON artifact
+  * @param configJson
+  *   the parsed config JSON
+  * @param layers
+  *   list of layer SHA256 hashes
+  */
 case class ManifestInfo(
     manifest: ArtifactWrapper,
     manifestConfig: JValue,

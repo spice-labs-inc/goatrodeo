@@ -2,7 +2,7 @@ import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 import scala.sys.process._
 
 val projectName = "goatrodeo"
-val scala3Version = "3.7.2"
+val scala3Version = "3.7.4"
 
 ThisBuild / organization := "io.spicelabs"
 ThisBuild / version := "0.0.1-SNAPSHOT" // Don't change this, it is overridden by the GitHub Actions workflow
@@ -79,7 +79,8 @@ ThisBuild / scalacOptions ++=
     "-Wunused:imports",
     "-feature",
     "-release",
-    "21"
+    "21",
+    "-Yexplicit-nulls"
   )
 
 // Add GitHub Packages resolver
@@ -106,6 +107,8 @@ lazy val root = project
     libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
+    libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,
+    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
     libraryDependencies += "commons-io" % "commons-io" % "2.18.0",
     libraryDependencies += "io.bullet" %% "borer-core" % "1.14.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",

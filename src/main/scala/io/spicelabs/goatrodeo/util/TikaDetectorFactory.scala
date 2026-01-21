@@ -1,4 +1,4 @@
-/* Copyright 2024 David Pollak, Spice Labs, Inc. & Contributors
+/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,49 +59,49 @@ class TikaDetectorFactory(tika: TikaConfig, detectors: Detector*) {
   private val firstResponders = TikaDetectorFactory.toArrayBuffer(detectors)
   private val tikaDetector = tika.getDetector()
   private val finalResponders = ArrayBuffer[Detector]()
-  private var dirty = true
-  private var detector: Detector = null
+  private var detectorOpt: Option[Detector] = None
 
   def addFirst(detectors: Detector*) =
     this.synchronized {
       firstResponders.addAll(detectors)
-      dirty = true
+      detectorOpt = None
     }
   def clearFirst() =
     this.synchronized {
       firstResponders.clear()
-      dirty = true
+      detectorOpt = None
     }
 
   def addFinal(detectors: Detector*) =
     this.synchronized {
       finalResponders.addAll(detectors)
-      dirty = true;
+      detectorOpt = None
     }
   def clearFinal() =
     this.synchronized {
       finalResponders.clear()
-      dirty = true
+      detectorOpt = None
     }
 
   def clearAll() =
     this.synchronized {
       clearFirst()
       clearFinal()
-      dirty = true
     }
 
   def toDetector(): Detector =
     this.synchronized {
-      if (dirty) {
-        val detectors: ju.List[Detector] = ArrayList[Detector]()
-        detectors.addAll(firstResponders.asJava)
-        detectors.add(tikaDetector)
-        detectors.addAll(finalResponders.asJava)
-        detector = CompositeDetector(detectors)
-        dirty = false
+      detectorOpt match {
+        case Some(d) => d
+        case None =>
+          val detectors: ju.List[Detector] = ArrayList[Detector]()
+          detectors.addAll(firstResponders.asJava)
+          detectors.add(tikaDetector)
+          detectors.addAll(finalResponders.asJava)
+          val d = CompositeDetector(detectors)
+          detectorOpt = Some(d)
+          d
       }
-      detector
     }
 }
 

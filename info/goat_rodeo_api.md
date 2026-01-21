@@ -1,5 +1,7 @@
 # Goat Rodeo API
 
+> **Navigation:** [Documentation Index](README.md) | [How It Works](goat_rodeo_operation.md) | [Architecture](architecture.md)
+
 When embedding Goat Rodeo in another application, there are two main operations:
 - assembling options
 - execution

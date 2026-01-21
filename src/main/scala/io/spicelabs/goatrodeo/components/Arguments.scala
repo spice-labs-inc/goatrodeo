@@ -1,4 +1,4 @@
-/* Copyright 2025 David Pollak, Steve Hawley Spice Labs, Inc. & Contributors
+/* Copyright 2025-2026 David Pollak, Steve Hawley, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,13 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.components
-import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentConstants
-import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentRegistrar
-import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentListener
-import io.spicelabs.rodeocomponents.APIFactory
-import io.spicelabs.rodeocomponents.RodeoComponent
-import scala.collection.mutable.ArrayBuffer
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.rodeocomponents.APIFactory
+import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentConstants
+import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentListener
+import io.spicelabs.rodeocomponents.APIS.arguments.RodeoArgumentRegistrar
+import io.spicelabs.rodeocomponents.RodeoComponent
+
+import scala.collection.mutable.ArrayBuffer
 
 /** This is the implementation of the command line argument API for components.
   * Command line arguments will be accumulated prior to discovering components.

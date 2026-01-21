@@ -1,4 +1,4 @@
-/* Copyright 2025 David Pollak, Steve Hawley Spice Labs, Inc. & Contributors
+/* Copyright 2025-2026 David Pollak, Steve Hawley, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.components
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.rodeocomponents.RodeoComponent
 import io.spicelabs.rodeocomponents.APIFactory
 import io.spicelabs.rodeocomponents.APIS.logging.RodeoLogger
 import io.spicelabs.rodeocomponents.APIS.logging.RodeoLoggerConstants
+import io.spicelabs.rodeocomponents.RodeoComponent
 
 class LoggingAPI(subscriber: RodeoComponent) extends RodeoLogger {
   private val log = Logger(subscriber.getClass())
