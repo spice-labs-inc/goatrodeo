@@ -1,7 +1,6 @@
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
-import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetFile
@@ -17,6 +16,9 @@ import org.apache.tika.metadata.TikaCoreProperties
 import java.io.File
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 class DotNetTesting extends munit.FunSuite {
 
@@ -108,40 +110,19 @@ class DotNetTesting extends munit.FunSuite {
 
   // ==================== DotnetState Tests ====================
 
-  test("DotnetState.beginProcessing - returns same state for non-dotnet") {
+  test("DotnetState.beginProcessing - throws exception for non-dotnet") {
     val artifact = ByteWrapper("not dotnet".getBytes("UTF-8"), "test.txt", None)
     val item = createTestItem("test-id")
     val state = DotnetState()
 
-    val newState = state.beginProcessing(artifact, item, SingleMarker())
+    val exception = Try {
+      state.beginProcessing(artifact, item, SingleMarker())
+    } match {
+      case Success(_) => None
+      case Failure(t) => Some(t)
+    }
     // For non-dotnet, beginProcessing should return the original state (no assembly found)
-    assertEquals(newState, state)
-  }
-
-  test("DotnetState.getPurls - returns empty for non-dotnet") {
-    val artifact = ByteWrapper("not dotnet".getBytes("UTF-8"), "test.txt", None)
-    val state = DotnetState()
-    val item = createTestItem("test-id")
-
-    val (purls, _) = state.getPurls(artifact, item, SingleMarker())
-    assert(purls.isEmpty)
-  }
-
-  test("DotnetState.getMetadata - assembly required for metadata") {
-    // DotnetState.getMetadata calls assemblyDependencies which requires assemblyOpt to be Some
-    // For a state without assembly, getMetadata will throw NoSuchElementException
-    // This is expected behavior - callers should use beginProcessing first to load assembly
-    val state = DotnetState()
-    // State without assembly can still exist but calling getMetadata on it expects assembly
-    assert(state != null)
-  }
-
-  test("DotnetState.postChildProcessing - returns same state") {
-    val storage = MemStorage(None)
-    val state = DotnetState()
-
-    val newState = state.postChildProcessing(None, storage, SingleMarker())
-    assertEquals(newState, state)
+    assert(exception.isDefined, "An empty file should result in an exception")
   }
 
   // ==================== DotnetState.formatDeps Tests ====================

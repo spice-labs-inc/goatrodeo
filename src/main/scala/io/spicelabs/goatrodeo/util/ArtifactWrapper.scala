@@ -61,6 +61,11 @@ sealed trait ArtifactWrapper {
   }
 
   /** The name of the Artifact. This corresponds to the name of a `File` on disk
+    * or the name of the artifact if it was extracted from a container (Zip,
+    * TAR, etc.).
+    *
+    * The path may be removed in certain cases. This is just a name and should
+    * not be considered a path to the file on local storage
     *
     * @return
     */
@@ -85,7 +90,7 @@ sealed trait ArtifactWrapper {
 
   lazy val uuid: String = UUID.randomUUID().toString()
 
-  /** Get the name for the file irregarless of the path
+  /** Get the name for the file irregardless of the path
     */
   lazy val filenameWithNoPath: String = (new File(path())).getName()
 

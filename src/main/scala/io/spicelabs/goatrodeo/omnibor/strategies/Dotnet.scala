@@ -23,11 +23,9 @@ import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.JsonDSL.*
-import org.json4s.jackson.JsonMethods.*
+import org.json4s.native.JsonMethods.*
 
 import java.io.FileInputStream
-import java.nio.file.Files
-import java.nio.file.Path
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable.ArrayBuffer
@@ -49,8 +47,8 @@ import scala.util.Try
   *   the optional parsed AssemblyDefinition
   */
 class DotnetState(
-    fileStmOpt: Option[FileInputStream] = None,
-    assemblyOpt: Option[AssemblyDefinition] = None
+    assemblyOpt: Option[AssemblyDefinition] = None,
+    streamOpt: Option[FileInputStream] = None
 ) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
   def beginProcessing(
@@ -61,24 +59,31 @@ class DotnetState(
     var fileStmOpt: Option[FileInputStream] = None
 
     Try {
-      fileStmOpt = Some(streamForArtifact(artifact))
-      val assembly = AssemblyDefinition.readAssembly(fileStmOpt.get)
-      DotnetState(fileStmOpt, Some(assembly))
+      val stream = io.spicelabs.goatrodeo.util.FileWalker.withinTempDir {
+        path => FileInputStream(artifact.forceFile(path))
+      }
+
+      fileStmOpt = Some(stream)
+      val assembly = AssemblyDefinition.readAssembly(stream)
+      DotnetState(Some(assembly), fileStmOpt)
     } match {
-      case Failure(exception) =>
+      case Failure(excpt) =>
         fileStmOpt match {
           case Some(fileStm) =>
             fileStm.close()
             log.error(
-              s"Error while reading assembly from ${artifact.path()}: ${exception.getMessage()}"
+              s"Error while reading assembly from ${artifact.path()}: ${excpt.getMessage()}"
             )
           case None =>
             log.error(
-              s"Unable to open file ${artifact.path()}: ${exception.getMessage()}"
+              s"Unable to open file ${artifact.path()}: ${excpt.getMessage()}"
             )
         }
-        this
-      case Success(value) => value
+        throw excpt
+
+      case Success(value) => {
+        value
+      }
     }
   }
 
@@ -87,7 +92,6 @@ class DotnetState(
       item: Item,
       marker: SingleMarker
   ): (Vector[PackageURL], DotnetState) = {
-
     assemblyOpt
       .map(assembly =>
         PackageURL(
@@ -100,16 +104,6 @@ class DotnetState(
         )
       )
       .toVector -> this
-  }
-
-  private def streamForArtifact(artifact: ArtifactWrapper): FileInputStream = {
-    val tempDir: Path = artifact.tempDir match {
-      case Some(p) =>
-        Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
-      case None => Files.createTempDirectory("goatrodeo_temp_dir")
-    }
-    val file = artifact.forceFile(tempDir)
-    FileInputStream(file)
   }
 
   override def getMetadata(
@@ -139,19 +133,26 @@ class DotnetState(
       k: String,
       v: Option[String]
   ): Option[(String, TreeSet[StringOrPair])] =
-    v match {
-      case Some(str) => Some(k, TreeSet[StringOrPair](str))
-      case None      => None
-    }
+    v.map(str => k -> TreeSet[StringOrPair](str))
 
   // each of these assembly attributes should
   // 1. exist
   // 2. have a zeroth constructor argument
   // 3. that value should be type String
-  // in the event that we get none of those, we return null
+  // in the event that we get none of those, we return None
   def customAttributeArgumentZero(attrName: String): Option[String] = {
     for {
       assembly <- assemblyOpt if assembly.hasCustomAttributes
+      // Steve says: DO NOT REMOVE THIS TRY.
+      // what's going on here that requires a Try?
+      // cilantro has code that lets us extract attributes and their
+      // associated data, however, the contents of these can be
+      // super complicated and requires code that is not (yet) ported.
+      // We don't actually care about these complicated cases for what we
+      // need. Unfortunately, a more graceful test is not possible/practical
+      // for this.
+      // See this issue: https://github.com/spice-labs-inc/goatrodeo/issues/209
+      // for more information.
       resOption <- Try {
         assembly.customAttributes.find(at =>
           at.attributeType.fullName == attrName
@@ -245,11 +246,16 @@ class DotnetState(
 
   def assemblyDependencies: Option[(String, TreeSet[StringOrPair])] = {
     import DotnetState.formatDeps
-    val assembly = assemblyOpt.get
-    val refs = assembly.mainModule.assemblyReferences;
-    if (refs.length == 0) return None
-    val deps = formatDeps(refs)
-    maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+    assemblyOpt.flatMap(assembly => {
+
+      val refs = assembly.mainModule.assemblyReferences;
+      if (refs.length == 0) None
+      else {
+        val deps = formatDeps(refs)
+        maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+      }
+    })
+
   }
 
   override def finalAugmentation(
@@ -265,11 +271,8 @@ class DotnetState(
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {
-    if (fileStmOpt.isDefined) {
-      fileStmOpt.get.close()
-      DotnetState()
-    }
-    this
+    streamOpt.foreach(fs => fs.close())
+    DotnetState()
   }
 }
 

@@ -14,6 +14,14 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
+import org.apache.commons.compress.archivers.ArchiveEntry
+import org.apache.commons.compress.archivers.ArchiveInputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -23,15 +31,6 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-
-import org.apache.commons.compress.archivers.ArchiveEntry
-import org.apache.commons.compress.archivers.ArchiveInputStream
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
-import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 
 class HelpersTestSuite extends munit.FunSuite {
 
@@ -800,7 +799,10 @@ Long-Value: This is a very long value that continues
     val iterator = Helpers.iteratorFor(zipInput)
     val entries = iterator.toList
     assertEquals(entries.length, 3)
-    assertEquals(entries.map(_.getName).toList, List("file1.txt", "file2.txt", "file3.txt"))
+    assertEquals(
+      entries.map(_.getName).toList,
+      List("file1.txt", "file2.txt", "file3.txt")
+    )
     zipInput.close()
   }
 
@@ -836,7 +838,13 @@ Long-Value: This is a very long value that continues
     assertEquals(entries.length, 5)
     assertEquals(
       entries.map(_.getName).toList,
-      List("root.txt", "dir1/", "dir1/file1.txt", "dir1/dir2/", "dir1/dir2/file2.txt")
+      List(
+        "root.txt",
+        "dir1/",
+        "dir1/file1.txt",
+        "dir1/dir2/",
+        "dir1/dir2/file2.txt"
+      )
     )
     zipInput.close()
   }
@@ -889,7 +897,10 @@ Long-Value: This is a very long value that continues
     val iterator = Helpers.iteratorFor(zipInput)
     val filesOnly = iterator.filter(!_.isDirectory).toList
     assertEquals(filesOnly.length, 2)
-    assertEquals(filesOnly.map(_.getName).toList, List("file1.txt", "file2.txt"))
+    assertEquals(
+      filesOnly.map(_.getName).toList,
+      List("file1.txt", "file2.txt")
+    )
     zipInput.close()
   }
 
@@ -928,7 +939,10 @@ Long-Value: This is a very long value that continues
     val iterator = Helpers.iteratorFor(tarInput)
     val entries = iterator.toList
     assertEquals(entries.length, 3)
-    assertEquals(entries.map(_.getName).toList, List("file1.txt", "file2.txt", "file3.txt"))
+    assertEquals(
+      entries.map(_.getName).toList,
+      List("file1.txt", "file2.txt", "file3.txt")
+    )
     tarInput.close()
   }
 

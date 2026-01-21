@@ -220,7 +220,7 @@ object Howdy {
       fsFilePaths = params.fsFilePaths
     )
 
-    Helpers.exitZero()
+    RodeoHost.host.end()
   }
 
   /** Initialize and start the component system.
