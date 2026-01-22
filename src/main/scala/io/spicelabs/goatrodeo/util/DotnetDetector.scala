@@ -29,35 +29,67 @@ import java.io.InputStream
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import java.nio.file.Files
+import java.io.FileOutputStream
+import java.io.BufferedInputStream
 
 class DotnetDetector extends Detector {
 
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
-    toFileInputStream(input, metadata) match {
-      case Some(fs) =>
-        Try {
-          val assembly = AssemblyDefinition.readAssembly(fs)
-          if (assembly != null && assembly.mainModule != null) {
-            DotnetDetector.DOTNET_MIME
-          } else {
-            MediaType.OCTET_STREAM
+    import DotnetDetector.isPE32
+    // bail quick if not your very basic PE32
+    if (!isPE32(input))
+      MediaType.OCTET_STREAM
+    else
+      toFileInputStream(input, metadata) match {
+        case Some(fs) =>
+          Try {
+            val assembly = AssemblyDefinition.readAssembly(fs)
+            if (assembly != null && assembly.mainModule != null) {
+              DotnetDetector.DOTNET_MIME
+            } else {
+              MediaType.OCTET_STREAM
+            }
+          } match {
+            case Failure(exception) =>
+              FileInputStreamEx.closeIfNeeded(fs)
+              MediaType.OCTET_STREAM
+            case Success(value) =>
+              FileInputStreamEx.closeIfNeeded(fs)
+              value
           }
-        } match {
-          case Failure(exception) =>
-            FileInputStreamEx.closeIfNeeded(fs)
-            MediaType.OCTET_STREAM
-          case Success(value) =>
-            FileInputStreamEx.closeIfNeeded(fs)
-            value
-        }
-      case None => MediaType.OCTET_STREAM
-    }
+        case None => MediaType.OCTET_STREAM
+      }
   }
 }
 
 object DotnetDetector {
   lazy val DOTNET_MIME: MediaType = {
     MediaType.parse("application/x-msdownload; format=pe32-dotnet")
+  }
+
+  // the first 2 bytes of a PE file is M (0x4d) and Z (0x5a)
+  // This can be extended to jump to the formal PE header, but that
+  // involves:
+  // Skipping forward 58 bytes
+  // reading a little endian 4 byte int (offset to PE header)
+  // Skipping to that offset if it's "sane"
+  // reading a little endian 4 byte int
+  // checking to see if it matches 0x00004550
+  private def isPE32(input: InputStream): Boolean = {
+    input.mark(1024)
+    Try {
+      val b0 = input.read()
+      val b1 = input.read()
+      b0 == 0x4d && b1 == 0x5a
+    } match {
+      case Failure(exception) =>
+        input.reset()
+        false
+      case Success(value) =>
+        input.reset()
+        true
+    }
   }
 }
 
@@ -87,11 +119,9 @@ object FileInputStreamEx {
 
           if (!f.exists()) {
             is match {
-              case tis: TikaInputStream if tis.getFile() match {
-                    case null => false
-                    case f    => f.isFile()
-                  } =>
-                Some(FileInputStreamEx(tis.getFile()))
+              case tis: TikaInputStream => {
+                saferGetFileInputStream(tis)
+              }
               case _ =>
                 log.error(
                   "file in metadata doesn't exist; tried to get TikaInputStream - that failed too."
@@ -108,6 +138,41 @@ object FileInputStreamEx {
             )
           }
         }
+    }
+  }
+
+  private def saferGetFileInputStream(
+      tis: TikaInputStream
+  ): Option[FileInputStream] = {
+    FileWalker.withinTempDir { tempPath =>
+      // Tika documentation sez: thou shalt mark/reset
+      // when you do a mark with a "reasonable" value (4K or so), the reset fails with an invalid mark
+      // because we're reading the whole file.
+      // When you mark with the stream length, that also fails.
+      // This works. Steve sez: don't touch this.
+      tis.mark(Integer.MAX_VALUE)
+      val result = Try {
+        val tempFile =
+          Files.createTempFile(tempPath, "mimework", ".tmp").toFile()
+        val tempFileOutputStream = FileOutputStream(tempFile)
+        tis.transferTo(tempFileOutputStream)
+        tempFileOutputStream.close()
+        val tempFileInputStream = FileInputStream(tempFile)
+        tempFile.delete()
+        Some(tempFileInputStream)
+      } match {
+        case Failure(exception) => {
+          log.error(
+            s"Failure creating temp file to detect MIME type: ${exception.getMessage()}"
+          )
+          None
+        }
+        case Success(value) => {
+          value
+        }
+      }
+      tis.reset()
+      result
     }
   }
 
