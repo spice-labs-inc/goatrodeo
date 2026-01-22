@@ -145,12 +145,17 @@ object FileInputStreamEx {
       tis: TikaInputStream
   ): Option[FileInputStream] = {
     FileWalker.withinTempDir { tempPath =>
+      // Tika documentation sez: thou shalt mark/reset
+      // when you do a mark with a "reasonable" value (4K or so), the reset fails with an invalid mark
+      // because we're reading the whole file.
+      // When you mark with the stream length, that also fails.
+      // This works. Steve sez: don't touch this.
       tis.mark(Integer.MAX_VALUE)
       val result = Try {
         val tempFile =
           Files.createTempFile(tempPath, "mimework", ".tmp").toFile()
         val tempFileOutputStream = FileOutputStream(tempFile)
-        Helpers.copy(tis, tempFileOutputStream)
+        tis.transferTo(tempFileOutputStream)
         tempFileOutputStream.close()
         val tempFileInputStream = FileInputStream(tempFile)
         tempFile.delete()
