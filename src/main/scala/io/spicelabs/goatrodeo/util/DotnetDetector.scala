@@ -29,6 +29,9 @@ import java.io.InputStream
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import java.nio.file.Files
+import java.io.FileOutputStream
+import java.io.BufferedInputStream
 
 class DotnetDetector extends Detector {
 
@@ -37,25 +40,26 @@ class DotnetDetector extends Detector {
     // bail quick if not your very basic PE32
     if (!isPE32(input))
       MediaType.OCTET_STREAM
-    else toFileInputStream(input, metadata) match {
-      case Some(fs) =>
-        Try {
-          val assembly = AssemblyDefinition.readAssembly(fs)
-          if (assembly != null && assembly.mainModule != null) {
-            DotnetDetector.DOTNET_MIME
-          } else {
-            MediaType.OCTET_STREAM
+    else
+      toFileInputStream(input, metadata) match {
+        case Some(fs) =>
+          Try {
+            val assembly = AssemblyDefinition.readAssembly(fs)
+            if (assembly != null && assembly.mainModule != null) {
+              DotnetDetector.DOTNET_MIME
+            } else {
+              MediaType.OCTET_STREAM
+            }
+          } match {
+            case Failure(exception) =>
+              FileInputStreamEx.closeIfNeeded(fs)
+              MediaType.OCTET_STREAM
+            case Success(value) =>
+              FileInputStreamEx.closeIfNeeded(fs)
+              value
           }
-        } match {
-          case Failure(exception) =>
-            FileInputStreamEx.closeIfNeeded(fs)
-            MediaType.OCTET_STREAM
-          case Success(value) =>
-            FileInputStreamEx.closeIfNeeded(fs)
-            value
-        }
-      case None => MediaType.OCTET_STREAM
-    }
+        case None => MediaType.OCTET_STREAM
+      }
   }
 }
 
@@ -80,7 +84,7 @@ object DotnetDetector {
       b0 == 0x4d && b1 == 0x5a
     } match {
       case Failure(exception) =>
-        input.reset() 
+        input.reset()
         false
       case Success(value) =>
         input.reset()
@@ -116,19 +120,7 @@ object FileInputStreamEx {
           if (!f.exists()) {
             is match {
               case tis: TikaInputStream => {
-                saferGetFile(tis) match {
-                  case Some(f) =>
-                    if (f.isFile()) {
-                      Some(FileInputStreamEx(f))
-                    } else {
-                      log.error("TikaInputStream is not a file")
-                      None
-                    }
-                  case None => {
-                    log.error("Unable to get a file from TikaInputStream")
-                    None
-                  }
-                }
+                saferGetFileInputStream(tis)
               }
               case _ =>
                 log.error(
@@ -149,17 +141,33 @@ object FileInputStreamEx {
     }
   }
 
-  private def saferGetFile(tis: TikaInputStream): Option[File] = {
-    Try {
-      tis.getFile()
-    } match {
-      case Failure(exception) => {
-        log.error(
-          s"failure to get file from TikaInputStream: ${exception.getMessage()}"
-        )
-        None
+  private def saferGetFileInputStream(
+      tis: TikaInputStream
+  ): Option[FileInputStream] = {
+    FileWalker.withinTempDir { tempPath =>
+      tis.mark(Integer.MAX_VALUE)
+      val result = Try {
+        val tempFile =
+          Files.createTempFile(tempPath, "mimework", ".tmp").toFile()
+        val tempFileOutputStream = FileOutputStream(tempFile)
+        Helpers.copy(tis, tempFileOutputStream)
+        tempFileOutputStream.close()
+        val tempFileInputStream = FileInputStream(tempFile)
+        tempFile.delete()
+        Some(tempFileInputStream)
+      } match {
+        case Failure(exception) => {
+          log.error(
+            s"Failure creating temp file to detect MIME type: ${exception.getMessage()}"
+          )
+          None
+        }
+        case Success(value) => {
+          value
+        }
       }
-      case Success(f) => Some(f)
+      tis.reset()
+      result
     }
   }
 
