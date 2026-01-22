@@ -1,0 +1,77 @@
+name: Bug
+description: Report a defect or unexpected behaviour
+title: "[Bug][Staging] "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐞 Bug Report
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Staging
+        - Production
+    validations:
+      required: true
+
+  - type: input
+    id: auth
+    attributes:
+      label: Authentication method
+      placeholder: Google Auth
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / OS
+      placeholder: Firefox (Linux)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What is the problem?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Log in
+        2. Navigate to ...
+        3. Observe behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, URLs, timestamps, etc.
+
