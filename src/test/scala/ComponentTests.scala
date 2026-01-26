@@ -126,7 +126,7 @@ class MyMimeISIdentifier extends MimeInputStreamIdentifier {
   ): ju.Optional[String] = {
     val header = stream.readNBytes(MyMimeISIdentifier.myHeader.length)
     if (header.startsWith(MyMimeISIdentifier.myHeader)) {
-      ju.Optional.of("application/postscript; format=kinda")
+      ju.Optional.of("text/postscript; format=kinda")
     } else {
       ju.Optional.empty()
     }
@@ -135,8 +135,8 @@ class MyMimeISIdentifier extends MimeInputStreamIdentifier {
 
 object MyMimeISIdentifier {
   lazy val myHeader = Array(
-    '%'.toByte,
-    '!'.toByte,
+    8,
+    7,
     's'.toByte,
     'o'.toByte,
     'r'.toByte,
@@ -169,7 +169,7 @@ class MyMimeFSIdentifier extends MimeFileInputStreamIdentifier {
 
 object MyMimeFSIdentifier {
   lazy val myHeader =
-    Array('/'.toByte, '/'.toByte, ' '.toByte, 'C'.toByte, '#'.toByte)
+    Array(')'.toByte, ')'.toByte, ' '.toByte, 'C'.toByte, '#'.toByte)
 }
 
 class MimeComponent extends RodeoComponent {
@@ -262,11 +262,11 @@ class ComponentTests extends munit.FunSuite {
     host.begin()
     host.exportImport()
     host.completeLoading()
-    val path = File("test_data/sorta.ps").toPath()
+    val path = File("test_data/sortaps").toPath()
     val tika = TikaInputStream.get(path)
-    val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.ps")
+    val mime = ArtifactWrapper.mimeTypeFor(tika, "sortaps")
     host.end()
-    assertEquals("application/postscript; format=kinda", mime)
+    assertEquals(mime, "text/postscript; format=kinda")
   }
 
   test("identifies-mime-with-file") {
@@ -279,6 +279,6 @@ class ComponentTests extends munit.FunSuite {
     val tika = TikaInputStream.get(path)
     val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.cs")
     host.end()
-    assertEquals("text/c-sharp; format=sorta", mime)
+    assertEquals(mime, "text/c-sharp; format=sorta")
   }
 }

@@ -128,7 +128,7 @@ object ArtifactWrapper {
   /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
-  private val detectorFactory = TikaDetectorFactory(tika, DotnetDetector())
+  private val detectorFactory = TikaDetectorFactory(tika, DotnetDetector(), ComponentDetector())
 
   /** Given an input stream and a filename, get the mime type
     *
