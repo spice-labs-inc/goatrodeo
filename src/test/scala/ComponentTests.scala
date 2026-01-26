@@ -13,6 +13,17 @@ import io.spicelabs.rodeocomponents.RodeoIdentity
 import java.lang.Runtime.Version
 import java.net.MalformedURLException
 import scala.jdk.OptionConverters.*
+import io.spicelabs.rodeocomponents.APIS.mimes.MimeConstants
+import io.spicelabs.rodeocomponents.APIS.mimes.MimeIdentifierRegistrar
+import io.spicelabs.goatrodeo.components.testing.MimeComponent.componetLoaded
+import io.spicelabs.rodeocomponents.APIS.mimes.MimeInputStreamIdentifier
+import java.io.InputStream
+import java.{util => ju}
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import org.apache.tika.io.TikaInputStream
+import java.io.File
+import io.spicelabs.rodeocomponents.APIS.mimes.MimeFileInputStreamIdentifier
+import java.io.FileInputStream
 
 class SimpleIdentity(private val _name: String, private val _publisher: String)
     extends RodeoIdentity {
@@ -20,6 +31,11 @@ class SimpleIdentity(private val _name: String, private val _publisher: String)
   override def publisher(): String = _publisher
 }
 
+// If you feel inclined to rename this class, you MUST modify the entry in:
+// resources/META-INF/services/io.spicelabs.rodeocomponents.RodeoComponent
+// The consequences of renaming this class without the change in the resource
+// is that java's component system will not load this class as a component and
+// the tests will fail.
 class SmokeTestComponent extends RodeoComponent {
   private lazy val _identity = SimpleIdentity("SmokeTest", "ComponentTests")
   override def initialize(): Unit = SmokeTestComponent.initialized = true
@@ -50,6 +66,11 @@ object SmokeTestComponent {
   }
 }
 
+// If you feel inclined to rename this class, you MUST modify the entry in:
+// resources/META-INF/services/io.spicelabs.rodeocomponents.RodeoComponent
+// The consequences of renaming this class without the change in the resource
+// is that java's component system will not load this class as a component and
+// the tests will fail.
 class PurlComponent extends RodeoComponent {
   private var purlAPI: Option[PurlAPI] = None
   private lazy val _identity = SimpleIdentity("PurlTest", "ComponentTests")
@@ -93,12 +114,102 @@ object PurlComponent {
   var exMessage = ""
 }
 
+class MyMimeISIdentifier extends MimeInputStreamIdentifier {
+  override def preferredHeaderLength(): Int = 10
+  override def canHandleHeader(header: Array[Byte]): Boolean = {
+    val result = header.startsWith(MyMimeISIdentifier.myHeader)
+    result
+  }
+  override def identifyMimeType(
+      stream: InputStream,
+      mimeSoFar: String
+  ): ju.Optional[String] = {
+    val header = stream.readNBytes(MyMimeISIdentifier.myHeader.length)
+    if (header.startsWith(MyMimeISIdentifier.myHeader)) {
+      ju.Optional.of("application/kinda-ps")
+    } else {
+      ju.Optional.empty()
+    }
+  }
+}
+
+object MyMimeISIdentifier {
+  lazy val myHeader = Array(
+    '%'.toByte,
+    '!'.toByte,
+    's'.toByte,
+    'o'.toByte,
+    'r'.toByte,
+    't'.toByte,
+    'a'.toByte,
+    '-'.toByte,
+    'p'.toByte,
+    's'.toByte
+  )
+}
+
+class MyMimeFSIdentifier extends MimeFileInputStreamIdentifier {
+  override def preferredHeaderLength(): Int = 5
+  override def canHandleHeader(header: Array[Byte]): Boolean = {
+    val result = header.startsWith(MyMimeFSIdentifier.myHeader)
+    result
+  }
+  override def identifyMimeType(
+      stream: FileInputStream,
+      mimeSoFar: String
+  ): ju.Optional[String] = {
+    val header = stream.readNBytes(MyMimeFSIdentifier.myHeader.length)
+    if (header.startsWith(MyMimeFSIdentifier.myHeader)) {
+      ju.Optional.of("text/c-sharp")
+    } else {
+      ju.Optional.empty()
+    }
+  }
+}
+
+object MyMimeFSIdentifier {
+  lazy val myHeader =
+    Array('/'.toByte, '/'.toByte, ' '.toByte, 'C'.toByte, '#'.toByte)
+}
+
+class MimeComponent extends RodeoComponent {
+  private var mimeAPI: Option[MimeIdentifierRegistrar] = None
+  private lazy val _identity = SimpleIdentity("MimeTest", "ComponentTests")
+
+  override def initialize(): Unit = { componetLoaded = true }
+  override def getIdentity(): RodeoIdentity = _identity
+  override def getComponentVersion(): Version =
+    RodeoEnvironment.currentVersion()
+  override def exportAPIFactories(receiver: APIFactoryReceiver): Unit = {}
+  override def importAPIFactories(factorySource: APIFactorySource): Unit = {
+    val mimeAPIFactory = factorySource
+      .getAPIFactory(MimeConstants.NAME, this, classOf[MimeIdentifierRegistrar])
+      .toScala
+    mimeAPI = mimeAPIFactory.map(maf => maf.buildAPI(this))
+    MimeComponent.apiLoaded = mimeAPI.isDefined
+  }
+  override def onLoadingComplete(): Unit = {
+    mimeAPI.foreach(api => {
+      api.register(MyMimeISIdentifier())
+      api.register(MyMimeFSIdentifier())
+    })
+  }
+  override def shutDown(): Unit = {
+    mimeAPI.foreach(api => api.release())
+  }
+}
+
+object MimeComponent {
+  var componetLoaded = false
+  var apiLoaded = false
+}
+
 class ComponentTests extends munit.FunSuite {
 
   test("basic smoke") {
     val host = RodeoHost()
     host.begin()
-    assertEquals(host.activeComponentCount, 3)
+    assertEquals(host.activeComponentCount, 4)
     host.end()
   }
 
@@ -106,7 +217,7 @@ class ComponentTests extends munit.FunSuite {
     val host = RodeoHost()
     host.begin()
     host.exportImport()
-    assertEquals(host.publishedAPICount, 3)
+    assertEquals(host.publishedAPICount, 4)
     host.end()
   }
 
@@ -134,4 +245,40 @@ class ComponentTests extends munit.FunSuite {
     assert(PurlComponent.correctPurl)
   }
 
+  test("smoke-loads-mime") {
+    val host = RodeoHost()
+    SmokeTestComponent.reset()
+    host.begin()
+    host.exportImport()
+    host.completeLoading()
+    host.end()
+    assert(MimeComponent.componetLoaded)
+    assert(MimeComponent.apiLoaded)
+  }
+
+  test("identifies-mime") {
+    val host = RodeoHost()
+    SmokeTestComponent.reset()
+    host.begin()
+    host.exportImport()
+    host.completeLoading()
+    val path = File("test_data/sorta.ps").toPath()
+    val tika = TikaInputStream.get(path)
+    val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.ps")
+    host.end()
+    assertEquals("application/kinda-ps", mime)
+  }
+
+  test("identifies-mime-with-file") {
+    val host = RodeoHost()
+    SmokeTestComponent.reset()
+    host.begin()
+    host.exportImport()
+    host.completeLoading()
+    val path = File("test_data/sorta.cs").toPath()
+    val tika = TikaInputStream.get(path)
+    val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.cs")
+    host.end()
+    assertEquals("text/c-sharp", mime)
+  }
 }
