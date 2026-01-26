@@ -126,7 +126,7 @@ class MyMimeISIdentifier extends MimeInputStreamIdentifier {
   ): ju.Optional[String] = {
     val header = stream.readNBytes(MyMimeISIdentifier.myHeader.length)
     if (header.startsWith(MyMimeISIdentifier.myHeader)) {
-      ju.Optional.of("application/kinda-ps")
+      ju.Optional.of("application/postscript; format=kinda")
     } else {
       ju.Optional.empty()
     }
@@ -160,7 +160,7 @@ class MyMimeFSIdentifier extends MimeFileInputStreamIdentifier {
   ): ju.Optional[String] = {
     val header = stream.readNBytes(MyMimeFSIdentifier.myHeader.length)
     if (header.startsWith(MyMimeFSIdentifier.myHeader)) {
-      ju.Optional.of("text/c-sharp")
+      ju.Optional.of("text/c-sharp; format=sorta")
     } else {
       ju.Optional.empty()
     }
@@ -266,7 +266,7 @@ class ComponentTests extends munit.FunSuite {
     val tika = TikaInputStream.get(path)
     val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.ps")
     host.end()
-    assertEquals("application/kinda-ps", mime)
+    assertEquals("application/postscript; format=kinda", mime)
   }
 
   test("identifies-mime-with-file") {
@@ -279,6 +279,6 @@ class ComponentTests extends munit.FunSuite {
     val tika = TikaInputStream.get(path)
     val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.cs")
     host.end()
-    assertEquals("text/c-sharp", mime)
+    assertEquals("text/c-sharp; format=sorta", mime)
   }
 }
