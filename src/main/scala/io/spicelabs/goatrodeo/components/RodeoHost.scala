@@ -33,6 +33,20 @@ import scala.util.Try
 
 import ju.ServiceLoader
 
+// The RodeoHost is a class that is used for hosting and managing the component system.
+// It acts as both an APIFactoryReceiver and an APIFactorySource for components by managing lists
+// of components. For now, we have a collection of "active" components and "inactive" components.
+// The inactive components are components which didn't meet requirements for loading or had some
+// kind of error.
+
+/**
+  * Represents an API that has been published by a component.
+  *
+  * @param publisher the component that published the API factory
+  * @param apiFactory the factory for building the API
+  * @param apiType the type of the API
+  * @param subscribers a collection of subscribers to the API factory
+  */
 private case class PublishedAPI(
     publisher: RodeoComponent,
     apiFactory: APIFactory[? <: API],
@@ -40,6 +54,23 @@ private case class PublishedAPI(
     subscribers: Vector[RodeoComponent] = Vector()
 ) {}
 
+/**
+  * A class to act as a host for components. It manages the list of components, acts as both an APIFactoryReceiver (components export to this)
+  * and an APIFactorySource (components import from this). It also provides a number of steps for managing the lifespan of components including
+  * discovery, initialization, validation, exporting and importing, providing an opportunity to do late initialization and computation, and
+  * clean up.
+  * RodeoHost is used in two main places: Main.scala which uses it for the real component use and it is also used in tests.
+  * In terms of usage, the methods called should be in this order:
+  * [[this.begin()]] - discovers components then initializes and filters them
+  * [[this.exportImport()]] - calls each active component to export API factories then import them
+  * [[this.completeLoading()]] - calls each active component to perform late-stage initialization
+  * [[this.end()]] - calls each active component to shut down
+  * All of this is done within Goat Rodeo and except for tests, there really isn't any reason to call these methods.
+  * In addition to the functioning of the component system, there are also a number of utility methods for looking
+  * at components and APIs.
+  * Internally, RodeoHost maintains a sense of whether [[this.begin()]] and [[this.end()]] has been called and uses that
+  * information to prevent it from being used incorrectly.
+  */
 class RodeoHost extends APIFactoryReceiver, APIFactorySource {
   private val publishedAPIS: HashMap[String, PublishedAPI] = HashMap()
   private val log = Logger(classOf[RodeoHost])
@@ -50,8 +81,13 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
   private var hasBegun = false
   private var hasEnded = false
 
+  /**
+    * Performs discovery and initialization of components. Upon entry, RodeoHost marks that it this method has been
+    * called. Calling begin multiple times on the same instance will have no effect. Calling begin after end will
+    * have no effect.
+    */
   def begin(): Unit = {
-    if (hasBegun)
+    if (hasBegun || hasEnded)
       return
     hasBegun = true
     val components = discoverComponents()
@@ -60,8 +96,12 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     inactiveComponents.addAll(inactive)
   }
 
+  /**
+    * Performs the export and import steps for components. If begin has not yet been called or end has been called then
+    * calling exportImport will have no effect.
+    */
   def exportImport(): Unit = {
-    if (hasEnded)
+    if (!hasBegun || hasEnded)
       return
     import RodeoHost.elapsedTime
     log.debug("starting component export")
@@ -74,12 +114,20 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     activeComponents.foreach(comp => comp.importAPIFactories(this))
   }
 
+  /**
+    * Calls each component's onLoadingComplete method. If begin has not yet been called or end has been called then
+    * calling completeLoading will have no effect.
+    */
   def completeLoading(): Unit = {
-    if (hasEnded)
+    if (!hasBegun || hasEnded)
       return
     activeComponents.foreach(comp => comp.onLoadingComplete())
   }
 
+  /**
+   * Calls each component's shutDown method. If begin has not yet been called or end has been called then calling end
+   * will have no effect.
+   */
   def end(): Unit = {
     if (hasEnded)
       return
@@ -88,17 +136,55 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     hasEnded = true
   }
 
+  /**
+    * A predicate to determine if a component has been detected. This searches through both active and inactive components.
+    *
+    * @param component the component to search for
+    * @return true if the component exists, false otherwise
+    */
   def hasComponent(component: RodeoComponent) =
     isActiveComponent(component) || isInactiveComponent(component)
+  /**
+    * A predicate to determine if a component is in the active component list.
+    *
+    * @param component the component to search for
+    * @return true if the component exists, false otherwise
+    */
   def isActiveComponent(component: RodeoComponent) =
     activeComponents.contains(component)
+  /**
+    * A predicate to determine if a component is in the inactive component list.
+    *
+    * @param component the component to search for
+    * @return true if the component exists, false otherwise
+    */
   def isInactiveComponent(component: RodeoComponent) =
     inactiveComponents.contains(component)
+  /**
+    * Gets the number of active components.
+    *
+    * @return the number of active components
+    */
   def activeComponentCount = activeComponents.size
+  /**
+    * Gets the number of inactive components.
+    *
+    * @return the number of inactive components
+    */
   def inactiveComponentCount = inactiveComponents.size
 
+  /**
+    * Gets the number of API factories that have been published.
+    *
+    * @return the number of published API factories
+    */
   def publishedAPICount = publishedAPIS.size
 
+  /**
+    * Performs discovery of components. This is an internal method used and should not be called directly outside of tests.
+    *
+    * @return an iterable collection of [[io.spicelabs.rodeocomponents.RodeoComponent]] objects
+    */
   def discoverComponents(): Iterator[RodeoComponent] = {
     import RodeoHost.elapsedTime
     log.debug("starting component discovery")
@@ -109,10 +195,22 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     loader.iterator.asScala
   }
 
+  /**
+    * Calls the initialize method of each [[io.spicelabs.rodeocomponents.RodeoComponent]] and checks to see if the
+    * component it valid. Validity is determined by a set of criteria:
+    * - If initialize did not throw an exception
+    * - If the identity is valid
+    * - If the component API version is supported
+    * There is no reason to call this method directly outside of tests.
+    *
+    * @param components an iterable collection of [[io.spicelabs.rodeocomponents.RodeoComponent]] objects to check
+    * @return
+    */
   def initializeAndfilterComponents(components: Iterator[RodeoComponent]) = {
     components.partition(isComponentValid)
   }
 
+  // predicate to determine if a component is valid. 
   private def isComponentValid(component: RodeoComponent): Boolean = {
     // true is a valid component
     val initializedOK = Try {
@@ -144,6 +242,7 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     validIdentity && validVersion
   }
 
+  // Checks the identity object for validity
   private def isIdentityValid(component: RodeoComponent): Option[String] = {
     val identity = Option(component.getIdentity()) match {
       // Short circuit out - nothing else is good.
@@ -161,7 +260,7 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     whatsWrong
   }
 
-  // This is the method to implrment the APIFactoryReceiver interface
+  // This is the method to implement the APIFactoryReceiver interface
   // Since this is code that will be called from, effectively, outer space we
   // need to verify all the arguments because would *you* trust alien data
   // types?
@@ -169,6 +268,14 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
   // The general idea is that we check the args, build a handy data structure to
   // hold the APIFactory, its point of origin, the type of the API, and a list of
   // current subscribers. Finally, we drop that in to a Map of apiName -> info
+  /**
+    * Provide a service for components to publish API factories.
+    *
+    * @param publisher the component publishing the API factory
+    * @param apiName the name of the API
+    * @param apiFactory the factory to build APIs
+    * @param apiType the type of the API (**not** the API factory)
+    */
   override def publishFactory[T <: API](
       publisher: RodeoComponent,
       apiName: String,
@@ -200,8 +307,15 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
   }
 
   // helper for adding an API, likely to be called from outside the context of
-  // publishFactory. For example, goat rodeo will need to populate the host
-  // with APIs for components to use.
+  // publishFactory. For example, goat rodeo may need to populate the host
+  // with APIs for components to use outside of the standard mechanism.
+
+  /**
+    * Internal method for adding an already validated published API factory. There is no reason to call this directly.
+    *
+    * @param apiName the name of the API factory
+    * @param theAPI the API that has been published
+    */
   def addAPI(apiName: String, theAPI: PublishedAPI): Unit = {
     val componentName = theAPI.publisher.getIdentity().name()
     val apiType = theAPI.apiType.toString()
@@ -220,6 +334,11 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
 
   // we may not actually need this and that's fine. I put this in strictly for
   // completeness.
+  /**
+    * Remove an API factory by name. There is no reason to call this directly.
+    *
+    * @param apiName
+    */
   def removeAPI(apiName: String): Unit = {
     publishedAPIS.remove(apiName) match {
       case Some(api) =>
@@ -230,7 +349,14 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
     }
   }
 
-  // This is the
+  /**
+    * Implements the interface for importing API factories. Factories are retrieved by name then matched by type.
+    *
+    * @param name the name of the API to seach for
+    * @param subscriber the subscriber to the API factory
+    * @param factoryType the type of the API
+    * @return an optional type with the API Factory if found, empty otherwise
+    */
   override def getAPIFactory[T <: API](
       name: String,
       subscriber: RodeoComponent,
@@ -310,7 +436,8 @@ class RodeoHost extends APIFactoryReceiver, APIFactorySource {
 }
 
 object RodeoHost {
-  def argCheck[T](
+  // helper routint to check an arg for null and return Either the argument or an error with the method and argument
+  private def argCheck[T](
       arg: T,
       argName: String,
       methodName: String
@@ -321,6 +448,16 @@ object RodeoHost {
     }
   }
 
+  /**
+    * Checks an argument for null (thanks, Java, you're the best). If the argument is null, log an error message and return true,
+    * otherwise return false.
+    *
+    * @param arg the argument to check for null
+    * @param argName the name of the argument to check
+    * @param methodName the name of the method calling
+    * @param log a place to log the error
+    * @return true if there was an error, false otherwise
+    */
   def isLoggedArgError[T](
       arg: T,
       argName: String,
@@ -335,6 +472,13 @@ object RodeoHost {
       }
     }
   }
+
+  /**
+    * Helper bit of pseudo syntax to measure the time it takes to execute a code block.
+    *
+    * @param body a code block to execute
+    * @return a tuple with the first element being the return from the code block and a long which is the time in nanoseconds
+    */
   def elapsedTime[T](body: => T): (T, Long) = {
     val start = System.nanoTime()
     val ret = body
