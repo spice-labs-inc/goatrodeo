@@ -1,2 +1,3 @@
 io.spicelabs.goatrodeo.components.testing.SmokeTestComponent
 io.spicelabs.goatrodeo.components.testing.PurlComponent
+io.spicelabs.goatrodeo.components.testing.MimeComponent

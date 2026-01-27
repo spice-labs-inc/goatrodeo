@@ -24,6 +24,7 @@ import io.spicelabs.rodeocomponents.RodeoEnvironment
 import io.spicelabs.rodeocomponents.RodeoIdentity
 
 import java.lang.Runtime.Version
+import io.spicelabs.rodeocomponents.APIS.mimes.MimeIdentifierRegistrar
 
 private class BuiltInIdentity extends RodeoIdentity {
   override def name(): String = "GoatRodeoComponent"
@@ -50,6 +51,14 @@ class BuiltInComponent extends RodeoComponent {
 
     val purls = PurlsAPIFactory()
     receiver.publishFactory(this, purls.name(), purls, classOf[PurlAPI])
+
+    val mimes = MimeAPIFactory()
+    receiver.publishFactory(
+      this,
+      mimes.name(),
+      mimes,
+      classOf[MimeIdentifierRegistrar]
+    )
   }
   override def importAPIFactories(factorySource: APIFactorySource): Unit = {}
   override def initialize(): Unit = {}
