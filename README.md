@@ -176,6 +176,9 @@ See [Performance Tuning Guide](info/goat_rodeo_operation.md#tuning-for-performan
 | 🛡️ [Hidden Reapers](info/hidden_reapers.md) | Finding hidden vulnerabilities |
 
 ---
+### Component Model
+🧩 Goat Rodeo has a plug-in model called Rodeo Components. The project is accessible [here](https://github.com/spice-labs-inc/rodeo-components).
+---
 
 ## Use Cases
 
