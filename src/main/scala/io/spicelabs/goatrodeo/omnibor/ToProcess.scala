@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import java.util.concurrent.atomic.AtomicReference
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -500,10 +501,15 @@ object ToProcess {
 
   type ByUUID = Map[String, ArtifactWrapper]
   type ByName = Map[String, Vector[ArtifactWrapper]]
-
-  val computeToProcess: Vector[
+  type ProcessFunc =
     (ByUUID, ByName) => (Vector[ToProcess], ByUUID, ByName, String)
-  ] =
+
+  // The older design used a Vector[ProcessFunc] as a singleton, which made it challenging for
+  // components to add into it at runtime. By putting the vector into an AtomicReference, then
+  // we can safely update it from the component model.
+  // Note to future Steve - maybe you want the to process list to be a more formal data structure
+  // that that includes a tag so it will be easier to remove computeFunctions if we want.
+  val dynamicToProcess: AtomicReference[Vector[ProcessFunc]] = AtomicReference(
     Vector(
       MavenToProcess.computeMavenFiles,
       DockerToProcess.computeDockerFiles,
@@ -511,6 +517,29 @@ object ToProcess {
       DotnetFile.computeDotnetFiles,
       GenericFile.computeGenericFiles
     )
+  )
+
+  /** Adds a new ProcessFunc to the list of process computers. This method is
+    * meant to be called by components when then want to register a computer.
+    * This method is thread-safe.
+    *
+    * @param p
+    *   a new ProcessFunc for computing work to do
+    */
+  def addNewToProcessComputer(p: ProcessFunc): Unit = {
+    // computerGenericFiles will always be the last item in the list.
+    // By using patch, we can insert an item before the last item.
+    // Patch is made to replace a sequence but if you set the length
+    // the sequence to replace to 0, it's effectively an insert.
+    dynamicToProcess.updateAndGet(v => {
+      v.patch(v.length - 1, Seq(p), 0)
+    })
+    ()
+  }
+
+  val computeToProcess: Vector[
+    ProcessFunc
+  ] = dynamicToProcess.get()
 
   /** Given a directory, find all the files and create the strategies for
     * processing
