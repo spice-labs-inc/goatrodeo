@@ -527,6 +527,10 @@ object ToProcess {
     *   a new ProcessFunc for computing work to do
     */
   def addNewToProcessComputer(p: ProcessFunc): Unit = {
+    // computerGenericFiles will always be the last item in the list.
+    // By using patch, we can insert an item before the last item.
+    // Patch is made to replace a sequence but if you set the length
+    // the sequence to replace to 0, it's effectively an insert.
     dynamicToProcess.updateAndGet(v => {
       v.patch(v.length - 1, Seq(p), 0)
     })
