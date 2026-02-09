@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import java.util.concurrent.atomic.AtomicReference
+import io.spicelabs.rodeocomponents.APIS.artifacts.ParentFrame
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -145,7 +146,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
 
 abstract class ParentScope(
     val augmentationByHash: Map[String, Vector[Augmentation]]
-) {
+) extends ParentFrame {
   def beginProcessing(
       store: Storage,
       artifact: ArtifactWrapper,

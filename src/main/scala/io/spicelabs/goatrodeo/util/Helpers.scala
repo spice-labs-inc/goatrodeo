@@ -50,6 +50,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
+import scala.annotation.tailrec
 
 /** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
   * content-addressable identifier based on Git's object hashing scheme.
@@ -1456,6 +1457,57 @@ object TreeMapExtensions {
       maybe match {
         case Some(elem) => tree + elem
         case _          => tree
+      }
+    }
+  }
+
+  /** Extensions methods on java.util.List
+    */
+  object JUListExtensions {
+
+    /** Convert a java.util.List<T> to a scala Vector[T] using tail recursion
+      *
+      * @param l
+      *   the List to convert
+      * @param index
+      *   the current index in the list to add to the Vector
+      * @param result
+      *   the resulting vector
+      * @return
+      */
+    @tailrec
+    private def asVectorTail[T](
+        l: java.util.List[T],
+        index: Int,
+        result: Vector[T]
+    ): Vector[T] = {
+      // base case - no more items to move
+      if (index >= l.size()) {
+        result
+      } else {
+        // recurse, moving the index one and with a vector with the current item at the tail
+        asVectorTail(l, index + 1, result :+ l.get(index))
+      }
+    }
+
+    @tailrec
+    private def asVectorMapTail[T, U](
+        l: java.util.List[T],
+        index: Int,
+        f: T => U,
+        result: Vector[U]
+    ): Vector[U] = {
+      if (index >= l.size()) {
+        result
+      } else {
+        asVectorMapTail(l, index + 1, f, result :+ f(l.get(index)))
+      }
+    }
+    extension [T](l: java.util.List[T]) {
+      // seed the tail recursive converter
+      def asVector: Vector[T] = asVectorTail(l, 0, Vector[T]())
+      def asVectorMap[U](f: T => U) = {
+        asVectorMapTail(l, 0, f, Vector[U]())
       }
     }
   }
