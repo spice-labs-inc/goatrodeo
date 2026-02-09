@@ -16,6 +16,20 @@ import io.spicelabs.goatrodeo.util.Helpers
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
+import io.spicelabs.rodeocomponents.APIS.artifacts.WorkItem
+import java.{util => ju}
+import io.spicelabs.rodeocomponents.APIS.artifacts.BackendStorage
+import scala.jdk.OptionConverters._
+import scala.jdk.CollectionConverters.*
+import io.spicelabs.rodeocomponents.APIS.purls.Purl
+import io.spicelabs.goatrodeo.components.PurlAdapter
+import io.spicelabs.goatrodeo.util.TreeMapExtensions.JUListExtensions.asVectorMap
+import io.spicelabs.goatrodeo.util.TreeMapExtensions.JUListExtensions.asVector
+import io.spicelabs.rodeocomponents.APIS.artifacts.StringPair
+import io.spicelabs.rodeocomponents.APIS.artifacts.ParentFrame
+import io.spicelabs.rodeocomponents.APIS.artifacts.StringPairOptional
+import scala.annotation.tailrec
+import io.spicelabs.goatrodeo.omnibor.Item.toTreeMap
 
 /** Represents a node in the Artifact Dependency Graph (ADG).
   *
@@ -39,7 +53,7 @@ case class Item(
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
     body: Option[ItemMetaData | ItemTagData]
-) {
+) extends WorkItem {
 
   /** Encode this Item to CBOR format.
     *
@@ -357,6 +371,70 @@ case class Item(
       })
     )
   }
+
+  override def compareMd5(other: WorkItem): Boolean = cmpMd5(
+    other.asInstanceOf[Item]
+  )
+  override def containedGitoids(): (ju.List[String]) = {
+    listContains().foldLeft(java.util.ArrayList[String]())((list, item) => {
+      list.add(item)
+      list
+    })
+  }
+  override def createOrUpdateInStorage(
+      store: BackendStorage,
+      context: java.util.function.Function[WorkItem, String]
+  ): WorkItem = {
+    createOrUpdateInStore(store.asInstanceOf[Storage], item => context(item))
+  }
+  override def enhanceWithMetadata(
+      parent: ju.Optional[String],
+      extra: ju.Map[String, ju.Set[StringPairOptional]],
+      filenames: ju.List[String],
+      mimeTypes: ju.List[String]
+  ): WorkItem = {
+    var par = parent.toScala
+    var meta = toTreeMap(extra)
+    val files = filenames.asVector
+    val mimes = mimeTypes.asVector
+    enhanceWithMetadata(par, meta, files, mimes)
+  }
+  override def enhanceWithPurls(purls: ju.List[Purl]): WorkItem = {
+    val purlVec = purls.asVectorMap(p => {
+      p.asInstanceOf[PurlAdapter].purl
+    })
+    enhanceItemWithPurls(purlVec)
+  }
+  override def getMd5(): Array[Byte] = this.md5
+  override def merge(other: WorkItem): WorkItem = merge(
+    other.asInstanceOf[Item]
+  )
+  override def getIdentifier(): String = identifier
+  override def getConnections(): ju.Set[StringPair] = {
+    connections.foldLeft(ju.TreeSet[StringPair]())((set, elem) => {
+      set.add(StringPair(elem._1, elem._2))
+      set
+    })
+  }
+  override def withNewConnection(edgeType: String, id: String): WorkItem =
+    withConnection(edgeType, id)
+  override def isRootWorkItem(): Boolean = isRoot()
+  override def referencedFromAliasOrBuildOrContained(): ju.List[StringPair] = {
+    val vec = buildListOfReferencesForAliasFromBuiltFromContainedBy()
+    vec.foldLeft(ju.ArrayList())((list, pair) => {
+      list.add(StringPair(pair._1, pair._2))
+      list
+    })
+  }
+  override def updateTheBackReferences(
+      store: BackendStorage,
+      frame: ParentFrame
+  ): WorkItem = {
+    updateBackReferences(
+      store.asInstanceOf[Storage],
+      frame.asInstanceOf[ParentScope]
+    )
+  }
 }
 
 /** Companion object for Item providing factory methods, CBOR codecs, and
@@ -535,6 +613,42 @@ object Item {
   def decode(bytes: Array[Byte]): Try[Item] = {
     Cbor.decode(bytes).to[Item].valueTry
   }
+
+  private def toTreeMap(
+      meta: ju.Map[String, ju.Set[StringPairOptional]]
+  ): TreeMap[String, TreeSet[StringOrPair]] = {
+
+    toTreeMapTail(
+      meta.keySet().iterator(),
+      meta,
+      TreeMap[String, TreeSet[StringOrPair]]()
+    )
+  }
+
+  @tailrec
+  private def toTreeMapTail(
+      iterator: ju.Iterator[String],
+      meta: ju.Map[String, ju.Set[StringPairOptional]],
+      result: TreeMap[String, TreeSet[StringOrPair]]
+  ): TreeMap[String, TreeSet[StringOrPair]] = {
+    if (!iterator.hasNext()) {
+      result
+    } else {
+      val key = iterator.next()
+      val value = meta.get(key).asScala
+      val newEntry =
+        value.foldLeft(TreeSet[StringOrPair]())((set, stringPair) => {
+          val first = stringPair.first()
+          val second = stringPair.second()
+          val sop =
+            if second.isPresent then StringOrPair(first, second.get())
+            else StringOrPair(first)
+          set + sop
+        })
+      toTreeMapTail(iterator, meta, result + (key -> newEntry))
+    }
+  }
+
 }
 
 /** Information about how to tag an ADG.
