@@ -124,7 +124,7 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
   /**
     * Returns true if the artifact is represented by a real file, false otherwise
     *
-    * @return true if the artiface is a real file, false otherwise
+    * @return true if the artifact is a real file, false otherwise
     */
   override def getIsRealFile(): Boolean = isRealFile()
   /**
