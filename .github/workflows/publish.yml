@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Notify release
         id: release-notification
-        uses: spice-labs-inc/action-release-notification@v3
+        uses: spice-labs-inc/action-release-notification@v3.3
         with:
           type: release
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -279,7 +279,7 @@ jobs:
           fi
 
       - name: Notify deployment result
-        uses: spice-labs-inc/action-release-notification@v3
+        uses: spice-labs-inc/action-release-notification@v3.3
         with:
           type: ${{ steps.deployment-status.outputs.overall_status == 'success' && 'deployment-success' || 'deployment-failure' }}
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
