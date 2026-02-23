@@ -121,43 +121,49 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
 
   // these methods implement the RodeoArtifact interface for the API
 
-  /**
-    * Returns true if the artifact is represented by a real file, false otherwise
+  /** Returns true if the artifact is represented by a real file, false
+    * otherwise
     *
-    * @return true if the artifact is a real file, false otherwise
+    * @return
+    *   true if the artifact is a real file, false otherwise
     */
   override def getIsRealFile(): Boolean = isRealFile()
-  /**
-    * Returns the mime type of the artifact
+
+  /** Returns the mime type of the artifact
     *
-    * @return a string representing the mime type of the artifact
+    * @return
+    *   a string representing the mime type of the artifact
     */
   override def getMimeType(): String = mimeType
-  /**
-    * Get a path or a name of the artifact. If the artifact is not represented by a real file, then this
-    * may be simple the name of the artifact within a container.
+
+  /** Get a path or a name of the artifact. If the artifact is not represented
+    * by a real file, then this may be simple the name of the artifact within a
+    * container.
     *
-    * @return the path or name of the artifact
+    * @return
+    *   the path or name of the artifact
     */
   override def getPath(): String = path()
-  /**
-    * Gets the size of the artifact in bytes
+
+  /** Gets the size of the artifact in bytes
     *
-    * @return the size of the artifact in bytes
+    * @return
+    *   the size of the artifact in bytes
     */
   override def getSize(): Long = size()
-  /**
-    * Gets a unique indentifier for the artifact
+
+  /** Gets a unique indentifier for the artifact
     *
-    * @return a unique identifier for the artifact
+    * @return
+    *   a unique identifier for the artifact
     */
   override def getUuid(): String = uuid
-  /**
-    * Get the name of the file without the path
+
+  /** Get the name of the file without the path
     *
     * @return
     */
-  override def getFilenameWithNoPath(): String  = filenameWithNoPath
+  override def getFilenameWithNoPath(): String = filenameWithNoPath
 }
 
 /** Companion object for ArtifactWrapper with factory methods and MIME type
@@ -169,7 +175,8 @@ object ArtifactWrapper {
   /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
-  private val detectorFactory = TikaDetectorFactory(tika, DotnetDetector(), ComponentDetector())
+  private val detectorFactory =
+    TikaDetectorFactory(tika, DotnetDetector(), ComponentDetector())
 
   /** Given an input stream and a filename, get the mime type
     *

@@ -209,7 +209,7 @@ class ComponentTests extends munit.FunSuite {
   test("basic smoke") {
     val host = RodeoHost()
     host.begin()
-    assertEquals(host.activeComponentCount, 4)
+    assertEquals(host.activeComponentCount, 5)
     host.end()
   }
 
@@ -217,7 +217,7 @@ class ComponentTests extends munit.FunSuite {
     val host = RodeoHost()
     host.begin()
     host.exportImport()
-    assertEquals(host.publishedAPICount, 4)
+    assertEquals(host.publishedAPICount, 5)
     host.end()
   }
 

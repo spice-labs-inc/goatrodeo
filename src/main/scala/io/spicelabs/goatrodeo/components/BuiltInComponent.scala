@@ -25,6 +25,7 @@ import io.spicelabs.rodeocomponents.RodeoIdentity
 
 import java.lang.Runtime.Version
 import io.spicelabs.rodeocomponents.APIS.mimes.MimeIdentifierRegistrar
+import io.spicelabs.rodeocomponents.APIS.artifacts.ArtifactHandlerRegistrar
 
 // Goat Rodeo exposes its own component which publishes APIs.
 // In this sense, Goat Rodeo is no different from other components.
@@ -105,6 +106,14 @@ class BuiltInComponent extends RodeoComponent {
       mimes.name(),
       mimes,
       classOf[MimeIdentifierRegistrar]
+    )
+
+    val artHandling = ArtifactHandlerFactory()
+    receiver.publishFactory(
+      this,
+      artHandling.name(),
+      artHandling,
+      classOf[ArtifactHandlerRegistrar]
     )
   }
 
