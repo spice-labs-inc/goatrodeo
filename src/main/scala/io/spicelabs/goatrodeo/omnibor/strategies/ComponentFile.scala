@@ -75,21 +75,28 @@ class ComponentState(
       item: Item,
       marker: ComponentMarker
   ): ComponentState = {
-    // if the artiface requires a file, we'll make sure that there is one and hold onto it until processing is done
-    val (stm: Option[InputStream], mem: ArtifactMemento) =
+    // if the artifact requires a file, we'll make sure that there is one and hold onto it until processing is done
+    val (stm: Option[InputStream], mem: Option[ArtifactMemento]) =
       if (handler.requiresFile()) {
         val fileStm = io.spicelabs.goatrodeo.util.FileWalker.withinTempDir {
           path => FileInputStream(artifact.forceFile(path))
         }
-        val mem = handler.begin(fileStm, artifact, item, marker.marker)
-        (Some(fileStm), mem)
+        val mem = handler.begin(
+          fileStm.asInstanceOf[InputStream],
+          artifact,
+          item,
+          marker.marker
+        )
+        (Some(fileStm), Some(mem))
       } else {
         artifact.withStream(stm => {
-          val mem = handler.begin(stm, artifact, item, marker.marker)
-          (None, mem)
+          val mem = handler
+            .begin(stm, artifact, item, marker.marker)
+            .asInstanceOf[ArtifactMemento]
+          (None, Some(mem))
         })
       }
-    ComponentState(handler, Some(mem), stm)
+    ComponentState(handler, mem, stm)
   }
 
   /** Get the metadata for the artifact translating the Java representation to

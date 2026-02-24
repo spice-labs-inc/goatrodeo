@@ -538,7 +538,31 @@ object ToProcess {
     ()
   }
 
-  val computeToProcess: Vector[
+  /** Resets the computeToProcess list to 'FAC-TREE' This is here because across
+    * all unit tests, components will get loaded multiple times and if a
+    * component adds a filter, there will be multiple instances of its filter
+    * function. Calling this after the test for that component has run, this is
+    * useful to clean up state. If this ends up being a long-term problem, it
+    * would probably be best to add a call to this inside of RodeoHost.end() and
+    * to consider changing the RodeoHost singleton to be one that can be reset
+    * to a new instance. The reason why that's not being done from the get-go is
+    * that in typical usage there is only one usage of goat rodeo per process
+    * rather than several.
+    */
+  def resetComputeToProcess() = {
+    dynamicToProcess.updateAndGet(v => {
+      Vector(
+        MavenToProcess.computeMavenFiles,
+        DockerToProcess.computeDockerFiles,
+        Debian.computeDebianFiles,
+        DotnetFile.computeDotnetFiles,
+        GenericFile.computeGenericFiles
+      )
+    })
+    ()
+  }
+
+  def computeToProcess: Vector[
     ProcessFunc
   ] = dynamicToProcess.get()
 
