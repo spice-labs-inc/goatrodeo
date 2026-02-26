@@ -32,6 +32,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import io.spicelabs.cilantro.CSVersion
 
 /** State maintained during .NET assembly processing.
   *
@@ -98,7 +99,10 @@ class DotnetState(
           "nuget",
           "",
           assembly.name.name,
-          assembly.name.version.toString(),
+          // if the build number is 0, it won't show in the nuget version number,
+          // so we get a string without the build number.
+          // The full number goes into the the VERSION metadata, however.
+          sanitizeVersion(assembly.name.version),
           null,
           ""
         )
@@ -256,6 +260,11 @@ class DotnetState(
       }
     })
 
+  }
+
+  def sanitizeVersion(version: CSVersion): String = {
+    if (version.revision <= 0) then CSVersion(version.major, version.minor, version.build, -1).toString()
+    else version.toString()
   }
 
   override def finalAugmentation(

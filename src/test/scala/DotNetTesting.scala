@@ -19,6 +19,7 @@ import scala.collection.immutable.TreeSet
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import java.io.FileInputStream
 
 class DotNetTesting extends munit.FunSuite {
 
@@ -95,7 +96,7 @@ class DotNetTesting extends munit.FunSuite {
       ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
     val keys = store1.keys()
     val purl = store1.keys().find(key => key.startsWith("pkg"))
-    assertEquals(purl, Some("pkg:nuget/hackproj@1.0.0.0"))
+    assertEquals(purl, Some("pkg:nuget/hackproj@1.0.0"))
   }
 
   test("Can get purl from nupkg") {
@@ -105,7 +106,7 @@ class DotNetTesting extends munit.FunSuite {
       ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
     val keys = store1.keys()
     val purl = store1.keys().find(key => key.startsWith("pkg"))
-    assertEquals(purl, Some("pkg:nuget/Newtonsoft.Json@13.0.0.0"))
+    assertEquals(purl, Some("pkg:nuget/Newtonsoft.Json@13.0.0"))
   }
 
   // ==================== DotnetState Tests ====================
@@ -229,5 +230,19 @@ class DotNetTesting extends munit.FunSuite {
       // Should process dotnet executables
       assertEquals(toProcess.length, 1)
     }
+  }
+
+
+  test("check bdinfo") {
+    val name = "test_data/bdinfo.tar"
+
+    val nested = FileWrapper(File(name), name, None)
+    val store1 =
+      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+
+    val result = store1.purls()
+    assertEquals(result.size, 1)
+    result.foreach(s =>
+      assertEquals(s, "pkg:nuget/BDInfo@0.8.0"))
   }
 }
