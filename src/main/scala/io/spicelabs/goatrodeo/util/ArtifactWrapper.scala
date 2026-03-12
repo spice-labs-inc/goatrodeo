@@ -164,6 +164,10 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     * @return
     */
   override def getFilenameWithNoPath(): String = filenameWithNoPath
+
+  override def withInputStream[T](func: java.util.function.Function[InputStream, T]): T = {
+    withStream((is) => func(is))
+  }
 }
 
 /** Companion object for ArtifactWrapper with factory methods and MIME type

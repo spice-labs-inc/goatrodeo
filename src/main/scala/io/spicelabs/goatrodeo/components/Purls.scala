@@ -24,6 +24,7 @@ import java.net.MalformedURLException
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import java.util.Optional
 
 // Steve sez:
 // This is the set of classes needed to expose the PackageURL api to components.
@@ -70,10 +71,19 @@ class LocalPurlFactory(
       PurlAdapter(builder.build())
     } match {
       // we expose this as a MalformedURLException so there doesn't need to
-      // be a component dependency onto MalformedPackagedURLException
+      // be a component dependency onto MalformedPackageURLException
       case Failure(exception) =>
         throw MalformedURLException(exception.getMessage())
       case Success(value) => value
+    }
+  }
+
+  override def fromString(purl: String): Optional[Purl] = {
+    Try {
+      PurlAdapter(PackageURL(purl))
+    } match {
+      case Failure(exception) => Optional.empty()
+      case Success(value) => Optional.of(value)
     }
   }
 }
