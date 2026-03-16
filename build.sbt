@@ -123,7 +123,7 @@ lazy val root = project
     libraryDependencies +=
       "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
-    libraryDependencies += "org.apache.tika" % "tika-core" % "3.0.0",
+    libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
     libraryDependencies += "io.spicelabs" % "cilantro_3" % "0.1.17",
