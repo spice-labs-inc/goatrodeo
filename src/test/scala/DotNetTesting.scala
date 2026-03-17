@@ -43,7 +43,7 @@ class DotNetTesting extends munit.FunSuite {
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
     val input = TikaInputStream.get(File(path), metadata)
-    val mime = ArtifactWrapper.mimeTypeFor(input, path)
+    val mime = ArtifactWrapper.mimeTypeFor(input, path, truePath = Some(path.toString()))
     assertEquals("application/x-msdownload; format=pe32-dotnet", mime)
   }
   test("get-me-a-mime-exe") {
@@ -51,7 +51,7 @@ class DotNetTesting extends munit.FunSuite {
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
     val input = TikaInputStream.get(File(path), metadata)
-    val mime = ArtifactWrapper.mimeTypeFor(input, path)
+    val mime = ArtifactWrapper.mimeTypeFor(input, path, truePath = Some(path.toString()))
     assertEquals("application/x-msdownload; format=pe32-dotnet", mime)
   }
 
@@ -72,7 +72,7 @@ class DotNetTesting extends munit.FunSuite {
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
     val input = TikaInputStream.get(File(path), metadata)
-    val mime = ArtifactWrapper.mimeTypeFor(input, path);
+    val mime = ArtifactWrapper.mimeTypeFor(input, path, truePath = Some(path.toString()));
     assertEquals("application/zip", mime)
   }
 

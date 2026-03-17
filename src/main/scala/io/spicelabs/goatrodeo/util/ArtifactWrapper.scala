@@ -80,7 +80,7 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
 
   private lazy val _mimeType: String = Using.resource(getTikaInputStream()) {
     stream =>
-      ArtifactWrapper.mimeTypeFor(stream, this.path())
+      ArtifactWrapper.mimeTypeFor(stream, this.path(), Some(this))
   }
 
   def isRealFile(): Boolean = false
@@ -179,8 +179,6 @@ object ArtifactWrapper {
   /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
-  private val detectorFactory =
-    TikaDetectorFactory(tika, DotnetDetector(), ComponentDetector())
 
   /** Given an input stream and a filename, get the mime type
     *
@@ -188,14 +186,21 @@ object ArtifactWrapper {
     *   -- the input stream
     * @param fileName
     *   -- the name of the file
+    * @param artifact
+    *   -- the artifact from which the stream was taken if there is one, None otherwise
+    * @param truePath
+    *   -- the path to an actual file that can be accessed with a FileInputStream
     */
-  def mimeTypeFor(rawData: TikaInputStream, fileName: String): String = {
+  def mimeTypeFor(rawData: TikaInputStream, fileName: String, artifact: Option[ArtifactWrapper] = None, truePath: Option[String] = None): String = {
     Try {
       val data = rawData
       val len = rawData.getLength()
 
       val metadata = new Metadata()
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
+      val detectorFactory =
+        TikaDetectorFactory(tika, DotnetDetector(artifact, truePath), ComponentDetector(artifact, truePath))
+
       val detected = detectorFactory.toDetector().detect(data, metadata)
       massageMimeType(fileName, rawData, detected)
     } match {

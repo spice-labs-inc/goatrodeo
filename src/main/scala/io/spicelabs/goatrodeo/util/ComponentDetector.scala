@@ -12,8 +12,9 @@ import com.typesafe.scalalogging.Logger
 import scala.annotation.tailrec
 import scala.jdk.OptionConverters._
 import java.io.FileInputStream
+import org.apache.tika.io.TikaInputStream
 
-class ComponentDetector extends Detector {
+class ComponentDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Option[String]) extends Detector {
   val log = Logger(classOf[ComponentDetector])
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
     val isDetectors = MimeHandling.inputStreamIdentifiers.get()
@@ -21,12 +22,11 @@ class ComponentDetector extends Detector {
     (isDetectors.length > 0, fileDetectors.length > 0) match {
       case (true, false) => detectISOnly(input, metadata, isDetectors)
       case (false, true) => {
-        FileInputStreamEx.toFileInputStream(input, metadata) match {
-          case Some(fs) => {
-            val result = detectFSOnly(fs, metadata, fileDetectors)
-            FileInputStreamEx.closeIfNeeded(fs)
-            result
-          }
+        val tisOpt = if input.isInstanceOf[TikaInputStream] then Some(input.asInstanceOf[TikaInputStream]) else None
+        DotnetDetector.withFileInputStream(tisOpt, artifactOpt, truePathOpt, fs => {
+          detectFSOnly(fs, metadata, fileDetectors)
+        }) match {
+          case Some(value) => value
           case None => MediaType.OCTET_STREAM
         }
       }
@@ -97,14 +97,13 @@ class ComponentDetector extends Detector {
     if (isResult != MediaType.OCTET_STREAM)
       isResult
     else {
-      FileInputStreamEx.toFileInputStream(input, metadata) match {
-        case Some(fs) => {
-          val result = detectFSOnly(fs, metadata, fileDetectors)
-          FileInputStreamEx.closeIfNeeded(fs)
-          result
+        val tisOpt = if input.isInstanceOf[TikaInputStream] then Some(input.asInstanceOf[TikaInputStream]) else None
+        DotnetDetector.withFileInputStream(tisOpt, artifactOpt, truePathOpt, fs => {
+          detectFSOnly(fs, metadata, fileDetectors)
+        }) match {
+          case Some(value) => value
+          case None => MediaType.OCTET_STREAM
         }
-        case None => MediaType.OCTET_STREAM
-      }
     }
   }
 

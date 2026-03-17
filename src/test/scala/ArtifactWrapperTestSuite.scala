@@ -252,7 +252,7 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, jarFile.getName())
       val input = TikaInputStream.get(jarFile.toPath(), metadata)
       try {
-        val mimeType = ArtifactWrapper.mimeTypeFor(input, jarFile.getName())
+        val mimeType = ArtifactWrapper.mimeTypeFor(input, jarFile.getName(), truePath = Some(jarFile.toPath().toString()))
         assertEquals(mimeType, "application/java-archive")
       } finally {
         input.close()
@@ -267,7 +267,7 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, debFile.getName())
       val input = TikaInputStream.get(debFile.toPath(), metadata)
       try {
-        val mimeType = ArtifactWrapper.mimeTypeFor(input, debFile.getName())
+        val mimeType = ArtifactWrapper.mimeTypeFor(input, debFile.getName(), truePath = Some(debFile.toPath().toString()))
         assertEquals(mimeType, "application/x-debian-package")
       } finally {
         input.close()
@@ -295,7 +295,7 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, nupkgFile.getName())
       val input = TikaInputStream.get(nupkgFile.toPath(), metadata)
       try {
-        val mimeType = ArtifactWrapper.mimeTypeFor(input, nupkgFile.getName())
+        val mimeType = ArtifactWrapper.mimeTypeFor(input, nupkgFile.getName(), truePath = Some(nupkgFile.toPath().toString()))
         assertEquals(mimeType, "application/zip")
       } finally {
         input.close()

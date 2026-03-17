@@ -16,7 +16,6 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.cilantro.AssemblyDefinition
-import io.spicelabs.goatrodeo.util.FileInputStreamEx.toFileInputStream
 import org.apache.tika.detect.Detector
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
@@ -31,35 +30,32 @@ import scala.util.Success
 import scala.util.Try
 import java.nio.file.Files
 import java.io.FileOutputStream
-import java.io.BufferedInputStream
 
-class DotnetDetector extends Detector {
+class DotnetDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Option[String]) extends Detector {
 
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
     import DotnetDetector.isPE32
     // bail quick if not your very basic PE32
-    if (!isPE32(input))
+    if (!isPE32(input)) {
       MediaType.OCTET_STREAM
-    else
-      toFileInputStream(input, metadata) match {
-        case Some(fs) =>
-          Try {
-            val assembly = AssemblyDefinition.readAssembly(fs)
-            if (assembly != null && assembly.mainModule != null) {
-              DotnetDetector.DOTNET_MIME
-            } else {
-              MediaType.OCTET_STREAM
-            }
-          } match {
-            case Failure(exception) =>
-              FileInputStreamEx.closeIfNeeded(fs)
-              MediaType.OCTET_STREAM
-            case Success(value) =>
-              FileInputStreamEx.closeIfNeeded(fs)
-              value
+    } else {
+      DotnetDetector.withFileInputStream(None, artifactOpt, truePathOpt, fs => {
+        Try {
+          val assembly = AssemblyDefinition.readAssembly(fs)
+          if (assembly != null && assembly.mainModule != null) {
+            DotnetDetector.DOTNET_MIME
+          } else {
+            MediaType.OCTET_STREAM
           }
+        } match {
+          case Failure(exception) => MediaType.OCTET_STREAM
+          case Success(value) => value
+        }
+      }) match {
+        case Some(value) => value
         case None => MediaType.OCTET_STREAM
       }
+    }
   }
 }
 
@@ -88,15 +84,83 @@ object DotnetDetector {
         false
       case Success(value) =>
         input.reset()
-        true
+        value
     }
+  }
+
+
+  // This is a work around for the problem of needing to mark/reset on an enormous file.
+  // There are 3 case here:
+  // 1. We have an ArtifactWrapper. In this case we either have a FileWrapper (easy)
+  //    or a ByteWrapper. In the latter case, stream it to a file using the existing tools.
+  // 2. We have an actual path. This happens when mimeTypeFor was called outside of an
+  //    artifact context but there is an actual path to that. There are a fair number of cases
+  //    of that happening, mostly in tests.
+  // 3. We have a TikaInputStream only. There is precisely one case where we get that and
+  //    it is in the case of looking inside an archive. A TikaInputStream is constructed from
+  //    a byte array.  In this case, it is safe to call the old mark/reset code since it is
+  //    not likely to be an enormous file - more precisely, if it was we would have already
+  //    failed in slurpInputNoClose.
+  
+  def withFileInputStream[T](tisOpt: Option[TikaInputStream], artifactOpt: Option[ArtifactWrapper],
+            truePathOpt: Option[String], f: (FileInputStream) => T): Option[T] = {
+      if (artifactOpt.isDefined) {
+        val artifact = artifactOpt.get
+        artifact match {
+          case fileArt: FileWrapper => {
+            val fs = FileInputStream(fileArt.wrappedFile)
+            val result = f(fs)
+            fs.close()
+            Some(result)
+          }
+          case other: ArtifactWrapper => {
+            other.tempDir match {
+              case None =>  {
+                FileWalker.withinTempDir { tempDir =>
+                  val fileName = other.filenameWithNoPath
+                  val file = Files.createTempFile(tempDir, "goatrodeo", fileName).toFile()
+                  val fs = FileInputStream(file)
+                  file.delete()
+                  val result = f(fs)
+                  fs.close()
+                  Some(result)
+                }
+              }
+              case Some(tempDir) => {
+                other.withStream(is => {
+                  val file = Helpers.tempFileFromStream(is, true, tempDir.toPath())
+                  val fs = FileInputStream(file)
+                  file.delete()
+                  val result = f(fs)
+                  fs.close()
+                  Some(result)
+                })
+              }
+            }
+          }
+        }
+      } else if (truePathOpt.isDefined) {
+        val fs = FileInputStream(truePathOpt.get)
+        val result = f(fs) 
+        fs.close()
+        Some(result)
+      } else if (tisOpt.isDefined) {
+        val tis = tisOpt.get
+        FileInputStreamEx.saferGetFileInputStream(tis) match {
+          case None => None
+          case Some(fs) => {
+            val result = f(fs)
+            fs.close()
+            Some(result)
+          }
+        }
+      } else {
+        None
+      }
   }
 }
 
 class FileInputStreamEx(private val f: File) extends FileInputStream(f) {
-  // def this(path: String) = {
-  //   this(File(path))
-  // }
 }
 
 object FileInputStreamEx {
@@ -141,7 +205,7 @@ object FileInputStreamEx {
     }
   }
 
-  private def saferGetFileInputStream(
+  def saferGetFileInputStream(
       tis: TikaInputStream
   ): Option[FileInputStream] = {
     FileWalker.withinTempDir { tempPath =>
@@ -150,29 +214,34 @@ object FileInputStreamEx {
       // because we're reading the whole file.
       // When you mark with the stream length, that also fails.
       // This works. Steve sez: don't touch this.
-      tis.mark(Integer.MAX_VALUE)
-      val result = Try {
-        val tempFile =
-          Files.createTempFile(tempPath, "mimework", ".tmp").toFile()
-        val tempFileOutputStream = FileOutputStream(tempFile)
-        tis.transferTo(tempFileOutputStream)
-        tempFileOutputStream.close()
-        val tempFileInputStream = FileInputStream(tempFile)
-        tempFile.delete()
-        Some(tempFileInputStream)
-      } match {
-        case Failure(exception) => {
-          log.error(
-            s"Failure creating temp file to detect MIME type: ${exception.getMessage()}"
-          )
-          None
+      Try {
+        tis.mark(Int.MaxValue)
+        val result = Try {
+          val tempFile =
+            Files.createTempFile(tempPath, "mimework", ".tmp").toFile()
+          val tempFileOutputStream = FileOutputStream(tempFile)
+          tis.transferTo(tempFileOutputStream)
+          tempFileOutputStream.close()
+          val tempFileInputStream = FileInputStream(tempFile)
+          tempFile.delete()
+          Some(tempFileInputStream)
+        } match {
+          case Failure(exception) => {
+            log.error(
+              s"Failure creating temp file to detect MIME type: ${exception.getMessage()}"
+            )
+            None
+          }
+          case Success(value) => {
+            value
+          }
         }
-        case Success(value) => {
-          value
-        }
+        tis.reset()
+        result
       }
-      tis.reset()
-      result
+    } match {
+      case Failure(exception) => None
+      case Success(value) => value
     }
   }
 

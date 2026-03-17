@@ -264,7 +264,7 @@ class ComponentTests extends munit.FunSuite {
     host.completeLoading()
     val path = File("test_data/sortaps").toPath()
     val tika = TikaInputStream.get(path)
-    val mime = ArtifactWrapper.mimeTypeFor(tika, "sortaps")
+    val mime = ArtifactWrapper.mimeTypeFor(tika, "sortaps", truePath = Some(path.toString()))
     host.end()
     assertEquals(mime, "text/postscript; format=kinda")
   }
@@ -277,7 +277,7 @@ class ComponentTests extends munit.FunSuite {
     host.completeLoading()
     val path = File("test_data/sorta.cs").toPath()
     val tika = TikaInputStream.get(path)
-    val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.cs")
+    val mime = ArtifactWrapper.mimeTypeFor(tika, "sorta.cs", truePath = Some(path.toString()))
     host.end()
     assertEquals(mime, "text/c-sharp; format=sorta")
   }
