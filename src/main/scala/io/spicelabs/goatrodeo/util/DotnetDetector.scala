@@ -51,10 +51,7 @@ class DotnetDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Option[S
           case Failure(exception) => MediaType.OCTET_STREAM
           case Success(value) => value
         }
-      }) match {
-        case Some(value) => value
-        case None => MediaType.OCTET_STREAM
-      }
+      }).getOrElse(MediaType.OCTET_STREAM)
     }
   }
 }

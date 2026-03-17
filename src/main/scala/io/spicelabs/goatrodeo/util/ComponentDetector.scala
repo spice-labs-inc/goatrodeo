@@ -22,7 +22,7 @@ class ComponentDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Optio
     (isDetectors.length > 0, fileDetectors.length > 0) match {
       case (true, false) => detectISOnly(input, metadata, isDetectors)
       case (false, true) => {
-        val tisOpt = if input.isInstanceOf[TikaInputStream] then Some(input.asInstanceOf[TikaInputStream]) else None
+        val tisOpt = asTikaInputStreamOpt(input)
         DotnetDetector.withFileInputStream(tisOpt, artifactOpt, truePathOpt, fs => {
           detectFSOnly(fs, metadata, fileDetectors)
         }) match {
@@ -97,13 +97,20 @@ class ComponentDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Optio
     if (isResult != MediaType.OCTET_STREAM)
       isResult
     else {
-        val tisOpt = if input.isInstanceOf[TikaInputStream] then Some(input.asInstanceOf[TikaInputStream]) else None
+        val tisOpt = asTikaInputStreamOpt(input)
         DotnetDetector.withFileInputStream(tisOpt, artifactOpt, truePathOpt, fs => {
           detectFSOnly(fs, metadata, fileDetectors)
         }) match {
           case Some(value) => value
           case None => MediaType.OCTET_STREAM
         }
+    }
+  }
+
+  private def asTikaInputStreamOpt(input: InputStream) = {
+    input match {
+      case input: TikaInputStream => Some(input)
+      case _ => None
     }
   }
 
