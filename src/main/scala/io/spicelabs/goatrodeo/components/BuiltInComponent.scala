@@ -115,34 +115,42 @@ class BuiltInComponent extends RodeoComponent {
       artHandling,
       classOf[ArtifactHandlerRegistrar]
     )
+
+    val containerHandling = ComponentContainersFactory()
+    receiver.publishFactory(
+      this,
+      containerHandling.name(),
+      containerHandling,
+      classOf[ComponentContainers]
+    )
   }
 
-  /**
-    * Import API factories from other components. There is no reason to call this directly.
-    * The BuiltInComponent does not import any factories.
+  /** Import API factories from other components. There is no reason to call
+    * this directly. The BuiltInComponent does not import any factories.
     *
     * @param factorySource
     */
   override def importAPIFactories(factorySource: APIFactorySource): Unit = {}
-  /**
-    * Initializes the BuiltInComponent. There is no reason to call this directly.
+
+  /** Initializes the BuiltInComponent. There is no reason to call this
+    * directly.
     */
   override def initialize(): Unit = {}
-  /**
-    * Allows the BuiltInComponent to perform any needed late work. There is no reason to call
-    * this directly.
+
+  /** Allows the BuiltInComponent to perform any needed late work. There is no
+    * reason to call this directly.
     */
   override def onLoadingComplete(): Unit = {}
-  /**
-    * Allows the BuiltInComponent to release an resources that its holding onto. There is no reason
-    * to call this directly.
+
+  /** Allows the BuiltInComponent to release an resources that its holding onto.
+    * There is no reason to call this directly.
     */
   override def shutDown(): Unit = {}
 }
 
 object BuiltInComponent {
-  /**
-    * provides a singleton for the BuiltInComponent.
+
+  /** provides a singleton for the BuiltInComponent.
     */
   lazy val component = BuiltInComponent()
 }

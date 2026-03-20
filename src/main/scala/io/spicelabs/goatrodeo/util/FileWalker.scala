@@ -368,6 +368,9 @@ object FileWalker {
     * @return
     *   true if this is definitely not a compressed file
     */
+  // Steve says: path is not being used right now.
+  // If this changes, look at how this is being used because other
+  // code depends on it working like it is.
   def notCompressed(path: String, mimeType: String): Boolean = {
     mimeType.startsWith("text/") ||
     mimeType.startsWith("image/") ||
@@ -387,71 +390,7 @@ object FileWalker {
       in: ArtifactWrapper,
       tempDir: Path
   ): OptionalArchiveStream = {
-    val mimeType = in.mimeType
-    if (notArchive(in)) None
-    else {
-      {
-        val ret = asZipContainer(in, tempDir)
-
-        ret
-      }.orElse(asISOWrapper(in, tempDir).orElse {
-        // the inputstream to the apache stuff is either a
-        // decompressed file or the input stream from the artifact
-
-        val withInputStreamFn: BufferedInputStream => OptionalArchiveStream =
-          theStream =>
-            asApacheCommonsArchiveWrapper(
-              theStream,
-              in.path(),
-              in.tempDir,
-              tempDir
-            )
-
-        // if it's not compressed, just run with the stream
-        if (notCompressed(in.path(), in.mimeType))
-          in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
-        else {
-          // if it might be compressed, try to decompress the stream into a file
-          val maybeFile: Option[File] = Try {
-            in.withStream { stream =>
-              val factory = new CompressorStreamFactory()
-              val fis = new BufferedInputStream(stream)
-
-              val input: CompressorInputStream =
-                factory.createCompressorInputStream(fis)
-
-              val theFile =
-                Files
-                  .createTempFile(tempDir, "goats", "uncompressed")
-                  .toFile()
-
-              val fos = new FileOutputStream(theFile)
-              Helpers.copy(input, fos)
-              fos.close()
-              theFile
-            }
-          }.toOption
-
-          maybeFile match {
-            // if we were able to decompress, then use the temp file
-            case Some(uncompressedFile) => {
-              try {
-                Using.resource(
-                  new BufferedInputStream(new FileInputStream(uncompressedFile))
-                ) { stream =>
-                  withInputStreamFn(stream)
-                }
-              } finally {
-                uncompressedFile.delete()
-              }
-            }
-            case None =>
-              in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
-          }
-
-        }
-      })
-    }
+    Containers.asContainer(in, tempDir)
   }
 
   private val threadTempDir: ThreadLocal[Option[Path]] = ThreadLocal()
@@ -541,6 +480,6 @@ object FileWalker {
 
   /** A stream of ArtifactWrappers... maybe
     */
-  private type OptionalArchiveStream =
+  type OptionalArchiveStream =
     Option[(Vector[ArtifactWrapper], String)]
 }

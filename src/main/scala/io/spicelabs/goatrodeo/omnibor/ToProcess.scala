@@ -504,21 +504,22 @@ object ToProcess {
   type ByName = Map[String, Vector[ArtifactWrapper]]
   type ProcessFunc =
     (ByUUID, ByName) => (Vector[ToProcess], ByUUID, ByName, String)
+  private val genericName = "Generic"
+  lazy val standardProcessors = Vector(
+    "Maven" -> MavenToProcess.computeMavenFiles,
+    "Docker" -> DockerToProcess.computeDockerFiles,
+    "Debian" -> Debian.computeDebianFiles,
+    "Dotnet" -> DotnetFile.computeDotnetFiles,
+    genericName -> GenericFile.computeGenericFiles
+  )
 
   // The older design used a Vector[ProcessFunc] as a singleton, which made it challenging for
   // components to add into it at runtime. By putting the vector into an AtomicReference, then
   // we can safely update it from the component model.
   // Note to future Steve - maybe you want the to process list to be a more formal data structure
   // that that includes a tag so it will be easier to remove computeFunctions if we want.
-  val dynamicToProcess: AtomicReference[Vector[ProcessFunc]] = AtomicReference(
-    Vector(
-      MavenToProcess.computeMavenFiles,
-      DockerToProcess.computeDockerFiles,
-      Debian.computeDebianFiles,
-      DotnetFile.computeDotnetFiles,
-      GenericFile.computeGenericFiles
-    )
-  )
+  val dynamicToProcess: AtomicReference[Vector[(String, ProcessFunc)]] =
+    AtomicReference(standardProcessors)
 
   /** Adds a new ProcessFunc to the list of process computers. This method is
     * meant to be called by components when then want to register a computer.
@@ -527,15 +528,28 @@ object ToProcess {
     * @param p
     *   a new ProcessFunc for computing work to do
     */
-  def addNewToProcessComputer(p: ProcessFunc): Unit = {
+  def addNewToProcessComputer(p: ProcessFunc, name: String): Unit = {
     // computerGenericFiles will always be the last item in the list.
     // By using patch, we can insert an item before the last item.
     // Patch is made to replace a sequence but if you set the length
     // the sequence to replace to 0, it's effectively an insert.
     dynamicToProcess.updateAndGet(v => {
-      v.patch(v.length - 1, Seq(p), 0)
+      v.patch(v.length - 1, Seq(name -> p), 0)
     })
     ()
+  }
+
+  def removeToProcessComputer(name: String): Unit = {
+    // nobody puts Baby in a corner
+    if (name == genericName)
+      return
+    dynamicToProcess.updateAndGet(v => {
+      v.filterNot((tupe) => tupe._1 == name)
+    })
+  }
+
+  def toProcessComputerNames(): Vector[String] = {
+    dynamicToProcess.get().map((name, f) => name)
   }
 
   /** Resets the computeToProcess list to 'FAC-TREE' This is here because across
@@ -550,21 +564,13 @@ object ToProcess {
     * rather than several.
     */
   def resetComputeToProcess() = {
-    dynamicToProcess.updateAndGet(v => {
-      Vector(
-        MavenToProcess.computeMavenFiles,
-        DockerToProcess.computeDockerFiles,
-        Debian.computeDebianFiles,
-        DotnetFile.computeDotnetFiles,
-        GenericFile.computeGenericFiles
-      )
-    })
+    dynamicToProcess.updateAndGet(v => standardProcessors)
     ()
   }
 
   def computeToProcess: Vector[
     ProcessFunc
-  ] = dynamicToProcess.get()
+  ] = dynamicToProcess.get().map((name, f) => f)
 
   /** Given a directory, find all the files and create the strategies for
     * processing

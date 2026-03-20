@@ -382,4 +382,19 @@ class PngArtifactTest extends munit.FunSuite {
     PngHandler.isActive = false
     assertEquals(result.size, 1)
   }
+
+  test("can get names") {
+    val names = ToProcess.toProcessComputerNames()
+    assertEquals(5, names.length)
+  }
+
+  test("can remove one") {
+    val beforeRemoveLength = ToProcess.toProcessComputerNames().length
+    ToProcess.removeToProcessComputer("Dotnet")
+    val afterRemoveLength = ToProcess.toProcessComputerNames().length
+    ToProcess.resetComputeToProcess()
+    val afterResetLength = ToProcess.toProcessComputerNames().length
+    assert(beforeRemoveLength > afterRemoveLength)
+    assertEquals(beforeRemoveLength, afterResetLength)
+  }
 }

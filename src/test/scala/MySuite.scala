@@ -307,7 +307,11 @@ class MySuite extends munit.FunSuite {
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, classFileName)
     val inputStream = TikaInputStream.get(f.toPath(), metadata)
-    val mimeType = ArtifactWrapper.mimeTypeFor(inputStream, classFileName, truePath = Some(f.toPath().toString()))
+    val mimeType = ArtifactWrapper.mimeTypeFor(
+      inputStream,
+      classFileName,
+      truePath = Some(f.toPath().toString())
+    )
     assert(
       mimeType == "application/java-vm",
       f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}"

@@ -14,7 +14,10 @@ import scala.jdk.OptionConverters._
 import java.io.FileInputStream
 import org.apache.tika.io.TikaInputStream
 
-class ComponentDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Option[String]) extends Detector {
+class ComponentDetector(
+    artifactOpt: Option[ArtifactWrapper],
+    truePathOpt: Option[String]
+) extends Detector {
   val log = Logger(classOf[ComponentDetector])
   override def detect(input: InputStream, metadata: Metadata): MediaType = {
     val isDetectors = MimeHandling.inputStreamIdentifiers.get()
@@ -23,11 +26,16 @@ class ComponentDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Optio
       case (true, false) => detectISOnly(input, metadata, isDetectors)
       case (false, true) => {
         val tisOpt = asTikaInputStreamOpt(input)
-        DotnetDetector.withFileInputStream(tisOpt, artifactOpt, truePathOpt, fs => {
-          detectFSOnly(fs, metadata, fileDetectors)
-        }) match {
+        DotnetDetector.withFileInputStream(
+          tisOpt,
+          artifactOpt,
+          truePathOpt,
+          fs => {
+            detectFSOnly(fs, metadata, fileDetectors)
+          }
+        ) match {
           case Some(value) => value
-          case None => MediaType.OCTET_STREAM
+          case None        => MediaType.OCTET_STREAM
         }
       }
       case (true, true) =>
@@ -97,20 +105,25 @@ class ComponentDetector(artifactOpt: Option[ArtifactWrapper], truePathOpt: Optio
     if (isResult != MediaType.OCTET_STREAM)
       isResult
     else {
-        val tisOpt = asTikaInputStreamOpt(input)
-        DotnetDetector.withFileInputStream(tisOpt, artifactOpt, truePathOpt, fs => {
+      val tisOpt = asTikaInputStreamOpt(input)
+      DotnetDetector.withFileInputStream(
+        tisOpt,
+        artifactOpt,
+        truePathOpt,
+        fs => {
           detectFSOnly(fs, metadata, fileDetectors)
-        }) match {
-          case Some(value) => value
-          case None => MediaType.OCTET_STREAM
         }
+      ) match {
+        case Some(value) => value
+        case None        => MediaType.OCTET_STREAM
+      }
     }
   }
 
   private def asTikaInputStreamOpt(input: InputStream) = {
     input match {
       case input: TikaInputStream => Some(input)
-      case _ => None
+      case _                      => None
     }
   }
 

@@ -7,6 +7,8 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.rodeocomponents.RodeoComponent
 import io.spicelabs.rodeocomponents.APIFactory
 import io.spicelabs.rodeocomponents.APIS.artifacts.ArtifactConstants
+import java.{util => ju}
+import scala.jdk.CollectionConverters._
 
 /** This implements the ArtifactHandlerRegistrar API. This allows a component to
   * insert itself into the chain of strategies for handling artifacts
@@ -17,7 +19,16 @@ class ArtifactHandling extends ArtifactHandlerRegistrar {
     // computeComponentFiles has an extra argument at the beginning that we curry
     // into a function that we will use in the strategies list
     val partialFunc = ComponentFile.computeComponentFiles(filter)
-    ToProcess.addNewToProcessComputer(partialFunc)
+    ToProcess.addNewToProcessComputer(partialFunc, filter.getName())
+  }
+
+  override def removeProcessFilter(name: String): Unit = {
+    ToProcess.removeToProcessComputer(name)
+  }
+
+  override def getProcessFilterNames(): ju.List[String] = {
+    val names = ToProcess.toProcessComputerNames()
+    names.asJava
   }
 
   override def release(): Unit = {}
