@@ -217,7 +217,7 @@ class ComponentTests extends munit.FunSuite {
     val host = RodeoHost()
     host.begin()
     host.exportImport()
-    assertEquals(host.publishedAPICount, 5)
+    assertEquals(host.publishedAPICount, 6)
     host.end()
   }
 

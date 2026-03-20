@@ -1,25 +1,16 @@
 package io.spicelabs.goatrodeo.util
 
-import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
-import org.apache.commons.compress.compressors.CompressorInputStream
-import org.apache.commons.compress.compressors.CompressorStreamFactory
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.BufferedInputStream
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.zip.ZipFile
-import scala.util.Try
-import scala.util.Using
 
 /** Actions that can be taken while walking files in an archive.
   */
@@ -47,150 +38,6 @@ enum FileAction {
   */
 object FileWalker {
   val logger: Logger = Logger(getClass())
-
-  private lazy val zipMimeTypes: Set[String] =
-    Set(
-      "application/zip",
-      "application/java-archive",
-      "application/vnd.android.package-archive"
-    )
-
-  private lazy val isoMimeTypes: Set[String] = Set(
-    "application/x-iso9660-image"
-  )
-
-  /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
-    *
-    * @param in
-    *   the file to try to construct the stream from
-    * @return
-    */
-  private def asZipContainer(
-      in: ArtifactWrapper,
-      tempDir: Path
-  ): OptionalArchiveStream = {
-    if (zipMimeTypes.contains(in.mimeType)) {
-      import scala.jdk.CollectionConverters.IteratorHasAsScala
-
-      val theFile = in.forceFile(tempDir)
-
-      try {
-
-        val zipFile = ZipFile(theFile)
-        try {
-          val it: Vector[ArtifactWrapper] = zipFile
-            .stream()
-            .iterator()
-            .asScala
-            .filter(v => { !v.isDirectory() })
-            .map(v => {
-              val name = v.getName()
-              val size = v.getSize()
-              ArtifactWrapper
-                .newWrapper(
-                  name,
-                  size,
-                  zipFile.getInputStream(v),
-                  in.tempDir,
-                  tempDir
-                )
-            })
-            .toVector
-          Some(
-            it,
-            "Zip Container"
-          )
-        } finally {
-          zipFile.close()
-        }
-
-      } catch {
-        case e: Exception =>
-          // if creating the artfiact wrappers from the thing that might be a zip file fail, it
-          // just means it's not a valid zip. This is okay.
-          logger.trace(
-            f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}",
-            e
-          )
-          None
-      }
-    } else {
-      None
-    }
-  }
-
-  /** Try to open the thing as an ISO file wrapper
-    *
-    * @param in
-    * @return
-    */
-  private def asISOWrapper(
-      in: ArtifactWrapper,
-      tempPath: Path
-  ): OptionalArchiveStream = {
-    if (isoMimeTypes.contains(in.mimeType)) {
-      try {
-        val theFile = in match {
-          case fw: FileWrapper => fw.wrappedFile
-          case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempPath))
-        }
-
-        val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
-
-        try {
-
-          val files = isoFileReader.getAllFiles()
-
-          import scala.jdk.CollectionConverters.ListHasAsScala
-          val flatList =
-            isoFileReader.convertTreeFilesToFlatList(files).asScala.toVector
-
-          val wrappers =
-            for (cycleFile <- flatList)
-              yield {
-
-                val nameWithThing = cycleFile.getFullFileName('/')
-                val name =
-                  (if (nameWithThing.endsWith(";1")) {
-                     nameWithThing.substring(0, nameWithThing.length() - 2)
-
-                   } else nameWithThing).toLowerCase()
-
-                val size = cycleFile.getSize()
-
-                ArtifactWrapper.newWrapper(
-                  name,
-                  size,
-                  isoFileReader.getFileStream(cycleFile),
-                  in.tempDir,
-                  tempPath
-                )
-              }
-
-          isoFileReader.close()
-
-          Some(
-            wrappers,
-            "ISO Reader"
-          )
-
-        } catch {
-          case e: Exception =>
-            // if creating the artfiact wrappers from the thing that might be an iso file fail, it
-            // just means it's not a valid iso. This is okay.
-            logger.trace(s"Try getAllFiles failed: ${e.getMessage}", e)
-            isoFileReader.close()
-            None
-        }
-      } catch {
-        case e: Exception =>
-          // if creating the artfiact wrappers from the thing that might be a zip file fail, it
-          // just means it's not a valid zip. This is okay.
-          logger.trace(s"Whole ISO Fetch process failed… ${e.getMessage}", e)
-          None
-      }
-    } else None
-  }
 
   /** Get the names of the files in an archive if the Apache commons tools can
     * open the archive
@@ -233,52 +80,6 @@ object FileWalker {
         })
         .toVector
     })
-  }
-
-  /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
-    * read most archive files" format
-    *
-    * Note this only reads *archives* – that is to say, something like a
-    * `.tar.gz` with many files It will *not* work on simple single compressed
-    * files in a gzip wrapper, which needs the `CompressorStreamFactory` rather
-    * than the `ArchiveStreamFactory`
-    *
-    * @param in
-    *   the file to try to construct the stream from
-    * @return
-    */
-  private def asApacheCommonsArchiveWrapper(
-      inputStream: BufferedInputStream,
-      name: String,
-      tempPath: Option[File],
-      tempDir: Path
-  ): OptionalArchiveStream = {
-    val factory = (new ArchiveStreamFactory())
-
-    try {
-      val input: ArchiveInputStream[ArchiveEntry] = factory
-        .createArchiveInputStream(
-          inputStream
-        )
-      val theIterator = Helpers
-        .iteratorFor(input)
-        .filter(!_.isDirectory())
-        .map(ae => {
-          val artifactName = ae.getName()
-
-          val size = ae.getSize()
-
-          ArtifactWrapper
-            .newWrapper(artifactName, size, input, tempPath, tempDir)
-        })
-        .toVector
-      input.close()
-
-      Some(theIterator -> "Apache Common Wrapper")
-    } catch {
-      case e: Exception =>
-        None
-    }
   }
 
   val definitelyNotArchive: Set[String] = Set(
@@ -368,6 +169,9 @@ object FileWalker {
     * @return
     *   true if this is definitely not a compressed file
     */
+  // Steve says: path is not being used right now.
+  // If this changes, look at how this is being used because other
+  // code depends on it working like it is.
   def notCompressed(path: String, mimeType: String): Boolean = {
     mimeType.startsWith("text/") ||
     mimeType.startsWith("image/") ||
@@ -387,71 +191,7 @@ object FileWalker {
       in: ArtifactWrapper,
       tempDir: Path
   ): OptionalArchiveStream = {
-    val mimeType = in.mimeType
-    if (notArchive(in)) None
-    else {
-      {
-        val ret = asZipContainer(in, tempDir)
-
-        ret
-      }.orElse(asISOWrapper(in, tempDir).orElse {
-        // the inputstream to the apache stuff is either a
-        // decompressed file or the input stream from the artifact
-
-        val withInputStreamFn: BufferedInputStream => OptionalArchiveStream =
-          theStream =>
-            asApacheCommonsArchiveWrapper(
-              theStream,
-              in.path(),
-              in.tempDir,
-              tempDir
-            )
-
-        // if it's not compressed, just run with the stream
-        if (notCompressed(in.path(), in.mimeType))
-          in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
-        else {
-          // if it might be compressed, try to decompress the stream into a file
-          val maybeFile: Option[File] = Try {
-            in.withStream { stream =>
-              val factory = new CompressorStreamFactory()
-              val fis = new BufferedInputStream(stream)
-
-              val input: CompressorInputStream =
-                factory.createCompressorInputStream(fis)
-
-              val theFile =
-                Files
-                  .createTempFile(tempDir, "goats", "uncompressed")
-                  .toFile()
-
-              val fos = new FileOutputStream(theFile)
-              Helpers.copy(input, fos)
-              fos.close()
-              theFile
-            }
-          }.toOption
-
-          maybeFile match {
-            // if we were able to decompress, then use the temp file
-            case Some(uncompressedFile) => {
-              try {
-                Using.resource(
-                  new BufferedInputStream(new FileInputStream(uncompressedFile))
-                ) { stream =>
-                  withInputStreamFn(stream)
-                }
-              } finally {
-                uncompressedFile.delete()
-              }
-            }
-            case None =>
-              in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
-          }
-
-        }
-      })
-    }
+    Containers.asContainer(in, tempDir)
   }
 
   private val threadTempDir: ThreadLocal[Option[Path]] = ThreadLocal()
@@ -541,6 +281,6 @@ object FileWalker {
 
   /** A stream of ArtifactWrappers... maybe
     */
-  private type OptionalArchiveStream =
+  type OptionalArchiveStream =
     Option[(Vector[ArtifactWrapper], String)]
 }

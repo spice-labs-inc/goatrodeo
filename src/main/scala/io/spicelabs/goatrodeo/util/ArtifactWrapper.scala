@@ -165,7 +165,9 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     */
   override def getFilenameWithNoPath(): String = filenameWithNoPath
 
-  override def withInputStream[T](func: java.util.function.Function[InputStream, T]): T = {
+  override def withInputStream[T](
+      func: java.util.function.Function[InputStream, T]
+  ): T = {
     withStream((is) => func(is))
   }
 }
@@ -187,11 +189,18 @@ object ArtifactWrapper {
     * @param fileName
     *   -- the name of the file
     * @param artifact
-    *   -- the artifact from which the stream was taken if there is one, None otherwise
+    *   -- the artifact from which the stream was taken if there is one, None
+    *   otherwise
     * @param truePath
-    *   -- the path to an actual file that can be accessed with a FileInputStream
+    *   -- the path to an actual file that can be accessed with a
+    *   FileInputStream
     */
-  def mimeTypeFor(rawData: TikaInputStream, fileName: String, artifact: Option[ArtifactWrapper] = None, truePath: Option[String] = None): String = {
+  def mimeTypeFor(
+      rawData: TikaInputStream,
+      fileName: String,
+      artifact: Option[ArtifactWrapper] = None,
+      truePath: Option[String] = None
+  ): String = {
     Try {
       val data = rawData
       val len = rawData.getLength()
@@ -199,7 +208,11 @@ object ArtifactWrapper {
       val metadata = new Metadata()
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
       val detectorFactory =
-        TikaDetectorFactory(tika, DotnetDetector(artifact, truePath), ComponentDetector(artifact, truePath))
+        TikaDetectorFactory(
+          tika,
+          DotnetDetector(artifact, truePath),
+          ComponentDetector(artifact, truePath)
+        )
 
       val detected = detectorFactory.toDetector().detect(data, metadata)
       massageMimeType(fileName, rawData, detected)
