@@ -16,7 +16,6 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
-import io.spicelabs.goatrodeo.components.RodeoHost
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.apache.bcel.classfile.ClassParser
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -203,7 +202,7 @@ object Helpers {
       associatedFiles: Map[String, GitOID]
   ): TreeSet[GitOID] = {
     file.mimeType match {
-      case maybeClass if javaClassMimeTypes.contains(maybeClass) =>
+      case maybeClass if javaClassMimeTypes.intersect(maybeClass).nonEmpty =>
         val sourceName: Option[String] =
           Try {
             file.withStream { is =>
@@ -933,7 +932,6 @@ object Helpers {
 
   // shut down the components gracefully
   def exitWrapper(exitCode: Int): Unit = {
-    RodeoHost.host.end()
     System.exit(exitCode)
   }
 

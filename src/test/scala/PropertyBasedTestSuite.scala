@@ -349,21 +349,21 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   property("Empty IncludeExclude includes everything") {
     forAll(genSimpleString) { s =>
       val filter = IncludeExclude()
-      filter.shouldInclude(s)
+      filter.shouldInclude(Set(s))
     }
   }
 
   property("Excluded item is not included (unless explicitly included)") {
     forAll(genSimpleString) { s =>
       val filter = IncludeExclude() :+ s"-$s"
-      !filter.shouldInclude(s)
+      !filter.shouldInclude(Set(s))
     }
   }
 
   property("Explicitly included item overrides exclusion") {
     forAll(genSimpleString.suchThat(_.nonEmpty)) { s =>
       val filter = (IncludeExclude() :+ s"-$s") :+ s"+$s"
-      filter.shouldInclude(s)
+      filter.shouldInclude(Set(s))
     }
   }
 
@@ -373,7 +373,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
       val filter2 = filter1 :+ s"+$s"
 
       // Both should behave the same way
-      filter1.shouldInclude(s) == filter2.shouldInclude(s)
+      filter1.shouldInclude(Set(s)) == filter2.shouldInclude(Set(s))
     }
   }
 

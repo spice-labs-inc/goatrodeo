@@ -7,9 +7,6 @@ import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.BufferedInputStream
 import java.io.File
@@ -69,50 +66,50 @@ object FileWalker {
       in: ArtifactWrapper,
       tempDir: Path
   ): OptionalArchiveStream = {
-    if (zipMimeTypes.contains(in.mimeType)) {
+    if (zipMimeTypes.intersect(in.mimeType).nonEmpty) {
       import scala.jdk.CollectionConverters.IteratorHasAsScala
 
-      val theFile = in.forceFile(tempDir)
-
-      try {
-
-        val zipFile = ZipFile(theFile)
+      in.withFile { theFile =>
         try {
-          val it: Vector[ArtifactWrapper] = zipFile
-            .stream()
-            .iterator()
-            .asScala
-            .filter(v => { !v.isDirectory() })
-            .map(v => {
-              val name = v.getName()
-              val size = v.getSize()
-              ArtifactWrapper
-                .newWrapper(
-                  name,
-                  size,
-                  zipFile.getInputStream(v),
-                  in.tempDir,
-                  tempDir
-                )
-            })
-            .toVector
-          Some(
-            it,
-            "Zip Container"
-          )
-        } finally {
-          zipFile.close()
-        }
 
-      } catch {
-        case e: Exception =>
-          // if creating the artfiact wrappers from the thing that might be a zip file fail, it
-          // just means it's not a valid zip. This is okay.
-          logger.trace(
-            f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}",
-            e
-          )
-          None
+          val zipFile = ZipFile(theFile)
+          try {
+            val it: Vector[ArtifactWrapper] = zipFile
+              .stream()
+              .iterator()
+              .asScala
+              .filter(v => { !v.isDirectory() })
+              .map(v => {
+                val name = v.getName()
+                val size = v.getSize()
+                ArtifactWrapper
+                  .newWrapper(
+                    name,
+                    size,
+                    zipFile.getInputStream(v),
+                    in.tempDir,
+                    tempDir
+                  )
+              })
+              .toVector
+            Some(
+              it,
+              "Zip Container"
+            )
+          } finally {
+            zipFile.close()
+          }
+
+        } catch {
+          case e: Exception =>
+            // if creating the artifact wrappers from the thing that might be a zip file fail, it
+            // just means it's not a valid zip. This is okay.
+            logger.trace(
+              f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}",
+              e
+            )
+            None
+        }
       }
     } else {
       None
@@ -128,7 +125,7 @@ object FileWalker {
       in: ArtifactWrapper,
       tempPath: Path
   ): OptionalArchiveStream = {
-    if (isoMimeTypes.contains(in.mimeType)) {
+    if (isoMimeTypes.intersect(in.mimeType).nonEmpty) {
       try {
         val theFile = in match {
           case fw: FileWrapper => fw.wrappedFile
@@ -190,49 +187,6 @@ object FileWalker {
           None
       }
     } else None
-  }
-
-  /** Get the names of the files in an archive if the Apache commons tools can
-    * open the archive
-    *
-    * @param inputStream
-    *   the input stream to the archive
-    * @return
-    *   if it's an openable archive, the names of the files inside it and true
-    *   if the name is a directory
-    */
-  def getContentNamesFromArchive(
-      inputStream: BufferedInputStream
-  ): Option[Vector[(String, Boolean, Option[String])]] = {
-    Some({
-      val factory = (new ArchiveStreamFactory())
-      val input: ArchiveInputStream[ArchiveEntry] = factory
-        .createArchiveInputStream(
-          inputStream
-        )
-
-      Helpers
-        .iteratorFor(input)
-        .map(ae => {
-          val name = ae.getName()
-          val dir = ae.isDirectory()
-
-          (
-            name,
-            dir,
-            if (dir) None
-            else {
-              val metadata = new Metadata()
-              metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, name)
-              val bi =
-                TikaInputStream.get(Helpers.slurpInputNoClose(input), metadata)
-
-              Some(ArtifactWrapper.mimeTypeFor(bi, name))
-            }
-          )
-        })
-        .toVector
-    })
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
@@ -352,11 +306,12 @@ object FileWalker {
     * @return
     *   true if this is definitely not an archive
     */
-  def notArchive(path: String, mimeType: String): Boolean = {
-    mimeType.startsWith("text/") ||
-    mimeType.startsWith("image/") ||
-    definitelyNotArchive.contains(mimeType) ||
-    (mimeType == "application/zip" && path.endsWith(".xpi"))
+  def notArchive(path: String, mimeType: Set[String]): Boolean = {
+    mimeType.exists(_.startsWith("text/")) ||
+    mimeType.exists(_.startsWith("image/")) ||
+    definitelyNotArchive.intersect(mimeType).nonEmpty /*||
+    (mimeType.contains("application/zip") && path.endsWith(".xpi"))*/
+
   }
 
   /** Check if a file is definitely not compressed based on MIME type and path.
@@ -368,10 +323,12 @@ object FileWalker {
     * @return
     *   true if this is definitely not a compressed file
     */
-  def notCompressed(path: String, mimeType: String): Boolean = {
-    mimeType.startsWith("text/") ||
-    mimeType.startsWith("image/") ||
-    notCompressedSet.contains(mimeType)
+  def notCompressed(path: String, mimeType: Set[String]): Boolean = {
+
+    mimeType.exists(_.startsWith("text/")) ||
+    mimeType.exists(_.startsWith("image/")) ||
+    notCompressedSet.intersect(mimeType).nonEmpty
+
   }
 
   /** Try a series of strategies (except for uncompressing a file) for creating

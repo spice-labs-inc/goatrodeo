@@ -3,7 +3,6 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
-import io.spicelabs.goatrodeo.components.Arguments
 import io.spicelabs.goatrodeo.util.Config.ExpandFiles.fixTilde
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
@@ -258,10 +257,7 @@ object Config {
         .unbounded()
         .action((args, c) => {
           args match {
-            case compName :: compArgs =>
-              c.copy(componentArgs =
-                Arguments.addArgs(compName, compArgs.toArray, c.componentArgs)
-              )
+
             case _ => {
               logger.info(OParser.usage(parser1))
               logger.info("--component ")

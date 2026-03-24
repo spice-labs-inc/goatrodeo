@@ -97,7 +97,7 @@ final case class GenericFile(file: ArtifactWrapper) extends ToProcess {
 
   /** The mime type of the main artifact
     */
-  def mimeType: String = file.mimeType
+  def mimeType: Set[String] = file.mimeType
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) =

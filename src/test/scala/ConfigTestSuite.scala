@@ -289,13 +289,13 @@ class ConfigTestSuite extends munit.FunSuite {
   test("Config - mimeFilter defaults to empty IncludeExclude") {
     val config = Config()
 
-    assert(config.mimeFilter.shouldInclude("anything"))
+    assert(config.mimeFilter.shouldInclude(Set("anything")))
   }
 
   test("Config - filenameFilter defaults to empty IncludeExclude") {
     val config = Config()
 
-    assert(config.filenameFilter.shouldInclude("anyfile.txt"))
+    assert(config.filenameFilter.shouldInclude(Set("anyfile.txt")))
   }
 
   test("Config - exclude patterns can be added") {

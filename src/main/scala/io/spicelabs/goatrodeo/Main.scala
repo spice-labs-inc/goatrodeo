@@ -16,8 +16,6 @@ package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
-import io.spicelabs.goatrodeo.components.Arguments
-import io.spicelabs.goatrodeo.components.RodeoHost
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
@@ -220,7 +218,6 @@ object Howdy {
       fsFilePaths = params.fsFilePaths
     )
 
-    RodeoHost.host.end()
   }
 
   /** Initialize and start the component system.
@@ -233,18 +230,12 @@ object Howdy {
     */
   @static
   def startComponents(params: Config) = {
-    val host = RodeoHost.host
-    host.begin()
-    host.exportImport()
     if (params.printComponentInfo) {
-      host.printComponentInfo()
       Helpers.exitZero()
     }
     if (params.printComponentArgumentInfo) {
-      Arguments.printDescriptions()
+      
       Helpers.exitZero()
     }
-    Arguments.processComponentArguments(params.componentArgs)
-    host.completeLoading()
   }
 }

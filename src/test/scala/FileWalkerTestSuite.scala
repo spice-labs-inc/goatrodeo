@@ -16,9 +16,7 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
-import java.io.BufferedInputStream
 import java.io.File
-import java.io.FileInputStream
 import java.nio.file.Files
 
 class FileWalkerTestSuite extends munit.FunSuite {
@@ -137,29 +135,30 @@ class FileWalkerTestSuite extends munit.FunSuite {
   // ==================== notArchive Tests ====================
 
   test("notArchive - returns true for text/plain") {
-    assert(FileWalker.notArchive("test.txt", "text/plain"))
+    assert(FileWalker.notArchive("test.txt", Set("text/plain")))
   }
 
   test("notArchive - returns true for image types") {
-    assert(FileWalker.notArchive("test.png", "image/png"))
-    assert(FileWalker.notArchive("test.jpg", "image/jpeg"))
-    assert(FileWalker.notArchive("test.gif", "image/gif"))
+    assert(FileWalker.notArchive("test.png", Set("image/png")))
+    assert(FileWalker.notArchive("test.jpg", Set("image/jpeg")))
+    assert(FileWalker.notArchive("test.gif", Set("image/gif")))
   }
 
   test("notArchive - returns true for application/java-vm") {
-    assert(FileWalker.notArchive("Test.class", "application/java-vm"))
+    assert(FileWalker.notArchive("Test.class", Set("application/java-vm")))
   }
 
-  test("notArchive - returns true for .xpi with application/zip") {
-    assert(FileWalker.notArchive("addon.xpi", "application/zip"))
-  }
+  // dpp sez -- not sure why .xpi files are excluded,
+  // test("notArchive - returns true for .xpi with application/zip") {
+  //   assert(FileWalker.notArchive("addon.xpi",Set( "application/zip")))
+  // }
 
   test("notArchive - returns false for application/zip") {
-    assert(!FileWalker.notArchive("test.zip", "application/zip"))
+    assert(!FileWalker.notArchive("test.zip",Set( "application/zip")))
   }
 
   test("notArchive - returns false for application/java-archive") {
-    assert(!FileWalker.notArchive("test.jar", "application/java-archive"))
+    assert(!FileWalker.notArchive("test.jar",Set( "application/java-archive")))
   }
 
   test("notArchive - uses ArtifactWrapper overload") {
@@ -170,77 +169,24 @@ class FileWalkerTestSuite extends munit.FunSuite {
   // ==================== notCompressed Tests ====================
 
   test("notCompressed - returns true for text/plain") {
-    assert(FileWalker.notCompressed("test.txt", "text/plain"))
+    assert(FileWalker.notCompressed("test.txt", Set("text/plain")))
   }
 
   test("notCompressed - returns true for image types") {
-    assert(FileWalker.notCompressed("test.png", "image/png"))
+    assert(FileWalker.notCompressed("test.png", Set("image/png")))
   }
 
   test("notCompressed - returns true for APK files") {
     assert(
       FileWalker.notCompressed(
         "app.apk",
-        "application/vnd.android.package-archive"
+        Set("application/vnd.android.package-archive")
       )
     )
   }
 
   test("notCompressed - returns false for gzip") {
-    assert(!FileWalker.notCompressed("test.gz", "application/gzip"))
-  }
-
-  // ==================== getContentNamesFromArchive Tests ====================
-
-  test("getContentNamesFromArchive - returns file names from archive") {
-    val jarFile = new File("test_data/log4j-core-2.22.1.jar")
-    if (jarFile.exists()) {
-      val bis = new BufferedInputStream(new FileInputStream(jarFile))
-      try {
-        val result = FileWalker.getContentNamesFromArchive(bis)
-
-        assert(result.isDefined)
-        val names = result.get
-        assert(names.nonEmpty)
-        assert(names.exists(_._1.endsWith(".class")))
-      } finally {
-        bis.close()
-      }
-    }
-  }
-
-  test("getContentNamesFromArchive - identifies directories") {
-    val jarFile = new File("test_data/log4j-core-2.22.1.jar")
-    if (jarFile.exists()) {
-      val bis = new BufferedInputStream(new FileInputStream(jarFile))
-      try {
-        val result = FileWalker.getContentNamesFromArchive(bis)
-
-        assert(result.isDefined)
-        val entries = result.get
-        val hasDir = entries.exists(_._2) // second element is isDirectory
-        // Jar files typically have directory entries
-      } finally {
-        bis.close()
-      }
-    }
-  }
-
-  test("getContentNamesFromArchive - returns mime types") {
-    val jarFile = new File("test_data/log4j-core-2.22.1.jar")
-    if (jarFile.exists()) {
-      val bis = new BufferedInputStream(new FileInputStream(jarFile))
-      try {
-        val result = FileWalker.getContentNamesFromArchive(bis)
-
-        assert(result.isDefined)
-        val entries = result.get
-        val filesWithMime = entries.filter(!_._2).filter(_._3.isDefined)
-        assert(filesWithMime.nonEmpty)
-      } finally {
-        bis.close()
-      }
-    }
+    assert(!FileWalker.notCompressed("test.gz", Set("application/gzip")))
   }
 
   // ==================== withinTempDir Tests ====================

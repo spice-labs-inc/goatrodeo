@@ -283,7 +283,7 @@ final case class MavenToProcess(
     javaDoc: Option[ArtifactWrapper]
 ) extends ToProcess {
 
-  /** Call at the end of successfull completing the operation
+  /** Call at the end of successful completing the operation
     */
   def markSuccessfulCompletion(): Unit = {
     jar.finished()
@@ -302,7 +302,7 @@ final case class MavenToProcess(
 
   /** The mime type of the main artifact
     */
-  def mimeType: String = jar.mimeType
+  def mimeType: Set[String] = jar.mimeType
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) = Vector(
@@ -341,7 +341,7 @@ object MavenToProcess {
       )) && !(name.endsWith("-sources.jar") || name.endsWith(
         "-javadoc.jar"
       )) &&
-      !artifacts.filter(_.mimeType == "application/java-archive").isEmpty
+      !artifacts.filter(_.mimeType.contains("application/java-archive")).isEmpty
     }
 
     val (toProcess, revisedByUUID, revisedByName) =

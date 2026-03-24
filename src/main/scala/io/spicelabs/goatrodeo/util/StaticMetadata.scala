@@ -215,7 +215,7 @@ object StaticMetadata {
     * @return
     */
   def isContainer(artifact: ArtifactWrapper): Boolean = {
-    staticMetadataMimeTypes.contains(artifact.mimeType)
+    !staticMetadataMimeTypes.intersect(artifact.mimeType).isEmpty
   }
 
   /** The beginning of a block list. Does nothing.
@@ -233,7 +233,7 @@ object StaticMetadata {
   }
 
   def isAllowed(artifact: ArtifactWrapper): Boolean = {
-    staticMetadataMimeTypes.contains(artifact.mimeType) || {
+    !staticMetadataMimeTypes.intersect(artifact.mimeType).isEmpty || {
       artifact match {
         case fw: FileWrapper => {
           val path = fw.wrappedFile.toPath

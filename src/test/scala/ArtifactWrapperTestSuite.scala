@@ -113,11 +113,11 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     val tempFile = Files.createTempFile("forcefiletest", ".txt").toFile()
     val tempDir = Files.createTempDirectory("tempdir")
     try {
+
       val wrapper = FileWrapper(tempFile, tempFile.getName(), None)
-      val forcedFile = wrapper.forceFile(tempDir)
-      assertEquals(forcedFile, tempFile)
+      wrapper.withFile(forcedFile => assertEquals(forcedFile, tempFile))
     } finally {
-      tempFile.delete()
+
       Helpers.deleteDirectory(tempDir)
     }
   }
@@ -245,69 +245,58 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
 
   // ==================== MIME Type Detection Tests ====================
 
+  def mimesForFile(name: String): Set[String] = {
+    val file = File(name)
+    if (file.exists()) {
+      FileWrapper(File(name), name, None, _ => ()).mimeType
+    } else { Set() }
+  }
+
+  def mimesForContent(value: String): Set[String] = {
+    ByteWrapper(value.getBytes("UTF-8"), "N/A", None).mimeType
+
+  }
+
   test("mimeTypeFor - detects JAR file") {
-    val jarFile = new File("test_data/log4j-core-2.22.1.jar")
-    if (jarFile.exists()) {
-      val metadata = new Metadata()
-      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, jarFile.getName())
-      val input = TikaInputStream.get(jarFile.toPath(), metadata)
-      try {
-        val mimeType = ArtifactWrapper.mimeTypeFor(input, jarFile.getName(), truePath = Some(jarFile.toPath().toString()))
-        assertEquals(mimeType, "application/java-archive")
-      } finally {
-        input.close()
-      }
-    }
+
+    assert(
+      mimesForFile("test_data/log4j-core-2.22.1.jar").contains(
+        "application/java-archive"
+      )
+    )
+
   }
 
   test("mimeTypeFor - detects DEB file") {
-    val debFile = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
-    if (debFile.exists()) {
-      val metadata = new Metadata()
-      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, debFile.getName())
-      val input = TikaInputStream.get(debFile.toPath(), metadata)
-      try {
-        val mimeType = ArtifactWrapper.mimeTypeFor(input, debFile.getName(), truePath = Some(debFile.toPath().toString()))
-        assertEquals(mimeType, "application/x-debian-package")
-      } finally {
-        input.close()
-      }
-    }
+    assert(
+      mimesForFile("test_data/tk8.6_8.6.14-1build1_amd64.deb").contains(
+        "application/x-debian-package"
+      )
+    )
   }
 
   test("mimeTypeFor - detects JSON content in text/plain") {
-    val jsonContent = """{"key": "value"}""".getBytes("UTF-8")
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, "data.txt")
-    val input = TikaInputStream.get(jsonContent, metadata)
-    try {
-      val mimeType = ArtifactWrapper.mimeTypeFor(input, "data.txt")
-      assertEquals(mimeType, "application/json")
-    } finally {
-      input.close()
-    }
+    assert(
+      mimesForContent("""{"key": "value"}""").contains(
+        "application/json"
+      )
+    )
   }
 
   test("mimeTypeFor - detects nupkg as application/zip") {
-    val nupkgFile = new File("test_data/newtonsoft.json.13.0.4.nupkg")
-    if (nupkgFile.exists()) {
-      val metadata = new Metadata()
-      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, nupkgFile.getName())
-      val input = TikaInputStream.get(nupkgFile.toPath(), metadata)
-      try {
-        val mimeType = ArtifactWrapper.mimeTypeFor(input, nupkgFile.getName(), truePath = Some(nupkgFile.toPath().toString()))
-        assertEquals(mimeType, "application/zip")
-      } finally {
-        input.close()
-      }
-    }
+    assert(
+      mimesForFile("test_data/newtonsoft.json.13.0.4.nupkg").contains(
+        "application/zip"
+      )
+    )
+
   }
 
   test("FileWrapper - mimeType is computed correctly for JAR") {
     val jarFile = new File("test_data/log4j-core-2.22.1.jar")
     if (jarFile.exists()) {
       val wrapper = FileWrapper(jarFile, jarFile.getName(), None)
-      assertEquals(wrapper.mimeType, "application/java-archive")
+      assert(wrapper.mimeType.contains("application/java-archive"))
     }
   }
 
@@ -315,14 +304,14 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     val debFile = new File("test_data/tk8.6_8.6.14-1build1_amd64.deb")
     if (debFile.exists()) {
       val wrapper = FileWrapper(debFile, debFile.getName(), None)
-      assertEquals(wrapper.mimeType, "application/x-debian-package")
+      assert(wrapper.mimeType.contains("application/x-debian-package"))
     }
   }
 
   test("ByteWrapper - mimeType is computed for content") {
     val textContent = "Hello, this is plain text content".getBytes("UTF-8")
     val wrapper = ByteWrapper(textContent, "test.txt", None)
-    assertEquals(wrapper.mimeType, "text/plain")
+    assert(wrapper.mimeType.contains("text/plain"))
   }
 
   // ==================== requireTempFile Tests ====================
@@ -350,44 +339,44 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
   }
 
   // ==================== isNupkg Tests ====================
+  // commented out because moved `isNupkg` to private - dpp
+  // test("isNupkg - returns Some(true) for valid nupkg") {
+  //   val nupkgFile = new File("test_data/newtonsoft.json.13.0.4.nupkg")
+  //   if (nupkgFile.exists()) {
+  //     val metadata = new Metadata()
+  //     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, nupkgFile.getName())
+  //     val input = TikaInputStream.get(nupkgFile.toPath(), metadata)
+  //     try {
+  //       val result = ArtifactWrapper.isNupkg(
+  //         nupkgFile.getName(),
+  //         "application/x-tika-ooxml",
+  //         input
+  //       )
+  //       assertEquals(result, Some(true))
+  //     } finally {
+  //       input.close()
+  //     }
+  //   }
+  // }
 
-  test("isNupkg - returns Some(true) for valid nupkg") {
-    val nupkgFile = new File("test_data/newtonsoft.json.13.0.4.nupkg")
-    if (nupkgFile.exists()) {
-      val metadata = new Metadata()
-      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, nupkgFile.getName())
-      val input = TikaInputStream.get(nupkgFile.toPath(), metadata)
-      try {
-        val result = ArtifactWrapper.isNupkg(
-          nupkgFile.getName(),
-          "application/x-tika-ooxml",
-          input
-        )
-        assertEquals(result, Some(true))
-      } finally {
-        input.close()
-      }
-    }
-  }
-
-  test("isNupkg - returns Some(false) for non-nupkg") {
-    val jarFile = new File("test_data/log4j-core-2.22.1.jar")
-    if (jarFile.exists()) {
-      val metadata = new Metadata()
-      metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, jarFile.getName())
-      val input = TikaInputStream.get(jarFile.toPath(), metadata)
-      try {
-        val result = ArtifactWrapper.isNupkg(
-          jarFile.getName(),
-          "application/java-archive",
-          input
-        )
-        assertEquals(result, Some(false))
-      } finally {
-        input.close()
-      }
-    }
-  }
+  // test("isNupkg - returns Some(false) for non-nupkg") {
+  //   val jarFile = new File("test_data/log4j-core-2.22.1.jar")
+  //   if (jarFile.exists()) {
+  //     val metadata = new Metadata()
+  //     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, jarFile.getName())
+  //     val input = TikaInputStream.get(jarFile.toPath(), metadata)
+  //     try {
+  //       val result = ArtifactWrapper.isNupkg(
+  //         jarFile.getName(),
+  //         "application/java-archive",
+  //         input
+  //       )
+  //       assertEquals(result, Some(false))
+  //     } finally {
+  //       input.close()
+  //     }
+  //   }
+  // }
 
   // ==================== Edge Cases ====================
 

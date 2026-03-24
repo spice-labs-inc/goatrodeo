@@ -193,7 +193,7 @@ class DebianTestSuite extends munit.FunSuite {
     val artifact = ByteWrapper(Array[Byte](), "path/to/test.deb", None)
     val tp = Debian(artifact)
 
-    assertEquals(tp.main, "path/to/test.deb")
+    assert(tp.main.contains( "path/to/test.deb"))
   }
 
   test("Debian.mimeType - returns artifact mime type") {
@@ -202,7 +202,7 @@ class DebianTestSuite extends munit.FunSuite {
       val wrapper = FileWrapper(debFile, debFile.getName(), None)
       val tp = Debian(wrapper)
 
-      assertEquals(tp.mimeType, "application/x-debian-package")
+      assert(tp.mimeType.contains( "application/x-debian-package"))
     }
   }
 

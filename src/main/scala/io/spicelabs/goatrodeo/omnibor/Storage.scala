@@ -28,15 +28,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
-import io.spicelabs.rodeocomponents.APIS.artifacts.BackendStorage
-import io.spicelabs.rodeocomponents.APIS.purls.Purl
-import io.spicelabs.goatrodeo.components.PurlAdapter
-import java.{util => ju}
-import scala.jdk.CollectionConverters._
+
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
-trait Storage extends BackendStorage {
+trait Storage {
 
   /** Does the path exist?
     *
@@ -325,26 +321,21 @@ class MemStorage(val targetDir: Option[File])
     }
   }
 
-  override def release(): Unit = sync.synchronized {
+   def release(): Unit = sync.synchronized {
     db.set(Map()); locks.clear()
   }
 
-  override def addPurl(purl: Purl): Unit = {
-    val thePurl = purl.asInstanceOf[PurlAdapter]
-    addPurl(thePurl.purl)
-  }
-
-  override def getPurls(): ju.Set[String] = {
+   def getPurls(): Set[String] = {
     thePurls.synchronized {
-      thePurls.get().asJava
+      thePurls.get()
     }
   }
 
-  override def getKeys(): ju.Set[String] = {
-    keys().asJava
+   def getKeys(): Set[String] = {
+    keys()
   }
 
-  override def containsID(identifier: String): Boolean = {
+   def containsID(identifier: String): Boolean = {
     contains(identifier)
   }
 }

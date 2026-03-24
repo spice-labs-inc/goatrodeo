@@ -302,15 +302,10 @@ class MySuite extends munit.FunSuite {
   test("calculate mime type for class file") {
     val classFileName =
       "target/scala-3.7.4/classes/io/spicelabs/goatrodeo/Howdy.class"
-
-    val f = new File(classFileName)
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, classFileName)
-    val inputStream = TikaInputStream.get(f.toPath(), metadata)
-    val mimeType = ArtifactWrapper.mimeTypeFor(inputStream, classFileName, truePath = Some(f.toPath().toString()))
+    val f = FileWrapper(new File(classFileName), classFileName, None, _ => ())
     assert(
-      mimeType == "application/java-vm",
-      f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}"
+      f.mimeType.contains("application/java-vm"),
+      f"Expecting mime type for a class file contain 'application/java-vm' but got ${f.mimeType}"
     )
   }
 

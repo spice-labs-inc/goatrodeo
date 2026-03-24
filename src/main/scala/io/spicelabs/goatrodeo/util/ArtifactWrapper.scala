@@ -22,7 +22,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.Using
-import io.spicelabs.rodeocomponents.APIS.artifacts.RodeoArtifact
+import java.util.concurrent.atomic.AtomicReference
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -34,7 +34,7 @@ import io.spicelabs.rodeocomponents.APIS.artifacts.RodeoArtifact
   *
   * Those byte streams may be in-memory or they may be on disk.
   */
-sealed trait ArtifactWrapper extends RodeoArtifact {
+sealed trait ArtifactWrapper {
 
   /** Convert the Artifact to a stream of bytes. Note that this is mostly used
     * for Hashing which is a block operation. No need for any buffering because
@@ -42,7 +42,7 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     *
     * @return
     */
-  protected def asStream(): InputStream
+  protected def asStream(): BufferedInputStream
 
   /** Execute a function with an InputStream to this artifact's content.
     *
@@ -55,7 +55,7 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     * @return
     *   the result of the function
     */
-  def withStream[T](f: InputStream => T): T = {
+  def withStream[T](f: BufferedInputStream => T): T = {
     Using.resource(asStream()) { stream =>
       f(stream)
     }
@@ -78,14 +78,16 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     */
   def size(): Long
 
-  private lazy val _mimeType: String = Using.resource(getTikaInputStream()) {
-    stream =>
-      ArtifactWrapper.mimeTypeFor(stream, this.path(), Some(this))
+  private lazy val _mimeType: Set[String] = {
+    val base = Set(Using.resource(getTikaInputStream()) { stream =>
+      ArtifactWrapper.mimeTypeFor(stream, this.path())
+    })
+    ArtifactWrapper.augmentMimeTypes(this, base)
   }
 
   def isRealFile(): Boolean = false
 
-  def mimeType: String = _mimeType
+  def mimeType: Set[String] = _mimeType
 
   protected def getTikaInputStream(): TikaInputStream
 
@@ -104,21 +106,6 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     */
   def finished(): Unit
 
-  /** If the ArtifactWraper doesn't point to a file, create a temporary file
-    *
-    * @param tempDir
-    *   the temporary directory to put the file in
-    *
-    * @return
-    *   the file
-    */
-  def forceFile(tempDir: Path): File = {
-    this match {
-      case fw: FileWrapper => fw.wrappedFile
-      case _ => this.withStream(Helpers.tempFileFromStream(_, true, tempDir))
-    }
-  }
-
   // these methods implement the RodeoArtifact interface for the API
 
   /** Returns true if the artifact is represented by a real file, false
@@ -127,14 +114,14 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     * @return
     *   true if the artifact is a real file, false otherwise
     */
-  override def getIsRealFile(): Boolean = isRealFile()
+  def getIsRealFile(): Boolean = isRealFile()
 
   /** Returns the mime type of the artifact
     *
     * @return
     *   a string representing the mime type of the artifact
     */
-  override def getMimeType(): String = mimeType
+  def getMimeType(): Set[String] = mimeType
 
   /** Get a path or a name of the artifact. If the artifact is not represented
     * by a real file, then this may be simple the name of the artifact within a
@@ -143,31 +130,35 @@ sealed trait ArtifactWrapper extends RodeoArtifact {
     * @return
     *   the path or name of the artifact
     */
-  override def getPath(): String = path()
+  def getPath(): String = path()
 
   /** Gets the size of the artifact in bytes
     *
     * @return
     *   the size of the artifact in bytes
     */
-  override def getSize(): Long = size()
+  def getSize(): Long = size()
 
-  /** Gets a unique indentifier for the artifact
+  /** Gets a unique identifier for the artifact
     *
     * @return
     *   a unique identifier for the artifact
     */
-  override def getUuid(): String = uuid
+  def getUuid(): String = uuid
 
   /** Get the name of the file without the path
     *
     * @return
     */
-  override def getFilenameWithNoPath(): String = filenameWithNoPath
+  def getFilenameWithNoPath(): String = filenameWithNoPath
 
-  override def withInputStream[T](func: java.util.function.Function[InputStream, T]): T = {
-    withStream((is) => func(is))
-  }
+  /** Execute the function with a file on the filesystem. The file may be
+    * temporary and may only exist for the duration of the scope of `withFile`,
+    * however, files are on a POSIX filesystem so having a handle to the file
+    * (e.g., `FileInputStream`), the FileInputStream will live for the duration
+    * of the reference.
+    */
+  def withFile[T](func: File => T): T
 }
 
 /** Companion object for ArtifactWrapper with factory methods and MIME type
@@ -186,26 +177,18 @@ object ArtifactWrapper {
     *   -- the input stream
     * @param fileName
     *   -- the name of the file
-    * @param artifact
-    *   -- the artifact from which the stream was taken if there is one, None otherwise
-    * @param truePath
-    *   -- the path to an actual file that can be accessed with a FileInputStream
     */
-  def mimeTypeFor(rawData: TikaInputStream, fileName: String, artifact: Option[ArtifactWrapper] = None, truePath: Option[String] = None): String = {
-    Try {
+  protected def mimeTypeFor(rawData: TikaInputStream, fileName: String): String = {
+    try {
       val data = rawData
       val len = rawData.getLength()
 
       val metadata = new Metadata()
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
-      val detectorFactory =
-        TikaDetectorFactory(tika, DotnetDetector(artifact, truePath), ComponentDetector(artifact, truePath))
-
-      val detected = detectorFactory.toDetector().detect(data, metadata)
+      val detected = tika.getDetector.detect(data, metadata)
       massageMimeType(fileName, rawData, detected)
-    } match {
-      case Success(value) => value
-      case Failure(e) =>
+    } catch {
+      case e: Exception =>
         logger.error(
           f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
           e
@@ -213,6 +196,30 @@ object ArtifactWrapper {
         "application/octet-stream"
     }
   }
+
+  private val mimeTypeAugmenters
+      : AtomicReference[Vector[(ArtifactWrapper, Set[String]) => Set[String]]] =
+    AtomicReference(Vector())
+
+  /** Augment the mime type with other mime types
+    */
+  def augmentMimeTypes(
+      artifact: ArtifactWrapper,
+      mimes: Set[String]
+  ): Set[String] = {
+    mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, theFn) =>
+      theFn(artifact, cur)
+    }
+  }
+
+  def addMimeTypeAugmenter(
+      theFn: (ArtifactWrapper, Set[String]) => Set[String]
+  ): Unit = {
+    mimeTypeAugmenters.getAndUpdate(v => v :+ theFn)
+  }
+
+  // constructor 
+  addMimeTypeAugmenter(DotnetDetector.mimeTypeAugmenter)
 
   private def massageMimeType(
       fileName: String,
@@ -239,7 +246,7 @@ object ArtifactWrapper {
     }
   }
 
-  def isNupkg(
+  private def isNupkg(
       fileName: String,
       detectedMime: String,
       rawData: TikaInputStream
@@ -363,6 +370,14 @@ final case class FileWrapper(
     tempDir: Option[File],
     finishedFunc: File => Unit = f => ()
 ) extends ArtifactWrapper {
+
+  // constructor
+  if (!wrappedFile.exists()) {
+    throw Exception(
+      f"Tried to create file wrapper for ${wrappedFile.getCanonicalPath()} that does not exist"
+    )
+  }
+
   override def isRealFile(): Boolean = true
   override protected def getTikaInputStream(): TikaInputStream = {
     val metadata = new Metadata()
@@ -370,14 +385,19 @@ final case class FileWrapper(
     TikaInputStream.get(wrappedFile.toPath(), metadata)
   }
 
-  if (!wrappedFile.exists()) {
-    throw Exception(
-      f"Tried to create file wrapper for ${wrappedFile.getCanonicalPath()} that does not exist"
-    )
-  }
-  override protected def asStream(): InputStream = new BufferedInputStream(
+  override protected def asStream(): BufferedInputStream = new BufferedInputStream(
     FileInputStream(wrappedFile)
   )
+
+  /** Execute the function with a file on the filesystem. The file may be
+    * temporary and may only exist for the duration of the scope of `withFile`,
+    * however, files are on a POSIX filesystem so having a handle to the file
+    * (e.g., `FileInputStream`), the FileInputStream will live for the duration
+    * of the reference.
+    */
+  def withFile[T](func: File => T): T = {
+    func(wrappedFile)
+  }
 
   override def path(): String = fixPath(thePath)
 
@@ -431,6 +451,23 @@ final case class ByteWrapper(
   override def asStream(): BufferedInputStream = new BufferedInputStream(
     ByteArrayInputStream(bytes)
   )
+
+  /** Execute the function with a file on the filesystem. The file may be
+    * temporary and may only exist for the duration of the scope of `withFile`,
+    * however, files are on a POSIX filesystem so having a handle to the file
+    * (e.g., `FileInputStream`), the FileInputStream will live for the duration
+    * of the reference.
+    */
+  def withFile[T](func: File => T): T = {
+    FileWalker.withinTempDir { path =>
+      val file = Helpers.tempFileFromStream(asStream(), false, path)
+      try {
+        func(file)
+      } finally {
+        file.delete()
+      }
+    }
+  }
 
   override def path(): String = fileName
 

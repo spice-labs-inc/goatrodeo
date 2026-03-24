@@ -106,7 +106,7 @@ final case class Debian(deb: ArtifactWrapper) extends ToProcess {
 
   /** The mime type of the main artifact
     */
-  def mimeType: String = deb.mimeType
+  def mimeType: Set[String] = deb.mimeType
 
   type MarkerType = SingleMarker
   type StateType = DebianState
@@ -132,7 +132,7 @@ object Debian {
       f: ArtifactWrapper
   ): Option[(Option[PackageURL], TreeMap[String, TreeSet[StringOrPair]])] = {
     val name = f.path()
-    if (f.mimeType == "application/x-debian-package") {
+    if (f.mimeType.contains("application/x-debian-package")) {
       val maybeRawLines: Option[(String, Vector[String])] = (FileWalker
         .withinArchiveStream(f) { files =>
           files
@@ -248,14 +248,15 @@ object Debian {
     var retByUUID = byUUID
 
     val retByName = byName.map { case (k, v) =>
-      val isDeb = v.filter(_.mimeType == "application/x-debian-package")
+      val isDeb = v.filter(_.mimeType.contains("application/x-debian-package"))
 
       // no debian files, just continue
       if (isDeb.isEmpty) {
         k -> v
       } else {
         // all the non-debian files
-        val newV = v.filter(_.mimeType != "application/x-debian-package")
+        val newV =
+          v.filter(!_.mimeType.contains("application/x-debian-package"))
 
         // for each of the debian files, add to ret, substract from uuid
         for { deb <- isDeb } {
