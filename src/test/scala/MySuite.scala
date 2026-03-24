@@ -16,17 +16,12 @@ import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
-//import io.spicelabs.goatrodeo.omnibor.strategies.Debian
 import io.spicelabs.goatrodeo.util.*
 import io.spicelabs.goatrodeo.util.Config
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.regex.Pattern
-import io.spicelabs.goatrodeo.omnibor.strategies.BaharatStrategy
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html

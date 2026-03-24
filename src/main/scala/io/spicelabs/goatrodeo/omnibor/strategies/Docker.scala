@@ -318,7 +318,9 @@ object DockerToProcess {
           }
           configFile <- byName.get(configHash) match {
             case Some(a)
-                if a.length == 1 && a(0).mimeType.exists(_.startsWith(jsonMimeType)) =>
+                if a.length == 1 && a(0).mimeType.exists(
+                  _.startsWith(jsonMimeType)
+                ) =>
               List(a(0))
             case _ => Nil
           }

@@ -234,7 +234,7 @@ object Howdy {
       Helpers.exitZero()
     }
     if (params.printComponentArgumentInfo) {
-      
+
       Helpers.exitZero()
     }
   }

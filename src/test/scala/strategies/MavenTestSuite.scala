@@ -317,7 +317,7 @@ class MavenTestSuite extends munit.FunSuite {
     val jarArtifact = ByteWrapper(Array[Byte](), "path/to/test.jar", None)
     val tp = MavenToProcess(jarArtifact, None, None, None)
 
-    assert(tp.main.contains( "path/to/test.jar"))
+    assert(tp.main.contains("path/to/test.jar"))
   }
 
   test("MavenToProcess.mimeType - returns jar mime type") {
@@ -325,7 +325,7 @@ class MavenTestSuite extends munit.FunSuite {
     if (jarFile.exists()) {
       val wrapper = FileWrapper(jarFile, jarFile.getName(), None)
       val tp = MavenToProcess(wrapper, None, None, None)
-      assert(tp.mimeType.contains( "application/java-archive"))
+      assert(tp.mimeType.contains("application/java-archive"))
     }
   }
 

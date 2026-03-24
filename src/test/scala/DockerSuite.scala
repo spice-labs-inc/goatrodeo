@@ -249,7 +249,7 @@ class DockerSuite extends munit.FunSuite {
       ByteWrapper("""[{}]""".getBytes("UTF-8"), "manifest.json", None)
     val tp = DockerToProcess(manifest, List(), Map())
 
-    assert(tp.mimeType.contains( "application/json"))
+    assert(tp.mimeType.contains("application/json"))
   }
 
   test("DockerToProcess.main - includes manifest path") {

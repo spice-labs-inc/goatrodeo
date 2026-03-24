@@ -96,7 +96,6 @@ resolvers += "GitHub Package Registry" at "https://maven.pkg.github.com/spice-la
 
 resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/public/"
 
-
 // pick up local Maven generated artifacts
 resolvers += Resolver.mavenLocal
 

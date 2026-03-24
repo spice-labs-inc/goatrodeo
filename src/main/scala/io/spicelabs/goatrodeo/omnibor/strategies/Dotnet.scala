@@ -4,6 +4,7 @@ import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.cilantro.AssemblyNameReference
+import io.spicelabs.cilantro.CSVersion
 import io.spicelabs.cilantro.CustomAttribute
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
@@ -32,7 +33,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import io.spicelabs.cilantro.CSVersion
 
 /** State maintained during .NET assembly processing.
   *
@@ -60,8 +60,8 @@ class DotnetState(
     var fileStmOpt: Option[FileInputStream] = None
 
     Try {
-      val stream: FileInputStream = artifact.withFile{
-        file => FileInputStream(file)
+      val stream: FileInputStream = artifact.withFile { file =>
+        FileInputStream(file)
       }
 
       fileStmOpt = Some(stream)
@@ -263,7 +263,8 @@ class DotnetState(
   }
 
   def sanitizeVersion(version: CSVersion): String = {
-    if (version.revision <= 0) then CSVersion(version.major, version.minor, version.build, -1).toString()
+    if (version.revision <= 0) then
+      CSVersion(version.major, version.minor, version.build, -1).toString()
     else version.toString()
   }
 

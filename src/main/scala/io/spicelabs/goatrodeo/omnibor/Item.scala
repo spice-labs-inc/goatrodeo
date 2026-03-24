@@ -39,7 +39,7 @@ case class Item(
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
     body: Option[ItemMetaData | ItemTagData]
-)  {
+) {
 
   /** Encode this Item to CBOR format.
     *
@@ -391,11 +391,11 @@ case class Item(
   //   })
   //   enhanceItemWithPurls(purlVec)
   // }
-   def getMd5(): Array[Byte] = this.md5
+  def getMd5(): Array[Byte] = this.md5
   // override def merge(other: WorkItem): WorkItem = merge(
   //   other.asInstanceOf[Item]
   // )
-   def getIdentifier(): String = identifier
+  def getIdentifier(): String = identifier
   // override def getConnections(): ju.Set[StringPair] = {
   //   connections.foldLeft(ju.TreeSet[StringPair]())((set, elem) => {
   //     set.add(StringPair(elem._1, elem._2))
@@ -404,7 +404,7 @@ case class Item(
   // }
   // override def withNewConnection(edgeType: String, id: String): WorkItem =
   //   withConnection(edgeType, id)
-   def isRootWorkItem(): Boolean = isRoot()
+  def isRootWorkItem(): Boolean = isRoot()
   // override def referencedFromAliasOrBuildOrContained(): ju.List[StringPair] = {
   //   val vec = buildListOfReferencesForAliasFromBuiltFromContainedBy()
   //   vec.foldLeft(ju.ArrayList())((list, pair) => {

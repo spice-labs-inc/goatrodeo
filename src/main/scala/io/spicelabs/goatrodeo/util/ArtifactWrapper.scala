@@ -18,11 +18,11 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.Using
-import java.util.concurrent.atomic.AtomicReference
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -178,7 +178,10 @@ object ArtifactWrapper {
     * @param fileName
     *   -- the name of the file
     */
-  protected def mimeTypeFor(rawData: TikaInputStream, fileName: String): String = {
+  protected def mimeTypeFor(
+      rawData: TikaInputStream,
+      fileName: String
+  ): String = {
     try {
       val data = rawData
       val len = rawData.getLength()
@@ -218,7 +221,7 @@ object ArtifactWrapper {
     mimeTypeAugmenters.getAndUpdate(v => v :+ theFn)
   }
 
-  // constructor 
+  // constructor
   addMimeTypeAugmenter(DotnetDetector.mimeTypeAugmenter)
 
   private def massageMimeType(
@@ -385,9 +388,10 @@ final case class FileWrapper(
     TikaInputStream.get(wrappedFile.toPath(), metadata)
   }
 
-  override protected def asStream(): BufferedInputStream = new BufferedInputStream(
-    FileInputStream(wrappedFile)
-  )
+  override protected def asStream(): BufferedInputStream =
+    new BufferedInputStream(
+      FileInputStream(wrappedFile)
+    )
 
   /** Execute the function with a file on the filesystem. The file may be
     * temporary and may only exist for the duration of the scope of `withFile`,

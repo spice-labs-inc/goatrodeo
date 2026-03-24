@@ -17,9 +17,9 @@ package io.spicelabs.goatrodeo.util
 import io.spicelabs.cilantro.AssemblyDefinition
 import org.apache.tika.mime.MediaType
 
+import java.io.FileInputStream
 import java.io.InputStream
 import scala.util.Using
-import java.io.FileInputStream
 
 object DotnetDetector {
   lazy val DOTNET_MIME: MediaType = {

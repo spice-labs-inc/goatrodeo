@@ -16,9 +16,6 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.ByteArrayInputStream
 import java.io.File

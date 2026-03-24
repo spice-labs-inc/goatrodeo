@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
-
 /** An abstract definition of a GitOID Corpus storage backend
   */
 trait Storage {
@@ -321,21 +320,21 @@ class MemStorage(val targetDir: Option[File])
     }
   }
 
-   def release(): Unit = sync.synchronized {
+  def release(): Unit = sync.synchronized {
     db.set(Map()); locks.clear()
   }
 
-   def getPurls(): Set[String] = {
+  def getPurls(): Set[String] = {
     thePurls.synchronized {
       thePurls.get()
     }
   }
 
-   def getKeys(): Set[String] = {
+  def getKeys(): Set[String] = {
     keys()
   }
 
-   def containsID(identifier: String): Boolean = {
+  def containsID(identifier: String): Boolean = {
     contains(identifier)
   }
 }

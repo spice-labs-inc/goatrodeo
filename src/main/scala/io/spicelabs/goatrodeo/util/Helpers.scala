@@ -45,11 +45,11 @@ import java.util.Date
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.tailrec
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
-import scala.annotation.tailrec
 
 /** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
   * content-addressable identifier based on Git's object hashing scheme.

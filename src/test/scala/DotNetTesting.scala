@@ -5,13 +5,9 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetFile
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
-import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.File
 import scala.collection.immutable.TreeMap

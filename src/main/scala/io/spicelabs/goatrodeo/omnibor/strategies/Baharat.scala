@@ -1,28 +1,32 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.omnibor.ToProcess.{ByUUID, ByName}
-import scala.util.Try
-import io.spicelabs.baharat.{PackageReader, Package}
-import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.omnibor.SingleMarker
-import io.spicelabs.goatrodeo.omnibor.ProcessingState
-import io.spicelabs.goatrodeo.omnibor.Item
 import com.github.packageurl.PackageURL
+import com.typesafe.scalalogging.Logger
+import io.spicelabs.baharat.Package
+import io.spicelabs.baharat.PackageReader
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ParentScope
+import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
-import io.spicelabs.goatrodeo.util.GitOID
-import scala.collection.immutable.TreeMap
-import scala.collection.immutable.TreeSet
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import scala.jdk.OptionConverters.RichOptional
-import scala.jdk.CollectionConverters.ListHasAsScala
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
+import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.GitOID
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
-import com.typesafe.scalalogging.Logger
+
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
+import scala.jdk.CollectionConverters.ListHasAsScala
+import scala.jdk.OptionConverters.RichOptional
+import scala.util.Try
 
 object BaharatStrategy {
-    val logger = Logger(this.getClass())
+  val logger = Logger(this.getClass())
+
   /** MIME types for all supported package formats */
   val supportedMimeTypes: Set[String] = Set(
     "application/x-rpm",
@@ -118,7 +122,7 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       marker: SingleMarker
   ): (Vector[PackageURL], BaharatState) = {
     Vector(pkg.packageUrl()) -> this
-    }
+  }
 
   override def getMetadata(
       artifact: ArtifactWrapper,

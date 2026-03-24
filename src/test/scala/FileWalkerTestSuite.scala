@@ -154,11 +154,11 @@ class FileWalkerTestSuite extends munit.FunSuite {
   // }
 
   test("notArchive - returns false for application/zip") {
-    assert(!FileWalker.notArchive("test.zip",Set( "application/zip")))
+    assert(!FileWalker.notArchive("test.zip", Set("application/zip")))
   }
 
   test("notArchive - returns false for application/java-archive") {
-    assert(!FileWalker.notArchive("test.jar",Set( "application/java-archive")))
+    assert(!FileWalker.notArchive("test.jar", Set("application/java-archive")))
   }
 
   test("notArchive - uses ArtifactWrapper overload") {

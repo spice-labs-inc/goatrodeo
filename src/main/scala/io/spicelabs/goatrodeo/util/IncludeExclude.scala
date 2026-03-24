@@ -60,7 +60,9 @@ class IncludeExclude(include: RegexPredicate, exclude: RegexPredicate) {
   def shouldInclude(candidate: Set[String]): Boolean = {
     // if the candidate is not in the exclude, it should be included.
     // if the candidate *is* is the exclude, then check to see if it's included
-    !candidate.exists(exclude.matches(_)) || candidate.exists(include.matches(_))
+    !candidate.exists(exclude.matches(_)) || candidate.exists(
+      include.matches(_)
+    )
   }
 
   /** Add a single predicate to this IncludeExclude, returning a new instance.
