@@ -246,7 +246,7 @@ trait ToProcess {
     */
   def itemCnt: Int
 
-  /** Call at the end of successfull completing the operation
+  /** Call at the end of successful completing the operation
     */
   def markSuccessfulCompletion(): Unit
 
@@ -513,7 +513,8 @@ object ToProcess {
     Vector(
       MavenToProcess.computeMavenFiles,
       DockerToProcess.computeDockerFiles,
-      Debian.computeDebianFiles,
+      // Debian.computeDebianFiles,
+      BaharatStrategy.computeBaharatFiles,
       DotnetFile.computeDotnetFiles,
       GenericFile.computeGenericFiles
     )
@@ -553,7 +554,8 @@ object ToProcess {
       Vector(
         MavenToProcess.computeMavenFiles,
         DockerToProcess.computeDockerFiles,
-        Debian.computeDebianFiles,
+        BaharatStrategy.computeBaharatFiles,
+        // Debian.computeDebianFiles,
         DotnetFile.computeDotnetFiles,
         GenericFile.computeGenericFiles
       )

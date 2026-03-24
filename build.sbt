@@ -129,8 +129,6 @@ lazy val root = project
 
     // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
-    libraryDependencies += "io.github.json4s" %% "json4s-jackson" % "4.1.0",
-    libraryDependencies += "com.github.luben" % "zstd-jni" % "1.5.6-4",
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.28.0",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
     libraryDependencies +=
@@ -140,7 +138,6 @@ lazy val root = project
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "org.tukaani" % "xz" % "1.10",
     libraryDependencies += "io.spicelabs" %% "cilantro" % "0.1.17",
-    // libraryDependencies += "io.spicelabs" % "rodeo-components_3" % "0.0.17",
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
     // Spice Labs "readers"
