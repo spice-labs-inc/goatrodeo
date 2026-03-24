@@ -179,10 +179,6 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
 
   }
 
-  // artifactMetaData
-  // .map(_._2)
-  // .getOrElse(TreeMap[String, TreeSet[StringOrPair]]()) -> this
-
   override def finalAugmentation(
       artifact: ArtifactWrapper,
       item: Item,

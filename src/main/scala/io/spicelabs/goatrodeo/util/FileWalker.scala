@@ -2,6 +2,8 @@ package io.spicelabs.goatrodeo.util
 
 import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.baharat.rpm.RpmReader
+import io.spicelabs.baharat.rpm.payload.PayloadEntry
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
@@ -40,6 +42,7 @@ enum FileAction {
   * Supported archive formats include:
   *   - ZIP-based: ZIP, JAR, WAR, Android APK
   *   - TAR-based: TAR, TAR.GZ, TAR.BZ2
+  *   - RPM files
   *   - Other: ISO9660, DEB (Debian packages)
   */
 object FileWalker {
@@ -55,6 +58,8 @@ object FileWalker {
   private lazy val isoMimeTypes: Set[String] = Set(
     "application/x-iso9660-image"
   )
+
+  private lazy val rpmMimeTypes: Set[String] = Set("application/x-rpm")
 
   /** Try to construct an `OptionalArchiveStream` from a Zip/WAR/etc. file
     *
@@ -110,6 +115,45 @@ object FileWalker {
             )
             None
         }
+      }
+    } else {
+      None
+    }
+  }
+
+  /** Try opening as an RPM file
+    */
+  private def asRPMWrapper(
+      in: ArtifactWrapper,
+      tempPath: Path
+  ): OptionalArchiveStream = {
+    if (rpmMimeTypes.intersect(in.mimeType).nonEmpty) {
+      try {
+        in.withFile(f => {
+          Using.resource(RpmReader.streamPayload(f.toPath())) {
+            import scala.jdk.CollectionConverters.IteratorHasAsScala
+            payload =>
+              val wrappers = for {
+                entry <- payload.iterator().asScala
+
+                file <- entry match {
+                  case f: PayloadEntry.FileEntry => Some(f)
+                  case _                         => None
+                }
+              } yield ArtifactWrapper.newWrapper(
+                file.path(),
+                file.size(),
+                file.content(),
+                in.tempDir,
+                tempPath
+              )
+              Some(wrappers.toVector -> "RPM")
+          }
+        })
+      } catch {
+        // Throw an exception and it's not an RPM
+        case e: Exception =>
+          None
       }
     } else {
       None
@@ -351,63 +395,74 @@ object FileWalker {
         val ret = asZipContainer(in, tempDir)
 
         ret
-      }.orElse(asISOWrapper(in, tempDir).orElse {
-        // the inputstream to the apache stuff is either a
-        // decompressed file or the input stream from the artifact
+      }.orElse(asRPMWrapper(in, tempDir))
+        .orElse(
+          asISOWrapper(in, tempDir)
+            .orElse {
+              // the inputstream to the apache stuff is either a
+              // decompressed file or the input stream from the artifact
 
-        val withInputStreamFn: BufferedInputStream => OptionalArchiveStream =
-          theStream =>
-            asApacheCommonsArchiveWrapper(
-              theStream,
-              in.path(),
-              in.tempDir,
-              tempDir
-            )
+              val withInputStreamFn
+                  : BufferedInputStream => OptionalArchiveStream =
+                theStream =>
+                  asApacheCommonsArchiveWrapper(
+                    theStream,
+                    in.path(),
+                    in.tempDir,
+                    tempDir
+                  )
 
-        // if it's not compressed, just run with the stream
-        if (notCompressed(in.path(), in.mimeType))
-          in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
-        else {
-          // if it might be compressed, try to decompress the stream into a file
-          val maybeFile: Option[File] = Try {
-            in.withStream { stream =>
-              val factory = new CompressorStreamFactory()
-              val fis = new BufferedInputStream(stream)
+              // if it's not compressed, just run with the stream
+              if (notCompressed(in.path(), in.mimeType))
+                in.withStream(s =>
+                  withInputStreamFn(new BufferedInputStream(s))
+                )
+              else {
+                // if it might be compressed, try to decompress the stream into a file
+                val maybeFile: Option[File] = Try {
+                  in.withStream { stream =>
+                    val factory = new CompressorStreamFactory()
+                    val fis = new BufferedInputStream(stream)
 
-              val input: CompressorInputStream =
-                factory.createCompressorInputStream(fis)
+                    val input: CompressorInputStream =
+                      factory.createCompressorInputStream(fis)
 
-              val theFile =
-                Files
-                  .createTempFile(tempDir, "goats", "uncompressed")
-                  .toFile()
+                    val theFile =
+                      Files
+                        .createTempFile(tempDir, "goats", "uncompressed")
+                        .toFile()
 
-              val fos = new FileOutputStream(theFile)
-              Helpers.copy(input, fos)
-              fos.close()
-              theFile
-            }
-          }.toOption
+                    val fos = new FileOutputStream(theFile)
+                    Helpers.copy(input, fos)
+                    fos.close()
+                    theFile
+                  }
+                }.toOption
 
-          maybeFile match {
-            // if we were able to decompress, then use the temp file
-            case Some(uncompressedFile) => {
-              try {
-                Using.resource(
-                  new BufferedInputStream(new FileInputStream(uncompressedFile))
-                ) { stream =>
-                  withInputStreamFn(stream)
+                maybeFile match {
+                  // if we were able to decompress, then use the temp file
+                  case Some(uncompressedFile) => {
+                    try {
+                      Using.resource(
+                        new BufferedInputStream(
+                          new FileInputStream(uncompressedFile)
+                        )
+                      ) { stream =>
+                        withInputStreamFn(stream)
+                      }
+                    } finally {
+                      uncompressedFile.delete()
+                    }
+                  }
+                  case None =>
+                    in.withStream(s =>
+                      withInputStreamFn(new BufferedInputStream(s))
+                    )
                 }
-              } finally {
-                uncompressedFile.delete()
+
               }
             }
-            case None =>
-              in.withStream(s => withInputStreamFn(new BufferedInputStream(s)))
-          }
-
-        }
-      })
+        )
     }
   }
 

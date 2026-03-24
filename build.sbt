@@ -140,7 +140,7 @@ lazy val root = project
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
     // Spice Labs "readers"
-    libraryDependencies += "io.spicelabs" % "baharat" % "0.0.1-SNAPSHOT",
+    libraryDependencies += "io.spicelabs" % "baharat" % "0.0.4",
     // libraryDependencies += "io.spicelabs" % "annatto" % "0.0.1-SNAPSHOT",
 
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),

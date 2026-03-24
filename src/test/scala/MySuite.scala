@@ -229,6 +229,20 @@ class MySuite extends munit.FunSuite {
     }
   }
 
+  test("Finds files in rpm") {
+    val name = "test_data/tk-8.6.8-1.el8.x86_64.rpm"
+    val nested =
+      FileWrapper(File(name), name, None)
+
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+    val gitoids = store.gitoidKeys()
+
+    assert(
+      gitoids.size > 200,
+      s"There should be at least 200 files found in the rpm, found ${gitoids.size}"
+    )
+  }
+
   // test("Compute pURL for .deb") {
   //   val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
   //   val (maybePurl, attrs) = BaharatStrategy
