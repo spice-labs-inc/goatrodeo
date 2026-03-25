@@ -100,7 +100,7 @@ class GenericTestSuite extends munit.FunSuite {
     val artifact = ByteWrapper("hello".getBytes("UTF-8"), "test.txt", None)
     val tp = GenericFile(artifact)
 
-    assertEquals(tp.mimeType, "text/plain")
+    assert(tp.mimeType.contains("text/plain"))
   }
 
   test(

@@ -4,6 +4,7 @@ import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.cilantro.AssemblyNameReference
+import io.spicelabs.cilantro.CSVersion
 import io.spicelabs.cilantro.CustomAttribute
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
@@ -32,7 +33,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import io.spicelabs.cilantro.CSVersion
 
 /** State maintained during .NET assembly processing.
   *
@@ -60,8 +60,8 @@ class DotnetState(
     var fileStmOpt: Option[FileInputStream] = None
 
     Try {
-      val stream = io.spicelabs.goatrodeo.util.FileWalker.withinTempDir {
-        path => FileInputStream(artifact.forceFile(path))
+      val stream: FileInputStream = artifact.withFile { file =>
+        FileInputStream(file)
       }
 
       fileStmOpt = Some(stream)
@@ -263,7 +263,8 @@ class DotnetState(
   }
 
   def sanitizeVersion(version: CSVersion): String = {
-    if (version.revision <= 0) then CSVersion(version.major, version.minor, version.build, -1).toString()
+    if (version.revision <= 0) then
+      CSVersion(version.major, version.minor, version.build, -1).toString()
     else version.toString()
   }
 
@@ -334,7 +335,7 @@ final case class DotnetFile(file: ArtifactWrapper) extends ToProcess {
 
   /** The mime type of the main artifact
     */
-  def mimeType: String = DotnetDetector.DOTNET_MIME.toString()
+  def mimeType: Set[String] = Set(DotnetDetector.DOTNET_MIME.toString())
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) =
@@ -366,16 +367,16 @@ object DotnetFile {
     val dotnetMime = DotnetDetector.DOTNET_MIME.toString()
 
     val retByName = byName.map { case (k, v) =>
-      val isDotnet = v.filter(_.mimeType == dotnetMime)
+      val isDotnet = v.filter(_.mimeType.contains(dotnetMime))
 
       // no isDotnet files, just continue
       if (isDotnet.isEmpty) {
         k -> v
       } else {
         // all the non-dotnet files
-        val newV = v.filter(_.mimeType != dotnetMime)
+        val newV = v.filter(!_.mimeType.contains(dotnetMime))
 
-        // for each of the dotnet files, add to ret, substract from uuid
+        // for each of the dotnet files, add to ret, subtract from uuid
         for { dotnet <- isDotnet } {
           retByUUID -= dotnet.uuid
           ret = ret :+ DotnetFile(dotnet)

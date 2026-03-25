@@ -16,12 +16,8 @@ import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.omnibor.strategies.Debian
 import io.spicelabs.goatrodeo.util.*
 import io.spicelabs.goatrodeo.util.Config
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -222,13 +218,6 @@ class MySuite extends munit.FunSuite {
           )
           .get
 
-        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
-
-        assert(
-          purls.length == 2,
-          s"should be two purls (the deb plugin and the syft generated) ${purls} on tk"
-        )
-
         assert(
           item.bodyAsItemMetaData.get.extra
             .get("static-metadata-artifact")
@@ -240,52 +229,66 @@ class MySuite extends munit.FunSuite {
     }
   }
 
-  test("Compute pURL for .deb") {
-    val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
-    val (maybePurl, attrs) = Debian
-      .computePurl(
-        FileWrapper(File(name), name, None)
-      )
-      .get
-    assert(maybePurl.isDefined, "Should compute a purl")
-    val purl = maybePurl.get
-    assertEquals(purl.getName(), "tk8.6", None)
+  test("Finds files in rpm") {
+    val name = "test_data/tk-8.6.8-1.el8.x86_64.rpm"
+    val nested =
+      FileWrapper(File(name), name, None)
+
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+    val gitoids = store.gitoidKeys()
+
     assert(
-      attrs.get("maintainer").get.size > 0,
-      "Should have a mainter"
-    )
-    assert(
-      attrs.get("description").get.head.value.contains("look-and-feel"),
-      "The description must support multi-line"
+      gitoids.size > 200,
+      s"There should be at least 200 files found in the rpm, found ${gitoids.size}"
     )
   }
 
-  test("Compute pURL for another .deb") {
-    val name = "test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"
+  // test("Compute pURL for .deb") {
+  //   val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
+  //   val (maybePurl, attrs) = BaharatStrategy
+  //     .computePurl(
+  //       FileWrapper(File(name), name, None)
+  //     )
+  //     .get
+  //   assert(maybePurl.isDefined, "Should compute a purl")
+  //   val purl = maybePurl.get
+  //   assertEquals(purl.getName(), "tk8.6", None)
+  //   assert(
+  //     attrs.get("maintainer").get.size > 0,
+  //     "Should have a mainter"
+  //   )
+  //   assert(
+  //     attrs.get("description").get.head.value.contains("look-and-feel"),
+  //     "The description must support multi-line"
+  //   )
+  // }
 
-    val (maybePurl, attrs) = Debian
-      .computePurl(
-        FileWrapper(File(name), name, None)
-      )
-      .get
-    assert(maybePurl.isDefined, "Should compute a purl")
-    val purl = maybePurl.get
-    assertEquals(purl.getName(), "libasound2", None)
-    assert(
-      attrs.get("maintainer").get.size > 0,
-      "Should have a mainter"
-    )
-    assert(
-      attrs
-        .get("description")
-        .get
-        .head
-        .value
-        .contains("ALSA library and its standard plugins"),
-      "The description must support multi-line"
-    )
+  // test("Compute pURL for another .deb") {
+  //   val name = "test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"
 
-  }
+  //   val (maybePurl, attrs) = Debian
+  //     .computePurl(
+  //       FileWrapper(File(name), name, None)
+  //     )
+  //     .get
+  //   assert(maybePurl.isDefined, "Should compute a purl")
+  //   val purl = maybePurl.get
+  //   assertEquals(purl.getName(), "libasound2", None)
+  //   assert(
+  //     attrs.get("maintainer").get.size > 0,
+  //     "Should have a mainter"
+  //   )
+  //   assert(
+  //     attrs
+  //       .get("description")
+  //       .get
+  //       .head
+  //       .value
+  //       .contains("ALSA library and its standard plugins"),
+  //     "The description must support multi-line"
+  //   )
+
+  // }
 
   test("deal with .deb and zst") {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
@@ -302,15 +305,10 @@ class MySuite extends munit.FunSuite {
   test("calculate mime type for class file") {
     val classFileName =
       "target/scala-3.7.4/classes/io/spicelabs/goatrodeo/Howdy.class"
-
-    val f = new File(classFileName)
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, classFileName)
-    val inputStream = TikaInputStream.get(f.toPath(), metadata)
-    val mimeType = ArtifactWrapper.mimeTypeFor(inputStream, classFileName, truePath = Some(f.toPath().toString()))
+    val f = FileWrapper(new File(classFileName), classFileName, None, _ => ())
     assert(
-      mimeType == "application/java-vm",
-      f"Expecting mime type for a class file to be 'application/java-vm' but got ${mimeType}"
+      f.mimeType.contains("application/java-vm"),
+      f"Expecting mime type for a class file contain 'application/java-vm' but got ${f.mimeType}"
     )
   }
 

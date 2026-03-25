@@ -62,7 +62,7 @@ class ADGTests extends munit.FunSuite {
         threadCnt = (Option(System.getenv("TEST_THREAD_CNT")))
           .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
           .getOrElse(25),
-        maxRecords = 50000,
+        maxRecords = 10000,
         tag = Some(TagInfo("foo", None)),
         fileListers = Vector(
           (

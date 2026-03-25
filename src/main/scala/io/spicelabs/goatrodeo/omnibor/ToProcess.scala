@@ -16,10 +16,9 @@ import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import java.util.concurrent.atomic.AtomicReference
-import io.spicelabs.rodeocomponents.APIS.artifacts.ParentFrame
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -146,7 +145,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
 
 abstract class ParentScope(
     val augmentationByHash: Map[String, Vector[Augmentation]]
-) extends ParentFrame {
+) {
   def beginProcessing(
       store: Storage,
       artifact: ArtifactWrapper,
@@ -241,13 +240,13 @@ trait ToProcess {
 
   /** The mime type of the main artifact
     */
-  def mimeType: String
+  def mimeType: Set[String]
 
   /** The number of items (e.g., jar, sources, pom) in this process bundle
     */
   def itemCnt: Int
 
-  /** Call at the end of successfull completing the operation
+  /** Call at the end of successful completing the operation
     */
   def markSuccessfulCompletion(): Unit
 
@@ -514,7 +513,8 @@ object ToProcess {
     Vector(
       MavenToProcess.computeMavenFiles,
       DockerToProcess.computeDockerFiles,
-      Debian.computeDebianFiles,
+      // Debian.computeDebianFiles,
+      BaharatStrategy.computeBaharatFiles,
       DotnetFile.computeDotnetFiles,
       GenericFile.computeGenericFiles
     )
@@ -554,7 +554,8 @@ object ToProcess {
       Vector(
         MavenToProcess.computeMavenFiles,
         DockerToProcess.computeDockerFiles,
-        Debian.computeDebianFiles,
+        BaharatStrategy.computeBaharatFiles,
+        // Debian.computeDebianFiles,
         DotnetFile.computeDotnetFiles,
         GenericFile.computeGenericFiles
       )

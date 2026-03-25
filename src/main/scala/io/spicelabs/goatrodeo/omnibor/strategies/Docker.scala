@@ -245,7 +245,7 @@ final case class DockerToProcess(
         f"${s}${m.configHash} "
       }}"
 
-  override def mimeType: String = manifest.mimeType
+  override def mimeType: Set[String] = manifest.mimeType
 
   override def itemCnt: Int = 1 + config.size + layers.size
 
@@ -296,7 +296,7 @@ object DockerToProcess {
     val configInfo =
       for {
         manifestVec <- maybeManifest if manifestVec.length == 1 &&
-          manifestVec(0).mimeType.startsWith(jsonMimeType)
+          manifestVec(0).mimeType.exists(_.startsWith(jsonMimeType))
 
         manifest = manifestVec(0)
 
@@ -318,7 +318,9 @@ object DockerToProcess {
           }
           configFile <- byName.get(configHash) match {
             case Some(a)
-                if a.length == 1 && a(0).mimeType.startsWith(jsonMimeType) =>
+                if a.length == 1 && a(0).mimeType.exists(
+                  _.startsWith(jsonMimeType)
+                ) =>
               List(a(0))
             case _ => Nil
           }

@@ -5,13 +5,9 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetFile
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
-import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
-import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.File
 import scala.collection.immutable.TreeMap
@@ -19,7 +15,6 @@ import scala.collection.immutable.TreeSet
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import java.io.FileInputStream
 
 class DotNetTesting extends munit.FunSuite {
 
@@ -39,20 +34,27 @@ class DotNetTesting extends munit.FunSuite {
     )
   }
   test("get-me-a-mime") {
+
     val path = "test_data/Smoke.dll"
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
-    val input = TikaInputStream.get(File(path), metadata)
-    val mime = ArtifactWrapper.mimeTypeFor(input, path, truePath = Some(path.toString()))
-    assertEquals("application/x-msdownload; format=pe32-dotnet", mime)
+    val f = FileWrapper(new File(path), path, None, _ => ())
+
+    assert(f.mimeType.contains("application/x-msdownload; format=pe32-dotnet"))
   }
+
+  def mimesForFile(name: String): Set[String] = {
+    val file = File(name)
+    if (file.exists()) {
+      FileWrapper(File(name), name, None, _ => ()).mimeType
+    } else { Set() }
+  }
+
   test("get-me-a-mime-exe") {
-    val path = "test_data/hackproj.dll"
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
-    val input = TikaInputStream.get(File(path), metadata)
-    val mime = ArtifactWrapper.mimeTypeFor(input, path, truePath = Some(path.toString()))
-    assertEquals("application/x-msdownload; format=pe32-dotnet", mime)
+    assert(
+      mimesForFile("test_data/hackproj.dll").contains(
+        "application/x-msdownload; format=pe32-dotnet"
+      )
+    )
+
   }
 
   test("Can build for a simple dotnet file") {
@@ -68,12 +70,11 @@ class DotNetTesting extends munit.FunSuite {
   }
 
   test("mime-from-nupkg") {
-    val path = "test_data/awesomeassertions.9.3.0.nupkg"
-    val metadata = new Metadata()
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, path)
-    val input = TikaInputStream.get(File(path), metadata)
-    val mime = ArtifactWrapper.mimeTypeFor(input, path, truePath = Some(path.toString()));
-    assertEquals("application/zip", mime)
+    assert(
+      mimesForFile("test_data/awesomeassertions.9.3.0.nupkg").contains(
+        "application/zip"
+      )
+    )
   }
 
   test("assembly-references") {
@@ -172,7 +173,9 @@ class DotNetTesting extends munit.FunSuite {
       val wrapper = FileWrapper(dllFile, dllFile.getName(), None)
       val tp = DotnetFile(wrapper)
 
-      assertEquals(tp.mimeType, "application/x-msdownload; format=pe32-dotnet")
+      assert(
+        tp.mimeType.contains("application/x-msdownload; format=pe32-dotnet")
+      )
     }
   }
 
@@ -232,7 +235,6 @@ class DotNetTesting extends munit.FunSuite {
     }
   }
 
-
   test("check bdinfo") {
     val name = "test_data/bdinfo.tar"
 
@@ -242,7 +244,6 @@ class DotNetTesting extends munit.FunSuite {
 
     val result = store1.purls()
     assertEquals(result.size, 1)
-    result.foreach(s =>
-      assertEquals(s, "pkg:nuget/BDInfo@0.8.0"))
+    result.foreach(s => assertEquals(s, "pkg:nuget/BDInfo@0.8.0"))
   }
 }

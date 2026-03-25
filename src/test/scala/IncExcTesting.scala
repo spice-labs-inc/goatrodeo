@@ -28,7 +28,7 @@ class IncExcTesting extends munit.FunSuite {
       Set[String](),
       Vector[Regex]()
     )
-    assert(includer.shouldInclude("all"))
+    assert(includer.shouldInclude(Set("all")))
   }
 
   test("excludes-all-text-MIME") {
@@ -38,9 +38,9 @@ class IncExcTesting extends munit.FunSuite {
       Set[String](),
       Vector("text\\/.*".r)
     )
-    assert(!includer.shouldInclude("text/html"))
-    assert(!includer.shouldInclude("text/plain"))
-    assert(!includer.shouldInclude("text/json"))
+    assert(!includer.shouldInclude(Set("text/html")))
+    assert(!includer.shouldInclude(Set("text/plain")))
+    assert(!includer.shouldInclude(Set("text/json")))
   }
 
   test("excludes-all-text-MIME-but-HTML") {
@@ -50,9 +50,9 @@ class IncExcTesting extends munit.FunSuite {
       Set[String](),
       Vector("text\\/.*".r)
     )
-    assert(includer.shouldInclude("text/html"))
-    assert(!includer.shouldInclude("text/plain"))
-    assert(!includer.shouldInclude("text/json"))
+    assert(includer.shouldInclude(Set("text/html")))
+    assert(!includer.shouldInclude(Set("text/plain")))
+    assert(!includer.shouldInclude(Set("text/json")))
   }
 
   test("excludes-all-text-MIME-but-hanything") {
@@ -62,10 +62,10 @@ class IncExcTesting extends munit.FunSuite {
       Set[String](),
       Vector("text\\/.*".r)
     )
-    assert(includer.shouldInclude("text/html"))
-    assert(includer.shouldInclude("text/howdy"))
-    assert(!includer.shouldInclude("text/plain"))
-    assert(!includer.shouldInclude("text/json"))
+    assert(includer.shouldInclude(Set("text/html")))
+    assert(includer.shouldInclude(Set("text/howdy")))
+    assert(!includer.shouldInclude(Set("text/plain")))
+    assert(!includer.shouldInclude(Set("text/json")))
   }
 
   test("comment") {
@@ -154,47 +154,47 @@ class IncExcTesting extends munit.FunSuite {
 
   test("IncludeExclude - :+ operator adds include exact") {
     val includer = IncludeExclude() :+ "+specific"
-    assert(includer.shouldInclude("specific"))
+    assert(includer.shouldInclude(Set("specific")))
   }
 
   test("IncludeExclude - :+ operator adds exclude exact") {
     val includer = IncludeExclude() :+ "-excluded"
-    assert(!includer.shouldInclude("excluded"))
-    assert(includer.shouldInclude("other"))
+    assert(!includer.shouldInclude(Set("excluded")))
+    assert(includer.shouldInclude(Set("other")))
   }
 
   test("IncludeExclude - :+ operator adds include regex") {
     val includer = IncludeExclude() :+ "*test.*"
-    assert(includer.shouldInclude("testing"))
-    assert(includer.shouldInclude("test123"))
+    assert(includer.shouldInclude(Set("testing")))
+    assert(includer.shouldInclude(Set("test123")))
   }
 
   test("IncludeExclude - :+ operator adds exclude regex") {
     val includer = IncludeExclude() :+ "/debug.*"
-    assert(!includer.shouldInclude("debugging"))
-    assert(includer.shouldInclude("info"))
+    assert(!includer.shouldInclude(Set("debugging")))
+    assert(includer.shouldInclude(Set("info")))
   }
 
   test("IncludeExclude - ++ operator chains multiple predicates") {
     val includer =
       IncludeExclude() ++ Vector("+allowed", "-forbidden", "/temp.*")
-    assert(includer.shouldInclude("allowed"))
-    assert(!includer.shouldInclude("forbidden"))
-    assert(!includer.shouldInclude("temporary"))
-    assert(includer.shouldInclude("permanent"))
+    assert(includer.shouldInclude(Set("allowed")))
+    assert(!includer.shouldInclude(Set("forbidden")))
+    assert(!includer.shouldInclude(Set("temporary")))
+    assert(includer.shouldInclude(Set("permanent")))
   }
 
   test("IncludeExclude - include overrides exclude for specific item") {
     val includer = IncludeExclude() ++ Vector("/.*\\.log", "+important.log")
-    assert(!includer.shouldInclude("error.log"))
-    assert(includer.shouldInclude("important.log"))
+    assert(!includer.shouldInclude(Set("error.log")))
+    assert(includer.shouldInclude(Set("important.log")))
   }
 
   test("IncludeExclude - default constructor allows everything") {
     val includer = new IncludeExclude()
-    assert(includer.shouldInclude("anything"))
-    assert(includer.shouldInclude(""))
-    assert(includer.shouldInclude("test/path/file.txt"))
+    assert(includer.shouldInclude(Set("anything")))
+    assert(includer.shouldInclude(Set("")))
+    assert(includer.shouldInclude(Set("test/path/file.txt")))
   }
 
   test("IncludeExclude - empty predicate string is ignored") {
