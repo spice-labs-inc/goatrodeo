@@ -23,6 +23,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.Using
+import org.apache.tika.utils.XMLReaderUtils
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -170,6 +171,8 @@ object ArtifactWrapper {
   /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
   private val tika = new TikaConfig()
+  // avoid the WARN Contention waiting for a SAXParser. Consider increasing the XMLReaderUtils.POOL_SIZE warning
+  XMLReaderUtils.setPoolSize(200)
 
   /** Given an input stream and a filename, get the mime type
     *
