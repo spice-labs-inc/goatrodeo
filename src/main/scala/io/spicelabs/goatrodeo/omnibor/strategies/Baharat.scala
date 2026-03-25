@@ -23,6 +23,8 @@ import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.ListHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
+import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import io.spicelabs.goatrodeo.omnibor.{MetadataKeyConstants => MKC}
 
 object BaharatStrategy {
   val logger = Logger(this.getClass())
@@ -130,26 +132,6 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       marker: SingleMarker
   ): (TreeMap[String, TreeSet[StringOrPair]], BaharatState) = {
     val metadata = pkg.metadata()
-    // format the metadata
-    val lst: Vector[(String, TreeSet[StringOrPair])] = Vector(
-      "arch" -> Some(metadata.arch()),
-      "buildtime" -> metadata.buildTime().map(_.toString()).toScala,
-      "description" -> metadata.description().toScala,
-      "epoch" -> metadata.epoch().map(_.toString()).toScala,
-      "group" -> metadata.group().toScala,
-      "installed_size" -> Some(metadata.installedSize().toString()),
-      "license" -> metadata.license().toScala,
-      "maintainer" -> metadata.maintainer().toScala,
-      "name" -> Some(metadata.name()),
-      "release" -> metadata.release().toScala,
-      "summary" -> metadata.summary().toScala,
-      "url" -> metadata.url().toScala,
-      "vendor" -> metadata.vendor().toScala,
-      "version" -> Some(metadata.version())
-    ).flatMap {
-      case (k, Some(v)) => Some(k -> TreeSet(StringOrPair(v)))
-      case _            => None
-    }
 
     // compute dependencies
     val dependencies: JArray = JArray(
@@ -169,14 +151,76 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
         .map(p => JString(p.toVersionedString()))
     )
 
-    TreeMap(
-      lst :+ ("dependencies" -> TreeSet(
-        StringOrPair("application/json", compact(render(dependencies)))
-      )) :+ ("provides" -> TreeSet(
-        StringOrPair("application/json", compact(render(provides)))
-      ))*
-    ) -> this
+    // adHoc generates a prefix onto the key
+    val adHoc = MKC.adHoc("Baharat")
 
+    val tm: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap[String, TreeSet[StringOrPair]]()
+        +? maybeStringOrPair(
+          adHoc("Arch"),
+          metadata.arch()
+        )
+        +? maybeStringOrPair(
+          MKC.PUBLICATION_DATE,
+          metadata.buildTime().map(_.toString()).toScala
+        )
+        +? maybeStringOrPair(
+          MKC.DESCRIPTION,
+          metadata.description().toScala
+        )
+        +? maybeStringOrPair(
+          adHoc("Epoch"),
+          metadata.epoch().map(_.toString()).toScala
+        )
+        +? maybeStringOrPair(
+          adHoc("Group"),
+          metadata.group().toScala
+        )
+        +? maybeStringOrPair(
+          adHoc("Installed_size"),
+          metadata.installedSize().toString()
+        )
+        +? maybeStringOrPair(
+          MKC.LICENSE,
+          metadata.license().toScala
+        )
+        +? maybeStringOrPair(
+          adHoc("Maintainer"),
+          metadata.maintainer().toScala
+        )
+        +? maybeStringOrPair(
+          MKC.NAME,
+          metadata.name()
+        )
+        +? maybeStringOrPair(
+          adHoc("Release"),
+          metadata.release().toScala
+        )
+        +? maybeStringOrPair(
+          adHoc("Summary"),
+          metadata.summary().toScala
+        )
+        +? maybeStringOrPair(
+          MKC.URL,
+          metadata.url().toScala
+        )
+        +? maybeStringOrPair(
+          MKC.PUBLISHER,
+          metadata.vendor().toScala
+        )
+        +? maybeStringOrPair(
+          MKC.VERSION,
+          metadata.version()
+        )
+        +? maybeStringOrPair(
+          MKC.DEPENDENCIES,
+          "application/json" -> compact(render(dependencies))
+        )
+        +? maybeStringOrPair(
+          adHoc("Provides"),
+          "application/json" -> compact(render(provides))
+        )
+    tm -> this
   }
 
   override def finalAugmentation(
@@ -193,4 +237,23 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       marker: SingleMarker
   ): BaharatState = this
 
+  // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].
+  // These three cases are the most common output from metadata and the output of thisfunction
+  // will feed the +? operator directly
+  private def maybeStringOrPair(
+      key: String,
+      s: String | Option[String] | (String, String)
+  ): Option[(String, TreeSet[StringOrPair])] = {
+    s match {
+      case value: String => Some(key -> TreeSet(StringOrPair(value)))
+      case value: Option[String] => {
+        value match {
+          case Some(str) => Some(key -> TreeSet(StringOrPair(str)))
+          case None      => None
+        }
+      }
+      case value: (String, String) =>
+        Some(key -> TreeSet(StringOrPair(value._1, value._2)))
+    }
+  }
 }
