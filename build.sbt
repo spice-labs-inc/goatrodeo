@@ -55,6 +55,44 @@ fatJar := {
   targetPath
 }
 
+// Tasks to verify fat JAR integrity
+val verifyJarContents = taskKey[Unit]("Verify no signature files in fat JAR")
+val testFatJar = taskKey[Unit]("Test that fat JAR runs without signature errors")
+
+verifyJarContents := {
+  val fatJarFile = (Compile / assembly).value
+  val jar = new java.util.jar.JarFile(fatJarFile)
+  try {
+    import scala.jdk.CollectionConverters._
+    val entries = jar.entries().asScala.toList
+    val badEntries = entries.filter { e =>
+      val name = e.getName
+      name.startsWith("META-INF/") && (
+        name.endsWith(".SF") || name.endsWith(".DSA") ||
+        name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith("SIG-")
+      )
+    }
+    if (badEntries.nonEmpty) {
+      throw new MessageOnlyException(
+        s"Found signature files in fat JAR: ${badEntries.map(_.getName).mkString(", ")}"
+      )
+    }
+  } finally {
+    jar.close()
+  }
+}
+
+testFatJar := {
+  val fatJarFile = (Compile / assembly).value
+  val result = scala.sys.process.Process(Seq("java", "-jar", fatJarFile.getAbsolutePath, "--help")).!
+  if (result != 0) {
+    throw new MessageOnlyException(s"Fat JAR failed to execute with exit code: $result")
+  }
+}
+
+// Hook fat JAR tests into `sbt test`
+Test / test := (Test / test).dependsOn(verifyJarContents, testFatJar).value
+
 publishMavenStyle := true
 publish / packagedArtifacts += (Artifact(
   projectName,
@@ -162,7 +200,11 @@ lazy val root = project
 
 ThisBuild / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
-  case _                                   => MergeStrategy.last
+  // Discard signature files from signed JARs
+  case PathList("META-INF", name) if name.endsWith(".SF") || name.endsWith(".DSA") ||
+    name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith("SIG-") =>
+    MergeStrategy.discard
+  case _ => MergeStrategy.last
 }
 
 Test / testOptions += Tests.Setup(() => {
