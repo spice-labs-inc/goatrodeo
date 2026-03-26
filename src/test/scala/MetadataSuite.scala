@@ -17,6 +17,10 @@ import io.spicelabs.goatrodeo.util.StaticMetadata
 import org.json4s.*
 
 import java.io.File
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import scala.collection.immutable.TreeSet
+import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
 class MetadataSuite extends munit.FunSuite {
   test("Metadata collections works") {
     if (StaticMetadata.hasSyft) {
@@ -68,5 +72,56 @@ class MetadataSuite extends munit.FunSuite {
     } else {
       assert(true)
     }
+  }
+
+  test("deb metadata") {
+      val file = File("test_data/debwithmetadata.deb")
+      val nested = FileWrapper(file, "debwithmetadata.deb", None, f => ())
+      //val nested = FileWrapper(file, name, None)
+      val store1 =
+        ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+
+      val result = store1.purls()
+
+      assertEquals(
+        result,
+        TreeSet("pkg:deb/not-a-real-package@1.2.3")
+      )
+
+      val mainitemOpt = store1.read("gitoid:blob:sha256:9ae1be82894af5681fcd9947792bc9e8e5dcea5f81b848dc5a0068d50b93ac51")
+      assert(mainitemOpt.isDefined)
+      val item = mainitemOpt.get
+      val metadataOpt = item.bodyAsItemMetaData
+      assert(metadataOpt.isDefined)
+      val metadata = metadataOpt.get
+      val extra = metadata.extra
+      val fail = TreeSet(StringOrPair("fail"))
+      
+      val arch = extra.getOrElse("Baharat:Arch", fail)
+      val size = extra.getOrElse("Baharat:Installed_size", fail)
+      val maint = extra.getOrElse("Baharat:Maintainer", fail)
+      val provides = extra.getOrElse("Baharat:Provides", fail)
+      val sum = extra.getOrElse("Baharat:Summary", fail)
+      val deps = extra.getOrElse("Dependencies", fail)
+      val desc = extra.getOrElse("Description", fail)
+      val name = extra.getOrElse("Name", fail)
+      val version = extra.getOrElse("Version", fail)
+  
+      assertContents(arch, "any")
+      assertNotEquals(size, fail)
+      assertContents(maint, "Spice Labs<info@spice-labs.io>")
+      assertNotEquals(provides, fail)
+      assertNotEquals(sum, fail)
+      assertNotEquals(deps, fail)
+      assertContents(desc, "This is a basic description of this package")
+      assertContents(name, "not-a-real-package")
+      assertContents(version, "1.2.3")
+  }
+
+  def assertContents(ts: TreeSet[StringOrPair], expected: String): Unit = {
+    val arr = ts.toArray
+    assertEquals(arr.length, 1)
+    val sop = arr(0)
+    assertEquals(sop.value, expected)
   }
 }
