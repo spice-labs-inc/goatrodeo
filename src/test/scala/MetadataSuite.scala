@@ -23,6 +23,7 @@ import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import scala.collection.immutable.HashSet
 
 object MetadataSuite {
   val failSop = TreeSet(StringOrPair("fail"))
@@ -242,6 +243,41 @@ box but need special configuration, like udhcpc, the dhcp client."""
     assertContents(publ, "SUSE LLC <https://www.suse.com/>")
     assertContents(url, "https://www.busybox.net/")
     assertContents(vers, "1.37.0")
+
+    var gitoids = store.gitoidKeys()
+
+    var expectedFiles = HashSet(
+      "usr/share/licenses/busybox/LICENSE",
+      "busybox-1.37.0-160099.8.2.aarch64.rpm",
+      "usr/share/man/man1/busybox.1.gz",
+      "pkg:rpm/busybox@1.37.0-160099.8.2?arch=aarch64",
+      "usr/bin/busybox",
+      "usr/share/doc/packages/busybox/mdev.txt",
+      "etc/man.conf",
+      "usr/bin/busybox.install",
+      "usr/share/busybox/busybox.links"
+    )
+
+    var meta = gitoids
+      .map(oid => {
+        store.read(oid)
+      })
+      .flatten
+      .map(item => item.body)
+      .flatten
+      .collect { case meta: ItemMetaData =>
+        meta
+      }
+      .map(meta => meta.fileNames)
+      .flatten
+      .toArray
+    assertEquals(meta.length, 9)
+    meta.foreach(fileName => {
+      assert(
+        expectedFiles.contains(fileName),
+        s"failed to find file $fileName in expected"
+      )
+    })
   }
 
   test("pacman-small") {
