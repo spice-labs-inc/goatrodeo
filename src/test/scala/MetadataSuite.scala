@@ -24,6 +24,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import scala.collection.immutable.HashSet
+import io.spicelabs.goatrodeo.omnibor.ItemTagData
 
 object MetadataSuite {
   val failSop = TreeSet(StringOrPair("fail"))
@@ -395,6 +396,109 @@ the performance, all instances of the terminal are sharing a single process."""
     assertContents(date, "2022-06-28T01:29:08Z")
     assertContents(url, "https://github.com/morganamilo/paru")
     assertContents(vers, "1.11.0-1")
+  }
+
+  test("pypi small") {
+    val store = getStore("colorama-0.4.6.tar.gz")
+    val metadata = assertPurlsAndMainItem(
+      store,
+      "pkg:pypi/colorama@0.4.6",
+      "gitoid:blob:sha256:fa66e52a468dbc7e129fb49d551edf94286f0840ec3a01e3f421d51a6a3d0335"
+    )
+
+    val extra = metadata.extra
+
+    val eco = extra.getOrElse("Annatto:Ecosystem", MetadataSuite.failSop)
+    val name = extra.getOrElse("Name", MetadataSuite.failSop)
+    val desc = extra.getOrElse("Description", MetadataSuite.failSop)
+    val lisc = extra.getOrElse("License", MetadataSuite.failSop)
+    val pub = extra.getOrElse("Publisher", MetadataSuite.failSop)
+    val vers = extra.getOrElse("Version", MetadataSuite.failSop)
+
+    assertContents(eco, "PyPi")
+    assertContents(name, "colorama")
+    assertContents(pub, "Jonathan Hartley")
+    assertContents(vers, "0.4.6")
+  }
+
+  test("small gem") {
+    val store = getStore("twilito-0.5.0.gem")
+
+    val item = store.read(
+      "gitoid:blob:sha256:dc3a67744a1387d355f7af6c15df31bb7341e0a3e3941f9c4ee8096d1efb6c9d"
+    )
+    val meta = item
+      .map(it => it.body)
+      .flatten
+      .map(cody =>
+        cody match {
+          case ItemMetaData(fileNames, mimeType, fileSize, extra) =>
+            extra.toArray
+          case ItemTagData(tag) => None
+        }
+      )
+
+    val metadata = assertPurlsAndMainItem(
+      store,
+      "pkg:gem/twilito@0.5.0",
+      "gitoid:blob:sha256:dc3a67744a1387d355f7af6c15df31bb7341e0a3e3941f9c4ee8096d1efb6c9d"
+    )
+
+    val extra = metadata.extra
+
+    val eco = extra.getOrElse("Annatto:Ecosystem", MetadataSuite.failSop)
+    val name = extra.getOrElse("Name", MetadataSuite.failSop)
+    val desc = extra.getOrElse("Description", MetadataSuite.failSop)
+    val lisc = extra.getOrElse("License", MetadataSuite.failSop)
+    val pub = extra.getOrElse("Publisher", MetadataSuite.failSop)
+    val vers = extra.getOrElse("Version", MetadataSuite.failSop)
+
+    assertContents(eco, "RubyGems")
+    assertContents(name, "twilito")
+    assertContents(
+      desc,
+      "A tiny, zero dependency, and easy to test helper for sending text messages with Twilio"
+    )
+    assertContents(pub, "Alex Ford")
+    assertContents(vers, "0.5.0")
+  }
+
+  test("php") {
+    val store = getStore("small-collection-1.3.0.zip")
+
+    val item = store.read(
+      "gitoid:blob:sha256:f736dfa08565afd91657a31e15019606fb3a17ab59804d7965bfbd462770127b"
+    )
+    val meta = item
+      .map(it => it.body)
+      .flatten
+      .map(cody =>
+        cody match {
+          case ItemMetaData(fileNames, mimeType, fileSize, extra) =>
+            extra.toArray
+          case ItemTagData(tag) => None
+        }
+      )
+
+    val metadata = assertPurlsAndMainItem(
+      store,
+      "pkg:composer/small/collection@1.3.0",
+      "gitoid:blob:sha256:f736dfa08565afd91657a31e15019606fb3a17ab59804d7965bfbd462770127b"
+    )
+
+    val extra = metadata.extra
+
+    val eco = extra.getOrElse("Annatto:Ecosystem", MetadataSuite.failSop)
+    val name = extra.getOrElse("Name", MetadataSuite.failSop)
+    val lisc = extra.getOrElse("License", MetadataSuite.failSop)
+    val pub = extra.getOrElse("Publisher", MetadataSuite.failSop)
+    val vers = extra.getOrElse("Version", MetadataSuite.failSop)
+
+    assertContents(eco, "Packagist")
+    assertContents(name, "small/collection")
+    assertContents(lisc, "GPL-3.0-only")
+    assertContents(pub, "Sébastien Kus")
+    assertContents(vers, "1.3.0")
   }
 
   def assertPresent(metadata: ItemMetaData, keys: Seq[String]): Unit = {

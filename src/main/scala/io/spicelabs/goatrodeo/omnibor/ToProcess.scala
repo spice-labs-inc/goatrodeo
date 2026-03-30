@@ -516,6 +516,7 @@ object ToProcess {
       // Debian.computeDebianFiles,
       BaharatStrategy.computeBaharatFiles,
       DotnetFile.computeDotnetFiles,
+      AnnattoStrategy.computeBaharatFiles,
       GenericFile.computeGenericFiles
     )
   )
@@ -557,6 +558,7 @@ object ToProcess {
         BaharatStrategy.computeBaharatFiles,
         // Debian.computeDebianFiles,
         DotnetFile.computeDotnetFiles,
+        AnnattoStrategy.computeBaharatFiles,
         GenericFile.computeGenericFiles
       )
     })
