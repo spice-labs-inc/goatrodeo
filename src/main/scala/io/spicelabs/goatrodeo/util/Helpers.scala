@@ -74,7 +74,7 @@ object Helpers {
     */
   def treeInfoFromManifest(
       manifestString: String
-  ): Metadata = {
+  ): GoatMetadata = {
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
     val manifest = java.util.jar.Manifest.apply(bis)
 
@@ -93,7 +93,7 @@ object Helpers {
       ))*
     )
 
-    Metadata(ret)
+    GoatMetadata(ret)
   }
 
   /** The random number generator

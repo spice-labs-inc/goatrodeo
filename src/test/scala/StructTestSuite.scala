@@ -20,7 +20,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemTagData
 import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -203,7 +203,7 @@ class StructTestSuite extends munit.FunSuite {
       fileNames = TreeSet("file1.txt", "file2.txt"),
       mimeType = TreeSet("text/plain"),
       fileSize = 1234,
-      extra = Metadata(TreeMap("key" -> TreeSet(StringOrPair("value"))))
+      extra = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("value"))))
     )
     val bytes = original.encodeCBOR()
     val decoded = Cbor.decode(bytes).to[ItemMetaData].value
@@ -215,8 +215,8 @@ class StructTestSuite extends munit.FunSuite {
   }
 
   test("ItemMetaData.merge - merges filenames") {
-    val a = ItemMetaData(TreeSet("file1"), TreeSet(), 100, Metadata())
-    val b = ItemMetaData(TreeSet("file2"), TreeSet(), 100, Metadata())
+    val a = ItemMetaData(TreeSet("file1"), TreeSet(), 100, GoatMetadata())
+    val b = ItemMetaData(TreeSet("file2"), TreeSet(), 100, GoatMetadata())
 
     val merged = a.merge(b, () => Vector(), () => Vector())
     assert(merged.fileNames.contains("file1"))
@@ -225,8 +225,8 @@ class StructTestSuite extends munit.FunSuite {
 
   test("ItemMetaData.merge - merges mimeTypes") {
     // Must have non-empty fileNames for merge to work
-    val a = ItemMetaData(TreeSet("file.txt"), TreeSet("mime1"), 100, Metadata())
-    val b = ItemMetaData(TreeSet("file.txt"), TreeSet("mime2"), 100, Metadata())
+    val a = ItemMetaData(TreeSet("file.txt"), TreeSet("mime1"), 100, GoatMetadata())
+    val b = ItemMetaData(TreeSet("file.txt"), TreeSet("mime2"), 100, GoatMetadata())
 
     val merged = a.merge(b, () => Vector(), () => Vector())
     assert(merged.mimeType.contains("mime1"))
@@ -235,8 +235,8 @@ class StructTestSuite extends munit.FunSuite {
 
   test("ItemMetaData.merge - preserves fileSize from first") {
     // Must have non-empty fileNames for merge to work
-    val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, Metadata())
-    val b = ItemMetaData(TreeSet("file.txt"), TreeSet(), 200, Metadata())
+    val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, GoatMetadata())
+    val b = ItemMetaData(TreeSet("file.txt"), TreeSet(), 200, GoatMetadata())
 
     val merged = a.merge(b, () => Vector(), () => Vector())
     assertEquals(merged.fileSize, 100L)
@@ -248,13 +248,13 @@ class StructTestSuite extends munit.FunSuite {
       TreeSet("file.txt"),
       TreeSet(),
       100,
-      Metadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
+      GoatMetadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
     )
     val b = ItemMetaData(
       TreeSet("file.txt"),
       TreeSet(),
       100,
-      Metadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+      GoatMetadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
     )
 
     val merged = a.merge(b, () => Vector(), () => Vector())
@@ -265,8 +265,8 @@ class StructTestSuite extends munit.FunSuite {
   test(
     "ItemMetaData.merge - creates gitoid-qualified filenames for duplicates"
   ) {
-    val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, Metadata())
-    val b = ItemMetaData(TreeSet("other.txt"), TreeSet(), 100, Metadata())
+    val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, GoatMetadata())
+    val b = ItemMetaData(TreeSet("other.txt"), TreeSet(), 100, GoatMetadata())
 
     val aContains = () => Vector("gitoid1", "gitoid2")
     val bContains = () => Vector("gitoid3", "gitoid4")
@@ -277,8 +277,8 @@ class StructTestSuite extends munit.FunSuite {
   }
 
   test("ItemMetaData.merge - single filename stays simple") {
-    val a = ItemMetaData(TreeSet("same.txt"), TreeSet(), 100, Metadata())
-    val b = ItemMetaData(TreeSet("same.txt"), TreeSet(), 100, Metadata())
+    val a = ItemMetaData(TreeSet("same.txt"), TreeSet(), 100, GoatMetadata())
+    val b = ItemMetaData(TreeSet("same.txt"), TreeSet(), 100, GoatMetadata())
 
     val merged = a.merge(b, () => Vector(), () => Vector())
     assertEquals(merged.fileNames.size, 1)

@@ -18,7 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -35,7 +35,7 @@ class ItemTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )
@@ -54,7 +54,7 @@ class ItemTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-        extra = Metadata()
+        extra = GoatMetadata()
         )
       )
     )
@@ -190,7 +190,7 @@ class ItemTestSuite extends munit.FunSuite {
       "tags",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet(), TreeSet(), 0, Metadata()))
+      Some(ItemMetaData(TreeSet(), TreeSet(), 0, GoatMetadata()))
     )
     assert(!item.isRoot())
   }
@@ -265,13 +265,13 @@ class ItemTestSuite extends munit.FunSuite {
       "id",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, Metadata()))
+      Some(ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, GoatMetadata()))
     )
     val item2 = Item(
       "id",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, Metadata()))
+      Some(ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, GoatMetadata()))
     )
 
     val merged = item1.merge(item2)
@@ -297,8 +297,8 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.merge - preserves extra metadata") {
-    val extra1 = Metadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
-    val extra2 = Metadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+    val extra1 = GoatMetadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
+    val extra2 = GoatMetadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
     // ItemMetaData.merge requires non-empty fileNames
     val item1 = Item(
       "id",
@@ -396,7 +396,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceWithMetadata - adds extra metadata") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val extra = Metadata(TreeMap("key" -> TreeSet(StringOrPair("value"))))
+    val extra = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("value"))))
 
     val enhanced = item.enhanceWithMetadata(extra = extra)
     assert(enhanced.bodyAsItemMetaData.get.extra.contains("key"))
@@ -429,7 +429,7 @@ class ItemTestSuite extends munit.FunSuite {
       "id",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, Metadata()))
+      Some(ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, GoatMetadata()))
     )
 
     val parent = Some("gitoid:blob:sha256:parent123")
@@ -449,13 +449,13 @@ class ItemTestSuite extends munit.FunSuite {
       "gitoid:blob:sha256:abc123",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file1.txt"), TreeSet(), 100, Metadata()))
+      Some(ItemMetaData(TreeSet("file1.txt"), TreeSet(), 100, GoatMetadata()))
     )
     val item2 = Item(
       "gitoid:blob:sha256:def456",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file2.txt"), TreeSet(), 100, Metadata()))
+      Some(ItemMetaData(TreeSet("file2.txt"), TreeSet(), 100, GoatMetadata()))
     )
 
     val map = Item.itemsToFilenameGitOIDMap(Seq(item1, item2))
@@ -473,7 +473,7 @@ class ItemTestSuite extends munit.FunSuite {
           TreeSet("include.java", "exclude.txt"),
           TreeSet(),
           100,
-          Metadata()
+          GoatMetadata()
         )
       )
     )
@@ -493,7 +493,7 @@ class ItemTestSuite extends munit.FunSuite {
           TreeSet("file.java"),
           TreeSet("text/x-java-source"),
           100,
-          Metadata()
+          GoatMetadata()
         )
       )
     )
@@ -502,7 +502,7 @@ class ItemTestSuite extends munit.FunSuite {
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
-        ItemMetaData(TreeSet("file.txt"), TreeSet("text/plain"), 100, Metadata())
+        ItemMetaData(TreeSet("file.txt"), TreeSet("text/plain"), 100, GoatMetadata())
       )
     )
 

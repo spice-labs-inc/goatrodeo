@@ -10,7 +10,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 import io.spicelabs.goatrodeo.util.StaticMetadata
 
 import java.io.File
@@ -92,7 +92,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: PM
-  ): (Metadata, ME)
+  ): (GoatMetadata, ME)
 
   /** If there's any final augmentation to do on an item
     *
@@ -161,7 +161,7 @@ abstract class ParentScope(
       store: Storage,
       artifact: ArtifactWrapper,
       item: Item,
-      metadata: Metadata,
+      metadata: GoatMetadata,
       paths: Vector[String]
   ): Item = item
   def finalAugmentation(

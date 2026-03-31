@@ -12,7 +12,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -287,7 +287,7 @@ case class Item(
                 fileNames = TreeSet(textPurls*),
                 mimeType = TreeSet(),
                 fileSize = 0,
-                extra = Metadata()
+                extra = GoatMetadata()
               )
             )
           case Some(body: ItemMetaData) =>
@@ -312,7 +312,7 @@ case class Item(
     */
   def enhanceWithMetadata(
       maybeParent: Option[GitOID] = None,
-      extra: Metadata = Metadata(),
+      extra: GoatMetadata = GoatMetadata(),
       filenames: Seq[String] = Vector(),
       mimeTypes: Seq[String] = Vector()
   ): Item = {
@@ -329,7 +329,7 @@ case class Item(
               fileNames = TreeSet(),
               mimeType = TreeSet(),
               fileSize = 0,
-              extra = Metadata()
+              extra = GoatMetadata()
             )
         }
         val baseFileNames = base.fileNames
@@ -350,7 +350,7 @@ case class Item(
 
         base.copy(
           fileNames = base.fileNames ++ augmentedFileNames,
-          extra = Metadata(base.extra.values ++ extra.values),
+          extra = GoatMetadata(base.extra.values ++ extra.values),
           mimeType = base.mimeType ++ TreeSet(mimeTypes*)
         )
 
@@ -394,7 +394,7 @@ object Item {
           fileNames = TreeSet(),
           mimeType = TreeSet.from(artifact.mimeType),
           fileSize = artifact.size(),
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )

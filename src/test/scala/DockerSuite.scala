@@ -11,7 +11,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import org.json4s.*
 import org.json4s.JsonAST.*
@@ -32,7 +32,7 @@ class DockerSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )
@@ -68,8 +68,8 @@ class DockerSuite extends munit.FunSuite {
   }
 
   test("Merging names works") {
-    val a = ItemMetaData(TreeSet("foo"), TreeSet(), 1, Metadata())
-    val b = ItemMetaData(TreeSet("bar"), TreeSet(), 1, Metadata())
+    val a = ItemMetaData(TreeSet("foo"), TreeSet(), 1, GoatMetadata())
+    val b = ItemMetaData(TreeSet("bar"), TreeSet(), 1, GoatMetadata())
 
     val aGitoids = () => Vector("yak", "moose")
     val bGitoids = () => Vector("dog", "cat")

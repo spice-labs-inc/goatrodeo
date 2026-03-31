@@ -17,7 +17,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 
@@ -165,16 +165,16 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
-  ): (Metadata, MavenState) = {
+  ): (GoatMetadata, MavenState) = {
 
     val baseTree = if (pomFile.length() > 4) {
-      Metadata(TreeMap(
+      GoatMetadata(TreeMap(
         "pom" -> TreeSet(StringOrPair("text/xml", pomFile))
       ))
-    } else Metadata()
+    } else GoatMetadata()
 
-    val manifest: Metadata = marker match {
-      case MavenMarkers.POM => Metadata()
+    val manifest: GoatMetadata = marker match {
+      case MavenMarkers.POM => GoatMetadata()
       case _ =>
         FileWalker
           .withinArchiveStream(artifact) { files =>
@@ -186,10 +186,10 @@ case class MavenState(
                   Helpers.slurpInputToString(stream)
                 }))
 
-              case None => Metadata()
+              case None => GoatMetadata()
             }
           }
-          .getOrElse(Metadata())
+          .getOrElse(GoatMetadata())
     }
 
     (baseTree ++ manifest) -> this
