@@ -205,13 +205,19 @@ object StringOrPair {
   implicit def fromString(s: String): StringOrPair = StringOf(s)
   implicit def fromPair(p: (String, String)): StringOrPair = PairOf(p._1, p._2)
 
-  given Ordering[StringOrPair] = {
-    Ordering.by[StringOrPair, String](e =>
-      e match {
-        case StringOf(s)    => s
-        case PairOf(s1, s2) => f"${s1}${s2}"
+  given ordering: Ordering[StringOrPair] = { (left, right) =>
+    left match {
+      case StringOf(left) => right match {
+        case StringOf(right) => Ordering[String].compare(left, right)
+        case PairOf(key, _)  => -1
       }
-    )
+      case PairOf(leftKey, leftValue) => right match {
+        case StringOf(right) => 1
+        case PairOf(rightKey, rightValue) =>
+          val comparison = Ordering[String].compare(leftKey, rightKey)
+          if (comparison != 0) comparison else Ordering[String].compare(leftValue, rightValue)
+      }
+    }
   }
 
   given Encoder[StringOrPair] = { (writer, item) =>
