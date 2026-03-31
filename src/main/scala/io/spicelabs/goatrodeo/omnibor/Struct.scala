@@ -22,7 +22,6 @@ import io.bullet.borer.derivation.key
 import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeSet
-import scala.language.implicitConversions
 
 /** Constants and predicates for edge types in the Artifact Dependency Graph.
   *

@@ -910,7 +910,7 @@ object Helpers {
 
   def readLenAndCBOR[A](
       fc: FileChannel
-  )(implicit decoder: io.bullet.borer.Decoder[A]): A = {
+  )(using decoder: io.bullet.borer.Decoder[A]): A = {
     val len = Helpers.readInt(fc)
     readCBOR(fc, len)
   }

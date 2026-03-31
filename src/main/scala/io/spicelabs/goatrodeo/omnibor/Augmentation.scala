@@ -3,7 +3,6 @@ package io.spicelabs.goatrodeo.omnibor
 import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.util.GoatMetadata
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 /** Data that augments an Item

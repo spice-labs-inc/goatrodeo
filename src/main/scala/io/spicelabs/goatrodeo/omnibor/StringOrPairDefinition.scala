@@ -25,8 +25,8 @@ object StringOrPairDefinition {
     def apply(s1: String, s2: String): StringOrPair = (s1, s2)
     def apply(s: (String, String)): StringOrPair = (s._1, s._2)
 
-    implicit def fromString(s: String): StringOrPair = s
-    implicit def fromPair(p: (String, String)): StringOrPair = (p._1, p._2)
+    given fromString: Conversion[String, StringOrPair] = identity(_)
+    given fromPair: Conversion[(String, String), StringOrPair] = identity(_)
 
     given canEqual: CanEqual[StringOrPair, String] = CanEqual.derived
     given canEqual2: CanEqual[String, StringOrPair] = CanEqual.derived
