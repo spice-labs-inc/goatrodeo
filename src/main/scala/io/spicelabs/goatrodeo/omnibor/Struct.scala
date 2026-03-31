@@ -19,7 +19,7 @@ import io.bullet.borer.Decoder
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeSet
 import scala.language.implicitConversions
@@ -269,7 +269,7 @@ case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
     @key("file_size") fileSize: Long,
-    extra: Metadata
+    extra: GoatMetadata
 ) {
 
   /** Encode this metadata to CBOR format. */

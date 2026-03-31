@@ -21,7 +21,7 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFileState
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeSet
 
@@ -37,7 +37,7 @@ class GenericTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )

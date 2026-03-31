@@ -14,7 +14,7 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -596,8 +596,8 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges disjoint maps") {
-    val a: Metadata = Metadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
-    val b: Metadata = Metadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+    val a: GoatMetadata = GoatMetadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
+    val b: GoatMetadata = GoatMetadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
     val result = a ++ b
     assertEquals(result.size, 2)
     assert(result.contains("key1"))
@@ -605,16 +605,16 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges overlapping keys") {
-    val a: Metadata = Metadata(TreeMap("key" -> TreeSet(StringOrPair("val1"))))
-    val b: Metadata = Metadata(TreeMap("key" -> TreeSet(StringOrPair("val2"))))
+    val a: GoatMetadata = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("val1"))))
+    val b: GoatMetadata = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("val2"))))
     val result = a ++ b
     assertEquals(result.size, 1)
     assertEquals(result("key").size, 2)
   }
 
   test("mergeTreeMaps - handles empty maps") {
-    val a: Metadata = Metadata()
-    val b: Metadata = Metadata(TreeMap("key" -> TreeSet(StringOrPair("val"))))
+    val a: GoatMetadata = GoatMetadata()
+    val b: GoatMetadata = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("val"))))
     val result = a ++ b
     assertEquals(result.size, 1)
   }

@@ -11,7 +11,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 /** State for generic file processing.
   *
@@ -51,8 +51,8 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Metadata, GenericFileState) =
-    Metadata() -> this
+  ): (GoatMetadata, GenericFileState) =
+    GoatMetadata() -> this
 
   override def finalAugmentation(
       artifact: ArtifactWrapper,

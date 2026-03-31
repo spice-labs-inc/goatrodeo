@@ -18,7 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import java.nio.file.Files
 import scala.collection.immutable.TreeSet
@@ -35,7 +35,7 @@ class StorageTestSuite extends munit.FunSuite {
           fileNames = TreeSet(fileNames.toSeq*),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )
@@ -413,7 +413,7 @@ class StorageTestSuite extends munit.FunSuite {
         "gitoid:blob:sha256:root123",
         TreeSet(),
         Some(ItemMetaData.mimeType),
-        Some(ItemMetaData(TreeSet(), TreeSet(), 100, Metadata()))
+        Some(ItemMetaData(TreeSet(), TreeSet(), 100, GoatMetadata()))
       )
       storage.write("gitoid:blob:sha256:root123", _ => Some(rootItem), _ => "")
 

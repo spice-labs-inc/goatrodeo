@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 
 import com.github.packageurl.PackageURL
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -38,12 +38,12 @@ final case class TopLevelExtraAugmentation(
                   fileNames = TreeSet(),
                   mimeType = TreeSet(),
                   fileSize = 0,
-                  extra = Metadata()
+                  extra = GoatMetadata()
                 )
             }
 
             Some(
-              orgBody.copy(extra = orgBody.extra ++ Metadata(TreeMap(name -> TreeSet(data))))
+              orgBody.copy(extra = orgBody.extra ++ GoatMetadata(TreeMap(name -> TreeSet(data))))
             )
           }
         )
@@ -97,12 +97,12 @@ final case class ExtraAugmentation(
                   fileNames = TreeSet(),
                   mimeType = TreeSet(),
                   fileSize = 0,
-                  extra = Metadata()
+                  extra = GoatMetadata()
                 )
             }
 
             Some(
-              orgBody.copy(extra = orgBody.extra ++ Metadata(TreeMap(name -> TreeSet(data))))
+              orgBody.copy(extra = orgBody.extra ++ GoatMetadata(TreeMap(name -> TreeSet(data))))
             )
           }
         )

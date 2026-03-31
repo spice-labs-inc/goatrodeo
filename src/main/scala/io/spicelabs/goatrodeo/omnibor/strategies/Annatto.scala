@@ -18,7 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 import io.spicelabs.goatrodeo.omnibor.{MetadataKeyConstants => MKC}
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.Storage
@@ -82,7 +82,7 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage) extends Proc
         pkg.toPurl().toScala.toVector -> this
     }
 
-    override def getMetadata(artifact: ArtifactWrapper, item: Item, marker: SingleMarker): (Metadata, AnnattoState) = {
+    override def getMetadata(artifact: ArtifactWrapper, item: Item, marker: SingleMarker): (GoatMetadata, AnnattoState) = {
   // Build metadata tree using standard keys (MKC) and ad-hoc prefix
       val adHoc = MKC.adHoc("Annatto")
       val metadata = pkg.metadata()
@@ -96,7 +96,7 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage) extends Proc
             +? maybeStringOrPair(MKC.PUBLISHER, metadata.publisher().toScala)
             +? maybeStringOrPair(MKC.PUBLICATION_DATE, metadata.publishedAt().map(_.toString).toScala)
             +? maybeStringOrPair(adHoc("Ecosystem"), ecoString(pkg.ecosystem()))
-        Metadata(tm) -> this
+        GoatMetadata(tm) -> this
     }
 
     override def finalAugmentation(artifact: ArtifactWrapper, item: Item, marker: SingleMarker, parentScope: ParentScope, store: Storage): (Item, AnnattoState) =

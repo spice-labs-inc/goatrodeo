@@ -7,17 +7,17 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-object Metadata {
-  given Encoder[Metadata] = (writer, item) => writer.write(item.values)
+object GoatMetadata {
+  given Encoder[GoatMetadata] = (writer, item) => writer.write(item.values)
 
-  given Decoder[Metadata] = { value =>
-    Metadata(summon[Decoder[TreeMap[String, TreeSet[StringOrPair]]]].read(value))
+  given Decoder[GoatMetadata] = { value =>
+    GoatMetadata(summon[Decoder[TreeMap[String, TreeSet[StringOrPair]]]].read(value))
   }
 }
 
-case class Metadata(values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()) {
+case class GoatMetadata(values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()) {
   export values.{size, isEmpty, contains, keySet, apply}
-  infix def ++ (right: Metadata): Metadata = {
+  infix def ++ (right: GoatMetadata): GoatMetadata = {
     var ret = values
 
     for { (key, value) <- right.values } {
@@ -28,7 +28,7 @@ case class Metadata(values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()) 
       ret = ret + (key -> nv)
     }
 
-    Metadata(ret)
+    GoatMetadata(ret)
   }
 
   def get(key: String): Option[TreeSet[StringOrPair]] = values.get(key)

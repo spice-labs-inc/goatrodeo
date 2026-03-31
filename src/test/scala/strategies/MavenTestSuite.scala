@@ -23,7 +23,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.MavenToProcess
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import java.io.File
 import java.nio.file.Files
@@ -49,7 +49,7 @@ class MavenTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )
@@ -230,7 +230,7 @@ class MavenTestSuite extends munit.FunSuite {
       "gitoid:blob:sha256:source123",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("Source.java"), TreeSet(), 100, Metadata()))
+      Some(ItemMetaData(TreeSet("Source.java"), TreeSet(), 100, GoatMetadata()))
     )
     storage.write(sourceItem.identifier, _ => Some(sourceItem), _ => "")
 

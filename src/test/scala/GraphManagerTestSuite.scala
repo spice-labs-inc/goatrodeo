@@ -18,7 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.util.Helpers
-import io.spicelabs.goatrodeo.util.Metadata
+import io.spicelabs.goatrodeo.util.GoatMetadata
 
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -39,7 +39,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = Metadata()
+          extra = GoatMetadata()
         )
       )
     )
