@@ -304,7 +304,7 @@ class MySuite extends munit.FunSuite {
 
   test("calculate mime type for class file") {
     val classFileName =
-      "target/scala-3.7.4/classes/io/spicelabs/goatrodeo/Howdy.class"
+      "target/scala-3.8.3/classes/io/spicelabs/goatrodeo/Howdy.class"
     val f = FileWrapper(new File(classFileName), classFileName, None, _ => ())
     assert(
       f.mimeType.contains("application/java-vm"),
