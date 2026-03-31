@@ -1102,7 +1102,7 @@ object Helpers {
     *   the signed long value
     */
   def readLong(reader: FileChannel): Long = {
-    val bytes = ByteBuffer.allocate(8) // new Array[Byte](8)
+    val bytes = ByteBuffer.allocate(8)
     reader.read(bytes)
     val byteBuffer = bytes
     byteBuffer.position(0).getLong()
