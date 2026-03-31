@@ -17,8 +17,6 @@ import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ItemTagData
-import io.spicelabs.goatrodeo.omnibor.PairOf
-import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.GoatMetadata
 
@@ -118,38 +116,38 @@ class StructTestSuite extends munit.FunSuite {
   // ==================== StringOrPair Variants Tests ====================
 
   test("StringOf - value returns string") {
-    val s = StringOf("test")
+    val s: StringOrPair = "test"
     assertEquals(s.value, "test")
   }
 
   test("StringOf - mimeType returns None") {
-    val s = StringOf("test")
+    val s: StringOrPair = "test"
     assertEquals(s.mimeType, None)
   }
 
   test("PairOf - value returns second string") {
-    val p = PairOf("mime/type", "content")
+    val p: StringOrPair = ("mime/type", "content")
     assertEquals(p.value, "content")
   }
 
   test("PairOf - mimeType returns Some with first string") {
-    val p = PairOf("mime/type", "content")
+    val p: StringOrPair = ("mime/type", "content")
     assertEquals(p.mimeType, Some("mime/type"))
   }
 
   test("StringOrPair.apply(String) - creates StringOf") {
     val result: StringOrPair = StringOrPair("test")
-    assert(result.isInstanceOf[StringOf])
+    assert(result.isInstanceOf[String])
   }
 
   test("StringOrPair.apply(String, String) - creates PairOf") {
     val result: StringOrPair = StringOrPair("mime", "content")
-    assert(result.isInstanceOf[PairOf])
+    assert(result.isInstanceOf[(String, String)])
   }
 
   test("StringOrPair.apply((String, String)) - creates PairOf from tuple") {
     val result: StringOrPair = StringOrPair("mime" -> "content")
-    assert(result.isInstanceOf[PairOf])
+    assert(result.isInstanceOf[(String, String)])
     assertEquals(result.value, "content")
     assertEquals(result.mimeType, Some("mime"))
   }
@@ -157,17 +155,17 @@ class StructTestSuite extends munit.FunSuite {
   // ==================== StringOrPair CBOR Tests ====================
 
   test("StringOf - CBOR round-trip") {
-    val original = StringOf("test value")
+    val original = "test value"
     val bytes = Cbor.encode(original: StringOrPair).toByteArray
-    val decoded = Cbor.decode(bytes).to[StringOrPair].value
-    assertEquals(decoded, original)
+    val decoded: StringOrPair = Cbor.decode(bytes).to[StringOrPair].value
+    assert(decoded == original)
   }
 
   test("PairOf - CBOR round-trip") {
-    val original = PairOf("text/plain", "content")
+    val original: StringOrPair = ("text/plain", "content")
     val bytes = Cbor.encode(original: StringOrPair).toByteArray
     val decoded = Cbor.decode(bytes).to[StringOrPair].value
-    assert(decoded.isInstanceOf[PairOf])
+    assert(decoded.isInstanceOf[(String, String)])
     assertEquals(decoded.value, "content")
     assertEquals(decoded.mimeType, Some("text/plain"))
   }

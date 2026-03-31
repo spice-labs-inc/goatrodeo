@@ -15,8 +15,6 @@ limitations under the License. */
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
-import io.spicelabs.goatrodeo.omnibor.PairOf
-import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
@@ -76,11 +74,11 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   /** Generate StringOrPair */
   val genStringOrPair: Gen[StringOrPair] = Gen.oneOf(
-    genSimpleString.map(StringOf(_)),
+    genSimpleString.map(StringOrPair(_)),
     for {
       mime <- genMimeType
       value <- genSimpleString
-    } yield PairOf(mime, value)
+    } yield StringOrPair(mime, value)
   )
 
   /** Generate TreeSet of strings */
@@ -430,25 +428,25 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   property("StringOf.value returns the string") {
     forAll(genSimpleString) { s =>
-      StringOf(s).value == s
+      StringOrPair(s).value == s
     }
   }
 
   property("PairOf.value returns second string") {
     forAll(genSimpleString, genSimpleString) { (s1, s2) =>
-      PairOf(s1, s2).value == s2
+      StringOrPair(s1, s2).value == s2
     }
   }
 
   property("PairOf.mimeType returns Some(first string)") {
     forAll(genSimpleString, genSimpleString) { (s1, s2) =>
-      PairOf(s1, s2).mimeType == Some(s1)
+      StringOrPair(s1, s2).mimeType == Some(s1)
     }
   }
 
   property("StringOf.mimeType returns None") {
     forAll(genSimpleString) { s =>
-      StringOf(s).mimeType.isEmpty
+      StringOrPair(s).mimeType.isEmpty
     }
   }
 
