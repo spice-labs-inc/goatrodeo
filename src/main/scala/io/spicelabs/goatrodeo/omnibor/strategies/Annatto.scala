@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import io.spicelabs.goatrodeo.util.Metadata
 import io.spicelabs.goatrodeo.omnibor.{MetadataKeyConstants => MKC}
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.Storage
@@ -46,7 +47,7 @@ object AnnattoStrategy {
         val revisedByName = byName.filterNot { case (_, artifacts) =>
             artifacts.exists(a => uuids.contains(a.uuid))
         }
-        
+
         (
             mine.map { case (artifact, pkg) => Annatto(artifact, pkg) }.toVector,
             revisedByUUID,
@@ -71,7 +72,7 @@ class Annatto(artifact: ArtifactWrapper, pkg: LanguagePackage) extends ToProcess
   type StateType = AnnattoState
   def getElementsToProcess(): (Seq[(ArtifactWrapper, MarkerType)], StateType) =
     Vector(artifact -> SingleMarker()) -> AnnattoState(artifact, pkg)
-  
+
 }
 
 class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage) extends ProcessingState[SingleMarker, AnnattoState] {
@@ -81,7 +82,7 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage) extends Proc
         pkg.toPurl().toScala.toVector -> this
     }
 
-    override def getMetadata(artifact: ArtifactWrapper, item: Item, marker: SingleMarker): (TreeMap[String, TreeSet[StringOrPair]], AnnattoState) = {
+    override def getMetadata(artifact: ArtifactWrapper, item: Item, marker: SingleMarker): (Metadata, AnnattoState) = {
   // Build metadata tree using standard keys (MKC) and ad-hoc prefix
       val adHoc = MKC.adHoc("Annatto")
       val metadata = pkg.metadata()
@@ -95,12 +96,12 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage) extends Proc
             +? maybeStringOrPair(MKC.PUBLISHER, metadata.publisher().toScala)
             +? maybeStringOrPair(MKC.PUBLICATION_DATE, metadata.publishedAt().map(_.toString).toScala)
             +? maybeStringOrPair(adHoc("Ecosystem"), ecoString(pkg.ecosystem()))
-        tm -> this
+        Metadata(tm) -> this
     }
 
-    override def finalAugmentation(artifact: ArtifactWrapper, item: Item, marker: SingleMarker, parentScope: ParentScope, store: Storage): (Item, AnnattoState) = 
+    override def finalAugmentation(artifact: ArtifactWrapper, item: Item, marker: SingleMarker, parentScope: ParentScope, store: Storage): (Item, AnnattoState) =
         item -> this
-    
+
     override def postChildProcessing(kids: Option[Vector[GitOID]], store: Storage, marker: SingleMarker): AnnattoState = this
 
   // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].
