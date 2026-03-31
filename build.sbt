@@ -152,7 +152,6 @@ lazy val root = project
     scalaVersion := scala3Version,
     semanticdbEnabled := true, // enable SemanticDB,
     semanticdbVersion := scalafixSemanticdb.revision,
-    libraryDependencies += "org.scala-lang" %% "toolkit" % "0.4.0",
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
     libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
@@ -160,20 +159,15 @@ lazy val root = project
     libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,
     libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
     libraryDependencies += "commons-io" % "commons-io" % "2.18.0",
-    libraryDependencies += "io.bullet" %% "borer-core" % "1.14.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
     libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
-
-    // json4s
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.28.0",
     libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
-    libraryDependencies +=
-      "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
-    libraryDependencies += "org.tukaani" % "xz" % "1.10",
     libraryDependencies += "io.spicelabs" %% "cilantro" % "0.1.17",
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
