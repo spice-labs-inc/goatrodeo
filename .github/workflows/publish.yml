@@ -69,11 +69,11 @@ jobs:
           PUBLISH_TARGET: github
 
       - name: Index and Upload ADG
-        uses: spice-labs-inc/action-spice-labs-surveyor@v4
+        uses: spice-labs-inc/action-spice-labs-surveyor@v5
         with:
           spice_pass: "${{ secrets.SPICE_PASS }}"
           input: "${{ github.workspace }}"
-          tag: "${{ github.event.repository.name }}"
+          subject: "${{ github.event.repository.name }}"
 
   publish-to-central:
     name: Re-publish Goatrodeo to Maven Central
@@ -226,11 +226,11 @@ jobs:
           outputs: type=oci,dest=target/release/goatrodeo-image.tar
 
       - name: Index and Upload ADG
-        uses: spice-labs-inc/action-spice-labs-surveyor@v4
+        uses: spice-labs-inc/action-spice-labs-surveyor@v5
         with:
           spice_pass: "${{ secrets.SPICE_PASS }}"
           input: "${{ github.workspace }}"
-          tag: "${{ github.event.repository.name }}"
+          subject: "${{ github.event.repository.name }}"
 
   notify:
     needs: [publish-jars, publish-to-central, docker-image]
