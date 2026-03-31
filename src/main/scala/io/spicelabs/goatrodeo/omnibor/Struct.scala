@@ -156,100 +156,122 @@ object EdgeType {
 /** Type alias for an edge in the graph: (edge type, target GitOID). */
 type Edge = (String, String)
 
-/** A value that can be either a simple String or a (mime type, value) pair.
-  *
-  * Used in ItemMetaData.extra to store additional information that may have
-  * associated MIME types (e.g., manifest content with "text/maven-manifest").
-  */
-sealed trait StringOrPair {
 
-  /** Get the main value (the string for StringOf, the second string for
-    * PairOf).
-    */
-  def value: String
 
-  /** Get the MIME type if this is a PairOf. */
-  def mimeType: Option[String] = None
+object opaques {
+  opaque type StringOrPair = String | (String, String)
+
+  object StringOrPair {
+    def apply(s: String): StringOrPair = s
+    def apply(s1: String, s2: String): StringOrPair = (s1, s2)
+    def apply(s: (String, String)): StringOrPair = (s._1, s._2)
+
+    implicit def fromString(s: String): StringOrPair = s
+    implicit def fromPair(p: (String, String)): StringOrPair = (p._1, p._2)
+
+    given canEqual: CanEqual[StringOrPair, String] = CanEqual.derived
+    given canEqual2: CanEqual[String, StringOrPair] = CanEqual.derived
+    given canEqual3: CanEqual[String, (String, String)] = CanEqual.derived
+    given canEqual4: CanEqual[(String, String), String] = CanEqual.derived
+
+    given ordering: Ordering[StringOrPair] = { (left, right) =>
+      left match {
+        case left: String => right match {
+          case right: String => Ordering[String].compare(left, right)
+          case (key, _)  => -1
+        }
+        case (leftKey, leftValue) => right match {
+          case right: String => 1
+          case (rightKey, rightValue) =>
+            val comparison = Ordering[String].compare(leftKey, rightKey)
+            if (comparison != 0) comparison else Ordering[String].compare(leftValue, rightValue)
+        }
+      }
+    }
+
+    given Encoder[StringOrPair] = { (writer, item) =>
+      item match {
+        case s: String => writer.writeString(s)
+        case (a, b) =>
+          writer
+            .writeArrayOpen(2)
+            .writeString(a)
+            .writeString(b)
+            .writeArrayClose()
+      }
+
+    }
+
+    given Decoder[StringOrPair] = { reader =>
+      if (reader.hasArrayStart || reader.hasArrayHeader(2)) {
+        val unbounded = reader.readArrayOpen(2)
+        val item = (reader.readString(), reader.readString())
+        reader.readArrayClose(unbounded, item)
+      } else if (reader.hasString) {
+        reader.readString()
+      } else {
+        reader.unexpectedDataItem(
+          f"Looking for 'String' or Array of String got ${reader.dataItem()}"
+        )
+      }
+
+  }
 }
 
-/** A StringOrPair containing just a simple string value.
-  *
-  * @param s
-  *   the string value
-  */
-final case class StringOf(s: String) extends StringOrPair {
-  def value = s
+  extension (stringOrPair: StringOrPair) {
+    def value: String = stringOrPair match {
+      case s: String => s
+      case (_, v)    => v
+    }
+
+    def mimeType: Option[String] = stringOrPair match {
+      case (mt, _) => Some(mt)
+      case _       => None
+    }
+  }
 }
 
-/** A StringOrPair containing a MIME type and a value.
-  *
-  * @param s1
-  *   the MIME type
-  * @param s2
-  *   the value
-  */
-final case class PairOf(s1: String, s2: String) extends StringOrPair {
-  def value = s2
-  override def mimeType: Option[String] = Some(s1)
-}
+export opaques.StringOrPair
+
+
+// /** A value that can be either a simple String or a (mime type, value) pair.
+//   *
+//   * Used in ItemMetaData.extra to store additional information that may have
+//   * associated MIME types (e.g., manifest content with "text/maven-manifest").
+//   */
+// sealed trait OldStringOrPair {
+
+//   /** Get the main value (the string for StringOf, the second string for
+//     * PairOf).
+//     */
+//   def value: String
+
+//   /** Get the MIME type if this is a PairOf. */
+//   def mimeType: Option[String] = None
+// }
+
+// /** A StringOrPair containing just a simple string value.
+//   *
+//   * @param s
+//   *   the string value
+//   */
+// final case class StringOf(s: String) extends StringOrPair {
+//   def value = s
+// }
+
+// /** A StringOrPair containing a MIME type and a value.
+//   *
+//   * @param s1
+//   *   the MIME type
+//   * @param s2
+//   *   the value
+//   */
+// final case class PairOf(s1: String, s2: String) extends StringOrPair {
+//   def value = s2
+//   override def mimeType: Option[String] = Some(s1)
+// }
 
 /** Factory methods and codecs for StringOrPair. */
-object StringOrPair {
-  def apply(s: String): StringOrPair = StringOf(s)
-  def apply(s1: String, s2: String): StringOrPair =
-    PairOf(s1, s2)
-  def apply(s: (String, String)): StringOrPair =
-    PairOf(s._1, s._2)
-
-  implicit def fromString(s: String): StringOrPair = StringOf(s)
-  implicit def fromPair(p: (String, String)): StringOrPair = PairOf(p._1, p._2)
-
-  given ordering: Ordering[StringOrPair] = { (left, right) =>
-    left match {
-      case StringOf(left) => right match {
-        case StringOf(right) => Ordering[String].compare(left, right)
-        case PairOf(key, _)  => -1
-      }
-      case PairOf(leftKey, leftValue) => right match {
-        case StringOf(right) => 1
-        case PairOf(rightKey, rightValue) =>
-          val comparison = Ordering[String].compare(leftKey, rightKey)
-          if (comparison != 0) comparison else Ordering[String].compare(leftValue, rightValue)
-      }
-    }
-  }
-
-  given Encoder[StringOrPair] = { (writer, item) =>
-    item match {
-      case StringOf(s) => writer.writeString(s)
-      case PairOf(a, b) =>
-        writer
-          .writeArrayOpen(2)
-          .writeString(a)
-          .writeString(b)
-          .writeArrayClose()
-    }
-
-  }
-
-  given Decoder[StringOrPair] = { reader =>
-    if (reader.hasArrayStart || reader.hasArrayHeader(2)) {
-      val unbounded = reader.readArrayOpen(2)
-      val item = PairOf(
-        reader.readString(),
-        reader.readString()
-      )
-      reader.readArrayClose(unbounded, item)
-    } else if (reader.hasString) {
-      StringOf(reader.readString())
-    } else {
-      reader.unexpectedDataItem(
-        f"Looking for 'String' or Array of String got ${reader.dataItem()}"
-      )
-    }
-
-  }
-}
 
 /** Metadata associated with an Item in the Artifact Dependency Graph.
   *
