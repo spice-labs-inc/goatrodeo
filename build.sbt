@@ -195,7 +195,9 @@ lazy val root = project
         scala.sys.process.Process("git rev-parse HEAD").!!.trim
       }
     ),
-    buildInfoPackage := "hellogoat"
+    buildInfoPackage := "hellogoat",
+    // Don't bundle logback.xml in the library jar — consumers provide their own
+    Compile / packageBin / mappings ~= { _.filter(_._2 != "logback.xml") }
   )
 
 ThisBuild / assemblyMergeStrategy := {

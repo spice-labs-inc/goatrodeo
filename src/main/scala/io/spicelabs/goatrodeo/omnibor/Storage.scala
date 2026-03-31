@@ -116,7 +116,7 @@ trait Storage {
     dir.mkdirs()
     val fileName = f"roots_${System.currentTimeMillis()}.json"
     val file = new File(dir, fileName)
-    Storage.logger.info(f"About to dump roots to ${file}")
+    Storage.logger.debug(f"About to dump roots to ${file}")
     val rootItems = for {
       key <- keys().toVector
       item <- read(key) if item.isRoot()
@@ -129,7 +129,7 @@ trait Storage {
     dir.mkdirs()
     val fileName = f"items_${System.currentTimeMillis()}.json"
     val file = new File(dir, fileName)
-    Storage.logger.info(f"About to emit all items as JSON to ${file}")
+    Storage.logger.debug(f"About to emit all items as JSON to ${file}")
     val fos = new FileOutputStream(file)
     val bos = new BufferedOutputStream(fos)
     bos.write("[\n".getBytes("UTF-8"))
@@ -295,7 +295,7 @@ class MemStorage(val targetDir: Option[File])
           waiters >= contentionThreshold && waiters % contentionThreshold == 0
         ) {
           for { updatedItem <- updated } {
-            logger.info(
+            logger.debug(
               f"Lock contention for ${path} waiting ${waiters} context ${context(updatedItem)}"
             )
           }

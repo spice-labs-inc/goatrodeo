@@ -145,7 +145,7 @@ object Builder {
 
     }
 
-    logger.info(
+    logger.debug(
       "Blocking build db until there's at least 1 item in the work queue"
     )
     // Don't kick off the consumer threads until at least 1 item
@@ -158,7 +158,7 @@ object Builder {
       }
     }
 
-    logger.info("Kicking off work queue consumer threads")
+    logger.debug("Kicking off work queue consumer threads")
     val loopStart = Instant.now()
     var updatedDest = dest
 
@@ -195,14 +195,14 @@ object Builder {
       )
 
       loopCnt += 1
-      logger.info(
+      logger.debug(
         f"Finished multi-thread consumer loop ${loopCnt} at ${Duration
             .between(totalStart, Instant.now())}"
       )
       updatedDest = destWithCount(dest, loopCnt)
     }
 
-    logger.info("Waiting for write threads")
+    logger.debug("Waiting for write threads")
 
     // loop while we wait for the end of processing
     while (writeThreadCnt.get() > 0) {
@@ -374,7 +374,7 @@ object Builder {
                         )
                         f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
                       } else ""
-                      logger.info(
+                      logger.debug(
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
                       )
@@ -483,13 +483,13 @@ object Builder {
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
-        logger.info(f"In store with target ${target}")
+        logger.debug(f"In store with target ${target}")
         target.mkdirs()
         val start = Instant.now()
 
         val purlOut = store.purls()
 
-        logger.info(f"Writing ${purlOut.size} Package URLs")
+        logger.debug(f"Writing ${purlOut.size} Package URLs")
         val purlFile = File(target, "purls.txt")
         purlFile.createNewFile()
         val bw = new BufferedWriter(new FileWriter(purlFile))
@@ -501,7 +501,7 @@ object Builder {
           bw.flush()
           bw.close()
         }
-        logger.info("Wrote pURLs, about to sort the index")
+        logger.debug("Wrote pURLs, about to sort the index")
 
         // make sure the destination exists
         target.getAbsoluteFile().mkdirs()
@@ -513,13 +513,13 @@ object Builder {
           allItems
         }
 
-        logger.info(
+        logger.debug(
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
 
         sorted.par.foreach(_.cachedCBOR)
 
-        logger.info(
+        logger.debug(
           f"Post CBOR cache at ${Duration.between(start, Instant.now())}"
         )
 
