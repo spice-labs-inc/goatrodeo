@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import language.implicitConversions
+
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.cilantro.AssemblyDefinition
