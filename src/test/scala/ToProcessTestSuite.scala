@@ -324,7 +324,7 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   test("computeToProcess - has correct number of strategies") {
     // Should have: Maven, Docker, Debian, Dotnet, Generic
-    assertEquals(ToProcess.computeToProcess.length, 5)
+    assertEquals(ToProcess.computeToProcess.length, 6)
   }
 
   // ==================== Integration Tests ====================
