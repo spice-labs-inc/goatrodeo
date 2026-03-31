@@ -18,10 +18,10 @@ import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Metadata
 
 import java.io.FileInputStream
 import java.nio.file.Files
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 class GraphManagerTestSuite extends munit.FunSuite {
@@ -39,7 +39,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = TreeMap()
+          extra = Metadata()
         )
       )
     )

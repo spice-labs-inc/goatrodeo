@@ -74,7 +74,7 @@ object Helpers {
     */
   def treeInfoFromManifest(
       manifestString: String
-  ): TreeMap[String, TreeSet[StringOrPair]] = {
+  ): Metadata = {
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
     val manifest = java.util.jar.Manifest.apply(bis)
 
@@ -93,35 +93,7 @@ object Helpers {
       ))*
     )
 
-    ret
-  }
-
-  /** Merge TreeMaps together
-    *
-    * @param a
-    *   TreeMap
-    * @param b
-    *   TreeMap
-    *
-    * @return
-    *   the merged TreeMap
-    */
-  def mergeTreeMaps(
-      a: TreeMap[String, TreeSet[StringOrPair]],
-      b: TreeMap[String, TreeSet[StringOrPair]]
-  ): TreeMap[String, TreeSet[StringOrPair]] = {
-
-    var ret = a
-    for { (k, v) <- b } {
-      val nv = ret.get(k) match {
-        case None     => v
-        case Some(mv) => v ++ mv
-      }
-      ret = ret + (k -> nv)
-    }
-
-    ret
-
+    Metadata(ret)
   }
 
   /** The random number generator

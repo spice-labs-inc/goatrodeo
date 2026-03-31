@@ -89,6 +89,7 @@ case class ByteWrapper(...)    // In-memory bytes
 ```
 
 **Design decisions:**
+
 - Files ≤ 64KB (when tempdir is configured) kept in memory
 - Files ≤ 32MB (when no tempdir) kept in memory
 - Larger files written to temp directory
@@ -114,13 +115,14 @@ trait ToProcess {
 trait ProcessingState[M, S] {
   def beginProcessing(...): S
   def getPurls(...): (Vector[PackageURL], S)
-  def getMetadata(...): (TreeMap[String, TreeSet[StringOrPair]], S)
+  def getMetadata(...): (Metadata, S)
   def finalAugmentation(...): (Item, S)
   def postChildProcessing(...): S
 }
 ```
 
 **Strategy selection order:**
+
 1. `MavenToProcess` - JAR/POM/sources/javadoc groupings
 2. `DockerToProcess` - Docker image manifests and layers
 3. `Debian` - .deb packages
@@ -141,6 +143,7 @@ case class Item(
 ```
 
 **Edge types** (defined in `Struct.scala`):
+
 - `contains` / `containedBy` - Parent/child relationships
 - `aliasFrom` / `aliasTo` - Alternative identifiers (MD5, SHA1, etc.)
 - `builtFrom` / `buildsTo` - Source-to-binary relationships
@@ -164,6 +167,7 @@ class MemStorage extends Storage {
 ```
 
 **Concurrency model:**
+
 - Reads are lock-free (immutable snapshot)
 - Writes use per-GitOID locks (minimal contention)
 - Updates are atomic read-modify-write
@@ -182,6 +186,7 @@ object FileWalker {
 ```
 
 **Supported formats:**
+
 - ZIP, JAR, WAR, EAR (via `ZipInputStream`)
 - NuGet packages (.nupkg) — detected as ZIP via magic bytes (see [`ArtifactWrapper.isNupkg()`](../src/main/scala/io/spicelabs/goatrodeo/util/ArtifactWrapper.scala) at lines 180-210)
 - TAR, TAR.GZ, TAR.BZ2 (via Commons Compress)
@@ -241,6 +246,7 @@ def writeEntries(storage: Storage, destDir: File): Unit
 ```
 
 Writes:
+
 - `.grd` files - CBOR-encoded Items
 - `.gri` files - Index (MD5 hash → file offset)
 - `.grc` file - Cluster metadata
@@ -350,6 +356,7 @@ sbt clean coverage test coverageReport
 ### Test Data
 
 Test artifacts are in `test_data/`:
+
 - `jar_test/` - Maven artifacts
 - `docker_tests/` - Docker images
 - `deb_tests/` - Debian packages
@@ -394,6 +401,7 @@ val item = Item.decode(bytes)
 ```
 
 **Why CBOR?**
+
 - Compact binary format
 - Faster than JSON
 - Schema-less (flexible)

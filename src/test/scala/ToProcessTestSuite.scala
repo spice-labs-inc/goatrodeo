@@ -22,10 +22,10 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Metadata
 
 import java.io.File
 import java.nio.file.Files
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 class ToProcessTestSuite extends munit.FunSuite {
@@ -40,7 +40,7 @@ class ToProcessTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = TreeMap()
+          extra = Metadata()
         )
       )
     )

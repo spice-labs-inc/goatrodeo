@@ -20,6 +20,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
+import io.spicelabs.goatrodeo.util.Metadata
 import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -94,10 +95,10 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   } yield TreeSet(items.take(5)*)(using Ordering.by(_.value))
 
   /** Generate extra metadata map */
-  val genExtra: Gen[TreeMap[String, TreeSet[StringOrPair]]] = for {
+  val genExtra: Gen[Metadata] = for {
     keys <- Gen.listOf(Gen.alphaLowerStr.suchThat(_.nonEmpty))
     values <- Gen.listOfN(keys.length, genTreeSetStringOrPair)
-  } yield TreeMap(keys.take(3).zip(values.take(3))*)
+  } yield Metadata(TreeMap(keys.take(3).zip(values.take(3))*))
 
   /** Generate ItemMetaData */
   val genItemMetaData: Gen[ItemMetaData] = for {
