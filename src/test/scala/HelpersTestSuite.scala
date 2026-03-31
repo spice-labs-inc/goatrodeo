@@ -30,7 +30,6 @@ import java.io.File
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 class HelpersTestSuite extends munit.FunSuite {
@@ -596,8 +595,8 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges disjoint maps") {
-    val a: GoatMetadata = GoatMetadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
-    val b: GoatMetadata = GoatMetadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+    val a: GoatMetadata = GoatMetadata("key1" -> TreeSet(StringOrPair("val1")))
+    val b: GoatMetadata = GoatMetadata("key2" -> TreeSet(StringOrPair("val2")))
     val result = a ++ b
     assertEquals(result.size, 2)
     assert(result.contains("key1"))
@@ -605,8 +604,8 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges overlapping keys") {
-    val a: GoatMetadata = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("val1"))))
-    val b: GoatMetadata = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("val2"))))
+    val a: GoatMetadata = GoatMetadata("key" -> TreeSet(StringOrPair("val1")))
+    val b: GoatMetadata = GoatMetadata("key" -> TreeSet(StringOrPair("val2")))
     val result = a ++ b
     assertEquals(result.size, 1)
     assertEquals(result("key").size, 2)
@@ -614,7 +613,7 @@ Long-Value: This is a very long value that continues
 
   test("mergeTreeMaps - handles empty maps") {
     val a: GoatMetadata = GoatMetadata()
-    val b: GoatMetadata = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("val"))))
+    val b: GoatMetadata = GoatMetadata("key" -> TreeSet(StringOrPair("val")))
     val result = a ++ b
     assertEquals(result.size, 1)
   }

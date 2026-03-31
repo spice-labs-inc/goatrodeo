@@ -8,6 +8,10 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 object GoatMetadata {
+
+  def apply(values: (String, TreeSet[StringOrPair])*): GoatMetadata =
+    GoatMetadata(TreeMap(values*))
+
   given Encoder[GoatMetadata] = (writer, item) => writer.write(item.values)
 
   given Decoder[GoatMetadata] = { value =>
@@ -16,7 +20,8 @@ object GoatMetadata {
 }
 
 case class GoatMetadata(values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()) {
-  export values.{size, isEmpty, contains, keySet, apply}
+  export values.{size, isEmpty, contains, keySet, apply, get, getOrElse}
+
   infix def ++ (right: GoatMetadata): GoatMetadata = {
     var ret = values
 
@@ -29,11 +34,5 @@ case class GoatMetadata(values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap
     }
 
     GoatMetadata(ret)
-  }
-
-  def get(key: String): Option[TreeSet[StringOrPair]] = values.get(key)
-
-  def getOrElse(key: String, default: TreeSet[StringOrPair]): TreeSet[StringOrPair] = {
-    values.getOrElse(key, default)
   }
 }

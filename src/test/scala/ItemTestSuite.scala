@@ -20,7 +20,6 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.GoatMetadata
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 class ItemTestSuite extends munit.FunSuite {
@@ -297,8 +296,8 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.merge - preserves extra metadata") {
-    val extra1 = GoatMetadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
-    val extra2 = GoatMetadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+    val extra1 = GoatMetadata("key1" -> TreeSet(StringOrPair("val1")))
+    val extra2 = GoatMetadata("key2" -> TreeSet(StringOrPair("val2")))
     // ItemMetaData.merge requires non-empty fileNames
     val item1 = Item(
       "id",
@@ -396,7 +395,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceWithMetadata - adds extra metadata") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val extra = GoatMetadata(TreeMap("key" -> TreeSet(StringOrPair("value"))))
+    val extra = GoatMetadata("key" -> TreeSet(StringOrPair("value")))
 
     val enhanced = item.enhanceWithMetadata(extra = extra)
     assert(enhanced.bodyAsItemMetaData.get.extra.contains("key"))

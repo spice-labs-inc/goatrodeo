@@ -19,7 +19,6 @@ import io.spicelabs.goatrodeo.util.GoatMetadata
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 /** Markers for different Docker/OCI image component types.
@@ -133,14 +132,14 @@ case class DockerState(
       marker: DockerMarkers
   ): (GoatMetadata, DockerState) = marker match {
     case DockerMarkers.Config(info) =>
-      GoatMetadata(TreeMap(
+      GoatMetadata(
         "docker_config" -> TreeSet(
           StringOrPair(pretty(render(info.configJson)))
         ),
         "docker_manifest" -> TreeSet(
           StringOrPair(pretty(render(info.manifestConfig)))
         )
-      )) -> this
+      ) -> this
     case _ => (GoatMetadata(), this)
   }
 
@@ -172,13 +171,13 @@ case class DockerState(
               parentItem
                 .enhanceWithMetadata(
                   mimeTypes = Vector("application/vnd.oci.image"),
-                  extra = GoatMetadata(TreeMap(
+                  extra = GoatMetadata(
                     "docker_config" -> TreeSet(
                       StringOrPair(pretty(render(info.configJson)))
                     ),
                     "docker_manifest" -> TreeSet(
                       StringOrPair(pretty(render(info.manifestConfig)))
-                    ))
+                    )
                   )
                 )
                 .enhanceItemWithPurls(thePurls)
