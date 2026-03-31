@@ -136,18 +136,18 @@ class StructTestSuite extends munit.FunSuite {
   }
 
   test("StringOrPair.apply(String) - creates StringOf") {
-    val result: StringOrPair = StringOrPair("test")
-    assert(result.isInstanceOf[String])
+    val result: StringOrPair = "test"
+    assert(!result.isPair)
   }
 
   test("StringOrPair.apply(String, String) - creates PairOf") {
-    val result: StringOrPair = StringOrPair("mime", "content")
-    assert(result.isInstanceOf[(String, String)])
+    val result: StringOrPair = ("mime", "content")
+    assert(result.isPair)
   }
 
   test("StringOrPair.apply((String, String)) - creates PairOf from tuple") {
-    val result: StringOrPair = StringOrPair("mime" -> "content")
-    assert(result.isInstanceOf[(String, String)])
+    val result: StringOrPair = "mime" -> "content"
+    assert(result.isPair)
     assertEquals(result.value, "content")
     assertEquals(result.mimeType, Some("mime"))
   }
@@ -165,7 +165,7 @@ class StructTestSuite extends munit.FunSuite {
     val original: StringOrPair = ("text/plain", "content")
     val bytes = Cbor.encode(original: StringOrPair).toByteArray
     val decoded = Cbor.decode(bytes).to[StringOrPair].value
-    assert(decoded.isInstanceOf[(String, String)])
+    assert(decoded.isPair)
     assertEquals(decoded.value, "content")
     assertEquals(decoded.mimeType, Some("text/plain"))
   }
