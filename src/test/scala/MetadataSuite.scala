@@ -433,7 +433,7 @@ the performance, all instances of the terminal are sharing a single process."""
       .map(cody =>
         cody match {
           case ItemMetaData(fileNames, mimeType, fileSize, extra) =>
-            extra.toArray
+            extra.values.toArray
           case ItemTagData(tag) => None
         }
       )
@@ -475,7 +475,7 @@ the performance, all instances of the terminal are sharing a single process."""
       .map(cody =>
         cody match {
           case ItemMetaData(fileNames, mimeType, fileSize, extra) =>
-            extra.toArray
+            extra.values.toArray
           case ItemTagData(tag) => None
         }
       )
