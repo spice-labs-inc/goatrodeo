@@ -18,7 +18,6 @@ import org.json4s.JsonAST.*
 import org.json4s.native.*
 
 import java.io.File
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 class DockerSuite extends munit.FunSuite {
   val logger = Logger(getClass())
