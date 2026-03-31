@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.toHex
+import io.spicelabs.goatrodeo.util.Metadata
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.JsonDSL.*
@@ -114,7 +115,7 @@ class DotnetState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (TreeMap[String, TreeSet[StringOrPair]], DotnetState) = {
+  ): (Metadata, DotnetState) = {
     // some of these metadata elements may not exist in the assembly
     // under consideration. Therefore, we use the custom +? operator
     // which will add the element if it's Some(foo) and ignore it if
@@ -130,7 +131,7 @@ class DotnetState(
       +? assemblyProducer
       +? assemblyDescription
       +? assemblyDependencies
-    (tm, this)
+    (Metadata(tm), this)
   }
 
   def maybeSOP(

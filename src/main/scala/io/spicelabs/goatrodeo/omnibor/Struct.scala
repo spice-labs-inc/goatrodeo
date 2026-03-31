@@ -19,9 +19,8 @@ import io.bullet.borer.Decoder
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
-import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Metadata
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.language.implicitConversions
 
@@ -270,7 +269,7 @@ case class ItemMetaData(
     @key("file_names") fileNames: TreeSet[String],
     @key("mime_type") mimeType: TreeSet[String],
     @key("file_size") fileSize: Long,
-    extra: TreeMap[String, TreeSet[StringOrPair]]
+    extra: Metadata
 ) {
 
   /** Encode this metadata to CBOR format. */
@@ -315,7 +314,7 @@ case class ItemMetaData(
       fileNames = resolvedFilenames,
       mimeType = this.mimeType ++ other.mimeType,
       fileSize = this.fileSize,
-      extra = Helpers.mergeTreeMaps(this.extra, other.extra)
+      extra = this.extra ++ other.extra
     )
 
     ret

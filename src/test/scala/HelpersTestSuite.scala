@@ -14,6 +14,7 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Metadata
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -595,31 +596,26 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges disjoint maps") {
-    val a: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap("key1" -> TreeSet(StringOrPair("val1")))
-    val b: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap("key2" -> TreeSet(StringOrPair("val2")))
-    val result = Helpers.mergeTreeMaps(a, b)
+    val a: Metadata = Metadata(TreeMap("key1" -> TreeSet(StringOrPair("val1"))))
+    val b: Metadata = Metadata(TreeMap("key2" -> TreeSet(StringOrPair("val2"))))
+    val result = a ++ b
     assertEquals(result.size, 2)
     assert(result.contains("key1"))
     assert(result.contains("key2"))
   }
 
   test("mergeTreeMaps - merges overlapping keys") {
-    val a: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap("key" -> TreeSet(StringOrPair("val1")))
-    val b: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap("key" -> TreeSet(StringOrPair("val2")))
-    val result = Helpers.mergeTreeMaps(a, b)
+    val a: Metadata = Metadata(TreeMap("key" -> TreeSet(StringOrPair("val1"))))
+    val b: Metadata = Metadata(TreeMap("key" -> TreeSet(StringOrPair("val2"))))
+    val result = a ++ b
     assertEquals(result.size, 1)
     assertEquals(result("key").size, 2)
   }
 
   test("mergeTreeMaps - handles empty maps") {
-    val a: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()
-    val b: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap("key" -> TreeSet(StringOrPair("val")))
-    val result = Helpers.mergeTreeMaps(a, b)
+    val a: Metadata = Metadata()
+    val b: Metadata = Metadata(TreeMap("key" -> TreeSet(StringOrPair("val"))))
+    val result = a ++ b
     assertEquals(result.size, 1)
   }
 

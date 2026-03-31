@@ -10,6 +10,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
+import io.spicelabs.goatrodeo.util.Metadata
 import io.spicelabs.goatrodeo.util.StaticMetadata
 
 import java.io.File
@@ -17,7 +18,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
@@ -92,7 +92,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: PM
-  ): (TreeMap[String, TreeSet[StringOrPair]], ME)
+  ): (Metadata, ME)
 
   /** If there's any final augmentation to do on an item
     *
@@ -161,7 +161,7 @@ abstract class ParentScope(
       store: Storage,
       artifact: ArtifactWrapper,
       item: Item,
-      metadata: TreeMap[String, TreeSet[StringOrPair]],
+      metadata: Metadata,
       paths: Vector[String]
   ): Item = item
   def finalAugmentation(

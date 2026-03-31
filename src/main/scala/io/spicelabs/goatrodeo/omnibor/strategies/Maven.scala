@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Metadata
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 
@@ -164,16 +165,16 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
-  ): (TreeMap[String, TreeSet[StringOrPair]], MavenState) = {
+  ): (Metadata, MavenState) = {
 
     val baseTree = if (pomFile.length() > 4) {
-      TreeMap(
+      Metadata(TreeMap(
         "pom" -> TreeSet(StringOrPair("text/xml", pomFile))
-      )
-    } else TreeMap[String, TreeSet[StringOrPair]]()
+      ))
+    } else Metadata()
 
-    val manifest: TreeMap[String, TreeSet[StringOrPair]] = marker match {
-      case MavenMarkers.POM => TreeMap()
+    val manifest: Metadata = marker match {
+      case MavenMarkers.POM => Metadata()
       case _ =>
         FileWalker
           .withinArchiveStream(artifact) { files =>
@@ -185,13 +186,13 @@ case class MavenState(
                   Helpers.slurpInputToString(stream)
                 }))
 
-              case None => TreeMap[String, TreeSet[StringOrPair]]()
+              case None => Metadata()
             }
           }
-          .getOrElse(TreeMap[String, TreeSet[StringOrPair]]())
+          .getOrElse(Metadata())
     }
 
-    Helpers.mergeTreeMaps(baseTree, manifest) -> this
+    (baseTree ++ manifest) -> this
   }
 
   override def finalAugmentation(

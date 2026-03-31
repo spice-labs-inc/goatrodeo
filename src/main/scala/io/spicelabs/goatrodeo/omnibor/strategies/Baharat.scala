@@ -15,6 +15,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Metadata
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -130,7 +131,7 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (TreeMap[String, TreeSet[StringOrPair]], BaharatState) = {
+  ): (Metadata, BaharatState) = {
     val metadata = pkg.metadata()
 
     // compute dependencies
@@ -220,7 +221,7 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
           adHoc("Provides"),
           "application/json" -> compact(render(provides))
         )
-    tm -> this
+    Metadata(tm) -> this
   }
 
   override def finalAugmentation(

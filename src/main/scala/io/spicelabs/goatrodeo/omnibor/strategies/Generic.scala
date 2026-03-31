@@ -6,15 +6,12 @@ import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
-import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
-
-import scala.collection.immutable.TreeMap
-import scala.collection.immutable.TreeSet
+import io.spicelabs.goatrodeo.util.Metadata
 
 /** State for generic file processing.
   *
@@ -54,8 +51,8 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (TreeMap[String, TreeSet[StringOrPair]], GenericFileState) =
-    TreeMap[String, TreeSet[StringOrPair]]() -> this
+  ): (Metadata, GenericFileState) =
+    Metadata() -> this
 
   override def finalAugmentation(
       artifact: ArtifactWrapper,

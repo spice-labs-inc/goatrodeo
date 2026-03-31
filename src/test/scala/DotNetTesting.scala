@@ -8,9 +8,9 @@ import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Metadata
 
 import java.io.File
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Failure
 import scala.util.Success
@@ -28,7 +28,7 @@ class DotNetTesting extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-          extra = TreeMap()
+          extra = Metadata()
         )
       )
     )

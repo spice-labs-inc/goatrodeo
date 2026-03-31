@@ -12,8 +12,8 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Metadata
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
 
@@ -287,7 +287,7 @@ case class Item(
                 fileNames = TreeSet(textPurls*),
                 mimeType = TreeSet(),
                 fileSize = 0,
-                extra = TreeMap()
+                extra = Metadata()
               )
             )
           case Some(body: ItemMetaData) =>
@@ -312,7 +312,7 @@ case class Item(
     */
   def enhanceWithMetadata(
       maybeParent: Option[GitOID] = None,
-      extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap(),
+      extra: Metadata = Metadata(),
       filenames: Seq[String] = Vector(),
       mimeTypes: Seq[String] = Vector()
   ): Item = {
@@ -329,7 +329,7 @@ case class Item(
               fileNames = TreeSet(),
               mimeType = TreeSet(),
               fileSize = 0,
-              extra = TreeMap()
+              extra = Metadata()
             )
         }
         val baseFileNames = base.fileNames
@@ -394,7 +394,7 @@ object Item {
           fileNames = TreeSet(),
           mimeType = TreeSet.from(artifact.mimeType),
           fileSize = artifact.size(),
-          extra = TreeMap()
+          extra = Metadata()
         )
       )
     )

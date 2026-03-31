@@ -15,6 +15,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Metadata
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -130,17 +131,17 @@ case class DockerState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: DockerMarkers
-  ): (TreeMap[String, TreeSet[StringOrPair]], DockerState) = marker match {
+  ): (Metadata, DockerState) = marker match {
     case DockerMarkers.Config(info) =>
-      TreeMap(
+      Metadata(TreeMap(
         "docker_config" -> TreeSet(
           StringOrPair(pretty(render(info.configJson)))
         ),
         "docker_manifest" -> TreeSet(
           StringOrPair(pretty(render(info.manifestConfig)))
         )
-      ) -> this
-    case _ => (TreeMap(), this)
+      )) -> this
+    case _ => (Metadata(), this)
   }
 
   override def finalAugmentation(
@@ -171,13 +172,13 @@ case class DockerState(
               parentItem
                 .enhanceWithMetadata(
                   mimeTypes = Vector("application/vnd.oci.image"),
-                  extra = TreeMap(
+                  extra = Metadata(TreeMap(
                     "docker_config" -> TreeSet(
                       StringOrPair(pretty(render(info.configJson)))
                     ),
                     "docker_manifest" -> TreeSet(
                       StringOrPair(pretty(render(info.manifestConfig)))
-                    )
+                    ))
                   )
                 )
                 .enhanceItemWithPurls(thePurls)
