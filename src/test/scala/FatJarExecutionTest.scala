@@ -18,7 +18,7 @@ import scala.sys.process._
 class FatJarExecutionTest extends munit.FunSuite {
 
   test("fat JAR must execute without SecurityException") {
-    val fatJarFile = new File(s"target/scala-3.7.4/goatrodeo-0.0.1-SNAPSHOT-fat.jar")
+    val fatJarFile = new File(s"target/scala-3.8.3/goatrodeo-0.0.1-SNAPSHOT-fat.jar")
     assert(fatJarFile.exists(), s"Fat JAR not found at ${fatJarFile.getAbsolutePath}")
 
     val result = Process(Seq("java", "-jar", fatJarFile.getAbsolutePath, "--help")).!
