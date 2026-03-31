@@ -513,7 +513,6 @@ object ToProcess {
     Vector(
       MavenToProcess.computeMavenFiles,
       DockerToProcess.computeDockerFiles,
-      // Debian.computeDebianFiles,
       BaharatStrategy.computeBaharatFiles,
       DotnetFile.computeDotnetFiles,
       GenericFile.computeGenericFiles
@@ -555,7 +554,6 @@ object ToProcess {
         MavenToProcess.computeMavenFiles,
         DockerToProcess.computeDockerFiles,
         BaharatStrategy.computeBaharatFiles,
-        // Debian.computeDebianFiles,
         DotnetFile.computeDotnetFiles,
         GenericFile.computeGenericFiles
       )

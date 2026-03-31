@@ -97,13 +97,9 @@ object GraphManager {
     while (items.hasNext && writer.position() < Consts.TargetMaxFileSize) {
       val orgEntry = items.next()
       val currentPosition = writer.position()
-      // val entry = orgEntry.fixReferencePosition(0L, currentPosition)
       val entry = orgEntry
-
       val md5 = entry.identifierMD5()
-
-      val entryBytes =
-        entry.encodeCBOR() // compression.compress(entry.encodeCBOR())
+      val entryBytes = entry.encodeCBOR()
 
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
 

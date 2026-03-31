@@ -264,7 +264,6 @@ object StaticMetadata {
         case fw: FileWrapper =>
           Try {
             val thePath = fw.wrappedFile.getCanonicalPath()
-            // println(s"Syfting ${thePath}")
             val pb = ProcessBuilder(
               List(
                 "syft",
