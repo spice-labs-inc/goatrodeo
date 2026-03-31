@@ -122,7 +122,7 @@ object GraphManager {
       afterWrite(entry)
       loopCnt += 1
       if (loopCnt % 1000000 == 0) {
-        logger.info(
+        logger.debug(
           f"Write loop ${loopCnt} at ${Duration.between(start, Instant.now())}"
         )
       }
@@ -136,7 +136,7 @@ object GraphManager {
     // compute SHA256 of the file
     writer.close()
 
-    logger.info(
+    logger.debug(
       f"Finished write loop at ${Duration.between(start, Instant.now())}"
     )
 
@@ -150,7 +150,7 @@ object GraphManager {
 
     tempFile.toFile().renameTo(targetFileName)
 
-    logger.info(f"Finished rename at ${Duration.between(start, Instant.now())}")
+    logger.debug(f"Finished rename at ${Duration.between(start, Instant.now())}")
 
     val targetIndexName =
       new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.gri")
@@ -179,7 +179,7 @@ object GraphManager {
 
     indexWriter.close()
 
-    logger.info(
+    logger.debug(
       f"Finished index write at ${Duration.between(start, Instant.now())}"
     )
 
@@ -192,7 +192,7 @@ object GraphManager {
 
     targetIndexName.renameTo(indexTargetFileName)
 
-    logger.info(
+    logger.debug(
       f"Finished index rename at ${Duration.between(start, Instant.now())}"
     )
 

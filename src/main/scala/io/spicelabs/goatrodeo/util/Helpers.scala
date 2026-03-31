@@ -300,7 +300,7 @@ object Helpers {
         result = result :+ f
         val curCount = count.addAndGet(1)
         if (curCount % 100000 == 0) {
-          logger.info(s"Find Files count ${curCount}")
+          logger.debug(s"Find Files count ${curCount}")
         }
       }
       FileVisitResult.CONTINUE

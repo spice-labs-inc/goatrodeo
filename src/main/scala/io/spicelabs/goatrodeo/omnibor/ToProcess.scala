@@ -601,17 +601,17 @@ object ToProcess {
       case 0 => 1
       case x => x
     }
-    if (infoMsgs_?) logger.info("Creating strategies for artifacts")
+    if (infoMsgs_?) logger.debug("Creating strategies for artifacts")
     // create the list of the files
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
       if (idx % by50 == 0 && infoMsgs_?) {
-        logger.info(f"Initial file setup ${idx} of ${totalCnt}")
+        logger.debug(f"Initial file setup ${idx} of ${totalCnt}")
       }
       f.uuid -> f
     }*)
 
-    if (infoMsgs_?) logger.info("Built UUID map")
+    if (infoMsgs_?) logger.debug("Built UUID map")
     // and by name for lookup
     val byName: ByName =
       artifacts.foldLeft(Map()) { case (map, wrapper) =>
@@ -623,17 +623,17 @@ object ToProcess {
       }
 
     if (infoMsgs_?)
-      logger.info("Finished setting up files for per-ecosystem specialization")
+      logger.debug("Finished setting up files for per-ecosystem specialization")
 
     val (processSet, finalByUUID, finalByName) =
       computeToProcess.zipWithIndex.foldLeft(
         (Vector[ToProcess](), byUUID, byName)
       ) { case ((workingSet, workingByUUID, workingByName), (theFn, cnt)) =>
-        if (infoMsgs_?) logger.info(f"Processing step ${cnt + 1}")
+        if (infoMsgs_?) logger.debug(f"Processing step ${cnt + 1}")
         val (addlToProcess, revisedByUUID, revisedByName, name) =
           theFn(workingByUUID, workingByName)
         if (infoMsgs_?)
-          logger.info(
+          logger.debug(
             f"Finished processing step ${cnt + 1} for ${name} found ${addlToProcess.length}"
           )
 
@@ -697,12 +697,12 @@ object ToProcess {
         allFiles.par.foreach(file => {
           val cnt = mimeCnt.addAndGet(1)
           if (cnt % 10000 == 0) {
-            logger.info(f"Mime builder count ${cnt}")
+            logger.debug(f"Mime builder count ${cnt}")
           }
           file.mimeType
         })
 
-        logger.info("Computed mime type for all files")
+        logger.debug("Computed mime type for all files")
 
         strategiesForArtifacts(
           allFiles,
@@ -710,7 +710,7 @@ object ToProcess {
             queue.add(toProcess)
             val total = count.addAndGet(toProcess.itemCnt)
             if (total % 1000 == 0) {
-              logger.info(
+              logger.debug(
                 f"built strategies to handle ${total} of ${allFiles.length}"
               )
             }
@@ -718,7 +718,7 @@ object ToProcess {
           true
         )
 
-        logger.info("Finished setting files up")
+        logger.debug("Finished setting files up")
       } catch {
         case e: Exception =>
           logger.error(f"Failed to build graph ${e.getMessage()}")
