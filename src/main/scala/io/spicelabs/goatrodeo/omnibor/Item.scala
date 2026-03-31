@@ -350,7 +350,7 @@ case class Item(
 
         base.copy(
           fileNames = base.fileNames ++ augmentedFileNames,
-          extra = base.extra ++ extra,
+          extra = Metadata(base.extra.values ++ extra.values),
           mimeType = base.mimeType ++ TreeSet(mimeTypes*)
         )
 
