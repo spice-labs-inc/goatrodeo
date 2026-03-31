@@ -43,7 +43,7 @@ final case class TopLevelExtraAugmentation(
             }
 
             Some(
-              orgBody.copy(extra = orgBody.extra ++ GoatMetadata(TreeMap(name -> TreeSet(data))))
+              orgBody.copy(extra = orgBody.extra ++ GoatMetadata(name -> TreeSet(data)))
             )
           }
         )
@@ -102,7 +102,7 @@ final case class ExtraAugmentation(
             }
 
             Some(
-              orgBody.copy(extra = orgBody.extra ++ GoatMetadata(TreeMap(name -> TreeSet(data))))
+              orgBody.copy(extra = orgBody.extra ++ GoatMetadata(name -> TreeSet(data)))
             )
           }
         )

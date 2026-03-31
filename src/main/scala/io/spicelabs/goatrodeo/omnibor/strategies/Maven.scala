@@ -21,7 +21,6 @@ import io.spicelabs.goatrodeo.util.GoatMetadata
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
 import scala.xml.NodeSeq
@@ -168,9 +167,9 @@ case class MavenState(
   ): (GoatMetadata, MavenState) = {
 
     val baseTree = if (pomFile.length() > 4) {
-      GoatMetadata(TreeMap(
+      GoatMetadata(
         "pom" -> TreeSet(StringOrPair("text/xml", pomFile))
-      ))
+      )
     } else GoatMetadata()
 
     val manifest: GoatMetadata = marker match {

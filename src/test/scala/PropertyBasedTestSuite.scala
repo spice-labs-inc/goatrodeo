@@ -27,7 +27,6 @@ import org.scalacheck.Gen
 import org.scalacheck.Prop.*
 
 import java.io.ByteArrayInputStream
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 /** Property-based tests using ScalaCheck.
@@ -98,7 +97,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   val genExtra: Gen[GoatMetadata] = for {
     keys <- Gen.listOf(Gen.alphaLowerStr.suchThat(_.nonEmpty))
     values <- Gen.listOfN(keys.length, genTreeSetStringOrPair)
-  } yield GoatMetadata(TreeMap(keys.take(3).zip(values.take(3))*))
+  } yield GoatMetadata(keys.take(3).zip(values.take(3))*)
 
   /** Generate ItemMetaData */
   val genItemMetaData: Gen[ItemMetaData] = for {
