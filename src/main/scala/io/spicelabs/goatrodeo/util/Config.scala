@@ -224,6 +224,10 @@ object Config {
         .text(
           "How many threads to run (default 4). Should be 2x-3x number of cores"
         )
+        .validate(t =>
+          if (t >= 1) success
+          else failure(s"threads must be >= 1, got $t")
+        )
         .action((t, c) => c.copy(threads = t)),
       opt[String]("mime-filter")
         .text(
