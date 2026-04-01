@@ -35,16 +35,19 @@ object StringOrPairDefinition {
 
     given ordering: Ordering[StringOrPair] = { (left, right) =>
       left match {
-        case left: String => right match {
-          case right: String => Ordering[String].compare(left, right)
-          case (key, _)  => -1
-        }
-        case (leftKey, leftValue) => right match {
-          case right: String => 1
-          case (rightKey, rightValue) =>
-            val comparison = Ordering[String].compare(leftKey, rightKey)
-            if (comparison != 0) comparison else Ordering[String].compare(leftValue, rightValue)
-        }
+        case left: String =>
+          right match {
+            case right: String => Ordering[String].compare(left, right)
+            case (key, _)      => -1
+          }
+        case (leftKey, leftValue) =>
+          right match {
+            case right: String => 1
+            case (rightKey, rightValue) =>
+              val comparison = Ordering[String].compare(leftKey, rightKey)
+              if (comparison != 0) comparison
+              else Ordering[String].compare(leftValue, rightValue)
+          }
       }
     }
 

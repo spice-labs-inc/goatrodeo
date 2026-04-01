@@ -222,8 +222,10 @@ class StructTestSuite extends munit.FunSuite {
 
   test("ItemMetaData.merge - merges mimeTypes") {
     // Must have non-empty fileNames for merge to work
-    val a = ItemMetaData(TreeSet("file.txt"), TreeSet("mime1"), 100, GoatMetadata())
-    val b = ItemMetaData(TreeSet("file.txt"), TreeSet("mime2"), 100, GoatMetadata())
+    val a =
+      ItemMetaData(TreeSet("file.txt"), TreeSet("mime1"), 100, GoatMetadata())
+    val b =
+      ItemMetaData(TreeSet("file.txt"), TreeSet("mime2"), 100, GoatMetadata())
 
     val merged = a.merge(b, () => Vector(), () => Vector())
     assert(merged.mimeType.contains("mime1"))

@@ -264,13 +264,17 @@ class ItemTestSuite extends munit.FunSuite {
       "id",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, GoatMetadata()))
+      Some(
+        ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, GoatMetadata())
+      )
     )
     val item2 = Item(
       "id",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, GoatMetadata()))
+      Some(
+        ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, GoatMetadata())
+      )
     )
 
     val merged = item1.merge(item2)
@@ -428,7 +432,9 @@ class ItemTestSuite extends munit.FunSuite {
       "id",
       TreeSet(),
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, GoatMetadata()))
+      Some(
+        ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, GoatMetadata())
+      )
     )
 
     val parent = Some("gitoid:blob:sha256:parent123")
@@ -501,7 +507,12 @@ class ItemTestSuite extends munit.FunSuite {
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
-        ItemMetaData(TreeSet("file.txt"), TreeSet("text/plain"), 100, GoatMetadata())
+        ItemMetaData(
+          TreeSet("file.txt"),
+          TreeSet("text/plain"),
+          100,
+          GoatMetadata()
+        )
       )
     )
 
