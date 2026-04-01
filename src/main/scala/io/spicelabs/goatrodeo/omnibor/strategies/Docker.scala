@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import language.implicitConversions
+
 import com.github.packageurl.PackageURL
 import com.github.packageurl.PackageURLBuilder
 import com.typesafe.scalalogging.Logger
@@ -133,12 +135,8 @@ case class DockerState(
   ): (GoatMetadata, DockerState) = marker match {
     case DockerMarkers.Config(info) =>
       GoatMetadata(
-        "docker_config" -> TreeSet(
-          StringOrPair(pretty(render(info.configJson)))
-        ),
-        "docker_manifest" -> TreeSet(
-          StringOrPair(pretty(render(info.manifestConfig)))
-        )
+        "docker_config" -> pretty(render(info.configJson)),
+        "docker_manifest" -> pretty(render(info.manifestConfig))
       ) -> this
     case _ => (GoatMetadata(), this)
   }

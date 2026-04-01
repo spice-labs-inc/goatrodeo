@@ -200,7 +200,7 @@ class StructTestSuite extends munit.FunSuite {
       fileNames = TreeSet("file1.txt", "file2.txt"),
       mimeType = TreeSet("text/plain"),
       fileSize = 1234,
-      extra = GoatMetadata("key" -> TreeSet(StringOrPair("value")))
+      extra = GoatMetadata("key" -> "value")
     )
     val bytes = original.encodeCBOR()
     val decoded = Cbor.decode(bytes).to[ItemMetaData].value
@@ -247,13 +247,13 @@ class StructTestSuite extends munit.FunSuite {
       TreeSet("file.txt"),
       TreeSet(),
       100,
-      GoatMetadata("key1" -> TreeSet(StringOrPair("val1")))
+      GoatMetadata("key1" -> "val1")
     )
     val b = ItemMetaData(
       TreeSet("file.txt"),
       TreeSet(),
       100,
-      GoatMetadata("key2" -> TreeSet(StringOrPair("val2")))
+      GoatMetadata("key2" -> "val2")
     )
 
     val merged = a.merge(b, () => Vector(), () => Vector())

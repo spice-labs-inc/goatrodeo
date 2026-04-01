@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 
+import language.implicitConversions
+
 import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.util.GoatMetadata
 
@@ -42,9 +44,7 @@ final case class TopLevelExtraAugmentation(
             }
 
             Some(
-              orgBody.copy(extra =
-                orgBody.extra ++ GoatMetadata(name -> TreeSet(data))
-              )
+              orgBody.copy(extra = orgBody.extra + (name, data))
             )
           }
         )
@@ -103,9 +103,7 @@ final case class ExtraAugmentation(
             }
 
             Some(
-              orgBody.copy(extra =
-                orgBody.extra ++ GoatMetadata(name -> TreeSet(data))
-              )
+              orgBody.copy(extra = orgBody.extra + (name, data))
             )
           }
         )

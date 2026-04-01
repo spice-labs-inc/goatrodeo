@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.GoatMetadata
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -30,7 +29,6 @@ import java.io.File
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
-import scala.collection.immutable.TreeSet
 
 class HelpersTestSuite extends munit.FunSuite {
 
@@ -595,8 +593,8 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges disjoint maps") {
-    val a: GoatMetadata = GoatMetadata("key1" -> TreeSet(StringOrPair("val1")))
-    val b: GoatMetadata = GoatMetadata("key2" -> TreeSet(StringOrPair("val2")))
+    val a: GoatMetadata = GoatMetadata("key1" -> "val1")
+    val b: GoatMetadata = GoatMetadata("key2" -> "val2")
     val result = a ++ b
     assertEquals(result.size, 2)
     assert(result.contains("key1"))
@@ -604,8 +602,8 @@ Long-Value: This is a very long value that continues
   }
 
   test("mergeTreeMaps - merges overlapping keys") {
-    val a: GoatMetadata = GoatMetadata("key" -> TreeSet(StringOrPair("val1")))
-    val b: GoatMetadata = GoatMetadata("key" -> TreeSet(StringOrPair("val2")))
+    val a: GoatMetadata = GoatMetadata("key" -> "val1")
+    val b: GoatMetadata = GoatMetadata("key" -> "val2")
     val result = a ++ b
     assertEquals(result.size, 1)
     assertEquals(result("key").size, 2)
@@ -613,7 +611,7 @@ Long-Value: This is a very long value that continues
 
   test("mergeTreeMaps - handles empty maps") {
     val a: GoatMetadata = GoatMetadata()
-    val b: GoatMetadata = GoatMetadata("key" -> TreeSet(StringOrPair("val")))
+    val b: GoatMetadata = GoatMetadata("key" -> "val")
     val result = a ++ b
     assertEquals(result.size, 1)
   }

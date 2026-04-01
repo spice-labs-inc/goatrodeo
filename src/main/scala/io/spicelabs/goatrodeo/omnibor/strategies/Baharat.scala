@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import language.implicitConversions
+
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.Package
@@ -17,14 +19,10 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.GoatMetadata
 import org.json4s.*
-import org.json4s.native.JsonMethods.*
 
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.ListHasAsScala
-import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import io.spicelabs.goatrodeo.omnibor.{MetadataKeyConstants => MKC}
 
 object BaharatStrategy {
@@ -155,73 +153,24 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
     // adHoc generates a prefix onto the key
     val adHoc = MKC.adHoc("Baharat")
 
-    val tm: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap[String, TreeSet[StringOrPair]]()
-        +? maybeStringOrPair(
-          adHoc("Arch"),
-          metadata.arch()
-        )
-        +? maybeStringOrPair(
-          MKC.PUBLICATION_DATE,
-          metadata.buildTime().map(_.toString()).toScala
-        )
-        +? maybeStringOrPair(
-          MKC.DESCRIPTION,
-          metadata.description().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Epoch"),
-          metadata.epoch().map(_.toString()).toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Group"),
-          metadata.group().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Installed_size"),
-          metadata.installedSize().toString()
-        )
-        +? maybeStringOrPair(
-          MKC.LICENSE,
-          metadata.license().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Maintainer"),
-          metadata.maintainer().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.NAME,
-          metadata.name()
-        )
-        +? maybeStringOrPair(
-          adHoc("Release"),
-          metadata.release().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Summary"),
-          metadata.summary().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.URL,
-          metadata.url().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.PUBLISHER,
-          metadata.vendor().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.VERSION,
-          metadata.version()
-        )
-        +? maybeStringOrPair(
-          MKC.DEPENDENCIES,
-          "application/json" -> compact(render(dependencies))
-        )
-        +? maybeStringOrPair(
-          adHoc("Provides"),
-          "application/json" -> compact(render(provides))
-        )
-    GoatMetadata(tm) -> this
+    GoatMetadata(
+      adHoc("Arch") -> metadata.arch(),
+      MKC.PUBLICATION_DATE -> metadata.buildTime().map(_.toString()),
+      MKC.DESCRIPTION -> metadata.description(),
+      adHoc("Epoch") -> metadata.epoch().map(_.toString()),
+      adHoc("Group") -> metadata.group(),
+      adHoc("Installed_size") -> metadata.installedSize().toString(),
+      MKC.LICENSE -> metadata.license(),
+      adHoc("Maintainer") -> metadata.maintainer(),
+      MKC.NAME -> metadata.name(),
+      adHoc("Release") -> metadata.release(),
+      adHoc("Summary") -> metadata.summary(),
+      MKC.URL -> metadata.url(),
+      MKC.PUBLISHER -> metadata.vendor(),
+      MKC.VERSION -> metadata.version(),
+      MKC.DEPENDENCIES -> dependencies,
+      adHoc("Provides") -> provides
+    ) -> this
   }
 
   override def finalAugmentation(

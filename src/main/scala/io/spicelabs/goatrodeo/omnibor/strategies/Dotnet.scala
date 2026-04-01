@@ -24,13 +24,11 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.goatrodeo.util.GoatMetadata
-import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.FileInputStream
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Failure
@@ -122,18 +120,18 @@ class DotnetState(
     // under consideration. Therefore, we use the custom +? operator
     // which will add the element if it's Some(foo) and ignore it if
     // it's None.
-    val tm = TreeMap[String, TreeSet[StringOrPair]]()
-      +? assemblyFullName
-      +? assemblyName
-      +? assemblyVersion
-      +? assemblyLocale
-      +? assemblyPublicKey
-      +? assemblyCopyright
-      +? assemblyTrademark
-      +? assemblyProducer
-      +? assemblyDescription
-      +? assemblyDependencies
-    (GoatMetadata(tm), this)
+    GoatMetadata(
+      assemblyFullName,
+      assemblyName,
+      assemblyVersion,
+      assemblyLocale,
+      assemblyPublicKey,
+      assemblyCopyright,
+      assemblyTrademark,
+      assemblyProducer,
+      assemblyDescription,
+      assemblyDependencies
+    ) -> this
   }
 
   def maybeSOP(

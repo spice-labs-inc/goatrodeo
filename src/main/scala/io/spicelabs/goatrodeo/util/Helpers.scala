@@ -14,6 +14,8 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
+import language.implicitConversions
+
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -45,7 +47,6 @@ import java.util.Date
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
@@ -79,7 +80,7 @@ object Helpers {
     val manifest = java.util.jar.Manifest.apply(bis)
 
     val mapping = for {
-      entry <- manifest.getMainAttributes().entrySet().asScala.toVector
+      entry <- manifest.getMainAttributes().entrySet().asScala
 
     } yield {
       entry.getKey.toString.toLowerCase -> TreeSet(
@@ -87,13 +88,10 @@ object Helpers {
       )
     }
 
-    val ret = TreeMap(
-      (mapping :+ "manifest" -> TreeSet(
-        StringOrPair("text/maven-manifest", manifestString)
-      ))*
-    )
-
-    GoatMetadata(ret)
+    GoatMetadata(mapping) + ("manifest", (
+      "text/maven-manifest",
+      manifestString
+    ))
   }
 
   /** The random number generator
@@ -1399,34 +1397,5 @@ object GitOIDUtils {
           )
       )
     )
-  }
-}
-
-/** Extension methods for TreeMap to support optional operations.
-  */
-object TreeMapExtensions {
-
-  /** Extension methods for TreeMap.
-    *
-    * @tparam K
-    *   the key type
-    * @tparam V
-    *   the value type
-    */
-  extension [K, V](tree: TreeMap[K, V]) {
-
-    /** Conditionally add an element to the TreeMap if the Option is Some.
-      *
-      * @param maybe
-      *   an optional key-value pair to add
-      * @return
-      *   the TreeMap with the element added (if Some), or unchanged (if None)
-      */
-    def +?(maybe: Option[(K, V)]): TreeMap[K, V] = {
-      maybe match {
-        case Some(elem) => tree + elem
-        case _          => tree
-      }
-    }
   }
 }

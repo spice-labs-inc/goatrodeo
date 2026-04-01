@@ -180,6 +180,7 @@ lazy val root = project
     compileOrder := CompileOrder.JavaThenScala,
     libraryDependencySchemes += "com.github.luben" % "zstd-jni" % VersionScheme.Always,
     scalacOptions += "-no-indent",
+    scalacOptions += "-language:implicitConversions",
     buildInfoKeys := Seq[BuildInfoKey](
       name,
       version,

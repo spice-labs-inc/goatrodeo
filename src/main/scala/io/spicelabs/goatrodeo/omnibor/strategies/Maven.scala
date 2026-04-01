@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import language.implicitConversions
+
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.Augmentation
@@ -9,7 +11,6 @@ import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.Storage
-import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
@@ -21,7 +22,6 @@ import io.spicelabs.goatrodeo.util.GoatMetadata
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 
-import scala.collection.immutable.TreeSet
 import scala.util.Try
 import scala.xml.NodeSeq
 import scala.xml.XML
@@ -167,9 +167,7 @@ case class MavenState(
   ): (GoatMetadata, MavenState) = {
 
     val baseTree = if (pomFile.length() > 4) {
-      GoatMetadata(
-        "pom" -> TreeSet(StringOrPair("text/xml", pomFile))
-      )
+      GoatMetadata("pom" -> ("text/xml", pomFile))
     } else GoatMetadata()
 
     val manifest: GoatMetadata = marker match {
