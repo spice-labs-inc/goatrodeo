@@ -15,14 +15,18 @@ object GoatMetadata {
   given Encoder[GoatMetadata] = (writer, item) => writer.write(item.values)
 
   given Decoder[GoatMetadata] = { value =>
-    GoatMetadata(summon[Decoder[TreeMap[String, TreeSet[StringOrPair]]]].read(value))
+    GoatMetadata(
+      summon[Decoder[TreeMap[String, TreeSet[StringOrPair]]]].read(value)
+    )
   }
 }
 
-case class GoatMetadata(values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()) {
+case class GoatMetadata(
+    values: TreeMap[String, TreeSet[StringOrPair]] = TreeMap()
+) {
   export values.{size, isEmpty, contains, keySet, apply, get, getOrElse}
 
-  infix def ++ (right: GoatMetadata): GoatMetadata = {
+  infix def ++(right: GoatMetadata): GoatMetadata = {
     var ret = values
 
     for { (key, value) <- right.values } {

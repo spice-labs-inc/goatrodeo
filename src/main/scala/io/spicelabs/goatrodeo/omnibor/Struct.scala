@@ -155,8 +155,6 @@ object EdgeType {
 /** Type alias for an edge in the graph: (edge type, target GitOID). */
 type Edge = (String, String)
 
-
-
 /** Metadata associated with an Item in the Artifact Dependency Graph.
   *
   * Contains information about the artifact such as filenames, MIME types, file
