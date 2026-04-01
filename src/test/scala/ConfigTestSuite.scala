@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Config.ExpandFiles
 import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
@@ -46,6 +47,18 @@ class ConfigTestSuite extends munit.FunSuite {
     val config = Config(threads = 8)
 
     assertEquals(config.threads, 8)
+  }
+
+  test("GoatRodeoBuilder - withThreads rejects zero") {
+    interceptMessage[IllegalArgumentException]("requirement failed: threads must be >= 1, got 0") {
+      GoatRodeo.builder().withThreads(0)
+    }
+  }
+
+  test("GoatRodeoBuilder - withThreads rejects negative") {
+    interceptMessage[IllegalArgumentException]("requirement failed: threads must be >= 1, got -1") {
+      GoatRodeo.builder().withThreads(-1)
+    }
   }
 
   test("Config - tag can be set") {

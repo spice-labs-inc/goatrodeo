@@ -91,6 +91,7 @@ class GoatRodeoBuilder {
     *   this builder
     */
   def withThreads(t: Int): GoatRodeoBuilder = {
+    require(t >= 1, s"threads must be >= 1, got $t")
     this.config = this.config.copy(threads = t)
     this
   }
