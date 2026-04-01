@@ -53,7 +53,7 @@ class ItemTestSuite extends munit.FunSuite {
           fileNames = TreeSet(id),
           mimeType = TreeSet("application/octet-stream"),
           fileSize = 100,
-        extra = GoatMetadata()
+          extra = GoatMetadata()
         )
       )
     )

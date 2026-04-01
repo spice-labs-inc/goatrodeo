@@ -115,7 +115,7 @@ trait ToProcess {
 trait ProcessingState[M, S] {
   def beginProcessing(...): S
   def getPurls(...): (Vector[PackageURL], S)
-  def getMetadata(...): (Metadata, S)
+  def getMetadata(...): (GoatMetadata, S)
   def finalAugmentation(...): (Item, S)
   def postChildProcessing(...): S
 }
