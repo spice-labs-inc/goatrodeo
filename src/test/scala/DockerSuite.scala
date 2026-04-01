@@ -37,7 +37,7 @@ class DockerSuite extends munit.FunSuite {
     )
   }
 
-  test("Can build for a simple Docker file") {
+  test("Can build for a simple Docker image") {
     val name = "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
 
     val nested = FileWrapper(File(name), name, None)
@@ -66,7 +66,7 @@ class DockerSuite extends munit.FunSuite {
 
   }
 
-  test("Merging names works") {
+  test("ItemMetaData.merge - combines file names from both items") {
     val a = ItemMetaData(TreeSet("foo"), TreeSet(), 1, TreeMap())
     val b = ItemMetaData(TreeSet("bar"), TreeSet(), 1, TreeMap())
 
@@ -84,7 +84,7 @@ class DockerSuite extends munit.FunSuite {
     )
   }
 
-  test("Can build for a complex file") {
+  test("Can build for a complex Docker image") {
     val name = "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
 
     val nested = FileWrapper(File(name), name, None)

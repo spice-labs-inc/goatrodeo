@@ -27,7 +27,7 @@ import java.util.regex.Pattern
 // https://scalameta.org/munit/docs/getting-started.html
 class MySuite extends munit.FunSuite {
 
-  test("gitoid to file") {
+  test("Gitoid URL converts to file path components") {
     val test = List(
       "gitoid:blob:sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a",
       "blob:sha256:880485f48092dd308a2ad8a7b6ce060c4b2ec81ecb4ba3f5fd450b79136a852a",
@@ -46,13 +46,13 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("regex") {
+  test("Basic regex pattern matching works") {
     val p = Pattern.compile("a")
     val m = p.matcher("aaaa")
     assert(m.find())
   }
 
-  test("good hex for sha256") {
+  test("SHA256 hash produces correct hex output") {
     val txt = Array[Byte](49, 50, 51, 10)
     val digest = GitOIDUtils.HashType.SHA256.getDigest()
     assertEquals(
@@ -66,7 +66,7 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("long to hex and back again") {
+  test("Long value converts to hex and back") {
     assertEquals(Helpers.toHex(0x1), "0000000000000001")
 
     assertEquals(Helpers.toHex(0x0030005000a00f01L), "0030005000a00f01")
@@ -83,7 +83,7 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("File Type Detection") {
+  test("File type detection works for common archive formats") {
     assert({
       val name = "test_data/HP1973-Source.zip"
       FileWalker
@@ -147,7 +147,7 @@ class MySuite extends munit.FunSuite {
 
   }
 
-  test("Walk a tar file") {
+  test("Walking a tar file yields multiple entries") {
     val name = "test_data/empty.tgz"
     val count =
       FileWalker
@@ -159,7 +159,7 @@ class MySuite extends munit.FunSuite {
     assert(count > 2)
   }
 
-  test("deal with nesting") {
+  test("Build graph from nested archive") {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
 
@@ -229,7 +229,7 @@ class MySuite extends munit.FunSuite {
     }
   }
 
-  test("Finds files in rpm") {
+  test("Finds files in RPM package") {
     val name = "test_data/tk-8.6.8-1.el8.x86_64.rpm"
     val nested =
       FileWrapper(File(name), name, None)
@@ -290,7 +290,7 @@ class MySuite extends munit.FunSuite {
 
   // }
 
-  test("deal with .deb and zst") {
+  test("Build graph from deb package with zst compression") {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
     val nested =
       FileWrapper(File(name), name, None)
@@ -302,7 +302,7 @@ class MySuite extends munit.FunSuite {
     assert(cnt > 10, f"expected more than 10, got ${cnt}")
   }
 
-  test("calculate mime type for class file") {
+  test("Calculate MIME type for class file") {
     val classFileName =
       "target/scala-3.8.3/classes/io/spicelabs/goatrodeo/Howdy.class"
     val f = FileWrapper(new File(classFileName), classFileName, None, _ => ())
@@ -312,7 +312,7 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("Build from nested") {
+  test("Build graph from nested archive with block list") {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
     val store1 =
@@ -331,7 +331,7 @@ class MySuite extends munit.FunSuite {
     assertEquals(
       store1.keys().toSet,
       store3.keys().toSet,
-      "Builds are reproducable"
+      "Builds are reproducible"
     )
     assertNotEquals(
       store1.keys().toSet,
@@ -343,7 +343,7 @@ class MySuite extends munit.FunSuite {
 
     assert(
       gitoids.size > 1200,
-      f"Expection more than 1,200 items, got ${gitoids.size}"
+      f"Expecting more than 1,200 items, got ${gitoids.size}"
     )
     assert(store1.size() > 2200)
     val keys = store1.keys()
@@ -374,7 +374,7 @@ class MySuite extends munit.FunSuite {
     )
   }
 
-  test("Build from Java") {
+  test("Build graph from Java source and JAR directory") {
     val source = File("test_data/jar_test")
     val strategy = ToProcess.strategyForDirectory(source, false, None)
 
@@ -477,7 +477,7 @@ Multi-Release: true
 
 """
 
-  test("Parse manifest") {
+  test("Parse MANIFEST.MF into tree structure") {
     val tree = Helpers.treeInfoFromManifest(complexManifest)
     assert(!tree.isEmpty, "Should have items in tree")
     assert(!tree("manifest").isEmpty, "Should find manifest")

@@ -14,7 +14,7 @@ import scala.util.Success
 import scala.util.Try
 
 class ADGTests extends munit.FunSuite {
-  test("Unreadable JAR") {
+  test("Questionable archives do not cause exceptions") {
     val source = File("test_data/download/adg_tests/repo_ea")
 
     // the test takes a couple of files with questionable TAR and ZIP archives
@@ -34,7 +34,7 @@ class ADGTests extends munit.FunSuite {
     }
   }
 
-  test("Build lots of JARs") {
+  test("Build database from many JARs") {
     val source = File("test_data/download/adg_tests")
 
     if (source.isDirectory()) {

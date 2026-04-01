@@ -4,24 +4,24 @@ import io.spicelabs.goatrodeo.util.RegexPredicate
 import scala.util.matching.Regex
 
 class IncExcTesting extends munit.FunSuite {
-  test("none-accepted") {
+  test("RegexPredicate - matches nothing when empty") {
     val predicates = RegexPredicate(Set[String](), Vector[Regex]())
     assert(!predicates.matches("anything"))
   }
 
-  test("exact-match") {
+  test("RegexPredicate - matches exact string") {
     val key = "splunge"
     val predicates = RegexPredicate(Set(key), Vector[Regex]())
     assert(predicates.matches(key))
   }
 
-  test("regex-match") {
+  test("RegexPredicate - matches regex pattern") {
     val key = "splunge"
     val predicates = RegexPredicate(Set[String](), Vector("spl\\w*".r))
     assert(predicates.matches(key))
   }
 
-  test("includes-all") {
+  test("IncludeExclude - includes all when empty") {
     val includer = IncludeExclude(
       Set[String](),
       Vector[Regex](),
@@ -31,7 +31,7 @@ class IncExcTesting extends munit.FunSuite {
     assert(includer.shouldInclude(Set("all")))
   }
 
-  test("excludes-all-text-MIME") {
+  test("IncludeExclude - excludes all text MIME types") {
     val includer = IncludeExclude(
       Set[String](),
       Vector[Regex](),
@@ -43,7 +43,7 @@ class IncExcTesting extends munit.FunSuite {
     assert(!includer.shouldInclude(Set("text/json")))
   }
 
-  test("excludes-all-text-MIME-but-HTML") {
+  test("IncludeExclude - excludes all text MIME types but HTML") {
     val includer = IncludeExclude(
       Set("text/html"),
       Vector[Regex](),
@@ -55,7 +55,7 @@ class IncExcTesting extends munit.FunSuite {
     assert(!includer.shouldInclude(Set("text/json")))
   }
 
-  test("excludes-all-text-MIME-but-hanything") {
+  test("IncludeExclude - excludes all text MIME types but h-prefixed") {
     val includer = IncludeExclude(
       Set("text/html"),
       Vector("text\\/h.*".r),
@@ -68,7 +68,7 @@ class IncExcTesting extends munit.FunSuite {
     assert(!includer.shouldInclude(Set("text/json")))
   }
 
-  test("comment") {
+  test("aggregatePredicate - ignores comment lines") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "# this is a comment",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())
@@ -79,7 +79,7 @@ class IncExcTesting extends munit.FunSuite {
     assertEquals(excR.size, 0)
   }
 
-  test("include-exact") {
+  test("aggregatePredicate - parses include exact") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "+splunge",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())
@@ -90,7 +90,7 @@ class IncExcTesting extends munit.FunSuite {
     assertEquals(excR.size, 0)
   }
 
-  test("include-regx") {
+  test("aggregatePredicate - parses include regex") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "*foo.*",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())
@@ -101,7 +101,7 @@ class IncExcTesting extends munit.FunSuite {
     assertEquals(excR.size, 0)
   }
 
-  test("exclude-exact") {
+  test("aggregatePredicate - parses exclude exact") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "-foo",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())
@@ -112,7 +112,7 @@ class IncExcTesting extends munit.FunSuite {
     assertEquals(excR.size, 0)
   }
 
-  test("exclude-regex") {
+  test("aggregatePredicate - parses exclude regex") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "/foo.*",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())
@@ -123,7 +123,7 @@ class IncExcTesting extends munit.FunSuite {
     assertEquals(excR.size, 1)
   }
 
-  test("bad-command") {
+  test("aggregatePredicate - throws on invalid command prefix") {
     intercept[IllegalArgumentException] {
       val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
         "&foo.*",
@@ -132,14 +132,14 @@ class IncExcTesting extends munit.FunSuite {
     }
   }
 
-  test("empty-comment") {
+  test("aggregatePredicate - handles empty comment") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "#",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())
     )
   }
 
-  test("empty-command") {
+  test("aggregatePredicate - handles empty command") {
     val (incE, incR, excE, excR) = IncludeExclude.aggregatePredicate(
       "+",
       (Set[String](), Vector[Regex](), Set[String](), Vector[Regex]())

@@ -31,7 +31,7 @@ object MetadataSuite {
 
 }
 class MetadataSuite extends munit.FunSuite {
-  test("Metadata collections works") {
+  test("Metadata collection works") {
     if (StaticMetadata.hasSyft) {
       val file = File("test_data/jar_test/slf4j-simple-1.6.1.jar")
       val fileWrapper =
@@ -50,7 +50,7 @@ class MetadataSuite extends munit.FunSuite {
     }
   }
 
-  test("Metadata collections works on nested stuff") {
+  test("Metadata collection works on nested archives") {
     if (StaticMetadata.hasSyft) {
       val file = File("test_data/nested.tar")
       val fileWrapper =
@@ -83,7 +83,7 @@ class MetadataSuite extends munit.FunSuite {
     }
   }
 
-  test("deb metadata") {
+  test("Deb package metadata contains expected fields") {
     val store = getStore("debwithmetadata.deb")
 
     val metadata = assertPurlsAndMainItem(
@@ -114,7 +114,7 @@ class MetadataSuite extends munit.FunSuite {
     assertContents(version, "1.2.3")
   }
 
-  test("apk-tiny1") {
+  test("APK metadata for acf-squid contains expected fields") {
     val store = getStore("acf-squid-0.11.0-r4.apk")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -151,7 +151,7 @@ class MetadataSuite extends munit.FunSuite {
     assertContents(vers, "0.11.0-r4")
   }
 
-  test("apk-tiny2") {
+  test("APK metadata for axel-doc contains expected fields") {
     val store = getStore("axel-doc-2.17.14-r1.apk")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -193,7 +193,7 @@ class MetadataSuite extends munit.FunSuite {
     assertContents(vers, "2.17.14-r1")
   }
 
-  test("rpm-smallish") {
+  test("RPM metadata for busybox contains expected fields") {
     val store = getStore("busybox-1.37.0-160099.8.2.aarch64.rpm")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -281,7 +281,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
     })
   }
 
-  test("pacman-small") {
+  test("Pacman metadata for cpufreqctl contains expected fields") {
     val store = getStore("cpufreqctl-8-1-x86_64.pkg.tar.zst")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -320,7 +320,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
     assertContents(vers, "8-1")
   }
 
-  test("other-deb") {
+  test("Deb metadata for lxterminal contains expected fields") {
     val store = getStore("lxterminal_0.4.0-2build2_amd64.deb")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -363,7 +363,7 @@ the performance, all instances of the terminal are sharing a single process."""
     assertContents(vers, "0.4.0-2build2")
   }
 
-  test("pacman-moderate") {
+  test("Pacman metadata for paru contains expected fields") {
     val store = getStore("paru-1.11.0-1-x86_64.pkg.tar.zst")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -398,7 +398,7 @@ the performance, all instances of the terminal are sharing a single process."""
     assertContents(vers, "1.11.0-1")
   }
 
-  test("pypi small") {
+  test("PyPI metadata for colorama contains expected fields") {
     val store = getStore("colorama-0.4.6.tar.gz")
     val metadata = assertPurlsAndMainItem(
       store,
@@ -421,7 +421,7 @@ the performance, all instances of the terminal are sharing a single process."""
     assertContents(vers, "0.4.6")
   }
 
-  test("small gem") {
+  test("RubyGem metadata for twilito contains expected fields") {
     val store = getStore("twilito-0.5.0.gem")
 
     val item = store.read(
@@ -463,7 +463,7 @@ the performance, all instances of the terminal are sharing a single process."""
     assertContents(vers, "0.5.0")
   }
 
-  test("php") {
+  test("Composer metadata for small/collection contains expected fields") {
     val store = getStore("small-collection-1.3.0.zip")
 
     val item = store.read(

@@ -33,7 +33,7 @@ class DotNetTesting extends munit.FunSuite {
       )
     )
   }
-  test("get-me-a-mime") {
+  test("DLL file has dotnet MIME type") {
 
     val path = "test_data/Smoke.dll"
     val f = FileWrapper(new File(path), path, None, _ => ())
@@ -48,7 +48,7 @@ class DotNetTesting extends munit.FunSuite {
     } else { Set() }
   }
 
-  test("get-me-a-mime-exe") {
+  test("Another DLL file has dotnet MIME type") {
     assert(
       mimesForFile("test_data/hackproj.dll").contains(
         "application/x-msdownload; format=pe32-dotnet"
@@ -69,7 +69,7 @@ class DotNetTesting extends munit.FunSuite {
     )
   }
 
-  test("mime-from-nupkg") {
+  test("nupkg file has zip MIME type") {
     assert(
       mimesForFile("test_data/awesomeassertions.9.3.0.nupkg").contains(
         "application/zip"
@@ -77,7 +77,7 @@ class DotNetTesting extends munit.FunSuite {
     )
   }
 
-  test("assembly-references") {
+  test("Can read assembly references from DLL") {
     val name = "test_data/hackproj.dll"
     val assembly = AssemblyDefinition.readAssembly(name)
     assert(assembly != null)
@@ -235,7 +235,7 @@ class DotNetTesting extends munit.FunSuite {
     }
   }
 
-  test("check bdinfo") {
+  test("Can extract NuGet purl from bdinfo tar") {
     val name = "test_data/bdinfo.tar"
 
     val nested = FileWrapper(File(name), name, None)
