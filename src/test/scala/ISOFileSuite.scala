@@ -27,7 +27,7 @@ import java.io.File
 class ISOFileSuite extends munit.FunSuite {
   val logger = Logger(getClass())
 
-  test("Simple file format parsing to ArtifactWrapper") {
+  test("withinArchiveStream - opens ISO file") {
     // todo - rerun this against 'simple.iso'; it mounts on macos fine and checks out as a proper iso file
     // but this test is giving me a "Negative Seek Offset" error…
 
@@ -41,7 +41,7 @@ class ISOFileSuite extends munit.FunSuite {
       Some(42)
     )
   }
-  test("Walk an ISO file") {
+  test("withinArchiveStream - counts entries in ISO file") {
     val name = "test_data/download/iso_tests/iso_of_archives.iso"
     val count =
       FileWalker
@@ -53,7 +53,7 @@ class ISOFileSuite extends munit.FunSuite {
 
   }
 
-  test("deal with nesting archives inside an ISO") {
+  test("GenericFile.process - handles nested archives inside an ISO") {
     val name = "test_data/download/iso_tests/iso_of_archives.iso"
     val nested =
       FileWrapper(File(name), name, None)
