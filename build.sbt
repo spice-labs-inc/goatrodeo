@@ -174,6 +174,7 @@ lazy val root = project
     // Spice Labs "readers"
     libraryDependencies += "io.spicelabs" % "baharat" % "0.0.4",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.1.0",
+    libraryDependencies += "io.spicelabs" % "saffron" % "0.2.3",
 
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     assembly / assemblyJarName := s"${projectName}-${version.value}-fat.jar",
