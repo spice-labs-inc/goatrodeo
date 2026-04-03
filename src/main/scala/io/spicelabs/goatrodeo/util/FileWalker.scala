@@ -19,6 +19,14 @@ import java.nio.file.Path
 import java.util.zip.ZipFile
 import scala.util.Try
 import scala.util.Using
+import io.spicelabs.saffron.DiskReader
+import scala.util.Failure
+import scala.util.Success
+import io.spicelabs.saffron.fs.FileSystemMount
+import scala.jdk.CollectionConverters.*
+import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
+import io.spicelabs.saffron.fs.FileSystemEntry
+import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
 
 /** Actions that can be taken while walking files in an archive.
   */
@@ -233,6 +241,70 @@ object FileWalker {
     } else None
   }
 
+  // partial list of saffron supported mime types
+  // some, like raw (application/octet-stream) and google cloud
+  // platform (application/gzip containing raw) are problematic in
+  // that octect/stream is any unrecognized mime type and application/gzip is
+  // already overloaded.
+  private val saffronMimeTypes = Set[String](
+    "application/x-qcow2",
+    "application/x-vmdk",
+    "application/x-vhd",
+    "application/x-vhdx",
+    "application/x-vdi",
+    "application/x-ami"
+  )
+
+  private def isSaffronSupported(mime: Set[String], path: Path) = {
+    // if we get some recognized mimes, succeed fast, otherwise check DiskReader
+    mime.intersect(saffronMimeTypes).nonEmpty || DiskReader.isSupported(path)
+  }
+
+  private def asSaffronFilesystem(
+      in: ArtifactWrapper,
+      tempPath: Path
+  ): OptionalArchiveStream = {
+    in.withFile(f => {
+      val path = f.toPath()
+      if (isSaffronSupported(in.mimeType, path)) {
+        Try {
+          val disk = DiskReader.open(path)
+          val systems = FileSystemMount.mountAll(disk).asScala
+          val files =
+            for {
+              system <- systems
+              file <- system.walk().iterator().asScala
+            } yield file
+          val artifacts = files
+            .filter(f => f.`type`() == EntryType.REGULAR_FILE)
+            .map(fileSystemEntry => {
+              fileSystemEntry match {
+                case regular: RegularFile =>
+                  Some(
+                    ArtifactWrapper.newWrapper(
+                      regular.path(),
+                      regular.size(),
+                      regular.openStream(),
+                      None,
+                      tempPath
+                    )
+                  )
+                case _ => None
+              }
+            })
+            .flatten
+            .toVector
+          artifacts -> s"Saffron ${disk.format().name()}"
+        } match {
+          case Failure(exception) => None
+          case Success(value)     => Some(value)
+        }
+      } else {
+        None
+      }
+    })
+  }
+
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
     * read most archive files" format
     *
@@ -353,9 +425,8 @@ object FileWalker {
   def notArchive(path: String, mimeType: Set[String]): Boolean = {
     mimeType.exists(_.startsWith("text/")) ||
     mimeType.exists(_.startsWith("image/")) ||
-    definitelyNotArchive.intersect(mimeType).nonEmpty /*||
+    definitelyNotArchive.intersect(mimeType).size == mimeType.size /*||
     (mimeType.contains("application/zip") && path.endsWith(".xpi"))*/
-
   }
 
   /** Check if a file is definitely not compressed based on MIME type and path.
@@ -396,6 +467,7 @@ object FileWalker {
 
         ret
       }.orElse(asRPMWrapper(in, tempDir))
+        .orElse(asSaffronFilesystem(in, tempDir))
         .orElse(
           asISOWrapper(in, tempDir)
             .orElse {
