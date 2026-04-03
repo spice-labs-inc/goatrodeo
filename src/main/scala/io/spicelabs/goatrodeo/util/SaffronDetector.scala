@@ -18,7 +18,7 @@ object SaffronDetector {
       }
     })
   }
-  def mimeTypeAugmentor(
+  def mimeTypeAugmenter(
       artifact: ArtifactWrapper,
       currentMimes: Set[String]
   ): Set[String] = {

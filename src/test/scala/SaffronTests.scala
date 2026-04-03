@@ -24,12 +24,11 @@ class SaffronTests extends munit.FunSuite {
             art.filenameWithNoPath == "puddle_jumper_octodex.jpg"
           )
         )
-        true
+        ()
       })
-      assert(successOpt.isDefined && successOpt.get)
-      true
+      assert(successOpt.isDefined)
     })
-    assert(openedArchiveOpt.isDefined && openedArchiveOpt.get)
+    assert(openedArchiveOpt.isDefined)
   }
 
   test("check minimal vhdx for files") {
