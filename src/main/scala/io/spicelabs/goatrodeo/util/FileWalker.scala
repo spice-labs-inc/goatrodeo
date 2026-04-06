@@ -425,7 +425,7 @@ object FileWalker {
   def notArchive(path: String, mimeType: Set[String]): Boolean = {
     mimeType.exists(_.startsWith("text/")) ||
     mimeType.exists(_.startsWith("image/")) ||
-    definitelyNotArchive.intersect(mimeType).size == mimeType.size /*||
+    mimeType.forall(definitelyNotArchive.contains(_)) /*||
     (mimeType.contains("application/zip") && path.endsWith(".xpi"))*/
   }
 
