@@ -57,7 +57,8 @@ fatJar := {
 
 // Tasks to verify fat JAR integrity
 val verifyJarContents = taskKey[Unit]("Verify no signature files in fat JAR")
-val testFatJar = taskKey[Unit]("Test that fat JAR runs without signature errors")
+val testFatJar =
+  taskKey[Unit]("Test that fat JAR runs without signature errors")
 
 verifyJarContents := {
   val fatJarFile = (Compile / assembly).value
@@ -69,7 +70,9 @@ verifyJarContents := {
       val name = e.getName
       name.startsWith("META-INF/") && (
         name.endsWith(".SF") || name.endsWith(".DSA") ||
-        name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith("SIG-")
+          name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith(
+            "SIG-"
+          )
       )
     }
     if (badEntries.nonEmpty) {
@@ -84,9 +87,13 @@ verifyJarContents := {
 
 testFatJar := {
   val fatJarFile = (Compile / assembly).value
-  val result = scala.sys.process.Process(Seq("java", "-jar", fatJarFile.getAbsolutePath, "--help")).!
+  val result = scala.sys.process
+    .Process(Seq("java", "-jar", fatJarFile.getAbsolutePath, "--help"))
+    .!
   if (result != 0) {
-    throw new MessageOnlyException(s"Fat JAR failed to execute with exit code: $result")
+    throw new MessageOnlyException(
+      s"Fat JAR failed to execute with exit code: $result"
+    )
   }
 }
 
@@ -175,7 +182,6 @@ lazy val root = project
     libraryDependencies += "io.spicelabs" % "baharat" % "0.0.4",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.1.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.2.3",
-
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     assembly / assemblyJarName := s"${projectName}-${version.value}-fat.jar",
     compileOrder := CompileOrder.JavaThenScala,
@@ -198,8 +204,10 @@ lazy val root = project
 ThisBuild / assemblyMergeStrategy := {
   case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
   // Discard signature files from signed JARs
-  case PathList("META-INF", name) if name.endsWith(".SF") || name.endsWith(".DSA") ||
-    name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith("SIG-") =>
+  case PathList("META-INF", name)
+      if name.endsWith(".SF") || name.endsWith(".DSA") ||
+        name.endsWith(".RSA") || name
+          .endsWith(".EC") || name.startsWith("SIG-") =>
     MergeStrategy.discard
   case _ => MergeStrategy.last
 }

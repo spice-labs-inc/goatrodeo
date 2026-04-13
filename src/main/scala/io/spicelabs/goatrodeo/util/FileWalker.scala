@@ -4,6 +4,11 @@ import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
+import io.spicelabs.saffron.DiskReader
+import io.spicelabs.saffron.fs.FileSystemEntry
+import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
+import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
+import io.spicelabs.saffron.fs.FileSystemMount
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
@@ -17,27 +22,9 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipFile
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.Using
-import io.spicelabs.saffron.DiskReader
-import scala.util.Failure
-import scala.util.Success
-import io.spicelabs.saffron.fs.FileSystemMount
-import scala.jdk.CollectionConverters.*
-import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
-import io.spicelabs.saffron.fs.FileSystemEntry
-import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
-
-/** Actions that can be taken while walking files in an archive.
-  */
-enum FileAction {
-
-  /** Skip diving into the current artifact (don't process its contents). */
-  case SkipDive
-
-  /** End the file walk immediately. */
-  case End
-}
 
 /** Utilities for traversing and extracting files from various archive formats.
   *
@@ -159,7 +146,6 @@ object FileWalker {
           }
         })
       } catch {
-        // Throw an exception and it's not an RPM
         case e: Exception =>
           None
       }
@@ -187,7 +173,6 @@ object FileWalker {
         val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
 
         try {
-
           val files = isoFileReader.getAllFiles()
 
           import scala.jdk.CollectionConverters.ListHasAsScala
@@ -277,7 +262,7 @@ object FileWalker {
             } yield file
           val artifacts = files
             .filter(f => f.`type`() == EntryType.REGULAR_FILE)
-            .map(fileSystemEntry => {
+            .flatMap(fileSystemEntry => {
               fileSystemEntry match {
                 case regular: RegularFile =>
                   Some(
@@ -292,13 +277,9 @@ object FileWalker {
                 case _ => None
               }
             })
-            .flatten
             .toVector
           artifacts -> s"Saffron ${disk.format().name()}"
-        } match {
-          case Failure(exception) => None
-          case Success(value)     => Some(value)
-        }
+        }.toOption
       } else {
         None
       }

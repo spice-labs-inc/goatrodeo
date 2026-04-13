@@ -207,16 +207,19 @@ object StringOrPair {
 
   given ordering: Ordering[StringOrPair] = { (left, right) =>
     left match {
-      case StringOf(left) => right match {
-        case StringOf(right) => Ordering[String].compare(left, right)
-        case PairOf(key, _)  => -1
-      }
-      case PairOf(leftKey, leftValue) => right match {
-        case StringOf(right) => 1
-        case PairOf(rightKey, rightValue) =>
-          val comparison = Ordering[String].compare(leftKey, rightKey)
-          if (comparison != 0) comparison else Ordering[String].compare(leftValue, rightValue)
-      }
+      case StringOf(left) =>
+        right match {
+          case StringOf(right) => Ordering[String].compare(left, right)
+          case PairOf(key, _)  => -1
+        }
+      case PairOf(leftKey, leftValue) =>
+        right match {
+          case StringOf(right) => 1
+          case PairOf(rightKey, rightValue) =>
+            val comparison = Ordering[String].compare(leftKey, rightKey)
+            if (comparison != 0) comparison
+            else Ordering[String].compare(leftValue, rightValue)
+        }
     }
   }
 

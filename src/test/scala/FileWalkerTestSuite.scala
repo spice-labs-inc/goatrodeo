@@ -148,11 +148,6 @@ class FileWalkerTestSuite extends munit.FunSuite {
     assert(FileWalker.notArchive("Test.class", Set("application/java-vm")))
   }
 
-  // dpp sez -- not sure why .xpi files are excluded,
-  // test("notArchive - returns true for .xpi with application/zip") {
-  //   assert(FileWalker.notArchive("addon.xpi",Set( "application/zip")))
-  // }
-
   test("notArchive - returns false for application/zip") {
     assert(!FileWalker.notArchive("test.zip", Set("application/zip")))
   }

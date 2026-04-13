@@ -7,6 +7,7 @@ import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.metadata.TikaCoreProperties
 import org.apache.tika.mime.MediaType
+import org.apache.tika.utils.XMLReaderUtils
 
 import java.io.BufferedInputStream
 import java.io.ByteArrayInputStream
@@ -23,7 +24,6 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.Using
-import org.apache.tika.utils.XMLReaderUtils
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
