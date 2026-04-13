@@ -11,20 +11,20 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.ItemTagData
+import io.spicelabs.goatrodeo.omnibor.Storage
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
 import org.json4s.*
 
 import java.io.File
-import io.spicelabs.goatrodeo.omnibor.ToProcess
-import scala.collection.immutable.TreeSet
-import io.spicelabs.goatrodeo.util.Config
-import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.omnibor.Storage
-import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import scala.collection.immutable.HashSet
-import io.spicelabs.goatrodeo.omnibor.ItemTagData
+import scala.collection.immutable.TreeSet
 
 object MetadataSuite {
   val failSop = TreeSet(StringOrPair("fail"))

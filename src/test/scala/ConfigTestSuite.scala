@@ -50,13 +50,17 @@ class ConfigTestSuite extends munit.FunSuite {
   }
 
   test("GoatRodeoBuilder - withThreads rejects zero") {
-    interceptMessage[IllegalArgumentException]("requirement failed: threads must be >= 1, got 0") {
+    interceptMessage[IllegalArgumentException](
+      "requirement failed: threads must be >= 1, got 0"
+    ) {
       GoatRodeo.builder().withThreads(0)
     }
   }
 
   test("GoatRodeoBuilder - withThreads rejects negative") {
-    interceptMessage[IllegalArgumentException]("requirement failed: threads must be >= 1, got -1") {
+    interceptMessage[IllegalArgumentException](
+      "requirement failed: threads must be >= 1, got -1"
+    ) {
       GoatRodeo.builder().withThreads(-1)
     }
   }

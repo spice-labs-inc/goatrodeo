@@ -146,7 +146,9 @@ object GraphManager {
 
     tempFile.toFile().renameTo(targetFileName)
 
-    logger.debug(f"Finished rename at ${Duration.between(start, Instant.now())}")
+    logger.debug(
+      f"Finished rename at ${Duration.between(start, Instant.now())}"
+    )
 
     val targetIndexName =
       new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.gri")

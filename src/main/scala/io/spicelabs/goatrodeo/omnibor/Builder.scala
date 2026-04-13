@@ -145,7 +145,7 @@ object Builder {
 
     }
 
-    logger.debug(
+    logger.info(
       "Blocking build db until there's at least 1 item in the work queue"
     )
     // Don't kick off the consumer threads until at least 1 item
@@ -195,7 +195,7 @@ object Builder {
       )
 
       loopCnt += 1
-      logger.debug(
+      logger.info(
         f"Finished multi-thread consumer loop ${loopCnt} at ${Duration
             .between(totalStart, Instant.now())}"
       )
@@ -374,7 +374,7 @@ object Builder {
                         )
                         f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
                       } else ""
-                      logger.debug(
+                      logger.info(
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
                       )
@@ -489,7 +489,7 @@ object Builder {
 
         val purlOut = store.purls()
 
-        logger.debug(f"Writing ${purlOut.size} Package URLs")
+        logger.info(f"Writing ${purlOut.size} Package URLs")
         val purlFile = File(target, "purls.txt")
         purlFile.createNewFile()
         val bw = new BufferedWriter(new FileWriter(purlFile))
@@ -513,13 +513,13 @@ object Builder {
           allItems
         }
 
-        logger.debug(
+        logger.info(
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
 
         sorted.par.foreach(_.cachedCBOR)
 
-        logger.debug(
+        logger.info(
           f"Post CBOR cache at ${Duration.between(start, Instant.now())}"
         )
 

@@ -5,6 +5,7 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.Package
 import io.spicelabs.baharat.PackageReader
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
@@ -15,6 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -23,8 +25,6 @@ import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.ListHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
-import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
-import io.spicelabs.goatrodeo.omnibor.{MetadataKeyConstants => MKC}
 
 object BaharatStrategy {
   val logger = Logger(this.getClass())

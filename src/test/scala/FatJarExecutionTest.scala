@@ -13,15 +13,20 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import java.io.File
-import scala.sys.process._
+import scala.sys.process.*
 
 class FatJarExecutionTest extends munit.FunSuite {
 
   test("fat JAR must execute without SecurityException") {
-    val fatJarFile = new File(s"target/scala-3.8.3/goatrodeo-0.0.1-SNAPSHOT-fat.jar")
-    assert(fatJarFile.exists(), s"Fat JAR not found at ${fatJarFile.getAbsolutePath}")
+    val fatJarFile =
+      new File(s"target/scala-3.8.3/goatrodeo-0.0.1-SNAPSHOT-fat.jar")
+    assert(
+      fatJarFile.exists(),
+      s"Fat JAR not found at ${fatJarFile.getAbsolutePath}"
+    )
 
-    val result = Process(Seq("java", "-jar", fatJarFile.getAbsolutePath, "--help")).!
+    val result =
+      Process(Seq("java", "-jar", fatJarFile.getAbsolutePath, "--help")).!
     assertEquals(
       result,
       0,

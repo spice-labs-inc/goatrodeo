@@ -1,7 +1,8 @@
-import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import java.io.File
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
+
+import java.io.File
 class SaffronTests extends munit.FunSuite {
 
   // this takes a compressed disk image file, decompresses it, then
