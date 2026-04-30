@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of python.org (GlobalSign Atlas R3 DV TLS CA 2025 Q4)",
+  "source": "openssl s_client -connect python.org:443 -showcerts (chain idx 1)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@6e221c831270ec73354db749c62a0d52d5d42f80c018fdefd5b2e25e5409c47c?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@f5165fc624453361e3a131c6ad90893a8de40158921a94e8a4b445398eedf6e0?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "GlobalSign Atlas R3 DV TLS CA 2025 Q4",
+      "Publisher": "GlobalSign",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=GlobalSign Atlas R3 DV TLS CA 2025 Q4,O=GlobalSign nv-sa,C=BE",
+      "Certificates:IssuerDN": "CN=GlobalSign,O=GlobalSign,OU=GlobalSign Root CA - R3",
+      "Certificates:Serial": "83da86ab0e31b19d8f03a5edd5bdbd66",
+      "Certificates:NotBefore": "2025-07-16T03:06:35Z",
+      "Certificates:NotAfter": "2027-07-16T00:00:00Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "6e221c831270ec73354db749c62a0d52d5d42f80c018fdefd5b2e25e5409c47c",
+      "Certificates:CertSha256": "f5165fc624453361e3a131c6ad90893a8de40158921a94e8a4b445398eedf6e0",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

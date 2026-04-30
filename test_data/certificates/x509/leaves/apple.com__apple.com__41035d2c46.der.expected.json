@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from apple.com (apple.com)",
+  "source": "openssl s_client -connect apple.com:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@7119de26e1deb2ad6b8ecbe2d95d631769afa4e20c256d67da340fb77627831f?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@41035d2c46bf24ff738501e27f860487993a687649f0f80e2c34407f9756f3a0?alg=ec&curve=p-256&self-signed=false&sig-alg=sha256-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "apple.com",
+      "Publisher": "Apple Public EV Server ECC CA 1 - G1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=apple.com,O=Apple Inc.,L=Cupertino,ST=California,C=US,2.5.4.5=C0806592,1.3.6.1.4.1.311.60.2.1.2=California,1.3.6.1.4.1.311.60.2.1.3=US,2.5.4.15=Private Organization",
+      "Certificates:IssuerDN": "CN=Apple Public EV Server ECC CA 1 - G1,O=Apple Inc.,C=US",
+      "Certificates:Serial": "b0d821bb015e5c61cbbf5c73e8285fb",
+      "Certificates:NotBefore": "2026-04-23T15:53:39Z",
+      "Certificates:NotAfter": "2026-07-16T18:52:56Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-ecdsa",
+      "Certificates:SpkiSha256": "7119de26e1deb2ad6b8ecbe2d95d631769afa4e20c256d67da340fb77627831f",
+      "Certificates:CertSha256": "41035d2c46bf24ff738501e27f860487993a687649f0f80e2c34407f9756f3a0",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:apple.com",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

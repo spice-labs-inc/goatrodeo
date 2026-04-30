@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from mozilla.org (mozilla.org)",
+  "source": "openssl s_client -connect mozilla.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@60e6a922cc435b1023bb0178de060845c2dea6a6d0f9efa6b3b281d9701c2a46?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@b4ce1dc88a2bbfd82a17b29b0fb83b06d8f14a4151e99c2685c3fc08035fac95?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "mozilla.org",
+      "Publisher": "WR3",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=mozilla.org",
+      "Certificates:IssuerDN": "CN=WR3,O=Google Trust Services,C=US",
+      "Certificates:Serial": "7d5d0ba07ec0aa0912ae8782b6e30271",
+      "Certificates:NotBefore": "2026-04-04T13:14:54Z",
+      "Certificates:NotAfter": "2026-07-03T14:09:06Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "60e6a922cc435b1023bb0178de060845c2dea6a6d0f9efa6b3b281d9701c2a46",
+      "Certificates:CertSha256": "b4ce1dc88a2bbfd82a17b29b0fb83b06d8f14a4151e99c2685c3fc08035fac95",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:mozilla.org",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

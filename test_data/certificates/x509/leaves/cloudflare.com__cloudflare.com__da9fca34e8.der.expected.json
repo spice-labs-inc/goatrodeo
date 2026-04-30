@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from cloudflare.com (cloudflare.com)",
+  "source": "openssl s_client -connect cloudflare.com:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@10654eb596e63c0c3e3015a2c10176a5c9dae9de40e444036980f93126185b90?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@da9fca34e821865e3066db0f029492013b6517f14aaf5a693abde9a48a174c19?alg=ec&curve=p-256&self-signed=false&sig-alg=sha256-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "cloudflare.com",
+      "Publisher": "WE1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=cloudflare.com",
+      "Certificates:IssuerDN": "CN=WE1,O=Google Trust Services,C=US",
+      "Certificates:Serial": "598d915e8031a8da0eec5becc124b4b7",
+      "Certificates:NotBefore": "2026-03-12T20:59:51Z",
+      "Certificates:NotAfter": "2026-06-10T21:59:46Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-ecdsa",
+      "Certificates:SpkiSha256": "10654eb596e63c0c3e3015a2c10176a5c9dae9de40e444036980f93126185b90",
+      "Certificates:CertSha256": "da9fca34e821865e3066db0f029492013b6517f14aaf5a693abde9a48a174c19",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:cloudflare.com,DNS:ns.cloudflare.com,DNS:*.ns.cloudflare.com,DNS:*.secondary.cloudflare.com,DNS:secondary.cloudflare.com",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

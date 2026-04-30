@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from gov.uk (www.gov.uk)",
+  "source": "openssl s_client -connect gov.uk:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@e48a820556ff683b771b6a75d2fb34f5f197cd9b872a594ad1b1c97ddb73ac5d?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@7b86b9317eae2af253d3e34cda9517b997a5a9adbc53f165cff55476e3f61b56?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "www.gov.uk",
+      "Publisher": "GlobalSign RSA OV SSL CA 2018",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=www.gov.uk,O=Government Digital Service,L=London,ST=Greater London,C=GB",
+      "Certificates:IssuerDN": "CN=GlobalSign RSA OV SSL CA 2018,O=GlobalSign nv-sa,C=BE",
+      "Certificates:Serial": "4247d6d08e7f58c125b85716",
+      "Certificates:NotBefore": "2025-11-26T22:06:15Z",
+      "Certificates:NotAfter": "2026-12-28T22:06:14Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "e48a820556ff683b771b6a75d2fb34f5f197cd9b872a594ad1b1c97ddb73ac5d",
+      "Certificates:CertSha256": "7b86b9317eae2af253d3e34cda9517b997a5a9adbc53f165cff55476e3f61b56",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:www.gov.uk,DNS:*.businesslink.gov.uk,DNS:*.direct.gov.uk,DNS:*.publishing.service.gov.uk,DNS:*.cabinet-office.gov.uk,DNS:assets.digital.cabinet-office.gov.uk,DNS:service.gov.uk,DNS:data.gov.uk,DNS:dfid.gov.uk,DNS:cabinet-office.gov.uk,DNS:api.gov.uk,DNS:www.data.gov.uk,DNS:gov.uk",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

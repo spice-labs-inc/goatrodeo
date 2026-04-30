@@ -1,0 +1,19 @@
+{
+  "description":"Real-world SSH public key \u2014 github.com/tpope",
+  "source":"https://github.com/tpope.keys",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-public-key"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/sha256@f0cQdJbl6rpXEB9iWT4AHlWb4GipF0DDqjCBtrfroBE?alg=rsa&size=2048"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:KeyAlgorithm":"rsa"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

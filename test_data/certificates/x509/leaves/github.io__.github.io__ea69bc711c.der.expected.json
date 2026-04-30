@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from github.io (*.github.io)",
+  "source": "openssl s_client -connect github.io:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@5be8c176ade8e2a8fc7175c1511c0aaa87c993c046e7d3443d738480c879dec0?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@ea69bc711cb9d45698d2fdaa4854d7dc086acd3a9c350164909b688ac7c0631f?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "*.github.io",
+      "Publisher": "R12",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=*.github.io",
+      "Certificates:IssuerDN": "CN=R12,O=Let's Encrypt,C=US",
+      "Certificates:Serial": "58d52ab702d0ff4b62b747a8afe3c3bb8da",
+      "Certificates:NotBefore": "2026-04-06T23:32:36Z",
+      "Certificates:NotAfter": "2026-07-05T23:32:35Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "5be8c176ade8e2a8fc7175c1511c0aaa87c993c046e7d3443d738480c879dec0",
+      "Certificates:CertSha256": "ea69bc711cb9d45698d2fdaa4854d7dc086acd3a9c350164909b688ac7c0631f",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:*.github.com,DNS:*.github.io,DNS:*.githubusercontent.com,DNS:github.com,DNS:github.io,DNS:githubusercontent.com",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

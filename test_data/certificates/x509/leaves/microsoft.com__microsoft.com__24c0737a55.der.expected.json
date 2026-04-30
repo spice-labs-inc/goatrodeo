@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from microsoft.com (microsoft.com)",
+  "source": "openssl s_client -connect microsoft.com:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@8bb5cce053b4ed5dbda8218670d403fe183f5ba251df985ded728e44b6175bed?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@24c0737a55fe979a494a9e510ce80c829225b91592cad7c60f3eaacf85b3590d?alg=rsa&self-signed=false&sig-alg=sha384-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "microsoft.com",
+      "Publisher": "Microsoft TLS G2 RSA CA OCSP 02",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=microsoft.com,O=Microsoft Corporation,L=Redmond,ST=WA,C=US",
+      "Certificates:IssuerDN": "CN=Microsoft TLS G2 RSA CA OCSP 02,O=Microsoft Corporation,C=US",
+      "Certificates:Serial": "410011f401f18160bd80a0032100000011f401",
+      "Certificates:NotBefore": "2026-04-15T22:05:11Z",
+      "Certificates:NotAfter": "2026-10-12T22:05:11Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha384-rsa",
+      "Certificates:SpkiSha256": "8bb5cce053b4ed5dbda8218670d403fe183f5ba251df985ded728e44b6175bed",
+      "Certificates:CertSha256": "24c0737a55fe979a494a9e510ce80c829225b91592cad7c60f3eaacf85b3590d",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:microsoft.com,DNS:s.microsoft.com,DNS:ga.microsoft.com,DNS:aep.microsoft.com,DNS:aer.microsoft.com,DNS:grv.microsoft.com,DNS:hup.microsoft.com,DNS:mac.microsoft.com,DNS:mkb.microsoft.com,DNS:pme.microsoft.com,DNS:pmi.microsoft.com,DNS:rss.microsoft.com,DNS:sar.microsoft.com,DNS:tco.microsoft.com,DNS:fuse.microsoft.com,DNS:ieak.microsoft.com,DNS:mac2.microsoft.com,DNS:mcsp.microsoft.com,DNS:open.microsoft.com,DNS:shop.microsoft.com,DNS:spur.microsoft.com,DNS:itpro.microsoft.com,DNS:mango.microsoft.com,DNS:music.microsoft.com,DNS:pymes.microsoft.com,DNS:store.microsoft.com,DNS:aether.microsoft.com,DNS:alerts.microsoft.com,DNS:design.microsoft.com,DNS:garage.microsoft.com,DNS:gigjam.microsoft.com,DNS:msctec.microsoft.com,DNS:online.microsoft.com,DNS:stream.microsoft.com,DNS:afflink.microsoft.com,DNS:connect.microsoft.com,DNS:develop.microsoft.com,DNS:domains.microsoft.com,DNS:example.microsoft.com,DNS:madeira.microsoft.com,DNS:msdnisv.microsoft.com,DNS:mspress.microsoft.com,DNS:www.aep.microsoft.com,DNS:www.aer.microsoft.com,DNS:wwwbeta.microsoft.com,DNS:business.microsoft.com,DNS:empresas.microsoft.com,DNS:learning.microsoft.com,DNS:msdnwiki.microsoft.com,DNS:openness.microsoft.com,DNS:pinpoint.microsoft.com,DNS:snackbox.microsoft.com,DNS:sponsors.microsoft.com,DNS:stationq.microsoft.com,DNS:aistories.microsoft.com,DNS:community.microsoft.com,DNS:crawlmsdn.microsoft.com,DNS:iotschool.microsoft.com,DNS:messenger.microsoft.com,DNS:minecraft.microsoft.com,DNS:backoffice.microsoft.com,DNS:enterprise.microsoft.com,DNS:iotcentral.microsoft.com,DNS:pinunblock.microsoft.com,DNS:reroute443.microsoft.com,DNS:communities.microsoft.com,DNS:explore-smb.microsoft.com,DNS:expressions.microsoft.com,DNS:ondernemers.microsoft.com,DNS:techacademy.microsoft.com,DNS:terraserver.microsoft.com,DNS:communities2.microsoft.com,DNS:connectevent.microsoft.com,DNS:dataplatform.microsoft.com,DNS:entrepreneur.microsoft.com,DNS:hxd.research.microsoft.com,DNS:mspartnerira.microsoft.com,DNS:mydatahealth.microsoft.com,DNS:oemcommunity.microsoft.com,DNS:real-stories.microsoft.com,DNS:www.formspro.microsoft.com,DNS:futuredecoded.microsoft.com,DNS:upgradecenter.microsoft.com,DNS:learnanalytics.microsoft.com,DNS:onlinelearning.microsoft.com,DNS:businesscentral.microsoft.com,DNS:cloud-immersion.microsoft.com,DNS:studentpartners.microsoft.com,DNS:analyticspartner.microsoft.com,DNS:businessplatform.microsoft.com,DNS:explore-security.microsoft.com,DNS:kleinunternehmen.microsoft.com,DNS:partnercommunity.microsoft.com,DNS:explore-marketing.microsoft.com,DNS:innovationcontest.microsoft.com,DNS:partnerincentives.microsoft.com,DNS:phoenixcataloguat.microsoft.com,DNS:szkolyprzyszlosci.microsoft.com,DNS:www.powerautomate.microsoft.com,DNS:successionplanning.microsoft.com,DNS:lumiaconversationsuk.microsoft.com,DNS:successionplanninguat.microsoft.com,DNS:businessmobilitycenter.microsoft.com,DNS:skypeandteams.fasttrack.microsoft.com,DNS:www.microsoftdlapartnerow.microsoft.com,DNS:commercialappcertification.microsoft.com,DNS:www.skypeandteams.fasttrack.microsoft.com,DNS:ceoconnections.event.microsoft.com,DNS:biz4afrika.microsoft.com,DNS:cashback.microsoft.com,DNS:www.cashback.microsoft.com,DNS:visio.microsoft.com,DNS:insidemsr.microsoft.com,DNS:developervelocityassessment.com,DNS:www.developervelocityassessment.com,DNS:gears5.com,DNS:www.gears5.com,DNS:www.gearstactics.com,DNS:gearstactics.com,DNS:m12.microsoft.com,DNS:seeingai.com,DNS:yourchoice.microsoft.com,DNS:mvtd.events.microsoft.com,DNS:imagine.microsoft.com,DNS:microsoft.com.au,DNS:www.microsoft.com.au,DNS:dynamics.microsoft.com,DNS:powerplatform.microsoft.com,DNS:powerapps.microsoft.com,DNS:powerautomate.microsoft.com,DNS:powervirtualagents.microsoft.com,DNS:powerpages.microsoft.com,DNS:test.ideas.fabric.microsoft.com,DNS:sds.microsoft.com,DNS:ppe.sds.microsoft.com,DNS:www.microsoft365copilot.com,DNS:www.jclarity.com,DNS:techinnovatorsspotlight.com,DNS:www.techinnovatorsspotlight.com,DNS:copilot.ai,DNS:getlicensingready.com,DNS:www.getlicensingready.com,DNS:jpn.delve.office.com,DNS:aus.delve.office.com,DNS:ind.delve.office.com,DNS:kor.delve.office.com,DNS:cobra.me.microsoft.com,DNS:www.businesscentral.com,DNS:businesscentral.com,DNS:msaidatastudio.officeppe.net,DNS:ideas.fabric.microsoft.com,DNS:www.cpt.link,DNS:cpt.link,DNS:yarp.dot.net,DNS:microsoftstream.com,DNS:www.microsoftstream.com,DNS:web.microsoftstream.com,DNS:discover.copilot.ai,DNS:copilot.com,DNS:www.copilot.com,DNS:discover.copilot.com,DNS:researchforum.microsoft.com,DNS:cdn.techcommunity.microsoft.com",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

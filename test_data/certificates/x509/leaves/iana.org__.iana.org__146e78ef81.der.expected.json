@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf from iana.org (*.iana.org)",
+  "source": "openssl s_client iana.org:443 (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@d56f85824b6ed2ab15b9040c20b574515d9a0ab415ca253b42cbc915a11de18d?alg=rsa&size=4096&version=3",
+      "pkg:x509/cert-sha256@146e78ef81434a17a4a787fa41a2e5410e6b677ba030761eaef1f3008f5fae01?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=4096&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "*.iana.org",
+      "Publisher": "Sectigo Public Server Authentication CA OV R36",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=*.iana.org,O=Internet Corporation For Assigned Names and Numbers,ST=California,C=US",
+      "Certificates:IssuerDN": "CN=Sectigo Public Server Authentication CA OV R36,O=Sectigo Limited,C=GB",
+      "Certificates:Serial": "1ce93c66f8f0ae83ece13e1627fc6fbf",
+      "Certificates:NotBefore": "2025-12-06T00:00:00Z",
+      "Certificates:NotAfter": "2027-01-05T23:59:59Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "d56f85824b6ed2ab15b9040c20b574515d9a0ab415ca253b42cbc915a11de18d",
+      "Certificates:CertSha256": "146e78ef81434a17a4a787fa41a2e5410e6b677ba030761eaef1f3008f5fae01",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "4096",
+      "Certificates:SAN": "DNS:*.iana.org,DNS:iana.org",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

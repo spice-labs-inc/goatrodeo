@@ -1,0 +1,48 @@
+{
+  "description": "IETF Hackathon BC r5: Falcon-512 self-signed trust anchor (round-3 alternate)",
+  "source": "https://github.com/IETF-Hackathon/pqc-certificates/raw/master/providers/bc/artifacts_certs_r5.zip#artifacts/falcon-512-1.3.9999.3.11_ta.der",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@fbfc983af7dc8d795af2ed48b6d1e6edf6735f2a2e63d041b7f1d049b2a1f130?alg=falcon&params=512&version=3",
+      "pkg:x509/cert-sha256@00cafb388889cf07ec6e2c5abef9b5f99b03e41ffa982af749ce1c0807b3f847?alg=falcon&params=512&self-signed=true&sig-alg=falcon-512&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "BC falcon-512 Test TA",
+      "Publisher": "BC falcon-512 Test TA",
+      "Description": "X.509 v3 certificate (falcon)",
+      "Certificates:SubjectDN": "CN=BC falcon-512 Test TA",
+      "Certificates:IssuerDN": "CN=BC falcon-512 Test TA",
+      "Certificates:Serial": "792becd7de1c866c0c83b87122d5c71dea28feb6",
+      "Certificates:NotBefore": "2026-01-24T14:12:24Z",
+      "Certificates:NotAfter": "2027-01-24T14:13:24Z",
+      "Certificates:KeyAlgorithm": "falcon",
+      "Certificates:SigAlgorithm": "falcon-512",
+      "Certificates:SpkiSha256": "fbfc983af7dc8d795af2ed48b6d1e6edf6735f2a2e63d041b7f1d049b2a1f130",
+      "Certificates:CertSha256": "00cafb388889cf07ec6e2c5abef9b5f99b03e41ffa982af749ce1c0807b3f847",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:Params": "512",
+      "Certificates:IsCA": "true"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

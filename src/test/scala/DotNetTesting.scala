@@ -96,7 +96,7 @@ class DotNetTesting extends munit.FunSuite {
     val store1 =
       ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
     val keys = store1.keys()
-    val purl = store1.keys().find(key => key.startsWith("pkg"))
+    val purl = store1.keys().find(key => key.startsWith("pkg:nuget"))
     assertEquals(purl, Some("pkg:nuget/hackproj@1.0.0"))
   }
 
@@ -106,7 +106,7 @@ class DotNetTesting extends munit.FunSuite {
     val store1 =
       ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
     val keys = store1.keys()
-    val purl = store1.keys().find(key => key.startsWith("pkg"))
+    val purl = store1.keys().find(key => key.startsWith("pkg:nuget"))
     assertEquals(purl, Some("pkg:nuget/Newtonsoft.Json@13.0.0"))
   }
 

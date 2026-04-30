@@ -44,7 +44,7 @@ class DockerSuite extends munit.FunSuite {
     val store1 =
       ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
-    val result = store1.purls()
+    val result = store1.purls().filter(_.startsWith("pkg:docker"))
 
     assertEquals(
       result,
@@ -91,7 +91,7 @@ class DockerSuite extends munit.FunSuite {
     val store1 =
       ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
 
-    val result = store1.purls()
+    val result = store1.purls().filter(_.startsWith("pkg:docker"))
     val expectedpurls = TreeSet(
       "pkg:docker/postgres@16.6",
       "pkg:docker/postgres@9.6.12",

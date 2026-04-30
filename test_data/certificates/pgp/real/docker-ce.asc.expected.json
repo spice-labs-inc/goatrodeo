@@ -1,0 +1,32 @@
+{
+  "description": "keys.openpgp.org PGP public key \u2014 Docker CE archive signing key",
+  "source": "https://keys.openpgp.org/vks/v1/by-fingerprint/9DC858229FC7DD38854AE2D88D81803C0EBFCD88",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pgp-keys"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "<computed: pkg:pgp/fingerprint@... in Phase 6>"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Certificates:PgpKeyCount": "<computed in Phase 6>"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

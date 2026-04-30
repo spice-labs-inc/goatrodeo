@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from kernel.org (tor.source.kernel.org)",
+  "source": "openssl s_client -connect kernel.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@7fb0cff56aa5afd5f629c33acec5634443e618a768a6cc7302397ffb1dc1bf6b?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@fe54679a04a0a1caac2bfd3ec19c6e28cd761009a74b04e996e919a1a7882d26?alg=ec&curve=p-256&self-signed=false&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "tor.source.kernel.org",
+      "Publisher": "E8",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=tor.source.kernel.org",
+      "Certificates:IssuerDN": "CN=E8,O=Let's Encrypt,C=US",
+      "Certificates:Serial": "5f8b854f1dbad9771dcc104b3daaf9f34ff",
+      "Certificates:NotBefore": "2026-04-16T19:56:22Z",
+      "Certificates:NotAfter": "2026-07-15T19:56:21Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "7fb0cff56aa5afd5f629c33acec5634443e618a768a6cc7302397ffb1dc1bf6b",
+      "Certificates:CertSha256": "fe54679a04a0a1caac2bfd3ec19c6e28cd761009a74b04e996e919a1a7882d26",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:android.kernel.org,DNS:git.kernel.org,DNS:kernel.org,DNS:linux.kernel.org,DNS:lore.kernel.org,DNS:origin.kernel.org,DNS:tor.source.kernel.org,DNS:wireless.kernel.org,DNS:www.kernel.org",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

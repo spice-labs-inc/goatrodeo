@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of apple.com (Apple Public EV Server ECC CA 1 - G1)",
+  "source": "openssl s_client -connect apple.com:443 -showcerts (chain idx 1)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@2ebd9f63cf5ab1b13da2177b596f2d2c8d29be83cb5fe5adfcdee63feae2ddcd?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@2585928d2c5bfd952e025bd12e27c6776224cf752ec362d3031cdd49351844d4?alg=ec&curve=p-256&self-signed=false&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Apple Public EV Server ECC CA 1 - G1",
+      "Publisher": "DigiCert Global Root G3",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=Apple Public EV Server ECC CA 1 - G1,O=Apple Inc.,C=US",
+      "Certificates:IssuerDN": "CN=DigiCert Global Root G3,OU=www.digicert.com,O=DigiCert Inc,C=US",
+      "Certificates:Serial": "cabaad1cec4e97cc2665881d02138f7",
+      "Certificates:NotBefore": "2020-04-29T12:34:52Z",
+      "Certificates:NotAfter": "2030-04-10T23:59:59Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "2ebd9f63cf5ab1b13da2177b596f2d2c8d29be83cb5fe5adfcdee63feae2ddcd",
+      "Certificates:CertSha256": "2585928d2c5bfd952e025bd12e27c6776224cf752ec362d3031cdd49351844d4",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

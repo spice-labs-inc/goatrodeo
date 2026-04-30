@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from github.com (github.com)",
+  "source": "openssl s_client -connect github.com:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@d2078187130abc9744946cc2f80e355d0f730557822c720812c6f5aac2322f6f?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@9716d39441ca651c51be78e969ca385ec213ec17715b8c91f01ee652f90fc62c?alg=ec&curve=p-256&self-signed=false&sig-alg=sha256-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "github.com",
+      "Publisher": "Sectigo Public Server Authentication CA DV E36",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=github.com",
+      "Certificates:IssuerDN": "CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB",
+      "Certificates:Serial": "1dc289c1eadafb04e9d1cf53d5d72253",
+      "Certificates:NotBefore": "2026-03-06T00:00:00Z",
+      "Certificates:NotAfter": "2026-06-03T23:59:59Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-ecdsa",
+      "Certificates:SpkiSha256": "d2078187130abc9744946cc2f80e355d0f730557822c720812c6f5aac2322f6f",
+      "Certificates:CertSha256": "9716d39441ca651c51be78e969ca385ec213ec17715b8c91f01ee652f90fc62c",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:github.com,DNS:www.github.com",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

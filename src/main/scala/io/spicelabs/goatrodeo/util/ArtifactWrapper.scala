@@ -227,6 +227,7 @@ object ArtifactWrapper {
   // constructor
   addMimeTypeAugmenter(DotnetDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(SaffronDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(CryptoDetector.mimeTypeAugmenter)
 
   private def massageMimeType(
       fileName: String,

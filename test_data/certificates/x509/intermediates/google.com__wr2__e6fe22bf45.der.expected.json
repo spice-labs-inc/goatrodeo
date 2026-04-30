@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of google.com (WR2)",
+  "source": "openssl s_client -connect google.com:443 -showcerts (chain idx 1)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@60fb4769fb4bc3aff4be773606734a185e78c62080dbc58571c723900e32a423?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@e6fe22bf45e4f0d3b85c59e02c0f495418e1eb8d3210f788d48cd5e1cb547cd4?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "WR2",
+      "Publisher": "GTS Root R1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=WR2,O=Google Trust Services,C=US",
+      "Certificates:IssuerDN": "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
+      "Certificates:Serial": "7ff005a07c4cded100ad9d66a5107b98",
+      "Certificates:NotBefore": "2023-12-13T09:00:00Z",
+      "Certificates:NotAfter": "2029-02-20T14:00:00Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "60fb4769fb4bc3aff4be773606734a185e78c62080dbc58571c723900e32a423",
+      "Certificates:CertSha256": "e6fe22bf45e4f0d3b85c59e02c0f495418e1eb8d3210f788d48cd5e1cb547cd4",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

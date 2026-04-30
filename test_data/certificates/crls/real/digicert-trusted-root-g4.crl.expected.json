@@ -1,0 +1,19 @@
+{
+  "description":"DigiCert Trusted Root G4 CRL (DER)",
+  "source":"http://crl3.digicert.com/DigiCertTrustedRootG4.crl",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pkix-crl"]
+  },
+  "purls":{
+    "mustContain":["pkg:x509/crl-sha256@3b628a0e2596dc5380698724cb7917077f111c42e4944b6f0389117155460375?sig-alg=sha384-rsa"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:CrlSha256":"3b628a0e2596dc5380698724cb7917077f111c42e4944b6f0389117155460375"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}
