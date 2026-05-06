@@ -189,6 +189,36 @@ class CryptoDetectorSuite extends FunSuite {
     assert(out.contains("application/x-openssh-certificate"))
   }
 
+  // G2 — Plan §sshCertTokens: the original sshCertTokens set had 4 of 6
+  // entries replaced by `[email protected]` placeholder strings. Phase 5
+  // restored the real OpenSSH cert-type tokens and these tests guard
+  // against regression for each of the 6.
+  test("[OpenSSH cert]: ssh-dss-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)") {
+    val out = detect("ssh-dss-cert-v01@openssh.com AAAA comment\n".getBytes)
+    assert(out.contains("application/x-openssh-certificate"))
+  }
+
+  test("[OpenSSH cert]: ecdsa-sha2-nistp256-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)") {
+    val out = detect("ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA comment\n".getBytes)
+    assert(out.contains("application/x-openssh-certificate"))
+  }
+
+  test("[OpenSSH cert]: ecdsa-sha2-nistp384-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)") {
+    val out = detect("ecdsa-sha2-nistp384-cert-v01@openssh.com AAAA comment\n".getBytes)
+    assert(out.contains("application/x-openssh-certificate"))
+  }
+
+  test("[OpenSSH cert]: ecdsa-sha2-nistp521-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)") {
+    val out = detect("ecdsa-sha2-nistp521-cert-v01@openssh.com AAAA comment\n".getBytes)
+    assert(out.contains("application/x-openssh-certificate"))
+  }
+
+  test("[OpenSSH cert][NEG]: placeholder string '[email protected]' must NOT be in token set (G2)") {
+    val out = detect("[email protected] AAAA comment\n".getBytes)
+    assert(!out.contains("application/x-openssh-certificate"),
+           s"placeholder '[email protected]' string should not match a cert token; got $out")
+  }
+
   test("[PGP armored pub]: BEGIN PGP PUBLIC KEY BLOCK adds application/pgp-keys") {
     val out = detect("-----BEGIN PGP PUBLIC KEY BLOCK-----\nXXX\n".getBytes)
     assert(out.contains("application/pgp-keys"))
@@ -217,6 +247,32 @@ class CryptoDetectorSuite extends FunSuite {
   test("[PGP binary]: first byte 0x98 (old-format public-key packet) adds application/pgp-keys") {
     val out = detect(Array[Byte](0x98.toByte, 0x4D, 0x04, 0x60))
     assert(out.contains("application/pgp-keys"))
+  }
+
+  // N2 (Phase 6 second-pass gap analysis): the old-format public-key
+  // packet tag (tag-6) has 4 length-encoding variants per RFC 4880 §4.2.1:
+  //   0x98 = 1-octet length, 0x99 = 2-octet, 0x9A = 4-octet, 0x9B = indeterminate.
+  // The original detector matched only 0x98; the G12 remediation extended
+  // it to all four. These three tests pin coverage of the newly-matched
+  // values so a future refactor cannot silently drop one.
+  test("[PGP binary]: first byte 0x99 (old-format tag-6, 2-octet length) adds application/pgp-keys (N2)") {
+    // 0x99 is what gpg(1) actually emits for an RSA-3072 export (the
+    // v4-rsa3072-pub.gpg fixture starts with bytes 99 01 8d 04).
+    val out = detect(Array[Byte](0x99.toByte, 0x01, 0x8d.toByte, 0x04))
+    assert(out.contains("application/pgp-keys"),
+      "0x99 (old-format tag-6, 2-octet length) must be detected as PGP")
+  }
+
+  test("[PGP binary]: first byte 0x9A (old-format tag-6, 4-octet length) adds application/pgp-keys (N2)") {
+    val out = detect(Array[Byte](0x9A.toByte, 0x00, 0x00, 0x01, 0x00))
+    assert(out.contains("application/pgp-keys"),
+      "0x9A (old-format tag-6, 4-octet length) must be detected as PGP")
+  }
+
+  test("[PGP binary]: first byte 0x9B (old-format tag-6, indeterminate length) adds application/pgp-keys (N2)") {
+    val out = detect(Array[Byte](0x9B.toByte, 0x04, 0x60.toByte, 0x00))
+    assert(out.contains("application/pgp-keys"),
+      "0x9B (old-format tag-6, indeterminate length) must be detected as PGP")
   }
 
   test("[JKS]: 0xfe 0xed 0xfe 0xed magic adds application/x-java-keystore") {

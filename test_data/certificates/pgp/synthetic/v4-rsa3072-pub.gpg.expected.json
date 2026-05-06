@@ -1,0 +1,19 @@
+{
+  "description":"G12 \u2014 binary (unarmored) PGP v4 RSA-3072 public key. Same primary key as v4-rsa3072-pub.asc (fingerprint 3800518c\u2026) but stored without ASCII armor. Exercises the binary-PGP path through Phase 2's content-sniffing detector and Phase 6's BC PGPUtil.getDecoderStream which transparently handles both armored and binary inputs.",
+  "source":"gpg --export --no-armor of the same key in v4-rsa3072-pub.asc",
+  "retrievedAt":"2026-05-01",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"1"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

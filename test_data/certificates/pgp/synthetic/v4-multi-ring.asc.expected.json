@@ -1,0 +1,19 @@
+{
+  "description":"G8 \u2014 concatenated 2-key-ring file: v4 RSA-3072 + v4 Ed25519+ECDH-cv25519. Exercises buildPgpKeyRing's multi-ring flat-mapping. Should emit 3 pURLs (1 RSA primary + 1 Ed25519 primary + 1 ECDH cv25519 subkey).",
+  "source":"cat v4-rsa3072-pub.asc v4-ed25519-pub.asc",
+  "retrievedAt":"2026-05-01",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4","pkg:pgp/fingerprint@6046c53c8df8c522076f8cd76d7faae796abc62e?alg=ed25519&curve=ed25519&version=4","pkg:pgp/fingerprint@59915a0a243d30d5002d6aa58ed81ea8adfb3a65?alg=ec&curve=curve25519&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"3"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

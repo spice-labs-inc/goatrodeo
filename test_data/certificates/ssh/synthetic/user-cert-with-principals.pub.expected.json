@@ -1,0 +1,21 @@
+{
+  "description":"G3 \u2014 Plan §125-135: OpenSSH user cert with non-empty critical options. Drives the SshCertCriticalOptions metadata path which is otherwise dead in the corpus.",
+  "source":"ssh-keygen -t ed25519 + ssh-keygen -s ca -I ... -n alice,bob -O force-command='/bin/echo hi' -O source-address='10.0.0.0/8' -V +52w",
+  "retrievedAt":"2026-04-30",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-certificate"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/cert-sha256@8751a9e25333b0db8eaf45c86be9f415f26524b2fd2b4d1b68db02ab9b629b85?alg=ed25519&cert-type=user&sig-alg=ssh-ed25519","pkg:ssh/sha256@zFwMKrXHWgfIwMqcrSmlOOo9WJj%2Fnj%2FIGazVs6CI%2B4U?alg=ed25519"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:SshCertType":"user",
+      "Certificates:SshCertPrincipals":"alice,bob",
+      "Certificates:SshCertCriticalOptions":"force-command,source-address"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

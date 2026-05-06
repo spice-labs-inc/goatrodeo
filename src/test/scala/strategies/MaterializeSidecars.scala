@@ -24,16 +24,21 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import scala.jdk.CollectionConverters.*
 
-/** One-shot materializer: replaces `<computed in Phase 4>` placeholders in
-  * pem-bundle and CRL sidecars with the actual canonical pURL strings the
-  * Certificates strategy emits. Run via:
+/** One-shot materializer: replaces `<computed in Phase N>` placeholders
+  * in pem-bundle, CRL, and SSH sidecars with the actual canonical pURL
+  * strings (and metadata values) the Certificates strategy emits.
   *
-  * `sbt "Test/runMain strategies.MaterializePhase4Sidecars"`
+  * Run via:
+  * `sbt "Test/runMain io.spicelabs.goatrodeo.omnibor.strategies.MaterializeSidecars"`
   *
   * Equivalent to Phase 0b's `cert_sidecar.py` canonicalization step but
   * sourced from the strategy's own emitters so the sidecars match what
-  * the strategy produces by construction. */
-object MaterializePhase4Sidecars {
+  * the strategy produces by construction.
+  *
+  * Originally `MaterializePhase4Sidecars`; renamed in Phase 5 (gap G8)
+  * once it grew to cover SSH. Will continue to grow with Phase 6 (PGP)
+  * and Phase 7 (private keys). */
+object MaterializeSidecars {
 
   private val corpusRoot: Path = Paths.get("test_data/certificates")
 
@@ -88,9 +93,30 @@ object MaterializePhase4Sidecars {
     }
   }
 
-  /** For each metadata field whose value is the placeholder
-    * `<computed in Phase 5>`, run the strategy to compute the real value
-    * and substitute. Other metadata entries are left alone. */
+  /** For each metadata field whose value is a `<computed>` or stale
+    * `StringOf(…)` placeholder, substitute from the supplied emitted
+    * map. Other metadata entries are left alone. */
+  private def patchMetadataPlaceholders(
+      sidecar: JValue,
+      emitted: Map[String, String],
+  ): JValue = {
+    sidecar.transformField {
+      case ("metadata", JObject(mfields)) =>
+        "metadata" -> JObject(mfields.map {
+          case ("mustContain", JObject(kvs)) =>
+            "mustContain" -> JObject(kvs.map {
+              case (k, JString(v))
+                  if v.startsWith("<computed") || v.startsWith("StringOf(") =>
+                val replacement = emitted.getOrElse(k, v)
+                k -> JString(replacement)
+              case other => other
+            })
+          case other => other
+        })
+    }
+  }
+
+  /** Run the SSH metadata builder and project to a Map[String,String]. */
   private def materializeSshMetadata(
       fixture: File,
       sidecar: JValue,
@@ -98,32 +124,89 @@ object MaterializePhase4Sidecars {
     sshClaim(fixture) match {
       case None => sidecar
       case Some((state, content)) =>
-        val emitted: Map[String, String] = {
-          val tm = content match {
-            case p: Certificates.SshPubkey =>
-              state.invokeSshPubkeyMetadata(wrap(fixture), p)
-            case c: Certificates.SshCert =>
-              state.invokeSshCertMetadata(wrap(fixture), c)
-            case _ => scala.collection.immutable.TreeMap.empty[String, scala.collection.immutable.TreeSet[io.spicelabs.goatrodeo.omnibor.StringOrPair]]
-          }
-          tm.iterator.flatMap { case (k, vs) =>
-            vs.headOption.map(v => k -> v.value)
-          }.toMap
+        val tm = content match {
+          case p: Certificates.SshPubkey =>
+            state.invokeSshPubkeyMetadata(wrap(fixture), p)
+          case c: Certificates.SshCert =>
+            state.invokeSshCertMetadata(wrap(fixture), c)
+          case _ => scala.collection.immutable.TreeMap.empty[String, scala.collection.immutable.TreeSet[io.spicelabs.goatrodeo.omnibor.StringOrPair]]
         }
-        sidecar.transformField {
-          case ("metadata", JObject(mfields)) =>
-            "metadata" -> JObject(mfields.map {
-              case ("mustContain", JObject(kvs)) =>
-                "mustContain" -> JObject(kvs.map {
-                  case (k, JString(v))
-                      if v.startsWith("<computed") || v.startsWith("StringOf(") =>
-                    val replacement = emitted.getOrElse(k, v)
-                    k -> JString(replacement)
-                  case other => other
-                })
-              case other => other
-            })
+        val emitted = tm.iterator.flatMap { case (k, vs) =>
+          vs.headOption.map(v => k -> v.value)
+        }.toMap
+        patchMetadataPlaceholders(sidecar, emitted)
+    }
+  }
+
+  // ---------- Phase-7: private-key materialization ---------------------
+
+  private def materializePrivateKey(fixture: File): Option[Vector[String]] = {
+    val w = wrap(fixture)
+    Certificates.classifyAndParse(w).map {
+      case p: Certificates.PrivateKeyPlaintextPem =>
+        val state = new CertificatesState(w, Some(p))
+        Vector(state.purlForPrivateKeyPem(p).canonicalize().nn)
+      case p: Certificates.PrivateKeyPlaintextOpenSsh =>
+        val state = new CertificatesState(w, Some(p))
+        Vector(state.purlForPrivateKeyOpenSsh(p).canonicalize().nn)
+      case _: Certificates.PrivateKeyEncrypted =>
+        Vector.empty // envelope-only, no pURL
+      case _ => Vector.empty
+    }
+  }
+
+  private def materializePrivateKeyMetadata(
+      fixture: File,
+      sidecar: JValue,
+  ): JValue = {
+    val w = wrap(fixture)
+    Certificates.classifyAndParse(w) match {
+      case None => sidecar
+      case Some(claim) =>
+        val state = new CertificatesState(w, Some(claim))
+        val tm = claim match {
+          case p: Certificates.PrivateKeyPlaintextPem =>
+            state.privateKeyPemMetadata(w, p)
+          case p: Certificates.PrivateKeyPlaintextOpenSsh =>
+            state.privateKeyOpenSshMetadata(w, p)
+          case p: Certificates.PrivateKeyEncrypted =>
+            state.privateKeyEncryptedMetadata(w, p)
+          case _ =>
+            scala.collection.immutable.TreeMap.empty[String,
+              scala.collection.immutable.TreeSet[
+                io.spicelabs.goatrodeo.omnibor.StringOrPair
+              ]]
         }
+        val emitted = tm.iterator.flatMap { case (k, vs) =>
+          vs.headOption.map(v => k -> v.value)
+        }.toMap
+        patchMetadataPlaceholders(sidecar, emitted)
+    }
+  }
+
+  // ---------- Phase-6: PGP materialization -----------------------------
+
+  private def materializePgp(fixture: File): Option[Vector[String]] = {
+    val w = wrap(fixture)
+    Certificates.parsePgpKeyRing(w).map { ring =>
+      ring.keys.map(k => Certificates.purlForPgpKey(k).canonicalize().nn)
+    }
+  }
+
+  private def materializePgpMetadata(
+      fixture: File,
+      sidecar: JValue,
+  ): JValue = {
+    val w = wrap(fixture)
+    Certificates.parsePgpKeyRing(w) match {
+      case None => sidecar
+      case Some(ring) =>
+        val state = new CertificatesState(w)
+        val tm = state.invokePgpKeyRingMetadata(w, ring)
+        val emitted = tm.iterator.flatMap { case (k, vs) =>
+          vs.headOption.map(v => k -> v.value)
+        }.toMap
+        patchMetadataPlaceholders(sidecar, emitted)
     }
   }
 
@@ -132,7 +215,6 @@ object MaterializePhase4Sidecars {
       compute: File => Option[Vector[String]],
       metadataPatch: Option[(File, JValue) => JValue] = None,
   ): Boolean = {
-    val sidecarFile = sidecarPath.toFile
     val fixturePath = sidecarPath.toString.stripSuffix(".expected.json")
     val fixture = new File(fixturePath)
     if (!fixture.exists()) return false
@@ -172,9 +254,13 @@ object MaterializePhase4Sidecars {
     val bundlesRoot = corpusRoot.resolve("pem-bundles")
     val crlsRoot = corpusRoot.resolve("crls")
     val sshRoot = corpusRoot.resolve("ssh")
+    val pgpRoot = corpusRoot.resolve("pgp")
+    val privateKeyRoot = corpusRoot.resolve("private-keys")
     var bundleHits = 0
     var crlHits = 0
     var sshHits = 0
+    var pgpHits = 0
+    var pkHits = 0
     walkSidecars(bundlesRoot).foreach { sc =>
       if (updateSidecar(sc, materializeBundle)) bundleHits += 1
     }
@@ -184,8 +270,17 @@ object MaterializePhase4Sidecars {
     walkSidecars(sshRoot).foreach { sc =>
       if (updateSidecar(sc, materializeSsh, Some(materializeSshMetadata))) sshHits += 1
     }
+    walkSidecars(pgpRoot).foreach { sc =>
+      if (updateSidecar(sc, materializePgp, Some(materializePgpMetadata))) pgpHits += 1
+    }
+    walkSidecars(privateKeyRoot).foreach { sc =>
+      if (updateSidecar(sc, materializePrivateKey,
+                        Some(materializePrivateKeyMetadata))) pkHits += 1
+    }
     println(s"\nbundles updated: $bundleHits")
     println(s"crls updated:    $crlHits")
     println(s"ssh updated:     $sshHits")
+    println(s"pgp updated:     $pgpHits")
+    println(s"pk updated:      $pkHits")
   }
 }

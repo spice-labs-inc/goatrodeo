@@ -36,6 +36,28 @@ import munit.FunSuite
   * correctly. A single off-by-one in `uint32` or a sign-extension bug
   * in `mpint` would silently produce wrong fingerprints. The unit tests
   * establish the wire reader's contract independent of the strategy.
+  *
+  * ## Per-test traceability (G9)
+  *
+  * | Test name | Plan / requirement section | Theory |
+  * |---|---|---|
+  * | readUInt32 reads 4 big-endian bytes | RFC 4251 §5 (uint32 = MSB-first) | basic decode |
+  * | readUInt32 handles values above 2^31 as unsigned | RFC 4251 §5 + signed-Long pitfall | guards JVM Int sign-extension bug |
+  * | readUInt64 reads 8 big-endian bytes | RFC 4251 §5 (uint64) | basic decode |
+  * | readString reads length-prefixed bytes | RFC 4251 §5 (string = uint32 + bytes) | basic decode |
+  * | readString of length zero returns empty array | RFC 4251 §5 ("string MAY contain zero octets") | empty-string edge case |
+  * | readString throws when length exceeds remaining | error mode contract | catch malformed wire blobs early |
+  * | readUInt32 on truncated input throws | error mode contract | guards silent truncation |
+  * | mpintBitLength: 0 bytes → 0 | Phase 5 plan §"size from modulus bit length" | RSA size inference base case |
+  * | mpintBitLength: SSH zero-pad stripped | RFC 4251 §5 (mpint zero-pad for high-bit-set positives) | RSA size inference correctness |
+  * | mpintBitLength: 2048-bit RSA modulus has 2048 bits | Phase 5 plan §RSA size | end-to-end size correctness |
+  * | mpintBitLength: high-byte bit count is honored | RFC 4251 §5 | granularity below the byte |
+  * | parseFirstKeyLine extracts algo, base64, comment | Phase 5 plan §Parse "split on whitespace" | line-format contract |
+  * | parseFirstKeyLine returns None on missing payload | error mode contract | guards parse-too-short |
+  * | parseFirstKeyLine strips UTF-8 BOM | Phase 2 P7 follow-on | tolerate text-tool BOM injection |
+  * | parseFirstKeyLine skips blank and # lines | authorized_keys-style file tolerance | first non-comment line wins |
+  * | readStringList unpacks principals | Phase 5 plan §SshCertPrincipals | OpenSSH cert decoding |
+  * | readNameDataList unpacks (name,data) pairs | Phase 5 plan §SshCertCriticalOptions / Extensions | OpenSSH cert decoding |
   */
 class SshWireFormatTests extends FunSuite {
 

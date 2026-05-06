@@ -1,0 +1,19 @@
+{
+  "description":"G1+G2 \u2014 PGP v4 ECDSA brainpoolP256r1 primary + ECDH brainpoolP256r1 subkey. Exercises pgpCurveOidMap brainpoolP256r1 OID 1.3.36.3.3.2.8.1.1.7.",
+  "source":"gpg --batch --gen-key with ECDSA + ECDH on brainpoolP256r1",
+  "retrievedAt":"2026-05-01",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@7c17c305167ef3aeffaedff35eb17155e6176ddd?alg=ec&curve=brainpoolp256r1&version=4","pkg:pgp/fingerprint@ef1d71cd7c609251485f3d071ff7ec16d8c4d8df?alg=ec&curve=brainpoolp256r1&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"2"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

@@ -327,12 +327,27 @@ object CryptoDetector {
       prefix: Array[Byte],
       builder: scala.collection.mutable.Builder[String, Set[String]]
   ): Unit = {
-    // OpenPGP packet-tag bytes for public/private key packets. From
-    // RFC 4880 §4.2: old-format public-key (tag 6) → 0x98, private-key
-    // (tag 5) → 0x95; new-format public-key → 0xC6, private-key → 0xC5.
+    // OpenPGP packet-tag bytes for public/private key packets per
+    // RFC 4880 §4.2.
+    //
+    // Old-format header: `10 tttt LL` — tag in bits 2-5, length-type in
+    // bits 0-1 (00=1-octet, 01=2-octet, 10=4-octet, 11=indeterminate).
+    //   tag 6 (public-key): 0x98 / 0x99 / 0x9A / 0x9B
+    //   tag 5 (private-key): 0x94 / 0x95 / 0x96 / 0x97
+    // New-format header: `11 tttttt` — full 6-bit tag.
+    //   tag 6 (public-key): 0xC6
+    //   tag 5 (private-key): 0xC5
+    //
+    // G12 fix: gpg --export --no-armor of an RSA-3072 key produces
+    // 0x99 (old-format tag 6 + 2-octet length). The original detector
+    // only matched 0x98 and missed everything else.
     if (prefix.length >= 1) {
       val b0 = prefix(0) & 0xff
-      if (b0 == 0xC6 || b0 == 0x98 || b0 == 0xC5 || b0 == 0x95) {
+      val pubKeyTag =
+        b0 == 0xC6 || b0 == 0x98 || b0 == 0x99 || b0 == 0x9A || b0 == 0x9B
+      val privKeyTag =
+        b0 == 0xC5 || b0 == 0x94 || b0 == 0x95 || b0 == 0x96 || b0 == 0x97
+      if (pubKeyTag || privKeyTag) {
         builder += "application/pgp-keys"
       }
     }

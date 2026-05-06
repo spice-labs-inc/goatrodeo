@@ -33,6 +33,11 @@ src/main/scala/io/spicelabs/goatrodeo/
 │       ├── Docker.scala    # Docker image layers
 │       ├── Debian.scala    # .deb packages
 │       ├── Dotnet.scala    # .NET assemblies
+│       ├── Annatto.scala   # Bun JS bundler outputs
+│       ├── Baharat.scala   # Saffron-flagged outputs
+│       ├── Certificates.scala       # X.509/CRL/keystore/SSH/PGP/private-key
+│       ├── CertificatesState.scala  # Per-artifact processing state for ^
+│       ├── CertificatesOidMaps.scala # OID lookup tables for ^
 │       └── Generic.scala   # Fallback for unknown types
 ├── util/                   # Utilities
 │   ├── Helpers.scala       # Hash functions, I/O utilities
@@ -120,12 +125,15 @@ trait ProcessingState[M, S] {
 }
 ```
 
-**Strategy selection order:**
+**Strategy selection order** (matches `ToProcess.scala`):
 1. `MavenToProcess` - JAR/POM/sources/javadoc groupings
 2. `DockerToProcess` - Docker image manifests and layers
 3. `Debian` - .deb packages
 4. `DotnetFile` - .NET assemblies
-5. `GenericFile` - Everything else (fallback)
+5. `Annatto` - Bun JavaScript bundler outputs
+6. `BaharatStrategy` - Saffron-flagged outputs
+7. `Certificates` - X.509 certs / CRLs / keystores / PEM bundles / SSH / PGP / private keys
+8. `GenericFile` - Everything else (fallback)
 
 ### 3. Item (`omnibor/Item.scala`)
 
@@ -215,6 +223,9 @@ val strategies = Vector(
   DockerToProcess.computeDockerFiles,
   Debian.computeDebianFiles,
   DotnetFile.computeDotnetFiles,
+  Annatto.computeAnnattoFiles,
+  BaharatStrategy.computeBaharatFiles,
+  Certificates.computeCertificateFiles,
   GenericFile.computeGenericFiles  // Must be last
 )
 ```
@@ -294,6 +305,19 @@ val strategies = Vector(
   GenericFile.computeGenericFiles  // Keep last
 )
 ```
+
+**Reference example:** the `Certificates` strategy
+([`Certificates.scala`](../src/main/scala/io/spicelabs/goatrodeo/omnibor/strategies/Certificates.scala))
+is a comprehensive worked example covering 8 distinct claim types
+(X.509 certs, CRLs, Java keystores, PEM bundles, SSH pubkeys + certs,
+PGP keys, private keys both unencrypted and encrypted), a sealed
+`ClaimedContent` ADT for dispatch, MIME-driven routing in
+`classifyAndParse`, per-variant emitters, and a defensive leak sweep
+(`assertNoLeak`) before metadata emission. See
+[`info/certificates_strategy.md`](certificates_strategy.md) for the
+user-facing strategy documentation and
+[`info/certificates/phase-{0..9}-claims.md`](certificates/) for the
+phased build-up.
 
 ### Adding New Metadata
 
