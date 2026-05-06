@@ -19,30 +19,29 @@ import munit.FunSuite
 
 import java.io.File
 
-/** Strategy-level PGP parser tests with `gpg --show-keys
-  * --with-fingerprint` ground truth.
+/** Strategy-level PGP parser tests with `gpg --show-keys --with-fingerprint`
+  * ground truth.
   *
   * ## What these tests test
   *
   * Phase 6 plan §"For each PGPPublicKey": fingerprint, version, alg,
-  * size/curve, subkey enumeration. The tests pin a representative
-  * fixture for each major algorithm + version combination and assert
-  * the strategy's parsed values against the canonical `gpg(1)` output
-  * captured at fixture-creation time.
+  * size/curve, subkey enumeration. The tests pin a representative fixture for
+  * each major algorithm + version combination and assert the strategy's parsed
+  * values against the canonical `gpg(1)` output captured at fixture-creation
+  * time.
   *
   * ## Why this matters
   *
-  * Sidecars are materialized from the strategy's own emitters
-  * (tautological by construction, same pattern as Phase 4/5). These
-  * tests provide independent ground truth: the expected fingerprints
-  * were lifted from `gpg --show-keys --with-fingerprint
-  * --with-subkey-fingerprint` output and committed inline below. A bug
-  * that flipped, say, `getFingerprint` to `getKeyID` (an 8-byte
+  * Sidecars are materialized from the strategy's own emitters (tautological by
+  * construction, same pattern as Phase 4/5). These tests provide independent
+  * ground truth: the expected fingerprints were lifted from `gpg --show-keys
+  * --with-fingerprint --with-subkey-fingerprint` output and committed inline
+  * below. A bug that flipped, say, `getFingerprint` to `getKeyID` (an 8-byte
   * truncation) would fail here.
   *
-  * v6 keys cannot be cross-checked against system `gpg` — current
-  * GnuPG releases reject the v6 packet format. The BC parser handles
-  * them; the v6 fixture is asserted against values BC reports.
+  * v6 keys cannot be cross-checked against system `gpg` — current GnuPG
+  * releases reject the v6 packet format. The BC parser handles them; the v6
+  * fixture is asserted against values BC reports.
   */
 class PgpStrategyParserTests extends FunSuite {
 
@@ -67,7 +66,9 @@ class PgpStrategyParserTests extends FunSuite {
     assert(k.userIds.exists(_.contains("rsa3072")))
   }
 
-  test("parsePgpKeyRing: v4 ed25519 primary + ECDH cv25519 encryption subkey (G3)") {
+  test(
+    "parsePgpKeyRing: v4 ed25519 primary + ECDH cv25519 encryption subkey (G3)"
+  ) {
     // Plan §125-135 fixture table: "ed25519, v4, subkey encryption".
     // Regenerated 2026-05-01 to add the encryption subkey the plan
     // requires; gpg --list-keys --with-fingerprint --with-subkey-fingerprint:
@@ -81,7 +82,10 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(r.keys.length, 2, "expected primary + 1 ECDH subkey")
     val primary = r.keys.find(_.isPrimary).get
     val sub = r.keys.find(!_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "6046c53c8df8c522076f8cd76d7faae796abc62e")
+    assertEquals(
+      primary.fingerprintHex,
+      "6046c53c8df8c522076f8cd76d7faae796abc62e"
+    )
     assertEquals(primary.version, 4)
     assertEquals(primary.canonicalAlg, "ed25519")
     assertEquals(sub.fingerprintHex, "59915a0a243d30d5002d6aa58ed81ea8adfb3a65")
@@ -103,15 +107,29 @@ class PgpStrategyParserTests extends FunSuite {
     val sub = r.keys.find(!_.isPrimary).get
     // Both primary and subkey have 2-year expiration per Expire-Date: 2y.
     // BC propagates from binding signature for the subkey.
-    assert(primary.expirationTime.isDefined,
-           s"primary expirationTime must be set; got ${primary.expirationTime}")
-    assert(sub.expirationTime.isDefined,
-           s"subkey expirationTime must be set; got ${sub.expirationTime}")
+    assert(
+      primary.expirationTime.isDefined,
+      s"primary expirationTime must be set; got ${primary.expirationTime}"
+    )
+    assert(
+      sub.expirationTime.isDefined,
+      s"subkey expirationTime must be set; got ${sub.expirationTime}"
+    )
     // Expiration is creation + 2 years (63072000 seconds).
-    val primaryYears = (primary.expirationTime.get.getTime - primary.creationTime.getTime) / 1000L
-    val subYears = (sub.expirationTime.get.getTime - sub.creationTime.getTime) / 1000L
-    assertEquals(primaryYears, 63072000L, "primary should expire 2y after creation")
-    assertEquals(subYears, 63072000L, "subkey should expire 2y after creation (read from binding signature)")
+    val primaryYears =
+      (primary.expirationTime.get.getTime - primary.creationTime.getTime) / 1000L
+    val subYears =
+      (sub.expirationTime.get.getTime - sub.creationTime.getTime) / 1000L
+    assertEquals(
+      primaryYears,
+      63072000L,
+      "primary should expire 2y after creation"
+    )
+    assertEquals(
+      subYears,
+      63072000L,
+      "subkey should expire 2y after creation (read from binding signature)"
+    )
   }
 
   test("parsePgpKeyRing: v4 DSA primary + ElGamal subkey") {
@@ -125,7 +143,10 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(r.keys.length, 2, "expected primary + 1 subkey")
     val primary = r.keys.find(_.isPrimary).get
     val sub = r.keys.find(!_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "266cb770bdb0894c43ce29af568d14792d3757e9")
+    assertEquals(
+      primary.fingerprintHex,
+      "266cb770bdb0894c43ce29af568d14792d3757e9"
+    )
     assertEquals(primary.canonicalAlg, "dsa")
     assertEquals(primary.keySize, Some(2048))
     assertEquals(sub.fingerprintHex, "2a60b99a059b5ac55dac99f4e75be0548b58de20")
@@ -137,7 +158,9 @@ class PgpStrategyParserTests extends FunSuite {
   // are asserted only via materializer-tautological values. These three
   // tests pin gpg(1) ground-truth fingerprints for additional fixtures
   // covering different organizational keys.
-  test("parsePgpKeyRing: real-world docker-ce signing key (rsa4096 + S subkey) (G5)") {
+  test(
+    "parsePgpKeyRing: real-world docker-ce signing key (rsa4096 + S subkey) (G5)"
+  ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   rsa4096 2017-02-22 [SCEAR]
     //         9DC8 5822 9FC7 DD38 854A  E2D8 8D81 803C 0EBF CD88
@@ -146,7 +169,10 @@ class PgpStrategyParserTests extends FunSuite {
     val w = wrap("test_data/certificates/pgp/real/docker-ce.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     val primary = r.keys.find(_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "9dc858229fc7dd38854ae2d88d81803c0ebfcd88")
+    assertEquals(
+      primary.fingerprintHex,
+      "9dc858229fc7dd38854ae2d88d81803c0ebfcd88"
+    )
     assertEquals(primary.canonicalAlg, "rsa")
     assertEquals(primary.keySize, Some(4096))
     val sub = r.keys.find(!_.isPrimary).get
@@ -162,7 +188,10 @@ class PgpStrategyParserTests extends FunSuite {
     val w = wrap("test_data/certificates/pgp/real/debian-cdimage.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     val primary = r.keys.find(_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "df9b9c49eaa9298432589d76da87e80d6294be9b")
+    assertEquals(
+      primary.fingerprintHex,
+      "df9b9c49eaa9298432589d76da87e80d6294be9b"
+    )
     val sub = r.keys.find(!_.isPrimary).get
     assertEquals(sub.fingerprintHex, "47a8ea16451bf5c9b6915c64642a5ac311cd9819")
   }
@@ -176,13 +205,18 @@ class PgpStrategyParserTests extends FunSuite {
     val w = wrap("test_data/certificates/pgp/real/kernel-konstantin.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     val primary = r.keys.find(_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "abaf11c65a2970b130abe3c479be3e4300411886")
+    assertEquals(
+      primary.fingerprintHex,
+      "abaf11c65a2970b130abe3c479be3e4300411886"
+    )
     assertEquals(primary.keySize, Some(2048))
     val sub = r.keys.find(!_.isPrimary).get
     assertEquals(sub.fingerprintHex, "aee416f7dccb753bb3d5609d88bce80f012f54ca")
   }
 
-  test("parsePgpKeyRing: real-world Linux kernel maintainer (rsa4096 + subkey)") {
+  test(
+    "parsePgpKeyRing: real-world Linux kernel maintainer (rsa4096 + subkey)"
+  ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   rsa4096 2011-09-23 [SCEAR]
     //         647F 2865 4894 E3BD 4571  99BE 38DB BDC8 6092 693E
@@ -193,7 +227,10 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(r.keys.length, 2)
     val primary = r.keys.find(_.isPrimary).get
     val sub = r.keys.find(!_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "647f28654894e3bd457199be38dbbdc86092693e")
+    assertEquals(
+      primary.fingerprintHex,
+      "647f28654894e3bd457199be38dbbdc86092693e"
+    )
     assertEquals(primary.canonicalAlg, "rsa")
     assertEquals(primary.keySize, Some(4096))
     assertEquals(sub.fingerprintHex, "f41bdf16f35cd80d9e56735bf38153e276d54749")
@@ -208,11 +245,16 @@ class PgpStrategyParserTests extends FunSuite {
     val w = wrap("test_data/certificates/pgp/synthetic/v6-ed25519-pub.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     assertEquals(r.keys.length, 3)
-    assert(r.keys.forall(_.version == 6),
-           s"expected all keys at v6, got ${r.keys.map(_.version)}")
+    assert(
+      r.keys.forall(_.version == 6),
+      s"expected all keys at v6, got ${r.keys.map(_.version)}"
+    )
     val fpLengths = r.keys.map(_.fingerprintHex.length).distinct
-    assertEquals(fpLengths, Vector(64),
-                 "v6 fingerprints must be 64 hex chars (32 bytes SHA-256)")
+    assertEquals(
+      fpLengths,
+      Vector(64),
+      "v6 fingerprints must be 64 hex chars (32 bytes SHA-256)"
+    )
   }
 
   test("purlForPgpKey: shape and ordering") {
@@ -221,7 +263,7 @@ class PgpStrategyParserTests extends FunSuite {
     val purl = Certificates.purlForPgpKey(r.keys.head).canonicalize().nn
     assertEquals(
       purl,
-      "pkg:pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4",
+      "pkg:pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4"
     )
   }
 
@@ -253,7 +295,9 @@ class PgpStrategyParserTests extends FunSuite {
   // claims white-box, so a regression in `pgpAlgIdMap` (e.g. ECDH→unknown)
   // or `pgpCurveOidMap` (e.g. NIST P-256 OID typo) fails here, not just
   // in the sidecars (which would have re-emitted the bug).
-  test("parsePgpKeyRing: v4 ECDSA NIST P-256 primary + ECDH NIST P-256 subkey (G1+G2 / N1)") {
+  test(
+    "parsePgpKeyRing: v4 ECDSA NIST P-256 primary + ECDH NIST P-256 subkey (G1+G2 / N1)"
+  ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   nistp256 2026-05-01 [SCA]
     //         266A 16A9 2E5F 70A9 303C  3AC2 E345 85E3 B7DD 707A
@@ -265,35 +309,56 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(r.keys.length, 2, "expected ECDSA primary + ECDH subkey")
     val primary = r.keys.find(_.isPrimary).get
     val sub = r.keys.find(!_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "266a16a92e5f70a9303c3ac2e34585e3b7dd707a")
-    assertEquals(primary.canonicalAlg, "ec",
-      "ECDSA (alg-id 19) maps to canonical 'ec'")
-    assertEquals(primary.curve, Some("p-256"),
-      "OID 1.2.840.10045.3.1.7 maps to 'p-256' via pgpCurveOidMap")
+    assertEquals(
+      primary.fingerprintHex,
+      "266a16a92e5f70a9303c3ac2e34585e3b7dd707a"
+    )
+    assertEquals(
+      primary.canonicalAlg,
+      "ec",
+      "ECDSA (alg-id 19) maps to canonical 'ec'"
+    )
+    assertEquals(
+      primary.curve,
+      Some("p-256"),
+      "OID 1.2.840.10045.3.1.7 maps to 'p-256' via pgpCurveOidMap"
+    )
     assertEquals(primary.keySize, None, "EC keys have no keySize")
     assertEquals(primary.pgpAlgId, 19, "PGP algorithm ID for ECDSA")
     assertEquals(sub.fingerprintHex, "4e1bc8cdbe7ac3d0cf8372e9b4394101605b32ae")
-    assertEquals(sub.canonicalAlg, "ec",
-      "ECDH (alg-id 18) maps to canonical 'ec'")
+    assertEquals(
+      sub.canonicalAlg,
+      "ec",
+      "ECDH (alg-id 18) maps to canonical 'ec'"
+    )
     assertEquals(sub.curve, Some("p-256"))
     assertEquals(sub.pgpAlgId, 18, "PGP algorithm ID for ECDH")
   }
 
-  test("parsePgpKeyRing: v4 ECDSA brainpoolP256r1 primary + ECDH subkey (G1+G2 / N1)") {
+  test(
+    "parsePgpKeyRing: v4 ECDSA brainpoolP256r1 primary + ECDH subkey (G1+G2 / N1)"
+  ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   brainpoolP256r1 2026-05-01 [SCA]
     //         7C17 C305 167E F3AE FFAE  DFF3 5EB1 7155 E617 6DDD
     //   sub   brainpoolP256r1 2026-05-01 [E]
     //         EF1D 71CD 7C60 9251 485F  3D07 1FF7 EC16 D8C4 D8DF
-    val w = wrap("test_data/certificates/pgp/synthetic/v4-ecdsa-brainpool256-pub.asc")
+    val w =
+      wrap("test_data/certificates/pgp/synthetic/v4-ecdsa-brainpool256-pub.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     assertEquals(r.keys.length, 2)
     val primary = r.keys.find(_.isPrimary).get
     val sub = r.keys.find(!_.isPrimary).get
-    assertEquals(primary.fingerprintHex, "7c17c305167ef3aeffaedff35eb17155e6176ddd")
+    assertEquals(
+      primary.fingerprintHex,
+      "7c17c305167ef3aeffaedff35eb17155e6176ddd"
+    )
     assertEquals(primary.canonicalAlg, "ec")
-    assertEquals(primary.curve, Some("brainpoolp256r1"),
-      "OID 1.3.36.3.3.2.8.1.1.7 maps to 'brainpoolp256r1' via pgpCurveOidMap")
+    assertEquals(
+      primary.curve,
+      Some("brainpoolp256r1"),
+      "OID 1.3.36.3.3.2.8.1.1.7 maps to 'brainpoolp256r1' via pgpCurveOidMap"
+    )
     assertEquals(sub.fingerprintHex, "ef1d71cd7c609251485f3d071ff7ec16d8c4d8df")
     assertEquals(sub.canonicalAlg, "ec")
     assertEquals(sub.curve, Some("brainpoolp256r1"))
@@ -308,19 +373,30 @@ class PgpStrategyParserTests extends FunSuite {
     // Source: cat v4-rsa3072-pub.asc v4-ed25519-pub.asc
     //   ring 1: 1 RSA-3072 primary
     //   ring 2: 1 Ed25519 primary + 1 ECDH cv25519 subkey
-    assertEquals(r.keys.length, 3,
-      "multi-ring concatenation must yield all keys from all rings")
+    assertEquals(
+      r.keys.length,
+      3,
+      "multi-ring concatenation must yield all keys from all rings"
+    )
     val fps = r.keys.map(_.fingerprintHex).toSet
-    assert(fps.contains("3800518ce65fa1b28e540b3cd242090793ba9dc6"),
-      "ring 1 RSA primary must be present")
-    assert(fps.contains("6046c53c8df8c522076f8cd76d7faae796abc62e"),
-      "ring 2 Ed25519 primary must be present")
-    assert(fps.contains("59915a0a243d30d5002d6aa58ed81ea8adfb3a65"),
-      "ring 2 ECDH cv25519 subkey must be present")
+    assert(
+      fps.contains("3800518ce65fa1b28e540b3cd242090793ba9dc6"),
+      "ring 1 RSA primary must be present"
+    )
+    assert(
+      fps.contains("6046c53c8df8c522076f8cd76d7faae796abc62e"),
+      "ring 2 Ed25519 primary must be present"
+    )
+    assert(
+      fps.contains("59915a0a243d30d5002d6aa58ed81ea8adfb3a65"),
+      "ring 2 ECDH cv25519 subkey must be present"
+    )
     // Documented design choice (N7 / ADR): top-level primaryUserId is the
     // first ring's primary uid, not a concat. Pin this contract.
-    assert(r.primaryUserId.exists(_.contains("rsa3072")),
-      s"primaryUserId must be the FIRST ring's primary uid; got ${r.primaryUserId}")
+    assert(
+      r.primaryUserId.exists(_.contains("rsa3072")),
+      s"primaryUserId must be the FIRST ring's primary uid; got ${r.primaryUserId}"
+    )
   }
 
   // G12 — binary (unarmored) PGP file. The .gpg fixture is the same key
@@ -328,16 +404,22 @@ class PgpStrategyParserTests extends FunSuite {
   // PGPUtil.getDecoderStream handles both forms transparently; this test
   // confirms the strategy emits the identical fingerprint on the binary
   // path as on the armored path.
-  test("parsePgpKeyRing: binary .gpg file yields same identity as armored .asc (G12 / N1)") {
-    val wBinary = wrap("test_data/certificates/pgp/synthetic/v4-rsa3072-pub.gpg")
-    val wArmored = wrap("test_data/certificates/pgp/synthetic/v4-rsa3072-pub.asc")
+  test(
+    "parsePgpKeyRing: binary .gpg file yields same identity as armored .asc (G12 / N1)"
+  ) {
+    val wBinary =
+      wrap("test_data/certificates/pgp/synthetic/v4-rsa3072-pub.gpg")
+    val wArmored =
+      wrap("test_data/certificates/pgp/synthetic/v4-rsa3072-pub.asc")
     val rBinary = Certificates.parsePgpKeyRing(wBinary).get
     val rArmored = Certificates.parsePgpKeyRing(wArmored).get
     assertEquals(rBinary.keys.length, 1)
-    assertEquals(rBinary.keys.head.fingerprintHex,
-                 rArmored.keys.head.fingerprintHex,
-                 "binary and armored fixtures of the same key must " +
-                 "produce identical fingerprints")
+    assertEquals(
+      rBinary.keys.head.fingerprintHex,
+      rArmored.keys.head.fingerprintHex,
+      "binary and armored fixtures of the same key must " +
+        "produce identical fingerprints"
+    )
     assertEquals(rBinary.keys.head.canonicalAlg, "rsa")
     assertEquals(rBinary.keys.head.keySize, Some(3072))
     assertEquals(rBinary.keys.head.version, 4)
@@ -351,14 +433,18 @@ class PgpStrategyParserTests extends FunSuite {
   // parser's None-returning contract on secret-key input is preserved.
   // Fixture relocated from edge-cases/pgp/ to private-keys/synthetic/
   // when Phase 7 began claiming it.
-  test("parsePgpKeyRing: PGP PRIVATE KEY BLOCK returns None from PUBLIC-key parser (G9)") {
-    val w = wrap("test_data/certificates/private-keys/synthetic/pgp-secret-ed25519-unencrypted.asc")
+  test(
+    "parsePgpKeyRing: PGP PRIVATE KEY BLOCK returns None from PUBLIC-key parser (G9)"
+  ) {
+    val w = wrap(
+      "test_data/certificates/private-keys/synthetic/pgp-secret-ed25519-unencrypted.asc"
+    )
     assertEquals(
       Certificates.parsePgpKeyRing(w),
       None,
       "parsePgpKeyRing (the Phase-6 public-key parser) must return " +
-      "None on secret-key input. Phase 7's parsePgpSecretKeyRing " +
-      "handles the actual claim; dispatch is via parsePgpKeyOrSecretKeyRing.",
+        "None on secret-key input. Phase 7's parsePgpSecretKeyRing " +
+        "handles the actual claim; dispatch is via parsePgpKeyOrSecretKeyRing."
     )
   }
 
@@ -369,17 +455,23 @@ class PgpStrategyParserTests extends FunSuite {
   // canonical-alg name set has 8 elements because `ec` covers both
   // ECDH(18) and ECDSA(19), and `ed25519` covers both EdDSA-Legacy(22)
   // and Ed25519(27). Pin all three numbers.
-  test("pgpAlgIdMap: 13 alg-id entries / 10 plan-table rows / 8 distinct canonical alg names (N3)") {
-    assertEquals(Certificates.pgpAlgIdMap.size, 13,
+  test(
+    "pgpAlgIdMap: 13 alg-id entries / 10 plan-table rows / 8 distinct canonical alg names (N3)"
+  ) {
+    assertEquals(
+      Certificates.pgpAlgIdMap.size,
+      13,
       "13 alg-id entries: RSA(1,2,3) + ElGamal(16,20) + DSA(17) + " +
-      "ECDH(18) + ECDSA(19) + EdDSA-Legacy(22) + X25519(25) + X448(26) " +
-      "+ Ed25519(27) + Ed448(28) = 3+2+1+1+1+1+1+1+1+1 = 13")
-    assertEquals(Certificates.pgpAlgIdMap.values.toSet,
-      Set("rsa", "elgamal", "dsa", "ec", "ed25519",
-          "x25519", "x448", "ed448"),
+        "ECDH(18) + ECDSA(19) + EdDSA-Legacy(22) + X25519(25) + X448(26) " +
+        "+ Ed25519(27) + Ed448(28) = 3+2+1+1+1+1+1+1+1+1 = 13"
+    )
+    assertEquals(
+      Certificates.pgpAlgIdMap.values.toSet,
+      Set("rsa", "elgamal", "dsa", "ec", "ed25519", "x25519", "x448", "ed448"),
       "8 distinct canonical-alg values; plan-table 10 rows collapse " +
-      "to 8 because (ECDH, ECDSA) both → 'ec' and (EdDSA-Legacy, " +
-      "Ed25519) both → 'ed25519'")
+        "to 8 because (ECDH, ECDSA) both → 'ec' and (EdDSA-Legacy, " +
+        "Ed25519) both → 'ed25519'"
+    )
     // Spot-check the unified-EC mapping (alg=ec for both ECDH and ECDSA).
     assertEquals(Certificates.pgpAlgIdMap(18), "ec")
     assertEquals(Certificates.pgpAlgIdMap(19), "ec")
@@ -394,6 +486,9 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(Certificates.pgpCurveOidMap.size, 8)
     // Spot-check: the two curves the new ECDSA fixtures exercise.
     assertEquals(Certificates.pgpCurveOidMap("1.2.840.10045.3.1.7"), "p-256")
-    assertEquals(Certificates.pgpCurveOidMap("1.3.36.3.3.2.8.1.1.7"), "brainpoolp256r1")
+    assertEquals(
+      Certificates.pgpCurveOidMap("1.3.36.3.3.2.8.1.1.7"),
+      "brainpoolp256r1"
+    )
   }
 }

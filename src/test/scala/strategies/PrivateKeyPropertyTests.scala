@@ -3,49 +3,50 @@
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData, SingleMarker}
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import munit.ScalaCheckSuite
-import org.scalacheck.Prop.forAll
 import org.scalacheck.Gen
+import org.scalacheck.Prop.forAll
 
 import java.io.File
-import java.nio.file.{Files, Paths}
-import scala.collection.immutable.{TreeMap, TreeSet}
+import java.nio.file.Files
+import java.nio.file.Paths
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
 /** ScalaCheck properties over the Phase-7 corpus.
   *
   * ## What these tests test
   *
-  * Phase 7's hard rules apply uniformly across every private-key
-  * fixture. These properties pin those uniform invariants so a new
-  * fixture added later is automatically covered:
+  * Phase 7's hard rules apply uniformly across every private-key fixture. These
+  * properties pin those uniform invariants so a new fixture added later is
+  * automatically covered:
   *
-  *   1. *Parse idempotence* — same fixture parsed twice yields the
-  *      same `ClaimedContent` (same envelope variant, same ADT
-  *      sub-type for plaintext, same SPKI bytes / wire bytes).
-  *   2. *Encrypted → no pURL* — every fixture that classifies as
-  *      `PrivateKeyEncrypted` produces zero pURLs through
-  *      `getPurls`. Plan §"Encrypted path": no pURL, no SPKI.
-  *   3. *Unencrypted → exactly one pURL* — every fixture that
-  *      classifies as `PrivateKeyPlaintextPem` or
-  *      `PrivateKeyPlaintextOpenSsh` produces exactly one pURL.
-  *   4. *Leak-sweep cleanliness* — `getMetadata` on every fixture
-  *      runs without raising the leak-guard exception, i.e., no
-  *      forbidden pattern AND no long-hex run on a non-allowlisted
-  *      key.
-  *   5. *Encrypted metadata never leaks key-derived fields* — for
-  *      every encrypted fixture, the emitted metadata MUST NOT
-  *      contain `Certificates:KeyAlgorithm`, `Certificates:KeySize`,
+  *   1. *Parse idempotence* — same fixture parsed twice yields the same
+  *      `ClaimedContent` (same envelope variant, same ADT sub-type for
+  *      plaintext, same SPKI bytes / wire bytes). 2. *Encrypted → no pURL* —
+  *      every fixture that classifies as `PrivateKeyEncrypted` produces zero
+  *      pURLs through `getPurls`. Plan §"Encrypted path": no pURL, no SPKI. 3.
+  *      *Unencrypted → exactly one pURL* — every fixture that classifies as
+  *      `PrivateKeyPlaintextPem` or `PrivateKeyPlaintextOpenSsh` produces
+  *      exactly one pURL. 4. *Leak-sweep cleanliness* — `getMetadata` on every
+  *      fixture runs without raising the leak-guard exception, i.e., no
+  *      forbidden pattern AND no long-hex run on a non-allowlisted key. 5.
+  *      *Encrypted metadata never leaks key-derived fields* — for every
+  *      encrypted fixture, the emitted metadata MUST NOT contain
+  *      `Certificates:KeyAlgorithm`, `Certificates:KeySize`,
   *      `Certificates:Curve`, `Certificates:SpkiSha256`, or
   *      `Certificates:SshFingerprintSha256`.
   *
   * ## Why this matters (HS-3)
   *
-  * Per Phase 7 plan §"Acceptance" + Appendix C: "No fixture in this
-  * phase triggers a password prompt, a decryption attempt, or a log
-  * message about encryption status beyond what's in the metadata."
-  * These properties pin the uniform parts of that contract.
+  * Per Phase 7 plan §"Acceptance" + Appendix C: "No fixture in this phase
+  * triggers a password prompt, a decryption attempt, or a log message about
+  * encryption status beyond what's in the metadata." These properties pin the
+  * uniform parts of that contract.
   */
 class PrivateKeyPropertyTests extends ScalaCheckSuite {
 
@@ -54,7 +55,10 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
     if (!Files.exists(root)) Seq.empty
     else {
       import scala.jdk.CollectionConverters.*
-      Files.walk(root).iterator().asScala
+      Files
+        .walk(root)
+        .iterator()
+        .asScala
         .filter(p => Files.isRegularFile(p))
         .filter(p => !p.toString.endsWith(".expected.json"))
         .filter(p => !p.toString.endsWith("/generate.sh"))
@@ -79,53 +83,67 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
         fileNames = TreeSet.empty,
         mimeType = TreeSet.empty,
         fileSize = 0L,
-        extra = TreeMap.empty,
+        extra = TreeMap.empty
       )
-    ),
+    )
   )
 
-  property("[PROP] parse idempotence: every fixture yields the same claim variant twice") {
+  property(
+    "[PROP] parse idempotence: every fixture yields the same claim variant twice"
+  ) {
     forAll(genFixture) { f =>
       val a = Certificates.classifyAndParse(wrap(f))
       val b = Certificates.classifyAndParse(wrap(f))
       (a, b) match {
         case (None, None) => true
-        case (Some(ax: Certificates.PrivateKeyPlaintextPem),
-              Some(bx: Certificates.PrivateKeyPlaintextPem)) =>
+        case (
+              Some(ax: Certificates.PrivateKeyPlaintextPem),
+              Some(bx: Certificates.PrivateKeyPlaintextPem)
+            ) =>
           ax.canonicalAlg == bx.canonicalAlg &&
-            ax.keySize == bx.keySize &&
-            ax.curve == bx.curve &&
-            ax.params == bx.params &&
-            java.util.Arrays.equals(ax.spkiBytes, bx.spkiBytes)
-        case (Some(ax: Certificates.PrivateKeyPlaintextOpenSsh),
-              Some(bx: Certificates.PrivateKeyPlaintextOpenSsh)) =>
+          ax.keySize == bx.keySize &&
+          ax.curve == bx.curve &&
+          ax.params == bx.params &&
+          java.util.Arrays.equals(ax.spkiBytes, bx.spkiBytes)
+        case (
+              Some(ax: Certificates.PrivateKeyPlaintextOpenSsh),
+              Some(bx: Certificates.PrivateKeyPlaintextOpenSsh)
+            ) =>
           ax.algName == bx.algName &&
-            ax.rsaModulusBits == bx.rsaModulusBits &&
-            java.util.Arrays.equals(ax.wireBytes, bx.wireBytes)
-        case (Some(ax: Certificates.PrivateKeyPlaintextPgp),
-              Some(bx: Certificates.PrivateKeyPlaintextPgp)) =>
+          ax.rsaModulusBits == bx.rsaModulusBits &&
+          java.util.Arrays.equals(ax.wireBytes, bx.wireBytes)
+        case (
+              Some(ax: Certificates.PrivateKeyPlaintextPgp),
+              Some(bx: Certificates.PrivateKeyPlaintextPgp)
+            ) =>
           ax.ring.keys.length == bx.ring.keys.length &&
-            ax.ring.keys.zip(bx.ring.keys).forall { case (ka, kb) =>
-              ka.fingerprintHex == kb.fingerprintHex &&
-              ka.canonicalAlg == kb.canonicalAlg &&
-              ka.curve == kb.curve &&
-              ka.keySize == kb.keySize &&
-              ka.version == kb.version
-            }
-        case (Some(ax: Certificates.PrivateKeyEncrypted),
-              Some(bx: Certificates.PrivateKeyEncrypted)) =>
+          ax.ring.keys.zip(bx.ring.keys).forall { case (ka, kb) =>
+            ka.fingerprintHex == kb.fingerprintHex &&
+            ka.canonicalAlg == kb.canonicalAlg &&
+            ka.curve == kb.curve &&
+            ka.keySize == kb.keySize &&
+            ka.version == kb.version
+          }
+        case (
+              Some(ax: Certificates.PrivateKeyEncrypted),
+              Some(bx: Certificates.PrivateKeyEncrypted)
+            ) =>
           ax == bx
         case _ => false
       }
     }
   }
 
-  property("[PROP] encrypted private keys produce zero pURLs (Phase 7 hard rule)") {
+  property(
+    "[PROP] encrypted private keys produce zero pURLs (Phase 7 hard rule)"
+  ) {
     forAll(genFixture) { f =>
       Certificates.classifyAndParse(wrap(f)) match {
         case Some(_: Certificates.PrivateKeyEncrypted) =>
-          val state = new CertificatesState(wrap(f),
-            Certificates.classifyAndParse(wrap(f)))
+          val state = new CertificatesState(
+            wrap(f),
+            Certificates.classifyAndParse(wrap(f))
+          )
           val (purls, _) = state.getPurls(wrap(f), stubItem(), SingleMarker())
           purls.isEmpty
         case _ => true
@@ -137,9 +155,11 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
     forAll(genFixture) { f =>
       Certificates.classifyAndParse(wrap(f)) match {
         case Some(_: Certificates.PrivateKeyPlaintextPem) |
-             Some(_: Certificates.PrivateKeyPlaintextOpenSsh) =>
-          val state = new CertificatesState(wrap(f),
-            Certificates.classifyAndParse(wrap(f)))
+            Some(_: Certificates.PrivateKeyPlaintextOpenSsh) =>
+          val state = new CertificatesState(
+            wrap(f),
+            Certificates.classifyAndParse(wrap(f))
+          )
           val (purls, _) = state.getPurls(wrap(f), stubItem(), SingleMarker())
           purls.length == 1
         case _ => true
@@ -147,7 +167,9 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
     }
   }
 
-  property("[PROP] leak sweep is clean for every fixture (no forbidden pattern, no leaked private scalar)") {
+  property(
+    "[PROP] leak sweep is clean for every fixture (no forbidden pattern, no leaked private scalar)"
+  ) {
     forAll(genFixture) { f =>
       Certificates.classifyAndParse(wrap(f)) match {
         case None => true
@@ -155,10 +177,12 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
           val state = new CertificatesState(wrap(f), Some(claim))
           // getMetadata runs assertNoLeak internally. If it raises,
           // the property fails.
-          scala.util.Try {
-            val _ = state.getMetadata(wrap(f), stubItem(), SingleMarker())
-            true
-          }.getOrElse(false)
+          scala.util
+            .Try {
+              val _ = state.getMetadata(wrap(f), stubItem(), SingleMarker())
+              true
+            }
+            .getOrElse(false)
       }
     }
   }
@@ -167,8 +191,10 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
     forAll(genFixture) { f =>
       Certificates.classifyAndParse(wrap(f)) match {
         case Some(_: Certificates.PrivateKeyEncrypted) =>
-          val state = new CertificatesState(wrap(f),
-            Certificates.classifyAndParse(wrap(f)))
+          val state = new CertificatesState(
+            wrap(f),
+            Certificates.classifyAndParse(wrap(f))
+          )
           val (md, _) = state.getMetadata(wrap(f), stubItem(), SingleMarker())
           val forbidden = Set(
             "Certificates:KeyAlgorithm",
@@ -176,7 +202,7 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
             "Certificates:Curve",
             "Certificates:SpkiSha256",
             "Certificates:SshFingerprintSha256",
-            "Certificates:DerivedFromPrivateKey",
+            "Certificates:DerivedFromPrivateKey"
           )
           forbidden.forall(k => !md.contains(k))
         case _ => true

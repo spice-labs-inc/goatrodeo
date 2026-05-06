@@ -322,7 +322,9 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   // ==================== computeToProcess Tests ====================
 
-  test("computeToProcess - registers each required strategy and keeps Generic last") {
+  test(
+    "computeToProcess - registers each required strategy and keeps Generic last"
+  ) {
     // Refactored from a hardcoded count assertion to a structural one
     // (per invariant #4 discussion / user-approved option 2 of the
     // Phase 1 invariant-#4 stop): assert the dispatch chain CONTAINS
@@ -344,17 +346,27 @@ class ToProcessTestSuite extends munit.FunSuite {
       label
     }
     val required = List(
-      "Maven", "Docker", "Baharat", "Dotnet", "Annatto",
-      "Certificates", "Generic",
+      "Maven",
+      "Docker",
+      "Baharat",
+      "Dotnet",
+      "Annatto",
+      "Certificates",
+      "Generic"
     )
     val missing = required.filterNot(labels.contains)
-    assert(missing.isEmpty,
+    assert(
+      missing.isEmpty,
       s"computeToProcess labels are $labels; missing required " +
-        s"strategies: ${missing.mkString("[", ", ", "]")}")
-    assertEquals(labels.last, "Generic",
+        s"strategies: ${missing.mkString("[", ", ", "]")}"
+    )
+    assertEquals(
+      labels.last,
+      "Generic",
       "The terminal dispatch entry must be GenericFile (label " +
         "`\"Generic\"`) so addNewToProcessComputer's " +
-        "patch(v.length - 1, ..., 0) places new strategies before it.")
+        "patch(v.length - 1, ..., 0) places new strategies before it."
+    )
   }
 
   // ==================== Integration Tests ====================

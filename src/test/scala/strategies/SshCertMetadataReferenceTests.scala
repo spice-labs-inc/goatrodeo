@@ -23,27 +23,24 @@ import java.io.File
   *
   * ## What these tests test
   *
-  * Phase-5 gap analysis G6: the materialized sidecars assert ≤2 of the
-  * ~12 cert metadata fields the strategy emits. A regression in the
-  * un-asserted fields (`SshCertCaFingerprint`, `SshCertSerial`, etc.)
-  * would not fail any per-fixture test. These tests assert the *full*
-  * cert-metadata table for two representative fixtures —
-  * `user-cert-ed25519.pub` and `host-cert-rsa-signed-by-ed25519.pub` —
-  * cross-checked against `ssh-keygen -L` output captured into the
-  * test docstring at write time.
+  * Phase-5 gap analysis G6: the materialized sidecars assert ≤2 of the ~12 cert
+  * metadata fields the strategy emits. A regression in the un-asserted fields
+  * (`SshCertCaFingerprint`, `SshCertSerial`, etc.) would not fail any
+  * per-fixture test. These tests assert the *full* cert-metadata table for two
+  * representative fixtures — `user-cert-ed25519.pub` and
+  * `host-cert-rsa-signed-by-ed25519.pub` — cross-checked against `ssh-keygen
+  * -L` output captured into the test docstring at write time.
   *
   * ## Why this is independent ground truth
   *
-  * The materializer fills sidecar values from the strategy itself
-  * (tautological by construction). These tests bypass that loop: the
-  * expected values were lifted from `ssh-keygen -L` output (the
-  * reference OpenSSH tool) at fixture-creation time. A bug that flipped
-  * `SshCertCaFingerprint` from the CA-key wire to the signed-key wire
-  * (a real regression risk) would fail here.
+  * The materializer fills sidecar values from the strategy itself (tautological
+  * by construction). These tests bypass that loop: the expected values were
+  * lifted from `ssh-keygen -L` output (the reference OpenSSH tool) at
+  * fixture-creation time. A bug that flipped `SshCertCaFingerprint` from the
+  * CA-key wire to the signed-key wire (a real regression risk) would fail here.
   *
-  * If the fixture bytes ever change, the expected values must be
-  * regenerated from `ssh-keygen -L -f <fixture>` and committed
-  * alongside the fixture.
+  * If the fixture bytes ever change, the expected values must be regenerated
+  * from `ssh-keygen -L -f <fixture>` and committed alongside the fixture.
   */
 class SshCertMetadataReferenceTests extends FunSuite {
 
@@ -52,7 +49,7 @@ class SshCertMetadataReferenceTests extends FunSuite {
 
   private def md(
       content: Certificates.SshCert,
-      artifact: FileWrapper,
+      artifact: FileWrapper
   ): Map[String, String] = {
     val state = new CertificatesState(artifact)
     val tm = state.invokeSshCertMetadata(artifact, content)
@@ -80,15 +77,18 @@ class SshCertMetadataReferenceTests extends FunSuite {
     assertEquals(m.get("Certificates:KeyAlgorithm"), Some("ed25519"))
     assertEquals(
       m.get("Certificates:SshFingerprintSha256"),
-      Some("SHA-256:kVSaQnN01FoMK0pdLrpUff7WML+tVX0Rk8TaQacCq9U"),
+      Some("SHA-256:kVSaQnN01FoMK0pdLrpUff7WML+tVX0Rk8TaQacCq9U")
     )
     assertEquals(
       m.get("Certificates:SshCertCaFingerprint"),
-      Some("SHA-256:X+vjHTahwmg5oSKI82OVww82afSzeH+9j6F/XWW1jlQ"),
+      Some("SHA-256:X+vjHTahwmg5oSKI82OVww82afSzeH+9j6F/XWW1jlQ")
     )
     assertEquals(m.get("Certificates:SshCertType"), Some("user"))
     assertEquals(m.get("Certificates:SshCertSerial"), Some("0"))
-    assertEquals(m.get("Certificates:SshCertKeyId"), Some("goatrodeo-test-user"))
+    assertEquals(
+      m.get("Certificates:SshCertKeyId"),
+      Some("goatrodeo-test-user")
+    )
     assertEquals(m.get("Certificates:SshCertSigAlgorithm"), Some("ssh-ed25519"))
     assertEquals(m.get("Certificates:SshCertPrincipals"), Some("alice,bob"))
     assertEquals(
@@ -96,7 +96,7 @@ class SshCertMetadataReferenceTests extends FunSuite {
       Some(
         "permit-X11-forwarding,permit-agent-forwarding," +
           "permit-port-forwarding,permit-pty,permit-user-rc"
-      ),
+      )
     )
     // Critical Options: (none) → key not emitted
     assertEquals(m.get("Certificates:SshCertCriticalOptions"), None)
@@ -107,19 +107,27 @@ class SshCertMetadataReferenceTests extends FunSuite {
     // non-empty + ISO-8601 shape (no sentinel triggered for this cert).
     val va = m("Certificates:SshCertValidAfter")
     val vb = m("Certificates:SshCertValidBefore")
-    assert(va.endsWith("Z") && va.contains("2026"),
-           s"unexpected SshCertValidAfter: $va")
-    assert(vb.endsWith("Z") && vb.contains("2027"),
-           s"unexpected SshCertValidBefore: $vb")
+    assert(
+      va.endsWith("Z") && va.contains("2026"),
+      s"unexpected SshCertValidAfter: $va"
+    )
+    assert(
+      vb.endsWith("Z") && vb.contains("2027"),
+      s"unexpected SshCertValidBefore: $vb"
+    )
     // Cert SHA-256 is the cert wire blob hash, not the signed-key fp
     val certHex = m("Certificates:SshCertSha256")
     assertEquals(certHex.length, 64)
-    assert(certHex.matches("[0-9a-f]+"),
-           s"SshCertSha256 must be lowercase hex: $certHex")
+    assert(
+      certHex.matches("[0-9a-f]+"),
+      s"SshCertSha256 must be lowercase hex: $certHex"
+    )
   }
 
   test("host-cert-rsa-signed-by-ed25519: cross-algorithm fields (G6)") {
-    val w = wrap("test_data/certificates/ssh/synthetic/host-cert-rsa-signed-by-ed25519.pub")
+    val w = wrap(
+      "test_data/certificates/ssh/synthetic/host-cert-rsa-signed-by-ed25519.pub"
+    )
     val cert = Certificates.parseSshCert(w).get
     val m = md(cert, w)
 
@@ -135,19 +143,22 @@ class SshCertMetadataReferenceTests extends FunSuite {
     assertEquals(m.get("Certificates:KeySize"), Some("2048"))
     assertEquals(
       m.get("Certificates:SshFingerprintSha256"),
-      Some("SHA-256:5Sgk1psapPr7plh7GPsdPJPf6sF95ZmAzMOAMU/xloo"),
+      Some("SHA-256:5Sgk1psapPr7plh7GPsdPJPf6sF95ZmAzMOAMU/xloo")
     )
     assertEquals(
       m.get("Certificates:SshCertCaFingerprint"),
-      Some("SHA-256:X+vjHTahwmg5oSKI82OVww82afSzeH+9j6F/XWW1jlQ"),
+      Some("SHA-256:X+vjHTahwmg5oSKI82OVww82afSzeH+9j6F/XWW1jlQ")
     )
     assertEquals(m.get("Certificates:SshCertType"), Some("host"))
     assertEquals(m.get("Certificates:SshCertSerial"), Some("0"))
-    assertEquals(m.get("Certificates:SshCertKeyId"), Some("goatrodeo-test-host"))
+    assertEquals(
+      m.get("Certificates:SshCertKeyId"),
+      Some("goatrodeo-test-host")
+    )
     assertEquals(m.get("Certificates:SshCertSigAlgorithm"), Some("ssh-ed25519"))
     assertEquals(
       m.get("Certificates:SshCertPrincipals"),
-      Some("host1.example,host2.example"),
+      Some("host1.example,host2.example")
     )
     assertEquals(m.get("Certificates:SshCertCriticalOptions"), None)
     assertEquals(m.get("Certificates:SshCertExtensions"), None)

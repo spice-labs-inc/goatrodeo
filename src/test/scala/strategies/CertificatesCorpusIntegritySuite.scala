@@ -24,45 +24,41 @@ import munit.FunSuite
   * `test_data/certificates/`:
   *
   *   - **`corpus contains at least 200 fixtures`** — traces to Phase 0's
-  *     sub-goal #2 in `certificates-strategy/phase-0-corpus.md`, which
-  *     declares 200 fixtures as the floor. Fails loudly when the corpus is
-  *     smaller so Phase 0 cannot silently ship understaffed.
+  *     sub-goal #2 in `certificates-strategy/phase-0-corpus.md`, which declares
+  *     200 fixtures as the floor. Fails loudly when the corpus is smaller so
+  *     Phase 0 cannot silently ship understaffed.
   *
-  *   - **`no orphan sidecars`** — every `.expected.json` must have a
-  *     matching fixture file beside it. An orphan sidecar usually means a
-  *     fixture was deleted without its sidecar; the test turns that into a
-  *     red so the next CI run catches it.
+  *   - **`no orphan sidecars`** — every `.expected.json` must have a matching
+  *     fixture file beside it. An orphan sidecar usually means a fixture was
+  *     deleted without its sidecar; the test turns that into a red so the next
+  *     CI run catches it.
   *
-  *   - **`no orphan fixtures`** — every fixture must have a sidecar. An
-  *     orphan fixture usually means someone committed a new file but forgot
-  *     the sidecar.
+  *   - **`no orphan fixtures`** — every fixture must have a sidecar. An orphan
+  *     fixture usually means someone committed a new file but forgot the
+  *     sidecar.
   *
-  *   - **`every sidecar parses and declares required fields`** — every
-  *     sidecar is structurally valid per [[CertificatesSidecar.parse]]. The
-  *     parser enforces that required fields (`description`, `source`,
-  *     `retrievedAt`, `itemCount`, `mimeTypes.mustContain`,
-  *     `purls.mustContain`, `metadata.mustContain`,
-  *     `forbiddenMetadataPatterns`) are present; this test surfaces parse
-  *     errors for every bad sidecar in one run rather than failing on the
-  *     first.
+  *   - **`every sidecar parses and declares required fields`** — every sidecar
+  *     is structurally valid per [[CertificatesSidecar.parse]]. The parser
+  *     enforces that required fields (`description`, `source`, `retrievedAt`,
+  *     `itemCount`, `mimeTypes.mustContain`, `purls.mustContain`,
+  *     `metadata.mustContain`, `forbiddenMetadataPatterns`) are present; this
+  *     test surfaces parse errors for every bad sidecar in one run rather than
+  *     failing on the first.
   *
   * ## Why this is separate from `CertificatesSuite`
   *
   * Per-fixture pipeline tests in `CertificatesSuite` iterate over a possibly
-  * empty list. When the corpus is empty, that suite emits zero tests.
-  * Integrity tests here run unconditionally so the build still fails when
-  * the corpus is missing.
+  * empty list. When the corpus is empty, that suite emits zero tests. Integrity
+  * tests here run unconditionally so the build still fails when the corpus is
+  * missing.
   *
   * ## Phase traceability
   *
   *   - Test `corpus contains at least 200 fixtures` → plan sub-goal #2
   *     (phase-0-corpus.md).
-  *   - Test `no orphan sidecars` → phase-0-corpus.md task #4 sourcing
-  *     protocol.
-  *   - Test `no orphan fixtures` → phase-0-corpus.md task #4 sourcing
-  *     protocol.
-  *   - Test `every sidecar parses` → phase-0-corpus.md sub-goal #1
-  *     (schema).
+  *   - Test `no orphan sidecars` → phase-0-corpus.md task #4 sourcing protocol.
+  *   - Test `no orphan fixtures` → phase-0-corpus.md task #4 sourcing protocol.
+  *   - Test `every sidecar parses` → phase-0-corpus.md sub-goal #1 (schema).
   */
 class CertificatesCorpusIntegritySuite extends FunSuite {
 

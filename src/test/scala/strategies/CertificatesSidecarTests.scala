@@ -29,17 +29,16 @@ import java.nio.file.Files
   *
   * ## LLM-friendly summary of each test
   *
-  *   - "valid minimal sidecar parses" — confirms the parser accepts a
-  *     sidecar that supplies only the required fields and no optional
-  *     ones.
+  *   - "valid minimal sidecar parses" — confirms the parser accepts a sidecar
+  *     that supplies only the required fields and no optional ones.
   *   - "valid full sidecar parses" — confirms optional fields
   *     (`mustNotContain`, `mustContainRanges`, `forbiddenMetadataKeys`)
   *     round-trip.
-  *   - "missing X throws" — one test per required field. Confirms the
-  *     parser fails loudly with a message naming the missing field,
-  *     rather than silently defaulting.
-  *   - "malformed JSON throws" — confirms syntactic errors are surfaced
-  *     with a "not valid JSON" message rather than a cryptic NPE.
+  *   - "missing X throws" — one test per required field. Confirms the parser
+  *     fails loudly with a message naming the missing field, rather than
+  *     silently defaulting.
+  *   - "malformed JSON throws" — confirms syntactic errors are surfaced with a
+  *     "not valid JSON" message rather than a cryptic NPE.
   *   - "wrong type on required field throws" — e.g., `itemCount: "one"`
   *     (string) must be rejected, not coerced.
   */
@@ -128,7 +127,10 @@ class CertificatesSidecarTests extends FunSuite {
       sc.metadata.mustContainRanges,
       Map("Certificates:EntryCount" -> NumericRange("100", "10000"))
     )
-    assertEquals(sc.forbiddenMetadataKeys, List("Certificates:PrivateKeyMaterial"))
+    assertEquals(
+      sc.forbiddenMetadataKeys,
+      List("Certificates:PrivateKeyMaterial")
+    )
     assertEquals(sc.forbiddenMetadataPatterns.size, 2)
   }
 
@@ -175,7 +177,8 @@ class CertificatesSidecarTests extends FunSuite {
 
   test("wrong type on required field throws SidecarParseError") {
     // itemCount as string instead of number
-    val broken = minimalSidecar.replace("\"itemCount\": 1", "\"itemCount\": \"one\"")
+    val broken =
+      minimalSidecar.replace("\"itemCount\": 1", "\"itemCount\": \"one\"")
     val ex = intercept[CertificatesSidecar.SidecarParseError] {
       CertificatesSidecar.parse(writeSidecar(broken))
     }
@@ -185,7 +188,9 @@ class CertificatesSidecarTests extends FunSuite {
     )
   }
 
-  test("ranges with non-numeric bounds are accepted by the parser (validation happens at assertion time)") {
+  test(
+    "ranges with non-numeric bounds are accepted by the parser (validation happens at assertion time)"
+  ) {
     // Parser does not validate that range bounds are numeric; that check
     // happens in `CertificatesAssertions.assertMetadataRanges`. This test
     // documents that contract — the parser is lenient about values, strict
@@ -204,8 +209,9 @@ class CertificatesSidecarTests extends FunSuite {
 
   // -- helpers --
 
-  /** Remove a field from a JSON string by naive string surgery — suitable
-    * only for the minimal well-formed sidecar used in this file's tests. */
+  /** Remove a field from a JSON string by naive string surgery — suitable only
+    * for the minimal well-formed sidecar used in this file's tests.
+    */
   private def removeField(json: String, field: String): String = {
     val segs = field.split('.').toList
     segs match {

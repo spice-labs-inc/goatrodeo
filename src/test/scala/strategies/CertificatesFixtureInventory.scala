@@ -16,25 +16,25 @@ package strategies
 
 import java.io.File
 
-/** Enumerates fixtures under a corpus root and surfaces counts, pairings,
-  * and orphan detection.
+/** Enumerates fixtures under a corpus root and surfaces counts, pairings, and
+  * orphan detection.
   *
   * ## LLM-friendly summary
   *
   * A "fixture" is any file under the root that is not a sidecar, not a
-  * `SOURCES.md`, not a `README.md` / `README_llm.md`, not a `generate.sh`,
-  * not a `.gitkeep`, not hidden, and not inside the `tools/` subtree.
+  * `SOURCES.md`, not a `README.md` / `README_llm.md`, not a `generate.sh`, not
+  * a `.gitkeep`, not hidden, and not inside the `tools/` subtree.
   *
   * A "sidecar" is any file ending in `.expected.json`.
   *
-  * The pairing rule: a sidecar named `foo.pem.expected.json` must sit
-  * alongside a fixture named `foo.pem`. The fixture's name is the sidecar's
-  * name with `.expected.json` stripped.
+  * The pairing rule: a sidecar named `foo.pem.expected.json` must sit alongside
+  * a fixture named `foo.pem`. The fixture's name is the sidecar's name with
+  * `.expected.json` stripped.
   *
-  * This class is a pure function of its root path — tests can instantiate
-  * it against a scratch temp directory. The default singleton
-  * [[CertificatesFixtureInventory]] binds it to `test_data/certificates`,
-  * which is what production suites use.
+  * This class is a pure function of its root path — tests can instantiate it
+  * against a scratch temp directory. The default singleton
+  * [[CertificatesFixtureInventory]] binds it to `test_data/certificates`, which
+  * is what production suites use.
   */
 class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
 
@@ -98,7 +98,8 @@ class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
   def allSidecars: Vector[File] =
     allFiles(corpusRoot).filter(isSidecar)
 
-  /** All discovered fixture-candidate files (non-sidecar, non-infrastructure). */
+  /** All discovered fixture-candidate files (non-sidecar, non-infrastructure).
+    */
   def allFixtureCandidates: Vector[File] =
     allFiles(corpusRoot).filter(isFixtureCandidate)
 
@@ -146,17 +147,18 @@ object CertificatesFixtureInventoryImpl {
   /** Extension marking a sidecar. */
   val sidecarSuffix: String = ".expected.json"
 
-  /** Relative paths (from a corpus root) that are infrastructure trees
-    * rather than category trees. */
+  /** Relative paths (from a corpus root) that are infrastructure trees rather
+    * than category trees.
+    */
   val infrastructureDirs: Set[String] = Set("tools")
 }
 
 /** Default singleton — binds [[CertificatesFixtureInventoryImpl]] to the
   * production corpus root at `test_data/certificates/`.
   *
-  * All production test suites reference this object. Unit tests that
-  * exercise the discovery logic instantiate [[CertificatesFixtureInventoryImpl]]
-  * against a scratch directory instead.
+  * All production test suites reference this object. Unit tests that exercise
+  * the discovery logic instantiate [[CertificatesFixtureInventoryImpl]] against
+  * a scratch directory instead.
   */
 object CertificatesFixtureInventory
     extends CertificatesFixtureInventoryImpl(new File("test_data/certificates"))

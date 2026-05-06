@@ -19,26 +19,25 @@ import munit.FunSuite
 
 import java.io.File
 
-/** Strategy-level SSH parser tests that cross-check fingerprints
-  * computed by `Certificates.sshFingerprintB64` against the canonical
-  * `ssh-keygen -lf` output.
+/** Strategy-level SSH parser tests that cross-check fingerprints computed by
+  * `Certificates.sshFingerprintB64` against the canonical `ssh-keygen -lf`
+  * output.
   *
   * ## What these tests test
   *
-  * - `parseSshPubkey` succeeds on each canonical fixture
-  * - `sshFingerprintB64` produces the same SHA-256 fingerprint that
-  *   `ssh-keygen -lf` produces (the "ground truth" anchor)
-  * - `parseSshCert` parses ED25519 and RSA cert wire formats and
-  *   correctly identifies cert-type, principals, and extensions
+  *   - `parseSshPubkey` succeeds on each canonical fixture
+  *   - `sshFingerprintB64` produces the same SHA-256 fingerprint that
+  *     `ssh-keygen -lf` produces (the "ground truth" anchor)
+  *   - `parseSshCert` parses ED25519 and RSA cert wire formats and correctly
+  *     identifies cert-type, principals, and extensions
   *
   * ## Why these tests matter
   *
   * The Phase-5 acceptance criterion is "All SSH fixtures pass sidecar
-  * assertions". Sidecars were materialized from the strategy's own
-  * output (tautological by design — same as Phase 4). These tests
-  * provide an independent ground-truth anchor by comparing against
-  * `ssh-keygen` (Phase-0 corpus generator) output that's been hand-
-  * verified.
+  * assertions". Sidecars were materialized from the strategy's own output
+  * (tautological by design — same as Phase 4). These tests provide an
+  * independent ground-truth anchor by comparing against `ssh-keygen` (Phase-0
+  * corpus generator) output that's been hand- verified.
   */
 class SshStrategyParserTests extends FunSuite {
 
@@ -67,7 +66,8 @@ class SshStrategyParserTests extends FunSuite {
   }
 
   test("parseSshPubkey: ecdsa-nistp256 detected with correct alg name") {
-    val w = wrap("test_data/certificates/ssh/synthetic/ecdsa-nistp256-openssh.pub")
+    val w =
+      wrap("test_data/certificates/ssh/synthetic/ecdsa-nistp256-openssh.pub")
     val pk = Certificates.parseSshPubkey(w)
     assert(pk.isDefined)
     assertEquals(pk.get.algName, "ecdsa-sha2-nistp256")
@@ -87,7 +87,9 @@ class SshStrategyParserTests extends FunSuite {
   }
 
   test("parseSshCert: host RSA cert signed by Ed25519 CA") {
-    val w = wrap("test_data/certificates/ssh/synthetic/host-cert-rsa-signed-by-ed25519.pub")
+    val w = wrap(
+      "test_data/certificates/ssh/synthetic/host-cert-rsa-signed-by-ed25519.pub"
+    )
     val c = Certificates.parseSshCert(w)
     assert(c.isDefined)
     val cert = c.get
@@ -104,14 +106,14 @@ class SshStrategyParserTests extends FunSuite {
   test("sshCertTimeLabel: 0xFFFFFFFFFFFFFFFF emits 'forever' (G1)") {
     assertEquals(
       Certificates.sshCertTimeLabel(-1L, "forever"),
-      "forever",
+      "forever"
     )
   }
 
   test("sshCertTimeLabel: 0L emits 'always' (G1)") {
     assertEquals(
       Certificates.sshCertTimeLabel(0L, "always"),
-      "always",
+      "always"
     )
   }
 
@@ -131,7 +133,7 @@ class SshStrategyParserTests extends FunSuite {
     tmp.deleteOnExit()
     java.nio.file.Files.write(
       tmp.toPath,
-      "not-an-algo AAAA comment\n".getBytes("UTF-8"),
+      "not-an-algo AAAA comment\n".getBytes("UTF-8")
     )
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parseSshPubkey(w), None)
@@ -148,12 +150,13 @@ class SshStrategyParserTests extends FunSuite {
   test("parseSshPubkey: alg/wire mismatch returns None (G11)") {
     // Wire blob says "ssh-ed25519" but file's first token claims "ssh-rsa"
     // → `innerAlg == alg` sanity check rejects it.
-    val ed25519WireB64 = "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
+    val ed25519WireB64 =
+      "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
     val tmp = java.io.File.createTempFile("mismatch", ".pub")
     tmp.deleteOnExit()
     java.nio.file.Files.write(
       tmp.toPath,
-      s"ssh-rsa $ed25519WireB64 fake-comment\n".getBytes("UTF-8"),
+      s"ssh-rsa $ed25519WireB64 fake-comment\n".getBytes("UTF-8")
     )
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parseSshPubkey(w), None)
@@ -167,10 +170,13 @@ class SshStrategyParserTests extends FunSuite {
   test("parseSshPubkey: authorized_keys option-prefix line returns None (G7)") {
     val tmp = java.io.File.createTempFile("auth-keys", ".pub")
     tmp.deleteOnExit()
-    val ed25519B64 = "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
+    val ed25519B64 =
+      "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
     java.nio.file.Files.write(
       tmp.toPath,
-      s"from=\"1.2.3.4\",no-pty ssh-ed25519 $ed25519B64 user@host\n".getBytes("UTF-8"),
+      s"from=\"1.2.3.4\",no-pty ssh-ed25519 $ed25519B64 user@host\n".getBytes(
+        "UTF-8"
+      )
     )
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parseSshPubkey(w), None)
@@ -181,7 +187,7 @@ class SshStrategyParserTests extends FunSuite {
     tmp.deleteOnExit()
     java.nio.file.Files.write(
       tmp.toPath,
-      "not-an-algo-cert-v01@openssh.com AAAA\n".getBytes("UTF-8"),
+      "not-an-algo-cert-v01@openssh.com AAAA\n".getBytes("UTF-8")
     )
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parseSshCert(w), None)
@@ -190,15 +196,15 @@ class SshStrategyParserTests extends FunSuite {
   test("signedKeyAlgFromCertName strips suffix") {
     assertEquals(
       Certificates.signedKeyAlgFromCertName("ssh-ed25519-cert-v01@openssh.com"),
-      Some("ssh-ed25519"),
+      Some("ssh-ed25519")
     )
     assertEquals(
       Certificates.signedKeyAlgFromCertName("ssh-rsa-cert-v01@openssh.com"),
-      Some("ssh-rsa"),
+      Some("ssh-rsa")
     )
     assertEquals(
       Certificates.signedKeyAlgFromCertName("ssh-rsa"),
-      None,
+      None
     )
   }
 }

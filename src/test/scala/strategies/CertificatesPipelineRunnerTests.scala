@@ -28,31 +28,30 @@ import scala.collection.immutable.TreeSet
 /** Unit tests for [[CertificatesPipelineRunner]] — specifically the
   * [[CertificatesPipelineRunner.filterPrimaryItems]] helper.
   *
-  * Traces to: `certificates-strategy/appendices.md` Appendix B
-  * (`itemCount` semantics — "number of Items the pipeline must emit for
-  * this fixture"). The pipeline stores three kinds of Items:
+  * Traces to: `certificates-strategy/appendices.md` Appendix B (`itemCount`
+  * semantics — "number of Items the pipeline must emit for this fixture"). The
+  * pipeline stores three kinds of Items:
   *   - primary artifact Items (body = `ItemMetaData`)
   *   - alias-stub Items written by the back-reference pass (body = None)
-  *   - tag Items (body = `ItemTagData`, only present when `withTag(...)`
-  *     is set in Config; Certificates fixture tests do not set that)
+  *   - tag Items (body = `ItemTagData`, only present when `withTag(...)` is set
+  *     in Config; Certificates fixture tests do not set that)
   *
-  * Only primary items are what a sidecar's `itemCount` counts. The
-  * filter is the seam that enforces that contract.
+  * Only primary items are what a sidecar's `itemCount` counts. The filter is
+  * the seam that enforces that contract.
   *
   * ## LLM-friendly summary of each test
   *
-  *   - "filterPrimaryItems keeps Items with ItemMetaData body" — the
-  *     positive path.
-  *   - "filterPrimaryItems drops Items with body=None (alias stubs)" —
-  *     the negative path this filter was introduced to handle.
-  *   - "filterPrimaryItems drops Items with ItemTagData body" —
-  *     defensive: if a future test harness sets a tag, the filter
-  *     correctly excludes tag Items from `itemCount`.
-  *   - "filterPrimaryItems preserves input ordering" — stable output
-  *     for deterministic `items.head` semantics in downstream
-  *     assertions.
-  *   - "runGoatRodeoOnSingleFile on a simple file returns at least one
-  *     primary item" — end-to-end sanity (no alias stubs leak through).
+  *   - "filterPrimaryItems keeps Items with ItemMetaData body" — the positive
+  *     path.
+  *   - "filterPrimaryItems drops Items with body=None (alias stubs)" — the
+  *     negative path this filter was introduced to handle.
+  *   - "filterPrimaryItems drops Items with ItemTagData body" — defensive: if a
+  *     future test harness sets a tag, the filter correctly excludes tag Items
+  *     from `itemCount`.
+  *   - "filterPrimaryItems preserves input ordering" — stable output for
+  *     deterministic `items.head` semantics in downstream assertions.
+  *   - "runGoatRodeoOnSingleFile on a simple file returns at least one primary
+  *     item" — end-to-end sanity (no alias stubs leak through).
   */
 class CertificatesPipelineRunnerTests extends FunSuite {
 
@@ -65,23 +64,23 @@ class CertificatesPipelineRunnerTests extends FunSuite {
         fileNames = TreeSet.empty,
         mimeType = TreeSet.empty,
         fileSize = 0L,
-        extra = TreeMap.empty,
+        extra = TreeMap.empty
       )
-    ),
+    )
   )
 
   private def aliasStubItem(id: String): Item = Item(
     identifier = id,
     connections = TreeSet.empty,
     bodyMimeType = None,
-    body = None,
+    body = None
   )
 
   private def tagItem(id: String): Item = Item(
     identifier = id,
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemTagData.mimeType),
-    body = Some(ItemTagData(Dom.NullElem)),
+    body = Some(ItemTagData(Dom.NullElem))
   )
 
   test("filterPrimaryItems keeps Items with ItemMetaData body") {
@@ -124,7 +123,7 @@ class CertificatesPipelineRunnerTests extends FunSuite {
   test("filterPrimaryItems on empty input returns empty") {
     assertEquals(
       CertificatesPipelineRunner.filterPrimaryItems(Vector.empty),
-      Vector.empty[Item],
+      Vector.empty[Item]
     )
   }
 
@@ -135,7 +134,9 @@ class CertificatesPipelineRunnerTests extends FunSuite {
     assertEquals(out, Vector.empty[Item])
   }
 
-  test("runGoatRodeoOnSingleFile on a simple file returns exactly one primary Item") {
+  test(
+    "runGoatRodeoOnSingleFile on a simple file returns exactly one primary Item"
+  ) {
     // Sanity integration test: run the real pipeline on a trivial
     // artifact written to a temp file. A pre-Phase-3 pipeline uses
     // GenericFile for unclaimed files → one primary Item. The filter
@@ -146,7 +147,8 @@ class CertificatesPipelineRunnerTests extends FunSuite {
     try {
       val items = CertificatesPipelineRunner.runGoatRodeoOnSingleFile(tmp)
       assertEquals(
-        items.size, 1,
+        items.size,
+        1,
         s"expected 1 primary Item, got ${items.size}: ${items.map(_.identifier)}"
       )
       assert(

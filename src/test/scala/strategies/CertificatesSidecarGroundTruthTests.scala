@@ -23,60 +23,57 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import scala.util.Try
 
-/** Ground-truth cross-check — verify that the `Certificates:CertSha256`
-  * and `Certificates:SpkiSha256` fields in every committed X.509 sidecar
-  * actually match the bytes of their paired fixture file.
+/** Ground-truth cross-check — verify that the `Certificates:CertSha256` and
+  * `Certificates:SpkiSha256` fields in every committed X.509 sidecar actually
+  * match the bytes of their paired fixture file.
   *
   * ## Why this suite exists
   *
   * Phase 0b shipped 200 sidecars whose values were computed by
-  * `tools/cert_sidecar.py` (Python + the `cryptography` package, itself
-  * a wrapper over OpenSSL). If that computation had a bug, or if
-  * someone edited a sidecar by hand without regenerating, or if a
-  * fixture file was swapped without updating the sidecar — every such
-  * drift is a silent source of false green or false red downstream.
+  * `tools/cert_sidecar.py` (Python + the `cryptography` package, itself a
+  * wrapper over OpenSSL). If that computation had a bug, or if someone edited a
+  * sidecar by hand without regenerating, or if a fixture file was swapped
+  * without updating the sidecar — every such drift is a silent source of false
+  * green or false red downstream.
   *
   * This suite uses **the JDK's built-in** `java.security.cert.
-  * CertificateFactory` — a completely separate X.509 parser from the
-  * one that authored the sidecars. If both agree on SHA-256 of the
-  * full DER cert and SHA-256 of the SubjectPublicKeyInfo, the
-  * ground-truth is independently verified.
+  * CertificateFactory` — a completely separate X.509 parser from the one that
+  * authored the sidecars. If both agree on SHA-256 of the full DER cert and
+  * SHA-256 of the SubjectPublicKeyInfo, the ground-truth is independently
+  * verified.
   *
   * ## Scope
   *
-  * Only X.509 sidecars are covered (those that carry
-  * `Certificates:CertSha256` / `Certificates:SpkiSha256`). Non-X.509
-  * fixtures (SSH, PGP, private keys, keystores, CRLs) do not have
-  * these fields and are skipped.
+  * Only X.509 sidecars are covered (those that carry `Certificates:CertSha256`
+  * / `Certificates:SpkiSha256`). Non-X.509 fixtures (SSH, PGP, private keys,
+  * keystores, CRLs) do not have these fields and are skipped.
   *
-  * The suite enforces n ≥ 5 as a minimum sample. If fewer than 5
-  * X.509 sidecars with computed fields are found, the test fails
-  * loudly — that would mean either the corpus has been gutted or
-  * the sidecar format has changed without this test being kept in
-  * sync.
+  * The suite enforces n ≥ 5 as a minimum sample. If fewer than 5 X.509 sidecars
+  * with computed fields are found, the test fails loudly — that would mean
+  * either the corpus has been gutted or the sidecar format has changed without
+  * this test being kept in sync.
   *
   * ## LLM-friendly summary
   *
   *   - "at least 5 X.509 fixtures are covered" — sample-size floor.
-  *   - "every X.509 fixture's CertSha256 matches SHA-256 of its
-  *     fixture bytes" — byte-level ground truth.
-  *   - "every X.509 fixture's SpkiSha256 matches SHA-256 of the
-  *     JDK-parsed SubjectPublicKeyInfo" — SPKI computation cross-
-  *     check.
-  *   - "every X.509 fixture's SubjectDN matches JDK's RFC-2253
-  *     rendering of the parsed subject" — DN formatting cross-check.
+  *   - "every X.509 fixture's CertSha256 matches SHA-256 of its fixture bytes"
+  *     — byte-level ground truth.
+  *   - "every X.509 fixture's SpkiSha256 matches SHA-256 of the JDK-parsed
+  *     SubjectPublicKeyInfo" — SPKI computation cross- check.
+  *   - "every X.509 fixture's SubjectDN matches JDK's RFC-2253 rendering of the
+  *     parsed subject" — DN formatting cross-check.
   */
 class CertificatesSidecarGroundTruthTests extends FunSuite {
 
   /** One X.509 fixture that has cert/SPKI/DN sidecar fields to verify. */
   private case class X509CheckCase(
       fixture: java.io.File,
-      sidecar: CertificatesSidecar,
+      sidecar: CertificatesSidecar
   )
 
   /** Collect every (fixture, sidecar) pair whose sidecar has
-    * `Certificates:CertSha256` — the marker that identifies an X.509
-    * sidecar with computed ground truth.
+    * `Certificates:CertSha256` — the marker that identifies an X.509 sidecar
+    * with computed ground truth.
     */
   private lazy val cases: Vector[X509CheckCase] = {
     CertificatesFixtureInventory.pairs.flatMap { pair =>
@@ -109,7 +106,9 @@ class CertificatesSidecarGroundTruthTests extends FunSuite {
     )
   }
 
-  test("every X.509 sidecar's Certificates:CertSha256 matches SHA-256 of the fixture's DER bytes (JDK parser)") {
+  test(
+    "every X.509 sidecar's Certificates:CertSha256 matches SHA-256 of the fixture's DER bytes (JDK parser)"
+  ) {
     val failures = cases.flatMap { c =>
       val raw = Files.readAllBytes(c.fixture.toPath)
       val cert = parseCert(raw)
@@ -129,7 +128,9 @@ class CertificatesSidecarGroundTruthTests extends FunSuite {
     )
   }
 
-  test("every X.509 sidecar's Certificates:SpkiSha256 matches SHA-256 of the JDK-parsed SubjectPublicKeyInfo") {
+  test(
+    "every X.509 sidecar's Certificates:SpkiSha256 matches SHA-256 of the JDK-parsed SubjectPublicKeyInfo"
+  ) {
     val failures = cases.flatMap { c =>
       val raw = Files.readAllBytes(c.fixture.toPath)
       val cert = parseCert(raw)
@@ -152,7 +153,9 @@ class CertificatesSidecarGroundTruthTests extends FunSuite {
     )
   }
 
-  test("every X.509 sidecar's Certificates:SubjectDN matches JDK's RFC-2253 rendering") {
+  test(
+    "every X.509 sidecar's Certificates:SubjectDN matches JDK's RFC-2253 rendering"
+  ) {
     // This does NOT catch every DN-formatting edge case — JDK and
     // `cryptography` may differ on attribute ordering for multi-RDN
     // names — but for the canonical single-RDN cases that dominate

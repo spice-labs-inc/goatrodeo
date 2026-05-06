@@ -26,44 +26,48 @@ import scala.sys.process.*
 
 /** End-to-end tests for `test_data/certificates/tools/compute-expected.sh`.
   *
-  * Plan task #3 (`certificates-strategy/phase-0-corpus.md`) specifies
-  * a draft-sidecar generator that contributors run when adding a
-  * fixture. Pre-Phase-0b, the script existed but was untested. A
-  * regression in the SubjectDN/IssuerDN sed expressions (an extra
-  * space in `sed 's/^subject= //'` against openssl's `subject=...`
-  * output) was shipping broken sidecars. This suite locks in the
-  * tool's contract:
+  * Plan task #3 (`certificates-strategy/phase-0-corpus.md`) specifies a
+  * draft-sidecar generator that contributors run when adding a fixture.
+  * Pre-Phase-0b, the script existed but was untested. A regression in the
+  * SubjectDN/IssuerDN sed expressions (an extra space in `sed 's/^subject= //'`
+  * against openssl's `subject=...` output) was shipping broken sidecars. This
+  * suite locks in the tool's contract:
   *
   *   - exit 0 on a valid PEM X.509 fixture
   *   - emits parseable JSON
   *   - SubjectDN field contains no `subject=` literal prefix
   *   - IssuerDN field contains no `issuer=` literal prefix
-  *   - Cert SHA-256 matches what the JDK X509 parser computes
-  *     against the same fixture's DER bytes
+  *   - Cert SHA-256 matches what the JDK X509 parser computes against the same
+  *     fixture's DER bytes
   *
-  * If the script is missing or `bash` cannot be invoked the test is
-  * marked `assume(... && !ignored)` so non-Linux dev machines do not
-  * fail-spuriously.
+  * If the script is missing or `bash` cannot be invoked the test is marked
+  * `assume(... && !ignored)` so non-Linux dev machines do not fail-spuriously.
   *
   * ## Trace to plan
   *
-  * Plan task: phase-0-corpus.md task #3 (the tool itself).
-  * Acceptance criterion verified: tool produces JSON with correctly-
-  * stripped DN values that any reviewer can hand-verify against
-  * `openssl x509 -subject -nameopt RFC2253` output.
+  * Plan task: phase-0-corpus.md task #3 (the tool itself). Acceptance criterion
+  * verified: tool produces JSON with correctly- stripped DN values that any
+  * reviewer can hand-verify against `openssl x509 -subject -nameopt RFC2253`
+  * output.
   */
 class ComputeExpectedToolTests extends FunSuite {
 
-  private val script = new File("test_data/certificates/tools/compute-expected.sh")
+  private val script = new File(
+    "test_data/certificates/tools/compute-expected.sh"
+  )
   private val sampleFixture = new File(
     "test_data/certificates/x509/canonical/letsencrypt-isrgrootx1.pem"
   )
 
   override def beforeAll(): Unit = {
-    assume(script.exists() && script.canExecute(),
-      s"compute-expected.sh missing or not executable at ${script.getPath}")
-    assume(sampleFixture.exists(),
-      s"sample fixture missing at ${sampleFixture.getPath}")
+    assume(
+      script.exists() && script.canExecute(),
+      s"compute-expected.sh missing or not executable at ${script.getPath}"
+    )
+    assume(
+      sampleFixture.exists(),
+      s"sample fixture missing at ${sampleFixture.getPath}"
+    )
   }
 
   private def runTool(fixture: File): (Int, String, String) = {
@@ -71,10 +75,11 @@ class ComputeExpectedToolTests extends FunSuite {
     val err = new StringBuilder
     val logger = ProcessLogger(
       o => { out.append(o); out.append('\n') },
-      e => { err.append(e); err.append('\n') },
+      e => { err.append(e); err.append('\n') }
     )
-    val rc = Process(Seq("bash", script.getAbsolutePath, fixture.getAbsolutePath))
-      .!(logger)
+    val rc =
+      Process(Seq("bash", script.getAbsolutePath, fixture.getAbsolutePath))
+        .!(logger)
     (rc, out.toString, err.toString)
   }
 
@@ -103,8 +108,8 @@ class ComputeExpectedToolTests extends FunSuite {
     Files.writeString(tmp.toPath, stdout)
     try {
       val parsed = CertificatesSidecar.parse(tmp)
-      val dn = parsed.metadata.mustContain.getOrElse(
-        "Certificates:SubjectDN", "")
+      val dn =
+        parsed.metadata.mustContain.getOrElse("Certificates:SubjectDN", "")
       assert(
         dn.nonEmpty,
         "Certificates:SubjectDN must be present and non-empty"
@@ -126,8 +131,8 @@ class ComputeExpectedToolTests extends FunSuite {
     Files.writeString(tmp.toPath, stdout)
     try {
       val parsed = CertificatesSidecar.parse(tmp)
-      val dn = parsed.metadata.mustContain.getOrElse(
-        "Certificates:IssuerDN", "")
+      val dn =
+        parsed.metadata.mustContain.getOrElse("Certificates:IssuerDN", "")
       assert(
         dn.nonEmpty,
         "Certificates:IssuerDN must be present and non-empty"
@@ -139,7 +144,9 @@ class ComputeExpectedToolTests extends FunSuite {
     } finally tmp.delete()
   }
 
-  test("compute-expected.sh's emitted CertSha256 (in cert-sha256@... pURL) matches JDK's parsed-DER SHA-256") {
+  test(
+    "compute-expected.sh's emitted CertSha256 (in cert-sha256@... pURL) matches JDK's parsed-DER SHA-256"
+  ) {
     val (_, stdout, _) = runTool(sampleFixture)
     val tmp = File.createTempFile("compute-expected-out-", ".json")
     Files.writeString(tmp.toPath, stdout)
@@ -168,9 +175,12 @@ class ComputeExpectedToolTests extends FunSuite {
         .digest(cert.getEncoded)
         .map(b => f"${b & 0xff}%02x")
         .mkString
-      assertEquals(toolHex, jdkHex,
+      assertEquals(
+        toolHex,
+        jdkHex,
         s"compute-expected.sh emitted cert-sha256=$toolHex but JDK " +
-          s"parsed DER hashes to $jdkHex")
+          s"parsed DER hashes to $jdkHex"
+      )
     } finally tmp.delete()
   }
 }

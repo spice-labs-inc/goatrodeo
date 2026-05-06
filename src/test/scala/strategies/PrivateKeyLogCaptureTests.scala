@@ -3,39 +3,40 @@
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData, SingleMarker}
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import munit.FunSuite
 
 import java.io.File
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 
 /** Phase 7 plan §"Acceptance":
   *
-  * > No fixture in this phase triggers a password prompt, a decryption
-  * > attempt, or a log message about encryption status beyond what's
-  * > in the metadata. **Verify via log capture in tests.**
+  * > No fixture in this phase triggers a password prompt, a decryption >
+  * attempt, or a log message about encryption status beyond what's > in the
+  * metadata. **Verify via log capture in tests.**
   *
-  * This suite installs a Logback `ListAppender` on the root logger,
-  * runs the full Phase-7 corpus through `classifyAndParse` +
-  * `getPurls` + `getMetadata`, and asserts:
+  * This suite installs a Logback `ListAppender` on the root logger, runs the
+  * full Phase-7 corpus through `classifyAndParse` + `getPurls` + `getMetadata`,
+  * and asserts:
   *
   *   1. NO log record originates from
-  *      `io.spicelabs.goatrodeo.omnibor.strategies.Certificates` —
-  *      there are zero log calls in the strategy code (verified by
-  *      static grep, but this dynamic test catches a future
-  *      regression where someone adds a log statement on a
-  *      private-key path).
-  *   2. NO log record at any level mentions "decrypt", "password",
-  *      "passphrase", or "BadPadding" — proving the encrypted-path
-  *      parsers never invoked any decryption call.
+  *      `io.spicelabs.goatrodeo.omnibor.strategies.Certificates` — there are
+  *      zero log calls in the strategy code (verified by static grep, but this
+  *      dynamic test catches a future regression where someone adds a log
+  *      statement on a private-key path). 2. NO log record at any level
+  *      mentions "decrypt", "password", "passphrase", or "BadPadding" — proving
+  *      the encrypted-path parsers never invoked any decryption call.
   *
-  * If either property fails, the relevant log records are dumped so
-  * the failing call can be located.
+  * If either property fails, the relevant log records are dumped so the failing
+  * call can be located.
   */
 class PrivateKeyLogCaptureTests extends FunSuite {
 
-  import ch.qos.logback.classic.{Level, Logger as LbLogger, LoggerContext}
+  import ch.qos.logback.classic.{Level, LoggerContext}
   import ch.qos.logback.classic.spi.ILoggingEvent
   import ch.qos.logback.core.read.ListAppender
   import org.slf4j.LoggerFactory
@@ -69,15 +70,18 @@ class PrivateKeyLogCaptureTests extends FunSuite {
         fileNames = TreeSet.empty,
         mimeType = TreeSet.empty,
         fileSize = 0L,
-        extra = TreeMap.empty,
+        extra = TreeMap.empty
       )
-    ),
+    )
   )
 
   private def runEveryPhase7Fixture(): Unit = {
     val root = java.nio.file.Paths.get("test_data/certificates/private-keys")
     if (!java.nio.file.Files.exists(root)) return
-    val files = java.nio.file.Files.walk(root).iterator().asScala
+    val files = java.nio.file.Files
+      .walk(root)
+      .iterator()
+      .asScala
       .filter(p => java.nio.file.Files.isRegularFile(p))
       .filter(p => !p.toString.endsWith(".expected.json"))
       .filter(p => !p.toString.endsWith("/generate.sh"))
@@ -93,34 +97,49 @@ class PrivateKeyLogCaptureTests extends FunSuite {
     }
   }
 
-  test("[HARD RULE Phase 7] no log records from Certificates strategy across the entire Phase-7 corpus") {
+  test(
+    "[HARD RULE Phase 7] no log records from Certificates strategy across the entire Phase-7 corpus"
+  ) {
     val (_, events) = runWithCapture(() => runEveryPhase7Fixture())
     val fromCert = events.filter { e =>
       Option(e.getLoggerName).exists(
-        _.startsWith("io.spicelabs.goatrodeo.omnibor.strategies.Certificates"))
+        _.startsWith("io.spicelabs.goatrodeo.omnibor.strategies.Certificates")
+      )
     }
     if (fromCert.nonEmpty) {
-      val sample = fromCert.take(5).map(e =>
-        s"  [${e.getLevel}] ${e.getLoggerName}: ${e.getFormattedMessage}").mkString("\n")
+      val sample = fromCert
+        .take(5)
+        .map(e =>
+          s"  [${e.getLevel}] ${e.getLoggerName}: ${e.getFormattedMessage}"
+        )
+        .mkString("\n")
       fail(
         s"Phase 7 hard rule: zero log records from Certificates expected; " +
-        s"got ${fromCert.length}:\n$sample")
+          s"got ${fromCert.length}:\n$sample"
+      )
     }
   }
 
-  test("[HARD RULE Phase 7] no log record mentions decrypt/password/passphrase/BadPadding (decryption-attempt smoke test)") {
+  test(
+    "[HARD RULE Phase 7] no log record mentions decrypt/password/passphrase/BadPadding (decryption-attempt smoke test)"
+  ) {
     val (_, events) = runWithCapture(() => runEveryPhase7Fixture())
     val suspicious = events.filter { e =>
       val msg = Option(e.getFormattedMessage).getOrElse("").toLowerCase
       msg.contains("decrypt") || msg.contains("password") ||
-        msg.contains("passphrase") || msg.contains("badpadding")
+      msg.contains("passphrase") || msg.contains("badpadding")
     }
     if (suspicious.nonEmpty) {
-      val sample = suspicious.take(5).map(e =>
-        s"  [${e.getLevel}] ${e.getLoggerName}: ${e.getFormattedMessage}").mkString("\n")
+      val sample = suspicious
+        .take(5)
+        .map(e =>
+          s"  [${e.getLevel}] ${e.getLoggerName}: ${e.getFormattedMessage}"
+        )
+        .mkString("\n")
       fail(
         s"Phase 7 hard rule: no log record may suggest a decryption " +
-        s"attempt; got ${suspicious.length}:\n$sample")
+          s"attempt; got ${suspicious.length}:\n$sample"
+      )
     }
   }
 }

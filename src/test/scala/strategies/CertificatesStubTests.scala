@@ -34,39 +34,36 @@ import scala.collection.immutable.TreeSet
   * Phase 1 of the Certificates strategy ships:
   *   - `CryptoDetector.mimeTypeAugmenter` — pass-through stub
   *   - `Certificates.computeCertificateFiles` — claims nothing
-  *   - `CertificatesState`'s 5 `ProcessingState` methods — all
-  *     pass-through
+  *   - `CertificatesState`'s 5 `ProcessingState` methods — all pass-through
   *
-  * These tests assert the stub contracts directly. They guard the
-  * Phase-1 invariant "no behavior change" against accidental
-  * regressions during Phase 2/3+ rewrites. They are a regression net,
-  * not an acceptance gate — Phase 2 will replace
-  * `CryptoDetector.mimeTypeAugmenter` with content sniffing, so that
-  * test will need to update (per invariant #4 — discuss before
-  * changing).
+  * These tests assert the stub contracts directly. They guard the Phase-1
+  * invariant "no behavior change" against accidental regressions during Phase
+  * 2/3+ rewrites. They are a regression net, not an acceptance gate — Phase 2
+  * will replace `CryptoDetector.mimeTypeAugmenter` with content sniffing, so
+  * that test will need to update (per invariant #4 — discuss before changing).
   *
   * ## Trace to plan
   *
-  * Plan: `certificates-strategy/phases-1-2-foundation-detector.md`
-  * Phase 1 task #3 (CryptoDetector stub) and task #5 (Certificates
-  * skeleton with five ProcessingState methods).
+  * Plan: `certificates-strategy/phases-1-2-foundation-detector.md` Phase 1 task
+  * #3 (CryptoDetector stub) and task #5 (Certificates skeleton with five
+  * ProcessingState methods).
   *
   * ## LLM-friendly summary
   *
-  * | Test | Phase 1 contract verified |
-  * |---|---|
-  * | `CryptoDetector returns currentMimes unchanged for empty set` | augmenter passes through ∅ |
-  * | `... for a small text-MIME set` | augmenter doesn't strip text-prefixed MIMEs like SaffronDetector does |
-  * | `... for a typical Tika-ish set` | no MIME types added or removed |
-  * | `... is purely additive in form` | output ⊇ input (subset relation) |
-  * | `Certificates.computeCertificateFiles returns empty + unchanged + label` | claim-nothing dispatcher |
-  * | `... preserves a single-entry byUUID map identity` | no map mutation |
-  * | `... preserves a single-entry byName map identity` | no map mutation |
-  * | `CertificatesState.beginProcessing returns this` | identity |
-  * | `... getPurls returns empty Vector + this` | empty pURL contract |
-  * | `... getMetadata returns empty TreeMap + this` | empty metadata contract |
-  * | `... finalAugmentation returns input Item + this` | no Item mutation |
-  * | `... postChildProcessing returns this` | identity |
+  * | Test                                                                     | Phase 1 contract verified                                             |
+  * |:-------------------------------------------------------------------------|:----------------------------------------------------------------------|
+  * | `CryptoDetector returns currentMimes unchanged for empty set`            | augmenter passes through ∅                                            |
+  * | `... for a small text-MIME set`                                          | augmenter doesn't strip text-prefixed MIMEs like SaffronDetector does |
+  * | `... for a typical Tika-ish set`                                         | no MIME types added or removed                                        |
+  * | `... is purely additive in form`                                         | output ⊇ input (subset relation)                                      |
+  * | `Certificates.computeCertificateFiles returns empty + unchanged + label` | claim-nothing dispatcher                                              |
+  * | `... preserves a single-entry byUUID map identity`                       | no map mutation                                                       |
+  * | `... preserves a single-entry byName map identity`                       | no map mutation                                                       |
+  * | `CertificatesState.beginProcessing returns this`                         | identity                                                              |
+  * | `... getPurls returns empty Vector + this`                               | empty pURL contract                                                   |
+  * | `... getMetadata returns empty TreeMap + this`                           | empty metadata contract                                               |
+  * | `... finalAugmentation returns input Item + this`                        | no Item mutation                                                      |
+  * | `... postChildProcessing returns this`                                   | identity                                                              |
   */
 class CertificatesStubTests extends FunSuite {
 
@@ -84,9 +81,9 @@ class CertificatesStubTests extends FunSuite {
         fileNames = TreeSet.empty,
         mimeType = TreeSet.empty,
         fileSize = 0L,
-        extra = TreeMap.empty,
+        extra = TreeMap.empty
       )
-    ),
+    )
   )
 
   // === SECTION A — Phase-INVARIANT contracts ==============================
@@ -96,17 +93,23 @@ class CertificatesStubTests extends FunSuite {
   // green. If a future phase needs to weaken any of them, that requires
   // invariant-#4 discussion BEFORE the test is changed.
 
-  test("[INVARIANT] CryptoDetector.mimeTypeAugmenter never strips MIME types beginning with `text/`") {
+  test(
+    "[INVARIANT] CryptoDetector.mimeTypeAugmenter never strips MIME types beginning with `text/`"
+  ) {
     // Plan task #2 detection-signature table footnote: contrasting
     // SaffronDetector, the Crypto augmenter is purely additive.
     val input = Set("text/plain", "text/html")
     val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input)
     val stripped = input.filterNot(out.contains)
-    assert(stripped.isEmpty,
-      s"text-prefixed MIMEs were stripped: $stripped (output=$out)")
+    assert(
+      stripped.isEmpty,
+      s"text-prefixed MIMEs were stripped: $stripped (output=$out)"
+    )
   }
 
-  test("[INVARIANT] CryptoDetector.mimeTypeAugmenter output is always a superset of input (additive)") {
+  test(
+    "[INVARIANT] CryptoDetector.mimeTypeAugmenter output is always a superset of input (additive)"
+  ) {
     // Phase 2 will replace the augmenter body with content sniffing.
     // The body changes; the additive-contract invariant doesn't.
     val cases = Seq(
@@ -114,13 +117,15 @@ class CertificatesStubTests extends FunSuite {
       Set("text/plain"),
       Set("application/octet-stream", "application/json"),
       Set("application/x-pem-file"),
-      Set("text/plain", "application/x-x509-ca-cert"),
+      Set("text/plain", "application/x-x509-ca-cert")
     )
     for (input <- cases) {
       val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input)
-      assert(input.subsetOf(out),
+      assert(
+        input.subsetOf(out),
         s"output $out must be a superset of input $input " +
-          "(augmenter is purely additive)")
+          "(augmenter is purely additive)"
+      )
     }
   }
 
@@ -141,38 +146,58 @@ class CertificatesStubTests extends FunSuite {
   // Per CLAUDE.md invariant #4, every change to these tests in subsequent
   // phases requires explicit user approval before it lands.
 
-  test("[STUB] CryptoDetector.mimeTypeAugmenter returns currentMimes unchanged for empty set") {
+  test(
+    "[STUB] CryptoDetector.mimeTypeAugmenter returns currentMimes unchanged for empty set"
+  ) {
     val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), Set.empty)
     assertEquals(out, Set.empty[String])
   }
 
-  test("[STUB] CryptoDetector.mimeTypeAugmenter on a typical Tika-ish set returns it identically (Phase 1 only — Phase 2 will add MIMEs for cert-shaped fixtures)") {
-    val input = Set("application/octet-stream", "application/x-pem-file",
-                    "application/x-x509-ca-cert", "text/plain")
+  test(
+    "[STUB] CryptoDetector.mimeTypeAugmenter on a typical Tika-ish set returns it identically (Phase 1 only — Phase 2 will add MIMEs for cert-shaped fixtures)"
+  ) {
+    val input = Set(
+      "application/octet-stream",
+      "application/x-pem-file",
+      "application/x-x509-ca-cert",
+      "text/plain"
+    )
     assertEquals(
       CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input),
-      input,
+      input
     )
   }
 
   // === SECTION B continued — Phase-1-STUB-specific (Certificates) ========
 
-  test("[STUB] Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") at Phase 1 (claim-nothing dispatcher)") {
+  test(
+    "[STUB] Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") at Phase 1 (claim-nothing dispatcher)"
+  ) {
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
     val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName = Map.empty
     val (claimed, returnedByUUID, returnedByName, label) =
       Certificates.computeCertificateFiles(byUUID, byName)
-    assertEquals(claimed, Vector.empty,
-      "Phase-1 stub must claim nothing.")
-    assertEquals(returnedByUUID, byUUID,
-      "Phase-1 stub must return byUUID unchanged.")
-    assertEquals(returnedByName, byName,
-      "Phase-1 stub must return byName unchanged.")
-    assertEquals(label, "Certificates",
-      "Dispatch label must be 'Certificates'.")
+    assertEquals(claimed, Vector.empty, "Phase-1 stub must claim nothing.")
+    assertEquals(
+      returnedByUUID,
+      byUUID,
+      "Phase-1 stub must return byUUID unchanged."
+    )
+    assertEquals(
+      returnedByName,
+      byName,
+      "Phase-1 stub must return byName unchanged."
+    )
+    assertEquals(
+      label,
+      "Certificates",
+      "Dispatch label must be 'Certificates'."
+    )
   }
 
-  test("[STUB] Certificates.computeCertificateFiles preserves a single-entry byUUID map identity (claim-nothing → no map mutation)") {
+  test(
+    "[STUB] Certificates.computeCertificateFiles preserves a single-entry byUUID map identity (claim-nothing → no map mutation)"
+  ) {
     val art = syntheticArtifact()
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID =
       Map(art.uuid -> art)
@@ -180,11 +205,15 @@ class CertificatesStubTests extends FunSuite {
     val (_, returnedByUUID, _, _) =
       Certificates.computeCertificateFiles(byUUID, byName)
     assertEquals(returnedByUUID, byUUID)
-    assert(returnedByUUID.contains(art.uuid),
-      "byUUID must still contain the artifact unchanged.")
+    assert(
+      returnedByUUID.contains(art.uuid),
+      "byUUID must still contain the artifact unchanged."
+    )
   }
 
-  test("[STUB] Certificates.computeCertificateFiles preserves a single-entry byName map identity (claim-nothing → no map mutation)") {
+  test(
+    "[STUB] Certificates.computeCertificateFiles preserves a single-entry byName map identity (claim-nothing → no map mutation)"
+  ) {
     val art = syntheticArtifact("foo.pem")
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
     val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName =
@@ -196,15 +225,18 @@ class CertificatesStubTests extends FunSuite {
 
   // === SECTION B continued — Phase-1-STUB-specific (CertificatesState) ===
 
-  test("[STUB] CertificatesState.beginProcessing returns this (identity pass-through; Phase 3+ will use this stage to cache parsed cert)") {
+  test(
+    "[STUB] CertificatesState.beginProcessing returns this (identity pass-through; Phase 3+ will use this stage to cache parsed cert)"
+  ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
     val out = state.beginProcessing(art, syntheticItem(), SingleMarker())
-    assert(out eq state,
-      "beginProcessing must return the same state instance.")
+    assert(out eq state, "beginProcessing must return the same state instance.")
   }
 
-  test("[STUB] CertificatesState.getPurls returns (empty Vector, this) at Phase 1 (Phase 3+ emits per-cert pURLs)") {
+  test(
+    "[STUB] CertificatesState.getPurls returns (empty Vector, this) at Phase 1 (Phase 3+ emits per-cert pURLs)"
+  ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
     val (purls, returned) =
@@ -213,36 +245,44 @@ class CertificatesStubTests extends FunSuite {
     assert(returned eq state)
   }
 
-  test("[STUB] CertificatesState.getMetadata returns (empty TreeMap, this) at Phase 1 (Phase 3+ emits per-cert metadata)") {
+  test(
+    "[STUB] CertificatesState.getMetadata returns (empty TreeMap, this) at Phase 1 (Phase 3+ emits per-cert metadata)"
+  ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
     val (md, returned) =
       state.getMetadata(art, syntheticItem(), SingleMarker())
-    assert(md.isEmpty,
-      "Phase-1 metadata contract is empty TreeMap.")
+    assert(md.isEmpty, "Phase-1 metadata contract is empty TreeMap.")
     assert(returned eq state)
   }
 
-  test("[STUB] CertificatesState.finalAugmentation returns the input Item unchanged at Phase 1 (Phase 3+ runs the leak sweep here)") {
+  test(
+    "[STUB] CertificatesState.finalAugmentation returns the input Item unchanged at Phase 1 (Phase 3+ runs the leak sweep here)"
+  ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
     val item = syntheticItem()
     val (returnedItem, returnedState) =
       state.finalAugmentation(
-        art, item, SingleMarker(),
+        art,
+        item,
+        SingleMarker(),
         ParentScope.forAndWith("test-scope", None, Map.empty),
-        MemStorage(None),
+        MemStorage(None)
       )
-    assert(returnedItem eq item,
-      "finalAugmentation must not mutate the Item.")
+    assert(returnedItem eq item, "finalAugmentation must not mutate the Item.")
     assert(returnedState eq state)
   }
 
-  test("[INVARIANT] CertificatesState.postChildProcessing returns this — the Certificates strategy never recurses into child Items (Hard rule #2)") {
+  test(
+    "[INVARIANT] CertificatesState.postChildProcessing returns this — the Certificates strategy never recurses into child Items (Hard rule #2)"
+  ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
     val out = state.postChildProcessing(
-      None, MemStorage(None), SingleMarker()
+      None,
+      MemStorage(None),
+      SingleMarker()
     )
     assert(out eq state)
   }
@@ -250,19 +290,22 @@ class CertificatesStubTests extends FunSuite {
   // === SECTION A continued — Phase-INVARIANT (registration) =============
 
   /** Phase-1 plan task #6 + claim #8 in `docs/certificates/phase-1-claims.md`
-    * say `Class.forName("io.spicelabs.goatrodeo.omnibor.strategies.Certificates")`
+    * say
+    * `Class.forName("io.spicelabs.goatrodeo.omnibor.strategies.Certificates")`
     * must resolve at runtime — that's the gate `CertificatesSuite` reads to
-    * decide whether to skip per-fixture tests. Prior to this test, claim #8
-    * was only verified indirectly via observing CertificatesSuite's gate
-    * flip. This locks the contract directly with no observation chain.
+    * decide whether to skip per-fixture tests. Prior to this test, claim #8 was
+    * only verified indirectly via observing CertificatesSuite's gate flip. This
+    * locks the contract directly with no observation chain.
     */
   test("[INVARIANT] Certificates strategy class is reflectively loadable") {
     val cls = Class.forName(
       "io.spicelabs.goatrodeo.omnibor.strategies.Certificates"
     )
-    assert(cls != null,
+    assert(
+      cls != null,
       "io.spicelabs.goatrodeo.omnibor.strategies.Certificates must " +
         "resolve via Class.forName so CertificatesSuite's strategyPresent " +
-        "gate flips to active.")
+        "gate flips to active."
+    )
   }
 }

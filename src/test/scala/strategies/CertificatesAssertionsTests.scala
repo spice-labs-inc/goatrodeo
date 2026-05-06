@@ -23,9 +23,9 @@ import munit.FunSuite
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Unit tests for [[CertificatesAssertions]] — each helper gets a positive
-  * and a negative test. Synthetic Items are constructed directly; no
-  * pipeline, no fixtures.
+/** Unit tests for [[CertificatesAssertions]] — each helper gets a positive and
+  * a negative test. Synthetic Items are constructed directly; no pipeline, no
+  * fixtures.
   *
   * Traces to: `certificates-strategy/appendices.md` Appendix B (assertion
   * contract) and Appendix C (forbidden-pattern leak guard).
@@ -34,11 +34,10 @@ import scala.collection.immutable.TreeSet
   *
   * Each helper is independently verified:
   *   - `assertMimeTypesContain` / `assertMimeTypesAbsent`
-  *   - `assertPurlsContain` / `assertPurlsAbsent` (including the
-  *     `<computed>` token path)
+  *   - `assertPurlsContain` / `assertPurlsAbsent` (including the `<computed>`
+  *     token path)
   *   - `assertMetadataContains` (exact + `<computed>` placeholder)
-  *   - `assertMetadataRanges` (inside + outside bounds, unparseable
-  *     bounds)
+  *   - `assertMetadataRanges` (inside + outside bounds, unparseable bounds)
   *   - `assertMetadataKeysAbsent`
   *   - `assertNoForbiddenPatterns` — the private-key leak guard
   */
@@ -81,7 +80,11 @@ class CertificatesAssertionsTests extends FunSuite {
   test("assertMimeTypesContain throws when any required is missing") {
     val item = mkItem(mimeTypes = Set("a/b"))
     val ex = intercept[AssertionError] {
-      CertificatesAssertions.assertMimeTypesContain(item, List("a/b", "missing"), "t")
+      CertificatesAssertions.assertMimeTypesContain(
+        item,
+        List("a/b", "missing"),
+        "t"
+      )
     }
     assert(ex.getMessage.contains("missing"))
   }
@@ -101,7 +104,8 @@ class CertificatesAssertionsTests extends FunSuite {
   // ---------- pURL helpers ----------
 
   test("assertPurlsContain passes when all required pURLs are present") {
-    val item = mkItem(purls = Set("pkg:x509/spki-sha256@abc", "pkg:ssh/sha256@xyz"))
+    val item =
+      mkItem(purls = Set("pkg:x509/spki-sha256@abc", "pkg:ssh/sha256@xyz"))
     CertificatesAssertions.assertPurlsContain(
       item,
       List("pkg:x509/spki-sha256@abc"),
@@ -120,7 +124,9 @@ class CertificatesAssertionsTests extends FunSuite {
     }
   }
 
-  test("assertPurlsContain accepts <computed> placeholder when some pURL matches the surrounding segments") {
+  test(
+    "assertPurlsContain accepts <computed> placeholder when some pURL matches the surrounding segments"
+  ) {
     val item = mkItem(purls = Set("pkg:x509/spki-sha256@abc123?alg=rsa"))
     CertificatesAssertions.assertPurlsContain(
       item,
@@ -129,7 +135,9 @@ class CertificatesAssertionsTests extends FunSuite {
     )
   }
 
-  test("assertPurlsContain with <computed> still throws when no pURL matches prefix or suffix") {
+  test(
+    "assertPurlsContain with <computed> still throws when no pURL matches prefix or suffix"
+  ) {
     val item = mkItem(purls = Set("pkg:ssh/sha256@xxx"))
     intercept[AssertionError] {
       CertificatesAssertions.assertPurlsContain(
@@ -184,7 +192,9 @@ class CertificatesAssertionsTests extends FunSuite {
     )
   }
 
-  test("assertMetadataContains accepts <computed> when key is present and non-empty") {
+  test(
+    "assertMetadataContains accepts <computed> when key is present and non-empty"
+  ) {
     val item = mkItem(extra = Map("Certificates:SpkiSha256" -> Set("abc123")))
     CertificatesAssertions.assertMetadataContains(
       item,
@@ -215,7 +225,9 @@ class CertificatesAssertionsTests extends FunSuite {
     }
   }
 
-  test("assertMetadataRanges passes when a value is inside the inclusive range") {
+  test(
+    "assertMetadataRanges passes when a value is inside the inclusive range"
+  ) {
     val item = mkItem(extra = Map("Certificates:EntryCount" -> Set("150")))
     CertificatesAssertions.assertMetadataRanges(
       item,
@@ -247,7 +259,8 @@ class CertificatesAssertionsTests extends FunSuite {
   }
 
   test("assertMetadataKeysAbsent throws when a forbidden key is present") {
-    val item = mkItem(extra = Map("Certificates:PrivateKeyMaterial" -> Set("leak")))
+    val item =
+      mkItem(extra = Map("Certificates:PrivateKeyMaterial" -> Set("leak")))
     intercept[AssertionError] {
       CertificatesAssertions.assertMetadataKeysAbsent(
         item,
@@ -260,7 +273,8 @@ class CertificatesAssertionsTests extends FunSuite {
   // ---------- leak guard ----------
 
   test("assertNoForbiddenPatterns passes when no value matches any pattern") {
-    val item = mkItem(extra = Map("Certificates:SubjectDN" -> Set("CN=Example")))
+    val item =
+      mkItem(extra = Map("Certificates:SubjectDN" -> Set("CN=Example")))
     CertificatesAssertions.assertNoForbiddenPatterns(
       item,
       List(
@@ -271,10 +285,11 @@ class CertificatesAssertionsTests extends FunSuite {
     )
   }
 
-  test("assertNoForbiddenPatterns catches a PEM private-key header in any metadata value") {
-    val item = mkItem(extra =
-      Map("SomeKey" -> Set("-----BEGIN RSA PRIVATE KEY-----"))
-    )
+  test(
+    "assertNoForbiddenPatterns catches a PEM private-key header in any metadata value"
+  ) {
+    val item =
+      mkItem(extra = Map("SomeKey" -> Set("-----BEGIN RSA PRIVATE KEY-----")))
     val ex = intercept[AssertionError] {
       CertificatesAssertions.assertNoForbiddenPatterns(
         item,
@@ -287,7 +302,11 @@ class CertificatesAssertionsTests extends FunSuite {
 
   test("assertNoForbiddenPatterns catches the openssh-key-v1 magic string") {
     val item = mkItem(extra =
-      Map("Certificates:SomeField" -> Set("blob contains openssh-key-v1 somewhere"))
+      Map(
+        "Certificates:SomeField" -> Set(
+          "blob contains openssh-key-v1 somewhere"
+        )
+      )
     )
     intercept[AssertionError] {
       CertificatesAssertions.assertNoForbiddenPatterns(
@@ -328,40 +347,50 @@ class CertificatesAssertionsTests extends FunSuite {
   // point at.
 
   test("assertNoForbiddenPatterns catches PKCS#8 base64 prefix MIIEvQIBADAN") {
-    val item = mkItem(extra =
-      Map("SomeKey" -> Set("MIIEvQIBADAN..." + "A" * 100))
-    )
+    val item =
+      mkItem(extra = Map("SomeKey" -> Set("MIIEvQIBADAN..." + "A" * 100)))
     intercept[AssertionError] {
       CertificatesAssertions.assertNoForbiddenPatterns(
-        item, List("MIIEvQIBADAN"), "t"
+        item,
+        List("MIIEvQIBADAN"),
+        "t"
       )
     }
   }
 
-  test("assertNoForbiddenPatterns catches PKCS#8 base64 prefix MIIEpAIBAAKCAQEA") {
-    val item = mkItem(extra =
-      Map("SomeKey" -> Set("MIIEpAIBAAKCAQEA" + "X" * 200))
-    )
+  test(
+    "assertNoForbiddenPatterns catches PKCS#8 base64 prefix MIIEpAIBAAKCAQEA"
+  ) {
+    val item =
+      mkItem(extra = Map("SomeKey" -> Set("MIIEpAIBAAKCAQEA" + "X" * 200)))
     intercept[AssertionError] {
       CertificatesAssertions.assertNoForbiddenPatterns(
-        item, List("MIIEpAIBAAKCAQEA"), "t"
+        item,
+        List("MIIEpAIBAAKCAQEA"),
+        "t"
       )
     }
   }
 
-  test("assertNoForbiddenPatterns catches MIIB...QIB... regex (broader PKCS#8 families)") {
+  test(
+    "assertNoForbiddenPatterns catches MIIB...QIB... regex (broader PKCS#8 families)"
+  ) {
     // Matches `MIIB{8 chars}QIB{any}` — the generic PKCS#8
     // short-key prefix pattern.
     val leak = "MIIBVAIBADANQIBsomethingmorehere"
     val item = mkItem(extra = Map("K" -> Set(leak)))
     intercept[AssertionError] {
       CertificatesAssertions.assertNoForbiddenPatterns(
-        item, List("MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+"), "t"
+        item,
+        List("MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+"),
+        "t"
       )
     }
   }
 
-  test("assertNoForbiddenPatterns catches full PEM private-key body, not just header") {
+  test(
+    "assertNoForbiddenPatterns catches full PEM private-key body, not just header"
+  ) {
     val leak =
       "-----BEGIN RSA PRIVATE KEY-----\n" +
         "MIIEpAIBAAKCAQEA1234\n" +
@@ -371,13 +400,17 @@ class CertificatesAssertionsTests extends FunSuite {
     intercept[AssertionError] {
       CertificatesAssertions.assertNoForbiddenPatterns(
         item,
-        List("-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----"),
-        "t",
+        List(
+          "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----"
+        ),
+        "t"
       )
     }
   }
 
-  test("assertNoForbiddenPatterns: safe values that look similar to prefixes do not false-positive") {
+  test(
+    "assertNoForbiddenPatterns: safe values that look similar to prefixes do not false-positive"
+  ) {
     // `MIIBQ` is legitimately the first 5 chars of many public-key DER
     // base64 encodings (subject-public-key-info). Without the `QIB`
     // anchoring requirement, we'd false-positive on every SPKI.
@@ -387,7 +420,7 @@ class CertificatesAssertionsTests extends FunSuite {
     CertificatesAssertions.assertNoForbiddenPatterns(
       item,
       List("MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+"),
-      "t",
+      "t"
     )
   }
 }

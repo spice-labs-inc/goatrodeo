@@ -20,42 +20,41 @@ import munit.FunSuite
   *
   * ## LLM-friendly summary
   *
-  * - Discovers every `(fixture, sidecar)` pair under
-  *   `test_data/certificates/` via [[CertificatesFixtureInventory.pairs]].
-  * - For each pair, emits one test that:
-  *     1. Parses the sidecar via [[CertificatesSidecar.parse]].
-  *     2. Runs the fixture through the full Goat Rodeo pipeline via
-  *        [[CertificatesPipelineRunner.runGoatRodeoOnSingleFile]].
-  *     3. Asserts `itemCount` exactly, then assertions from
-  *        [[CertificatesAssertions]] on the first Item.
+  *   - Discovers every `(fixture, sidecar)` pair under
+  *     `test_data/certificates/` via [[CertificatesFixtureInventory.pairs]].
+  *   - For each pair, emits one test that:
+  *     1. Parses the sidecar via [[CertificatesSidecar.parse]]. 2. Runs the
+  *        fixture through the full Goat Rodeo pipeline via
+  *        [[CertificatesPipelineRunner.runGoatRodeoOnSingleFile]]. 3. Asserts
+  *        `itemCount` exactly, then assertions from [[CertificatesAssertions]]
+  *        on the first Item.
   *
   * ## Phase-0 state
   *
   * Phase 0 of the Certificates plan specifies the harness-is-present state.
-  * Phase 0 has split into (a) infrastructure — this file and its siblings —
-  * and (b) corpus population (the 200+ fixture download). Until (b) lands,
+  * Phase 0 has split into (a) infrastructure — this file and its siblings — and
+  * (b) corpus population (the 200+ fixture download). Until (b) lands,
   * [[CertificatesFixtureInventory.pairs]] is empty and this suite emits zero
   * per-fixture tests.
   *
-  * Corpus-integrity assertions (the 200-floor, orphan detection, sidecar
-  * schema validation) live in [[CertificatesCorpusIntegritySuite]] — that
-  * suite runs every time even when no fixtures exist, so the build fails
-  * until the corpus is populated. Per the plan's acceptance criteria ("mark
-  * all pending OR fail loudly — pick one"), we fail loudly via the integrity
-  * suite and emit passing pending placeholders here when fixtures exist but
-  * the strategy is not yet producing the expected Items.
+  * Corpus-integrity assertions (the 200-floor, orphan detection, sidecar schema
+  * validation) live in [[CertificatesCorpusIntegritySuite]] — that suite runs
+  * every time even when no fixtures exist, so the build fails until the corpus
+  * is populated. Per the plan's acceptance criteria ("mark all pending OR fail
+  * loudly — pick one"), we fail loudly via the integrity suite and emit passing
+  * pending placeholders here when fixtures exist but the strategy is not yet
+  * producing the expected Items.
   */
 class CertificatesSuite extends FunSuite {
 
-  /** Is the Certificates strategy class registered on the classpath?
-    * Phase 1's first commit creates
-    * `io.spicelabs.goatrodeo.omnibor.strategies.Certificates`; until
-    * then this suite's per-fixture assertions cannot be meaningfully
-    * evaluated (the pipeline uses GenericFile as the fallback and
-    * emits no crypto pURLs / metadata). To keep the state uniform per
-    * the Phase 0 plan's "all pending OR all fail loudly — no partial
-    * mix" rule, every per-fixture test is marked `.ignore` until the
-    * class exists.
+  /** Is the Certificates strategy class registered on the classpath? Phase 1's
+    * first commit creates
+    * `io.spicelabs.goatrodeo.omnibor.strategies.Certificates`; until then this
+    * suite's per-fixture assertions cannot be meaningfully evaluated (the
+    * pipeline uses GenericFile as the fallback and emits no crypto pURLs /
+    * metadata). To keep the state uniform per the Phase 0 plan's "all pending
+    * OR all fail loudly — no partial mix" rule, every per-fixture test is
+    * marked `.ignore` until the class exists.
     */
   private val strategyPresent: Boolean = {
     try {

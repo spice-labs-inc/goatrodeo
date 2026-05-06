@@ -36,8 +36,8 @@ import scala.util.Try
   *   - `description`, `source`, `retrievedAt` — provenance
   *   - `itemCount` — exact number of Items the pipeline must emit for this
   *     fixture
-  *   - `mimeTypes.mustContain` / `mustNotContain` — subset / absence
-  *     assertions on the MIME types attached to the emitted Item
+  *   - `mimeTypes.mustContain` / `mustNotContain` — subset / absence assertions
+  *     on the MIME types attached to the emitted Item
   *   - `purls.mustContain` / `mustNotContain` — subset / absence assertions on
   *     emitted pURLs (canonicalized strings)
   *   - `metadata.mustContain` — subset assertion on the Item's extra metadata
@@ -78,12 +78,12 @@ final case class PurlAssertions(
 
 /** Metadata subset and range assertions.
   *
-  * `mustContain` values may be either a bare string (exact match against one
-  * of the `StringOrPair` values at that key) or the literal token
-  * `"<computed>"` which means "key must be present and non-empty, exact value
-  * not yet locked in". Use `"<computed>"` as a bootstrap placeholder when
-  * authoring sidecars; replace with the locked-in value once the fixture's
-  * ground truth is computed via the `compute-expected.sh` tool.
+  * `mustContain` values may be either a bare string (exact match against one of
+  * the `StringOrPair` values at that key) or the literal token `"<computed>"`
+  * which means "key must be present and non-empty, exact value not yet locked
+  * in". Use `"<computed>"` as a bootstrap placeholder when authoring sidecars;
+  * replace with the locked-in value once the fixture's ground truth is computed
+  * via the `compute-expected.sh` tool.
   */
 final case class MetadataAssertions(
     mustContain: Map[String, String],
@@ -175,8 +175,7 @@ object CertificatesSidecar {
       ),
       forbiddenMetadataKeys =
         opt("forbiddenMetadataKeys")(asStringList).getOrElse(Nil),
-      forbiddenMetadataPatterns =
-        req("forbiddenMetadataPatterns")(asStringList)
+      forbiddenMetadataPatterns = req("forbiddenMetadataPatterns")(asStringList)
     )
   }
 

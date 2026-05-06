@@ -30,9 +30,8 @@ import scala.collection.immutable.TreeSet
   * self-contained — the harness orchestrates, these helpers adjudicate.
   *
   * Every helper that fails throws [[AssertionError]] with a message naming:
-  *   - the fixture (via the caller's context — callers are expected to
-  *     prepend or include fixture identification in the failure message
-  *     they propagate)
+  *   - the fixture (via the caller's context — callers are expected to prepend
+  *     or include fixture identification in the failure message they propagate)
   *   - what was expected
   *   - what was actually observed
   *
@@ -40,13 +39,13 @@ import scala.collection.immutable.TreeSet
   *
   *   - MIME types for the emitted Item live in `item.bodyAsItemMetaData.map
   *     (_.mimeType)` (a `TreeSet[String]`).
-  *   - pURLs are attached as `EdgeType.aliasFrom` connections on the item
-  *     (the canonical string form of each pURL appears there) and also as
-  *     entries in `ItemMetaData.fileNames`; we read them off the connection
-  *     set which is the authoritative location.
+  *   - pURLs are attached as `EdgeType.aliasFrom` connections on the item (the
+  *     canonical string form of each pURL appears there) and also as entries in
+  *     `ItemMetaData.fileNames`; we read them off the connection set which is
+  *     the authoritative location.
   *   - Ad-hoc metadata lives in `ItemMetaData.extra` — keyed by strings like
-  *     `Certificates:SubjectDN` (colon-separator convention; see parent
-  *     plan's Hard rule #6).
+  *     `Certificates:SubjectDN` (colon-separator convention; see parent plan's
+  *     Hard rule #6).
   */
 object CertificatesAssertions {
 
@@ -55,21 +54,26 @@ object CertificatesAssertions {
     * `PackageURL.canonicalize()`.
     */
   def purlsOf(item: Item): Set[String] = {
-    item.connections.collect {
-      case (edgeType, target) if edgeType == EdgeType.aliasFrom =>
-        target
-    }.toSet.filter(_.startsWith("pkg:"))
+    item.connections
+      .collect {
+        case (edgeType, target) if edgeType == EdgeType.aliasFrom =>
+          target
+      }
+      .toSet
+      .filter(_.startsWith("pkg:"))
   }
 
   /** Extract the MIME type set attached to the Item. Returns empty set if the
-    * Item has no metadata body. */
+    * Item has no metadata body.
+    */
   def mimeTypesOf(item: Item): TreeSet[String] =
     item.bodyAsItemMetaData.map(_.mimeType).getOrElse(TreeSet.empty)
 
   /** Flatten the `extra` metadata to a list of `(key, value)` pairs where
-    * `value` is the plain string form of each [[StringOrPair]]. For
-    * `PairOf`, only the value (not the MIME-type half) is returned — the
-    * leak sweep and most assertions care about the value itself. */
+    * `value` is the plain string form of each [[StringOrPair]]. For `PairOf`,
+    * only the value (not the MIME-type half) is returned — the leak sweep and
+    * most assertions care about the value itself.
+    */
   def metadataEntries(item: Item): Vector[(String, String)] = {
     val extra = item.bodyAsItemMetaData.map(_.extra).getOrElse(Map.empty)
     extra.toVector.flatMap { case (k, vs) =>
@@ -116,10 +120,11 @@ object CertificatesAssertions {
     }
   }
 
-  /** Assert that every pURL string in `required` is emitted. `required`
-    * strings may contain `<computed>` tokens — those skip the exact check
-    * for that pURL and only verify that *some* pURL matches the prefix
-    * before the first `<computed>` and the suffix after it. */
+  /** Assert that every pURL string in `required` is emitted. `required` strings
+    * may contain `<computed>` tokens — those skip the exact check for that pURL
+    * and only verify that *some* pURL matches the prefix before the first
+    * `<computed>` and the suffix after it.
+    */
   def assertPurlsContain(
       item: Item,
       required: List[String],
@@ -130,12 +135,14 @@ object CertificatesAssertions {
       if (req.contains("<computed>")) {
         val parts = req.split("<computed>", -1).toVector
         actual.exists { a =>
-          parts.foldLeft(Option(0)) {
-            case (None, _)        => None
-            case (Some(idx), seg) =>
-              val nextIdx = a.indexOf(seg, idx)
-              if (nextIdx < 0) None else Some(nextIdx + seg.length)
-          }.isDefined
+          parts
+            .foldLeft(Option(0)) {
+              case (None, _) => None
+              case (Some(idx), seg) =>
+                val nextIdx = a.indexOf(seg, idx)
+                if (nextIdx < 0) None else Some(nextIdx + seg.length)
+            }
+            .isDefined
         }
       } else actual.contains(req)
     }
@@ -162,9 +169,10 @@ object CertificatesAssertions {
     }
   }
 
-  /** Assert that every `key -> expected` pair in `required` is present in
-    * the Item's extra metadata. If `expected == "<computed>"`, only key
-    * presence (and non-empty value) is checked. */
+  /** Assert that every `key -> expected` pair in `required` is present in the
+    * Item's extra metadata. If `expected == "<computed>"`, only key presence
+    * (and non-empty value) is checked.
+    */
   def assertMetadataContains(
       item: Item,
       required: Map[String, String],
@@ -244,8 +252,8 @@ object CertificatesAssertions {
   }
 
   /** Assert that no metadata value on the Item matches any of the supplied
-    * forbidden regex patterns. This is the private-key leak guard (see
-    * Appendix C in `certificates-strategy/appendices.md`).
+    * forbidden regex patterns. This is the private-key leak guard (see Appendix
+    * C in `certificates-strategy/appendices.md`).
     */
   def assertNoForbiddenPatterns(
       item: Item,

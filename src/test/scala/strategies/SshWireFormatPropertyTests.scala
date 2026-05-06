@@ -16,39 +16,37 @@ package strategies
 
 import io.spicelabs.goatrodeo.util.SshWireReader
 import munit.ScalaCheckSuite
-import org.scalacheck.Prop.{forAll, propBoolean}
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Arbitrary
+import org.scalacheck.Gen
+import org.scalacheck.Prop.forAll
+import org.scalacheck.Prop.propBoolean
 
 /** Property-based tests for the RFC 4251 SSH wire-format reader.
   *
   * ## What these tests test
   *
-  * Phase-5 gap analysis G5: example-based tests can't cover the full
-  * input space of byte-pumping code; properties can. These test the
-  * invariants of the wire reader against generated input:
+  * Phase-5 gap analysis G5: example-based tests can't cover the full input
+  * space of byte-pumping code; properties can. These test the invariants of the
+  * wire reader against generated input:
   *
-  *   1. *uint32 round-trip*: encoder ∘ decoder = id for any unsigned
-  *      32-bit value.
-  *   2. *uint64 round-trip*: same for 64-bit including the sentinel
-  *      values `0` and `0xFFFFFFFFFFFFFFFFL` that broke G1.
-  *   3. *string round-trip*: writeString → readString returns the
-  *      original bytes for any byte-array length 0..32k.
-  *   4. *boundary-throw*: any reader fed bytes shorter than the
-  *      claimed length throws (no silent truncation).
-  *   5. *mpint bit-length consistency*: for any non-negative BigInt n,
-  *      `mpintBitLength(SshMpint(n)) == n.bitLength` modulo SSH's
-  *      zero-pad convention.
-  *   6. *string-list round-trip*: write+read of a list of UTF-8
+  *   1. *uint32 round-trip*: encoder ∘ decoder = id for any unsigned 32-bit
+  *      value. 2. *uint64 round-trip*: same for 64-bit including the sentinel
+  *      values `0` and `0xFFFFFFFFFFFFFFFFL` that broke G1. 3. *string
+  *      round-trip*: writeString → readString returns the original bytes for
+  *      any byte-array length 0..32k. 4. *boundary-throw*: any reader fed bytes
+  *      shorter than the claimed length throws (no silent truncation). 5.
+  *      *mpint bit-length consistency*: for any non-negative BigInt n,
+  *      `mpintBitLength(SshMpint(n)) == n.bitLength` modulo SSH's zero-pad
+  *      convention. 6. *string-list round-trip*: write+read of a list of UTF-8
   *      strings returns the same list.
   *
   * ## Why this matters
   *
-  * G1 (`valid_before` sentinel wrapping to 1969) was a uint64 bug that
-  * no example-based test caught because no fixture happened to have
-  * that value. Property #2 — "uint64 round-trip including sentinels" —
-  * would have caught it. The other properties guard related classes
-  * of bugs in the byte-pumping path that drives all of Phase 5's
-  * fingerprinting and metadata extraction.
+  * G1 (`valid_before` sentinel wrapping to 1969) was a uint64 bug that no
+  * example-based test caught because no fixture happened to have that value.
+  * Property #2 — "uint64 round-trip including sentinels" — would have caught
+  * it. The other properties guard related classes of bugs in the byte-pumping
+  * path that drives all of Phase 5's fingerprinting and metadata extraction.
   */
 class SshWireFormatPropertyTests extends ScalaCheckSuite {
 
@@ -57,7 +55,7 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
   private def writeUInt32(out: java.io.ByteArrayOutputStream, v: Long): Unit = {
     out.write(((v >>> 24) & 0xff).toInt)
     out.write(((v >>> 16) & 0xff).toInt)
-    out.write(((v >>>  8) & 0xff).toInt)
+    out.write(((v >>> 8) & 0xff).toInt)
     out.write((v & 0xff).toInt)
   }
 
@@ -68,11 +66,14 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
     out.write(((v >>> 32) & 0xff).toInt)
     out.write(((v >>> 24) & 0xff).toInt)
     out.write(((v >>> 16) & 0xff).toInt)
-    out.write(((v >>>  8) & 0xff).toInt)
+    out.write(((v >>> 8) & 0xff).toInt)
     out.write((v & 0xff).toInt)
   }
 
-  private def writeString(out: java.io.ByteArrayOutputStream, b: Array[Byte]): Unit = {
+  private def writeString(
+      out: java.io.ByteArrayOutputStream,
+      b: Array[Byte]
+  ): Unit = {
     writeUInt32(out, b.length.toLong)
     out.write(b)
   }
@@ -85,15 +86,19 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
   private val genUInt64: Gen[Long] = Gen.frequency(
     1 -> Gen.const(0L),
     1 -> Gen.const(-1L), // 0xFFFFFFFFFFFFFFFFL as Long
-    8 -> Arbitrary.arbitrary[Long],
+    8 -> Arbitrary.arbitrary[Long]
   )
 
   private val genBytes: Gen[Array[Byte]] =
-    Gen.choose(0, 32 * 1024).flatMap(n => Gen.listOfN(n, Arbitrary.arbitrary[Byte])).map(_.toArray)
+    Gen
+      .choose(0, 32 * 1024)
+      .flatMap(n => Gen.listOfN(n, Arbitrary.arbitrary[Byte]))
+      .map(_.toArray)
 
   /** Encode a non-negative BigInt as an SSH `mpint`: minimal-octet
-    * two's-complement BE, with a single leading 0x00 if the high bit
-    * would otherwise be set. */
+    * two's-complement BE, with a single leading 0x00 if the high bit would
+    * otherwise be set.
+    */
   private def writeMpintBytes(n: BigInt): Array[Byte] = {
     require(n.signum >= 0, "non-negative only for this property")
     if (n == 0) Array.emptyByteArray
@@ -117,7 +122,9 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
     }
   }
 
-  property("[PROP] uint64 round-trip including sentinels 0 and 0xFFFF…FFFF (G5 #2 / G1 regression guard)") {
+  property(
+    "[PROP] uint64 round-trip including sentinels 0 and 0xFFFF…FFFF (G5 #2 / G1 regression guard)"
+  ) {
     forAll(genUInt64) { v =>
       val out = new java.io.ByteArrayOutputStream()
       writeUInt64(out, v)
@@ -146,7 +153,9 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
     }
   }
 
-  property("[PROP] mpintBitLength matches BigInt.bitLength for non-negative inputs (G5 #5)") {
+  property(
+    "[PROP] mpintBitLength matches BigInt.bitLength for non-negative inputs (G5 #5)"
+  ) {
     forAll(Gen.choose(0, 4096), Arbitrary.arbitrary[Long]) { (bits, seed) =>
       val n =
         if (bits == 0) BigInt(0)

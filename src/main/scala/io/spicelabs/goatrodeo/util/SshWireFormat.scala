@@ -17,24 +17,8 @@ package io.spicelabs.goatrodeo.util
 import java.nio.charset.StandardCharsets
 import scala.util.Try
 
-/** RFC 4251 / SSH wire-format reader.
-  *
-  * ## LLM-friendly summary
-  *
-  * SSH/OpenSSH public-key blobs are encoded in the RFC 4251 wire format:
-  *
-  *   - `byte`    — single octet
-  *   - `uint32`  — big-endian 32-bit unsigned integer
-  *   - `uint64`  — big-endian 64-bit unsigned integer
-  *   - `string`  — `uint32` length followed by that many bytes
-  *   - `mpint`   — `string` whose bytes form a big-endian two's-complement integer
-  *   - `name-list` — `string` whose contents are ASCII names separated by `,`
-  *   - `string-of-strings` — `string` whose contents are themselves a sequence
-  *     of `string` records (used for OpenSSH cert principals/options/extensions)
-  *
-  * This reader is bytes-only: it never decodes characters except where
-  * explicitly requested via `readUtf8String`. Out-of-bounds reads throw
-  * `IndexOutOfBoundsException` to make malformed input loud rather than silent.
+/** RFC 4251 / SSH wire-format reader. Out-of-bounds reads throw
+  * `IndexOutOfBoundsException`.
   */
 final class SshWireReader(val bytes: Array[Byte]) {
   private var pos: Int = 0
@@ -44,25 +28,34 @@ final class SshWireReader(val bytes: Array[Byte]) {
   def position: Int = pos
 
   def readByte(): Int = {
-    require(remaining >= 1, s"SshWireReader: short read at $pos (need 1, have $remaining)")
+    require(
+      remaining >= 1,
+      s"SshWireReader: short read at $pos (need 1, have $remaining)"
+    )
     val b = bytes(pos) & 0xff
     pos += 1
     b
   }
 
   def readUInt32(): Long = {
-    require(remaining >= 4, s"SshWireReader: short read at $pos (need 4, have $remaining)")
+    require(
+      remaining >= 4,
+      s"SshWireReader: short read at $pos (need 4, have $remaining)"
+    )
     val v =
-      ((bytes(pos)     & 0xffL) << 24) |
-      ((bytes(pos + 1) & 0xffL) << 16) |
-      ((bytes(pos + 2) & 0xffL) <<  8) |
-      ((bytes(pos + 3) & 0xffL))
+      ((bytes(pos) & 0xffL) << 24) |
+        ((bytes(pos + 1) & 0xffL) << 16) |
+        ((bytes(pos + 2) & 0xffL) << 8) |
+        ((bytes(pos + 3) & 0xffL))
     pos += 4
     v
   }
 
   def readUInt64(): Long = {
-    require(remaining >= 8, s"SshWireReader: short read at $pos (need 8, have $remaining)")
+    require(
+      remaining >= 8,
+      s"SshWireReader: short read at $pos (need 8, have $remaining)"
+    )
     val hi = readUInt32()
     val lo = readUInt32()
     (hi << 32) | (lo & 0xffffffffL)
@@ -84,15 +77,12 @@ final class SshWireReader(val bytes: Array[Byte]) {
   def readUtf8String(): String =
     new String(readString(), StandardCharsets.UTF_8)
 
-  /** SSH `mpint`: a `string` whose bytes form a big-endian two's-complement
-    * integer. For positive RSA moduli the high bit is zero-padded with a
-    * leading `0x00` byte; this reader returns the raw bytes — call sites
-    * decide how to interpret. */
+  /** SSH `mpint` — big-endian two's-complement integer bytes per RFC 4251. */
   def readMpint(): Array[Byte] = readString()
 
-  /** Read a sequence of length-prefixed strings packed inside an outer
-    * `string` (used for OpenSSH cert principals / critical options /
-    * extensions). */
+  /** Read a sequence of length-prefixed strings packed inside an outer `string`
+    * (used for OpenSSH cert principals / critical options / extensions).
+    */
   def readStringList(): Vector[String] = {
     val inner = readString()
     val r = new SshWireReader(inner)
@@ -101,9 +91,9 @@ final class SshWireReader(val bytes: Array[Byte]) {
     acc.toVector
   }
 
-  /** Read a sequence of (name, data) pairs packed inside an outer `string`.
-    * Used for OpenSSH cert critical options and extensions, which are
-    * each a flat sequence of `string(name) | string(data)`. */
+  /** Read (name, data) pairs from an outer `string`, per OpenSSH cert
+    * critical-options/extensions format.
+    */
   def readNameDataList(): Vector[(String, Array[Byte])] = {
     val inner = readString()
     val r = new SshWireReader(inner)
@@ -119,14 +109,15 @@ final class SshWireReader(val bytes: Array[Byte]) {
 
 object SshWireReader {
 
-  /** Number of significant bits in a non-negative SSH `mpint`'s magnitude.
-    * Strips a single leading `0x00` byte (the SSH zero-padding for positive
-    * values whose high bit would otherwise be set). */
+  /** Number of significant bits in a non-negative SSH `mpint` magnitude. Strips
+    * leading `0x00` zero-padding byte.
+    */
   def mpintBitLength(mpint: Array[Byte]): Int = {
     if (mpint.length == 0) 0
     else {
       val (offset, head) =
-        if (mpint(0) == 0.toByte) (1, if (mpint.length >= 2) mpint(1) & 0xff else 0)
+        if (mpint(0) == 0.toByte)
+          (1, if (mpint.length >= 2) mpint(1) & 0xff else 0)
         else (0, mpint(0) & 0xff)
       if (offset >= mpint.length) 0
       else {
@@ -141,18 +132,13 @@ object SshWireReader {
     }
   }
 
-  /** Parse a single OpenSSH-format public-key line:
-    *
-    * `algo-name base64(wire) [comment...]`
-    *
-    * Returns `(algoName, wireBytes, optComment)` or `None` if the line
-    * doesn't have at least two whitespace-separated tokens or the second
-    * token isn't valid base64.
-    *
-    * Trims a leading UTF-8 / UTF-16 BOM and skips blank lines. The first
-    * non-blank line is taken (matches `authorized_keys` semantics for a
-    * single-key file). */
-  def parseFirstKeyLine(content: String): Option[(String, Array[Byte], Option[String])] = {
+  /** Parse an OpenSSH public-key line: `algo-name base64(wire) [comment...]`.
+    * Returns `(algoName, wireBytes, optComment)` or `None` on parse failure.
+    * Strips BOM, skips blank/comment lines, takes first non-blank line.
+    */
+  def parseFirstKeyLine(
+      content: String
+  ): Option[(String, Array[Byte], Option[String])] = {
     val stripped = content
       .stripPrefix("\uFEFF")
       .stripPrefix("\u00EF\u00BB\u00BF")
@@ -164,18 +150,19 @@ object SshWireReader {
       val line = rawLine.trim
       val parts = line.split("\\s+", 3)
       if (parts.length < 2) None
-      else Try {
-        val b64 = parts(1)
-        // OpenSSH uses standard base64 with padding. Some tools strip
-        // padding; tolerate both by re-padding.
-        val padded =
-          if (b64.length % 4 == 0) b64
-          else b64 + "=" * (4 - (b64.length % 4))
-        val wire = java.util.Base64.getDecoder.nn.decode(padded).nn
-        val comment =
-          if (parts.length >= 3 && parts(2).nonEmpty) Some(parts(2)) else None
-        (parts(0), wire, comment)
-      }.toOption
+      else
+        Try {
+          val b64 = parts(1)
+          // OpenSSH uses standard base64 with padding. Some tools strip
+          // padding; tolerate both by re-padding.
+          val padded =
+            if (b64.length % 4 == 0) b64
+            else b64 + "=" * (4 - (b64.length % 4))
+          val wire = java.util.Base64.getDecoder.nn.decode(padded).nn
+          val comment =
+            if (parts.length >= 3 && parts(2).nonEmpty) Some(parts(2)) else None
+          (parts(0), wire, comment)
+        }.toOption
     }
   }
 }

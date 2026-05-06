@@ -15,34 +15,31 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
-import io.spicelabs.goatrodeo.omnibor.Item
-import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
-import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesOidMaps.*
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.openssl.PEMParser
 
 import java.io.ByteArrayInputStream
 import java.io.InputStreamReader
 import java.security.KeyStore
-import java.security.MessageDigest
-import java.security.Security
 import java.security.cert.CertificateFactory
 import java.security.cert.X509CRL
 import java.security.cert.X509Certificate
 import java.security.interfaces.DSAPublicKey
-import java.security.interfaces.RSAPublicKey
 import java.security.interfaces.ECPublicKey
-import java.time.format.DateTimeFormatter
+import java.security.interfaces.RSAPublicKey
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -50,69 +47,51 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.Using
 
-/** Strategy entry-point for X.509 certificates, CRLs, Java keystores
-  * (JKS/JCEKS/PKCS#12/BKS), PEM bundles, SSH public keys, OpenSSH
-  * CA-issued certificates, PGP keys, and private keys.
-  *
-  * Phase 3 lands the X.509 single-cert path. Phase 4 adds keystores,
-  * PEM bundles, and CRLs. Phases 5-7 add SSH, PGP, and private keys.
-  *
-  * ## Hard rules
-  *
-  *   - Never emit raw private-key material in any Item body, metadata
-  *     value, log message, or debug output. Enforced by the
-  *     defensive leak sweep in [[CertificatesState.finalAugmentation]].
-  *   - Keystores produce one Item with all contained pURLs and
-  *     metadata flat — no child Items.
-  *   - No new `EdgeType` values added.
-  *   - All qualifier values are lowercase with hyphens.
-  *   - Ad-hoc metadata keys use `:` as the separator.
+/** Certificates strategy: X.509 certificates, CRLs, keystores, PEM bundles, SSH
+  * keys/certs, PGP keys, and private keys.
   */
 object Certificates {
 
-  // Register the BC provider once at object init. Idempotent.
-  private val _bcInit: Unit = {
-    if (Security.getProvider("BC") == null) {
-      Security.addProvider(new BouncyCastleProvider())
-    }
-  }
-
   // ---------- claim variants -------------------------------------------
 
-  /** A successfully-parsed artifact ready for emission. The variant
-    * tells `getPurls` / `getMetadata` how to dispatch. */
+  /** A successfully-parsed artifact ready for emission. The variant tells
+    * `getPurls` / `getMetadata` how to dispatch.
+    */
   sealed trait ClaimedContent
 
-  /** Phase-3: single X.509 certificate. */
+  /** Single X.509 certificate. */
   final case class SingleCert(cert: X509Certificate) extends ClaimedContent
 
-  /** Phase-4: Java/BC keystore.
-    * @param ks         opened keystore (`null` password); `None` if
-    *                   the null-password load failed (encrypted)
-    * @param format     `"jks"`, `"jceks"`, `"pkcs12"`, `"bks"`
-    * @param entryCount alias count if loaded; 0 if encrypted
+  /** Java/BC keystore.
+    * @param ks
+    *   opened keystore (`null` password); `None` if the null-password load
+    *   failed (encrypted)
+    * @param format
+    *   `"jks"`, `"jceks"`, `"pkcs12"`, `"bks"`
+    * @param entryCount
+    *   alias count if loaded; 0 if encrypted
     */
   final case class Keystore(
       ks: Option[KeyStore],
       format: String,
-      entryCount: Int,
+      entryCount: Int
   ) extends ClaimedContent
 
-  /** Phase-4: multi-block PEM bundle. */
+  /** Multi-block PEM bundle. */
   final case class Bundle(certs: Vector[X509Certificate]) extends ClaimedContent
 
-  /** Phase-4: X.509 Certificate Revocation List. */
+  /** X.509 Certificate Revocation List. */
   final case class Crl(crl: X509CRL) extends ClaimedContent
 
-  /** Phase-5: plain OpenSSH public key (single line). */
+  /** Plain OpenSSH public key (single line). */
   final case class SshPubkey(
       wireBytes: Array[Byte],
       algName: String,
       comment: Option[String],
-      rsaModulusBits: Option[Int],
+      rsaModulusBits: Option[Int]
   ) extends ClaimedContent
 
-  /** Phase-5: OpenSSH CA-issued certificate (user or host). */
+  /** OpenSSH CA-issued certificate. */
   final case class SshCert(
       certBytes: Array[Byte],
       certTypeName: String,
@@ -129,13 +108,10 @@ object Certificates {
       extensions: Vector[String],
       caKeyWire: Array[Byte],
       caSigAlgName: String,
-      comment: Option[String],
+      comment: Option[String]
   ) extends ClaimedContent
 
-  /** Phase-6: a single PGP key inside a PGP key ring — primary or
-    * subkey. The strategy emits one pURL and one namespaced metadata
-    * block per key, matching Phase 5's "every key is its own crypto
-    * identity" stance. */
+  /** A single PGP key (primary or subkey). */
   final case class PgpKey(
       fingerprintHex: String,
       version: Int,
@@ -146,67 +122,38 @@ object Certificates {
       isPrimary: Boolean,
       creationTime: java.util.Date,
       expirationTime: Option[java.util.Date],
-      userIds: Vector[String],
+      userIds: Vector[String]
   )
 
-  /** Phase-6: one or more PGP keys parsed from an `application/pgp-keys`
-    * artifact (armored or binary). The first user-id (if any) on the
-    * primary key feeds `MKC.NAME`. */
+  /** One or more PGP keys parsed from an `application/pgp-keys` artifact. */
   final case class PgpKeyRing(
       keys: Vector[PgpKey],
-      primaryUserId: Option[String],
+      primaryUserId: Option[String]
   ) extends ClaimedContent
 
-  /** Phase-7: an unencrypted PKCS#8 or legacy-PEM private key from
-    * which the public key has been derived. The strategy emits a
-    * `pkg:x509/spki-sha256@{hex}` pURL — same shape as Phase 3's SPKI
-    * pURL — plus full pubkey-style metadata with
-    * `Certificates:DerivedFromPrivateKey=true` and
-    * `Certificates:Envelope=plaintext`.
-    *
-    * Hard-rule invariant: `spkiBytes` is the public SubjectPublicKeyInfo
-    * DER. No private-key material is carried here. The leak sweep will
-    * re-verify before emit.
-    */
+  /** Unencrypted PKCS#8 or legacy-PEM private key with derived public SPKI. */
   final case class PrivateKeyPlaintextPem(
       spkiBytes: Array[Byte],
       canonicalAlg: String,
       keySize: Option[Int],
       curve: Option[String],
-      params: Option[String],
+      params: Option[String]
   ) extends ClaimedContent
 
-  /** Phase-7: an unencrypted OpenSSH-v1 private key. The wire-format
-    * public-key blob is stored alongside the private region in the
-    * clear (per RFC-style openssh-key-v1 format), so we read it
-    * directly rather than re-deriving from any private scalar. The
-    * emitted pURL matches Phase 5's `pkg:ssh/sha256@{b64}` shape.
-    */
+  /** Unencrypted OpenSSH-v1 private key. */
   final case class PrivateKeyPlaintextOpenSsh(
       wireBytes: Array[Byte],
       algName: String,
-      rsaModulusBits: Option[Int],
+      rsaModulusBits: Option[Int]
   ) extends ClaimedContent
 
-  /** Phase-7: an unencrypted PGP secret key ring. The public-key
-    * portion of every secret key is derivable via
-    * `PGPSecretKey.getPublicKey`; we collect those and reuse Phase 6's
-    * emitters. `Certificates:DerivedFromPrivateKey=true` distinguishes
-    * the metadata from a plain Phase-6 public-key claim.
+  /** Unencrypted PGP secret key ring; public keys derived from each secret key.
     */
   final case class PrivateKeyPlaintextPgp(
-      ring: PgpKeyRing,
+      ring: PgpKeyRing
   ) extends ClaimedContent
 
-  /** Phase-7: an encrypted private key (any of PKCS#8-encrypted,
-    * legacy-PEM-encrypted, OpenSSH-encrypted, or PGP-encrypted-secret).
-    * Emits envelope-only metadata; **no pURL**, **no decryption
-    * attempt**, **no password guessing**.
-    *
-    * Per Phase 7 plan, salt and IV are part of the envelope (not
-    * private material — they're public KDF/cipher parameters). They
-    * are stored here as hex strings.
-    */
+  /** Encrypted private key — envelope metadata only, no pURL. */
   final case class PrivateKeyEncrypted(
       envelope: String,
       kdfAlgorithm: Option[String],
@@ -214,14 +161,14 @@ object Certificates {
       kdfPrf: Option[String],
       cipher: Option[String],
       salt: Option[String] = None,
-      iv: Option[String] = None,
+      iv: Option[String] = None
   ) extends ClaimedContent
 
   // ---------- claim & parse dispatch -----------------------------------
 
   private val singleCertMimes: Set[String] = Set(
     "application/pkix-cert",
-    "application/x-x509-ca-cert",
+    "application/x-x509-ca-cert"
   )
   private val pemFileMime: String = "application/x-pem-file"
   private val pemBundleMime: String = "application/x-pem-bundle"
@@ -238,9 +185,8 @@ object Certificates {
   private val opensshPrivateKeyMime: String =
     "application/x-openssh-private-key"
 
-  /** Phase-3 + Phase-4 claim logic: classify each candidate artifact
-    * by MIME priority, parse, and emit `ToProcess` instances for
-    * those that successfully decode.
+  /** Classify each candidate artifact by MIME priority, parse, and emit
+    * `ToProcess` instances.
     */
   def computeCertificateFiles(
       byUUID: ToProcess.ByUUID,
@@ -265,9 +211,7 @@ object Certificates {
     (toProcess, revisedByUUID, revisedByName, "Certificates")
   }
 
-  /** Priority-ordered classification then parse. Order matters: PEM
-    * bundle wins over single cert; keystore wins over single cert
-    * (when MIMEs disagree, e.g., dual-emission case from CryptoDetector). */
+  /** Classify and parse the artifact. */
   private[strategies] def classifyAndParse(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
@@ -290,20 +234,20 @@ object Certificates {
     else if (mimes.contains(pgpKeysMime)) parsePgpKeyOrSecretKeyRing(artifact)
     else if (isSingleCertCandidate(mimes)) {
       parseSingleCert(artifact).map(SingleCert.apply)
-    }
-    else None
+    } else None
   }
 
-  /** True if the artifact's MIME set indicates a single X.509 cert
-    * (Phase-3 claim). Excludes bundle / keystore / SSH / PGP /
-    * private-key / CRL forms. */
+  /** True if the artifact's MIME set indicates a single X.509 cert. Excludes
+    * bundle / keystore / SSH / PGP / private-key / CRL forms.
+    */
   private[strategies] def isSingleCertCandidate(mimes: Set[String]): Boolean = {
     val anySingleCert = mimes.intersect(singleCertMimes).nonEmpty
-    val pemNonBundle = mimes.contains(pemFileMime) && !mimes.contains(pemBundleMime)
+    val pemNonBundle =
+      mimes.contains(pemFileMime) && !mimes.contains(pemBundleMime)
     (anySingleCert || pemNonBundle) &&
-      !mimes.contains(pemBundleMime) &&
-      !mimes.exists(m =>
-        m == jksMime || m == jceksMime || m == pkcs12Mime ||
+    !mimes.contains(pemBundleMime) &&
+    !mimes.exists(m =>
+      m == jksMime || m == jceksMime || m == pkcs12Mime ||
         m == "application/x-openssh-public-key" ||
         m == "application/x-openssh-certificate" ||
         m == "application/x-openssh-private-key" ||
@@ -312,7 +256,7 @@ object Certificates {
         m == "application/x-pem-encrypted-private-key" ||
         m == "application/x-pem-public-key" ||
         m == crlMime
-      )
+    )
   }
 
   /** Parse a single X.509 cert (PEM or DER). */
@@ -329,13 +273,18 @@ object Certificates {
     new JcaX509CertificateConverter().setProvider("BC")
 
   private def tryParsePem(bytes: Array[Byte]): Option[X509Certificate] = Try {
-    Using.resource(new PEMParser(new InputStreamReader(
-      new ByteArrayInputStream(bytes), "ISO-8859-1"
-    ))) { parser =>
+    Using.resource(
+      new PEMParser(
+        new InputStreamReader(
+          new ByteArrayInputStream(bytes),
+          "ISO-8859-1"
+        )
+      )
+    ) { parser =>
       val obj = parser.readObject()
       obj match {
         case h: X509CertificateHolder => converter.getCertificate(h)
-        case _ => null
+        case _                        => null
       }
     }
   }.toOption.filter(_ != null)
@@ -346,21 +295,23 @@ object Certificates {
       .asInstanceOf[X509Certificate]
   }.toOption
 
-  /** Parse a multi-block PEM bundle. Iterates `PEMParser.readObject`
-    * to EOF, collecting every `X509CertificateHolder`. Skips other
-    * block types (private keys, CSRs, etc.) — Hard rule #1: a PEM
-    * bundle that mixes certs and private keys yields ONLY the certs;
-    * the private-key blocks are silently ignored at parse time so
-    * they cannot reach metadata. */
+  /** Parse a multi-block PEM bundle; collects X509CertificateHolder objects
+    * only.
+    */
   private[strategies] def parseBundle(
       artifact: ArtifactWrapper
   ): Option[Bundle] = {
     val collected = artifact.withFile { f =>
       val bytes = java.nio.file.Files.readAllBytes(f.toPath)
       Try {
-        Using.resource(new PEMParser(new InputStreamReader(
-          new ByteArrayInputStream(bytes), "ISO-8859-1"
-        ))) { parser =>
+        Using.resource(
+          new PEMParser(
+            new InputStreamReader(
+              new ByteArrayInputStream(bytes),
+              "ISO-8859-1"
+            )
+          )
+        ) { parser =>
           val acc = scala.collection.mutable.ListBuffer[X509Certificate]()
           var obj = parser.readObject()
           while (obj != null) {
@@ -378,23 +329,17 @@ object Certificates {
     if (collected.isEmpty) None else Some(Bundle(collected))
   }
 
-  /** Parse a keystore. Tries `null` password only — per Hard rule:
-    * never guess passwords. If the null-password load fails, returns
-    * a `Keystore` with `ks = None` (envelope-only path).
-    *
-    * Catches every failure type: `IOException` wrapping
-    * `UnrecoverableKeyException`, MAC errors on PKCS#12, BadPadding
-    * on JKS, etc. Any failure → encrypted-envelope path. */
+  /** Parse a keystore. Tries null password only. */
   private[strategies] def parseKeystore(
       artifact: ArtifactWrapper,
-      format: String,
+      format: String
   ): Option[Keystore] = {
     val canonicalFormat = format.toLowerCase match {
-      case "jks" => "jks"
-      case "jceks" => "jceks"
+      case "jks"    => "jks"
+      case "jceks"  => "jceks"
       case "pkcs12" => "pkcs12"
-      case "bks" => "bks"
-      case other => other.toLowerCase
+      case "bks"    => "bks"
+      case other    => other.toLowerCase
     }
     val outcome: Try[KeyStore] = Try {
       artifact.withFile { f =>
@@ -406,10 +351,7 @@ object Certificates {
     }
     outcome match {
       case scala.util.Success(ks) if canonicalFormat == "bks" =>
-        // BC's BKS provider accepts a null password for cert-only reads even
-        // when the store was generated with a real password. We can't tell
-        // from a successful null-load whether the store was actually
-        // unencrypted, so BKS always takes the envelope-only path.
+        // BC's BKS accepts null password even when generated with a real one; always envelope-only.
         Some(Keystore(None, canonicalFormat, 0))
       case scala.util.Success(ks) =>
         val count = Try(ks.size()).getOrElse(0)
@@ -433,12 +375,13 @@ object Certificates {
     }
   }
 
-  // ---------- Phase-5: SSH parsing -------------------------------------
+  // ---------- SSH parsing ---------------------------------------------
 
-  /** OpenSSH wire algorithm name → (canonical alg, optional companion
-    * (qualKey, qualValue), security-key flag). The `sk-*` variants set
-    * the third element so the emitter can attach `sk=true`. */
-  private[strategies] val sshAlgMap: Map[String, (String, Option[(String, String)], Boolean)] = Map(
+  /** SSH wire algorithm name → (canonical alg, optional companion qualifier,
+    * security-key flag).
+    */
+  private[strategies] val sshAlgMap
+      : Map[String, (String, Option[(String, String)], Boolean)] = Map(
     "ssh-rsa" -> ("rsa", None, false),
     "ssh-dss" -> ("dsa", Some(("size", "1024")), false),
     "ssh-ed25519" -> ("ed25519", None, false),
@@ -447,34 +390,23 @@ object Certificates {
     "ecdsa-sha2-nistp384" -> ("ec", Some(("curve", "p-384")), false),
     "ecdsa-sha2-nistp521" -> ("ec", Some(("curve", "p-521")), false),
     "sk-ssh-ed25519@openssh.com" -> ("ed25519", None, true),
-    "sk-ecdsa-sha2-nistp256@openssh.com" -> ("ec", Some(("curve", "p-256")), true),
+    "sk-ecdsa-sha2-nistp256@openssh.com" -> ("ec", Some(
+      ("curve", "p-256")
+    ), true)
   )
 
-  /** SSH cert type tokens end with `-cert-v01@openssh.com`. Strip the
-    * suffix to get the underlying signed-key alg name. */
-  private[strategies] def signedKeyAlgFromCertName(certName: String): Option[String] = {
+  /** Strip -cert-v01@openssh.com suffix to get the signed-key algorithm name.
+    */
+  private[strategies] def signedKeyAlgFromCertName(
+      certName: String
+  ): Option[String] = {
     val suffix = "-cert-v01@openssh.com"
     if (certName.endsWith(suffix))
       Some(certName.substring(0, certName.length - suffix.length))
     else None
   }
 
-  /** Parse an OpenSSH plain public-key file.
-    *
-    * Per Phase 5 plan: "single-line OpenSSH wire format" — a line whose
-    * first whitespace-separated token is the algorithm name (e.g.,
-    * `ssh-rsa`, `ssh-ed25519`, `ecdsa-sha2-nistp256`).
-    *
-    * **Known limitation (G7):** `authorized_keys` lines may have options
-    * before the algorithm token, e.g.
-    * `from="1.2.3.4",no-pty ssh-rsa AAAA... user@host`. Those lines fail
-    * the algorithm-token check (the first token is the option string)
-    * and silently return `None`. The CryptoDetector also won't tag them
-    * with the SSH MIME, so they remain unclaimed. This matches the
-    * plan's strict reading; if a future requirement is to inventory
-    * keys inside option-prefixed authorized_keys files, extend
-    * `SshWireReader.parseFirstKeyLine` to scan tokens left-to-right
-    * for the first recognized algorithm name. */
+  /** Parse an OpenSSH plain public-key file. */
   private[strategies] def parseSshPubkey(
       artifact: ArtifactWrapper
   ): Option[SshPubkey] = {
@@ -482,10 +414,11 @@ object Certificates {
       Try {
         val raw = new String(
           java.nio.file.Files.readAllBytes(f.toPath),
-          java.nio.charset.StandardCharsets.UTF_8,
+          java.nio.charset.StandardCharsets.UTF_8
         )
-        io.spicelabs.goatrodeo.util.SshWireReader.parseFirstKeyLine(raw).flatMap {
-          case (alg, wire, comment) =>
+        io.spicelabs.goatrodeo.util.SshWireReader
+          .parseFirstKeyLine(raw)
+          .flatMap { case (alg, wire, comment) =>
             // Sanity: the wire blob's first string must equal the alg
             // token. If it doesn't, decline (probably an `authorized_keys`
             // options line or a corrupted file).
@@ -498,11 +431,13 @@ object Certificates {
                 if (alg == "ssh-rsa") {
                   val _e = r.readMpint()
                   val n = r.readMpint()
-                  Some(io.spicelabs.goatrodeo.util.SshWireReader.mpintBitLength(n))
+                  Some(
+                    io.spicelabs.goatrodeo.util.SshWireReader.mpintBitLength(n)
+                  )
                 } else None
               Some(SshPubkey(wire, alg, comment, rsaBits))
             }
-        }
+          }
       }.toOption.flatten
     }
   }
@@ -515,32 +450,34 @@ object Certificates {
       Try {
         val raw = new String(
           java.nio.file.Files.readAllBytes(f.toPath),
-          java.nio.charset.StandardCharsets.UTF_8,
+          java.nio.charset.StandardCharsets.UTF_8
         )
-        io.spicelabs.goatrodeo.util.SshWireReader.parseFirstKeyLine(raw).flatMap {
-          case (certTypeName, certBytes, comment) =>
+        io.spicelabs.goatrodeo.util.SshWireReader
+          .parseFirstKeyLine(raw)
+          .flatMap { case (certTypeName, certBytes, comment) =>
             signedKeyAlgFromCertName(certTypeName).flatMap { signedAlg =>
               if (!sshAlgMap.contains(signedAlg)) None
               else parseSshCertBlob(certTypeName, signedAlg, certBytes, comment)
             }
-        }
+          }
       }.toOption.flatten
     }
   }
 
-  /** Decode the cert wire blob. The first string is the cert-type-name
-    * (matches the file's first token). What follows is `nonce` then
-    * algorithm-specific public-key fields, then the metadata fields. */
+  /** Decode the cert wire blob. */
   private def parseSshCertBlob(
       certTypeName: String,
       signedAlg: String,
       certBytes: Array[Byte],
-      comment: Option[String],
+      comment: Option[String]
   ): Option[SshCert] = Try {
     import io.spicelabs.goatrodeo.util.SshWireReader
     val r = new SshWireReader(certBytes)
     val innerType = r.readUtf8String()
-    require(innerType == certTypeName, s"cert-type mismatch: $innerType vs $certTypeName")
+    require(
+      innerType == certTypeName,
+      s"cert-type mismatch: $innerType vs $certTypeName"
+    )
     val _nonce = r.readString()
 
     // Read the signed key's algorithm-specific fields and reconstruct the
@@ -548,15 +485,21 @@ object Certificates {
     val keyFieldsBuf = new java.io.ByteArrayOutputStream()
     var rsaBits: Option[Int] = None
 
-    def writeString(out: java.io.ByteArrayOutputStream, b: Array[Byte]): Unit = {
+    def writeString(
+        out: java.io.ByteArrayOutputStream,
+        b: Array[Byte]
+    ): Unit = {
       val len = b.length
       out.write((len >>> 24) & 0xff)
       out.write((len >>> 16) & 0xff)
-      out.write((len >>>  8) & 0xff)
+      out.write((len >>> 8) & 0xff)
       out.write(len & 0xff)
       out.write(b)
     }
-    writeString(keyFieldsBuf, signedAlg.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+    writeString(
+      keyFieldsBuf,
+      signedAlg.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+    )
 
     signedAlg match {
       case "ssh-rsa" =>
@@ -574,12 +517,16 @@ object Certificates {
         val curve = r.readString(); writeString(keyFieldsBuf, curve)
         val q = r.readString(); writeString(keyFieldsBuf, q)
       case other =>
-        throw new IllegalArgumentException(s"unsupported SSH cert key alg: $other")
+        throw new IllegalArgumentException(
+          s"unsupported SSH cert key alg: $other"
+        )
     }
 
     val signedKeyWire = keyFieldsBuf.toByteArray
     val serialL = r.readUInt64()
-    val serial = if (serialL >= 0) BigInt(serialL) else BigInt(java.lang.Long.toUnsignedString(serialL))
+    val serial =
+      if (serialL >= 0) BigInt(serialL)
+      else BigInt(java.lang.Long.toUnsignedString(serialL))
     val certType = r.readUInt32()
     val keyId = r.readUtf8String()
     val principals = r.readStringList()
@@ -592,48 +539,41 @@ object Certificates {
     val signatureBlob = r.readString()
     val sigReader = new SshWireReader(signatureBlob)
     val caSigAlg = sigReader.readUtf8String()
-    Some(SshCert(
-      certBytes = certBytes,
-      certTypeName = certTypeName,
-      signedKeyWire = signedKeyWire,
-      signedKeyAlgName = signedAlg,
-      rsaModulusBits = rsaBits,
-      serial = serial,
-      certType = certType,
-      keyId = keyId,
-      principals = principals,
-      validAfter = validAfter,
-      validBefore = validBefore,
-      criticalOptions = criticalOptions,
-      extensions = extensions,
-      caKeyWire = caKeyWire,
-      caSigAlgName = caSigAlg,
-      comment = comment,
-    ))
+    Some(
+      SshCert(
+        certBytes = certBytes,
+        certTypeName = certTypeName,
+        signedKeyWire = signedKeyWire,
+        signedKeyAlgName = signedAlg,
+        rsaModulusBits = rsaBits,
+        serial = serial,
+        certType = certType,
+        keyId = keyId,
+        principals = principals,
+        validAfter = validAfter,
+        validBefore = validBefore,
+        criticalOptions = criticalOptions,
+        extensions = extensions,
+        caKeyWire = caKeyWire,
+        caSigAlgName = caSigAlg,
+        comment = comment
+      )
+    )
   }.toOption.flatten
 
-  /** SHA-256 base64-no-padding fingerprint over an SSH wire blob (the
-    * `ssh-keygen -lf` form minus the `SHA-256:` prefix). */
+  /** SHA-256 base64-no-padding fingerprint over an SSH wire blob. */
   private[strategies] def sshFingerprintB64(wire: Array[Byte]): String = {
     val md = java.security.MessageDigest.getInstance("SHA-256")
     val digest = md.digest(wire)
     java.util.Base64.getEncoder.nn.withoutPadding.nn.encodeToString(digest).nn
   }
 
-  /** Render an OpenSSH cert validity timestamp.
-    *
-    * OpenSSH uses two sentinel values for unbounded validity:
-    *   - `0` (epoch start) → cert is valid "always" from the past
-    *   - `0xFFFFFFFFFFFFFFFFL` ("never expires") → cert is valid "forever"
-    *
-    * Both come through `readUInt64()` as `Long` — the 0xFFFF…FFFFL form
-    * is `-1L` after sign-extension. Naively converting via
-    * `Instant.ofEpochSecond` gives `1970-01-01T00:00:00Z` and
-    * `1969-12-31T23:59:59Z` respectively — semantically wrong. Detect
-    * both and emit the literal `sentinelLabel` instead. */
+  /** Render an OpenSSH cert validity timestamp, using sentinelLabel for
+    * unbounded values.
+    */
   private[strategies] def sshCertTimeLabel(
       epochSec: Long,
-      sentinelLabel: String,
+      sentinelLabel: String
   ): String = {
     val isUnsignedMax = epochSec == -1L
     val isZero = epochSec == 0L
@@ -641,11 +581,10 @@ object Certificates {
     else isoUtc(java.util.Date.from(java.time.Instant.ofEpochSecond(epochSec)))
   }
 
-  /** Companion-qualifier helper for SSH: `size=N` for RSA, `curve=p-256`
-    * for EC, none otherwise. Optional `sk=true` from the alg map. */
+  /** Companion-qualifier helper for SSH pURLs. */
   private[strategies] def sshKeyQualifiers(
       algName: String,
-      rsaBits: Option[Int],
+      rsaBits: Option[Int]
   ): Vector[String] = {
     val (canon, companion, sk) = sshAlgMap(algName)
     val parts = scala.collection.mutable.ListBuffer[String](s"alg=$canon")
@@ -657,32 +596,26 @@ object Certificates {
     parts.toVector
   }
 
-  // ---------- Phase-6: PGP parsing -------------------------------------
+  // ---------- PGP parsing ---------------------------------------------
 
-  /** PGP algorithm-id (RFC 4880 §9.1 + RFC 9580 additions) → canonical
-    * alg name. Per Appendix A, `ec` is the unified EC alg name; the
-    * curve disambiguates ECDH vs ECDSA. EdDSA legacy (22), Ed25519 (27),
-    * and Ed448 (28) all map to canonical Ed25519/Ed448 names. */
+  /** PGP algorithm-id → canonical alg name. */
   private[strategies] val pgpAlgIdMap: Map[Int, String] = Map(
-    1 -> "rsa",       // RSA (Encrypt or Sign)
-    2 -> "rsa",       // RSA (Encrypt-Only)  — deprecated
-    3 -> "rsa",       // RSA (Sign-Only)     — deprecated
-    16 -> "elgamal",  // ElGamal (Encrypt-Only)
-    17 -> "dsa",      // DSA
-    18 -> "ec",       // ECDH
-    19 -> "ec",       // ECDSA
-    20 -> "elgamal",  // ElGamal (Sign + Encrypt) — deprecated
-    22 -> "ed25519",  // EdDSA Legacy
-    25 -> "x25519",   // X25519
-    26 -> "x448",     // X448
-    27 -> "ed25519",  // Ed25519 (RFC 9580)
-    28 -> "ed448",    // Ed448  (RFC 9580)
+    1 -> "rsa", // RSA (Encrypt or Sign)
+    2 -> "rsa", // RSA (Encrypt-Only)  — deprecated
+    3 -> "rsa", // RSA (Sign-Only)     — deprecated
+    16 -> "elgamal", // ElGamal (Encrypt-Only)
+    17 -> "dsa", // DSA
+    18 -> "ec", // ECDH
+    19 -> "ec", // ECDSA
+    20 -> "elgamal", // ElGamal (Sign + Encrypt) — deprecated
+    22 -> "ed25519", // EdDSA Legacy
+    25 -> "x25519", // X25519
+    26 -> "x448", // X448
+    27 -> "ed25519", // Ed25519 (RFC 9580)
+    28 -> "ed448" // Ed448  (RFC 9580)
   )
 
-  /** PGP curve OID → canonical curve name. Plus a friendly-name
-    * fallback for keys that report a textual curve name (e.g. v6
-    * Ed25519/X25519 use named curves at the algorithm-id level rather
-    * than via the legacy ECDH/ECDSA OID. */
+  /** PGP curve OID → canonical curve name. */
   private[strategies] val pgpCurveOidMap: Map[String, String] = Map(
     "1.2.840.10045.3.1.7" -> "p-256",
     "1.3.132.0.34" -> "p-384",
@@ -691,30 +624,16 @@ object Certificates {
     "1.3.36.3.3.2.8.1.1.11" -> "brainpoolp384r1",
     "1.3.36.3.3.2.8.1.1.13" -> "brainpoolp512r1",
     "1.3.6.1.4.1.3029.1.5.1" -> "curve25519",
-    "1.3.6.1.4.1.11591.15.1" -> "ed25519",
+    "1.3.6.1.4.1.11591.15.1" -> "ed25519"
   )
 
-  /** Phase-7 dispatch wrapper: try the Phase-6 public-key path first;
-    * if that returns None (e.g. a `BEGIN PGP PRIVATE KEY BLOCK` file
-    * which yields a `PGPSecretKeyRing` from the BC factory), fall
-    * through to the Phase-7 secret-key path.
-    *
-    * The Phase-6 white-box contract is preserved: `parsePgpKeyRing`
-    * itself still returns `None` for secret-key input. The wrapper
-    * sits at dispatch level. */
+  /** Try public-key path first; fall through to secret-key path. */
   private[strategies] def parsePgpKeyOrSecretKeyRing(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] =
     parsePgpKeyRing(artifact).orElse(parsePgpSecretKeyRing(artifact))
 
-  /** Parse a PGP key ring (armored or binary). Iterates every key in
-    * every ring (primary + each subkey).
-    *
-    * Multi-ring handling (G8): an armored file may contain multiple
-    * concatenated `BEGIN PGP PUBLIC KEY BLOCK` segments. `PGPUtil.getDecoderStream`
-    * decodes only the first, so we split on the armor start marker and
-    * parse each segment independently. Binary input is parsed as a
-    * single byte stream (binary PGP packets concatenate naturally). */
+  /** Parse a PGP key ring (armored or binary). */
   private[strategies] def parsePgpKeyRing(
       artifact: ArtifactWrapper
   ): Option[PgpKeyRing] = {
@@ -734,9 +653,10 @@ object Certificates {
     }
   }
 
-  /** Split a raw byte buffer into one segment per `BEGIN PGP …` armor
-    * block. If the buffer contains no armor marker, returns the whole
-    * buffer as a single segment (binary input). */
+  /** Split a raw byte buffer into one segment per `BEGIN PGP …` armor block. If
+    * the buffer contains no armor marker, returns the whole buffer as a single
+    * segment (binary input).
+    */
   private def splitArmoredBlocks(raw: Array[Byte]): Vector[Array[Byte]] = {
     val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
     val begin = "-----BEGIN PGP "
@@ -747,29 +667,30 @@ object Certificates {
       while (idx >= 0) {
         val next = text.indexOf(begin, idx + begin.length)
         val end = if (next < 0) text.length else next
-        acc += text.substring(idx, end).getBytes(
-          java.nio.charset.StandardCharsets.ISO_8859_1
-        )
+        acc += text
+          .substring(idx, end)
+          .getBytes(
+            java.nio.charset.StandardCharsets.ISO_8859_1
+          )
         idx = next
       }
       acc.toVector
     }
   }
 
-  /** Read every `PGPPublicKeyRing` (or collection thereof) from a single
-    * decoder stream, appending to `acc`. */
+  /** Read every PGPPublicKeyRing from a decoder stream. */
   private def parsePgpStream(
       bytes: Array[Byte],
       acc: scala.collection.mutable.ListBuffer[
         org.bouncycastle.openpgp.PGPPublicKeyRing
-      ],
+      ]
   ): Unit = {
     val decoded = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(
       new java.io.ByteArrayInputStream(bytes)
     )
     val factory = new org.bouncycastle.openpgp.PGPObjectFactory(
       decoded,
-      new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator(),
+      new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
     )
     var obj = factory.nextObject()
     while (obj != null) {
@@ -784,9 +705,7 @@ object Certificates {
     }
   }
 
-  /** Project a sequence of `PGPPublicKeyRing`s into a single `PgpKeyRing`
-    * holding every primary + subkey. The first ring's primary key
-    * supplies the `primaryUserId` for `MKC.NAME`. */
+  /** Project PGPPublicKeyRings into a single PgpKeyRing. */
   private def buildPgpKeyRing(
       rings: Vector[org.bouncycastle.openpgp.PGPPublicKeyRing]
   ): PgpKeyRing = {
@@ -797,30 +716,15 @@ object Certificates {
       val primary = ring.getPublicKey
       Option(primary).flatMap { pk =>
         val it = pk.getUserIDs
-        if (it != null && it.hasNext) Some(it.next().nn.toString.nn) else None
+        if (it != null && it.hasNext) Option(it.next().toString) else None
       }
     }
     PgpKeyRing(keys, primaryUid)
   }
 
-  /** Phase-7: parse a PGP secret-key block (armored or binary). Each
-    * `PGPSecretKey` exposes its public-key portion via `getPublicKey`,
-    * AND an S2K specifier (`getS2K`) describing how the private key
-    * material is protected.
-    *
-    * If ANY secret key in the ring has an active S2K (encrypted), the
-    * entire artifact takes the **encrypted** path: envelope-only
-    * metadata, no pURL. Otherwise (every secret key has no S2K
-    * protection — i.e., the secret material is stored in the clear),
-    * the **unencrypted** path applies: derive `PGPPublicKey` from each
-    * secret key and reuse Phase 6's emitters with
-    * `Envelope=plaintext` + `DerivedFromPrivateKey=true`.
-    *
-    * Hard rule reinforcement: this method never reads or serializes
-    * the private-key bytes. `getPublicKey` returns the public portion
-    * which is stored separately inside the secret-key packet. The S2K
-    * specifier itself is metadata (algo, salt, iteration count) — not
-    * private-key material. */
+  /** Parse a PGP secret-key block. If any key is encrypted, takes envelope-only
+    * path; otherwise derives public keys.
+    */
   private[strategies] def parsePgpSecretKeyRing(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
@@ -838,20 +742,19 @@ object Certificates {
     }
   }
 
-  /** Read every `PGPSecretKeyRing` from a single decoder stream,
-    * appending to `acc`. Mirror of `parsePgpStream` for secret keys. */
+  /** Read every PGPSecretKeyRing from a decoder stream. */
   private def parsePgpSecretStream(
       bytes: Array[Byte],
       acc: scala.collection.mutable.ListBuffer[
         org.bouncycastle.openpgp.PGPSecretKeyRing
-      ],
+      ]
   ): Unit = {
     val decoded = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(
       new java.io.ByteArrayInputStream(bytes)
     )
     val factory = new org.bouncycastle.openpgp.PGPObjectFactory(
       decoded,
-      new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator(),
+      new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
     )
     var obj = factory.nextObject()
     while (obj != null) {
@@ -866,7 +769,7 @@ object Certificates {
     }
   }
 
-  /** Build a Phase-7 ClaimedContent from PGPSecretKeyRing(s). */
+  /** Build a ClaimedContent from PGPSecretKeyRings. */
   private def buildPgpSecretClaim(
       rings: Vector[org.bouncycastle.openpgp.PGPSecretKeyRing]
   ): ClaimedContent = {
@@ -889,10 +792,7 @@ object Certificates {
     }
   }
 
-  /** True if the secret key has an active S2K specifier (private-key
-    * material is encrypted). BC's `getS2K` returns null for unencrypted
-    * keys; `getEncAlgorithm == 0` is the SymmetricKeyAlgorithmTags
-    * value for "no encryption". */
+  /** True if the secret key has active S2K or non-zero encryption algorithm. */
   private def isSecretKeyEncrypted(
       sk: org.bouncycastle.openpgp.PGPSecretKey
   ): Boolean = {
@@ -901,18 +801,9 @@ object Certificates {
     s2k.isDefined || encAlg != 0
   }
 
-  /** Build the encrypted-PGP-secret claim from a representative
-    * encrypted `PGPSecretKey`. We extract:
-    *   - cipher = `getKeyEncryptionAlgorithm` mapped to a canonical
-    *     name via `pgpSymmetricCipherNameMap`
-    *   - kdfAlgorithm = `"s2k-iterated"` if the S2K type is iterated-
-    *     and-salted (BC returns S2K with `getType == 3`), else simple
-    *     `"s2k"`
-    *   - kdfIterations = S2K iteration count (BC `getIterationCount`
-    *     returns the encoded count; we expose the raw int)
-    *   - kdfPrf = canonical hash name from S2K's `getHashAlgorithm`
-    *
-    * No private-key bytes are ever read. */
+  /** Build the encrypted-PGP-secret claim from a representative encrypted
+    * PGPSecretKey.
+    */
   private def pgpSecretEncryptedClaim(
       sk: org.bouncycastle.openpgp.PGPSecretKey
   ): PrivateKeyEncrypted = {
@@ -936,7 +827,7 @@ object Certificates {
     val s2kSalt: Option[String] = s2kOpt.flatMap { s2k =>
       Try {
         val saltBytes = s2k.getIV
-        if (saltBytes != null && saltBytes.length > 0) bytesToHex(saltBytes)
+        if (saltBytes != null && saltBytes.length > 0) Helpers.toHex(saltBytes)
         else ""
       }.toOption.filter(_.nonEmpty)
     }
@@ -947,12 +838,11 @@ object Certificates {
       kdfPrf = kdfPrf,
       cipher = cipher,
       salt = s2kSalt,
-      iv = None,
+      iv = None
     )
   }
 
-  /** PGP SymmetricKeyAlgorithmTag → canonical cipher name. Per
-    * RFC 4880 §9.2 / RFC 9580 §9.3. */
+  /** PGP SymmetricKeyAlgorithmTag → canonical cipher name. */
   private[strategies] val pgpSymmetricCipherNameMap: Map[Int, String] = Map(
     1 -> "idea",
     2 -> "des-ede3-cbc",
@@ -964,7 +854,7 @@ object Certificates {
     10 -> "twofish",
     11 -> "camellia-128",
     12 -> "camellia-192",
-    13 -> "camellia-256",
+    13 -> "camellia-256"
   )
 
   /** PGP HashAlgorithmTag → canonical hash name. */
@@ -977,20 +867,10 @@ object Certificates {
     10 -> "sha512",
     11 -> "sha224",
     12 -> "sha3-256",
-    14 -> "sha3-512",
+    14 -> "sha3-512"
   )
 
-  /** Project a single `PGPPublicKey` into our `PgpKey` value.
-    *
-    * v5 policy (claim #20 in `phase-6-claims.md`, also gap N6): we
-    * read whatever `pk.getVersion` returns and store it. There is no
-    * v5 fixture in the corpus and no contributor request for one. If
-    * BC parses a v5 key successfully, the strategy emits `version=5`
-    * and a 64-hex SHA-256 fingerprint (same length as v6). If BC
-    * raises on a v5 packet, the surrounding `Try` in `parsePgpKeyRing`
-    * swallows it and the artifact is unclaimed. Both behaviors are
-    * acceptable; revisit if a v5 fixture is added or BC's v5 support
-    * exhibits issues. */
+  /** Project a PGPPublicKey into a PgpKey. */
   private def pgpKeyOf(
       pk: org.bouncycastle.openpgp.PGPPublicKey
   ): PgpKey = {
@@ -1028,7 +908,7 @@ object Certificates {
     val userIds: Vector[String] = {
       val it = pk.getUserIDs
       if (it == null) Vector.empty
-      else it.asScala.toVector.map(_.toString.nn)
+      else it.asScala.toVector.map(_.toString)
     }
 
     val expSecs = Try(pk.getValidSeconds).toOption.getOrElse(0L)
@@ -1047,17 +927,17 @@ object Certificates {
       isPrimary = pk.isMasterKey,
       creationTime = pk.getCreationTime,
       expirationTime = expiration,
-      userIds = userIds,
+      userIds = userIds
     )
   }
 
-  /** Build the `pkg:pgp/fingerprint@{hex}?...` pURL for a single PGP key. */
+  /** Build the pkg:pgp/fingerprint@{hex}?... pURL for a PGP key. */
   private[strategies] def purlForPgpKey(
       key: PgpKey
   ): PackageURL = {
     val parts = scala.collection.mutable.ListBuffer[String](
       s"alg=${key.canonicalAlg}",
-      s"version=${key.version}",
+      s"version=${key.version}"
     )
     key.keySize.foreach(s => parts += s"size=$s")
     key.curve.foreach(c => parts += s"curve=$c")
@@ -1065,58 +945,52 @@ object Certificates {
     new PackageURL(s"pkg:pgp/fingerprint@${key.fingerprintHex}?$qual")
   }
 
-  /** First 8 hex chars of the key fingerprint — matches PGP short-ID
-    * convention used as the metadata namespace token. */
+  /** First 8 hex chars of the key fingerprint. */
   private[strategies] def pgpFp8(key: PgpKey): String =
     key.fingerprintHex.take(8)
 
-  // ---------- canonical mappings (Appendix A) ---------------------------
-
-  /** Public-key OIDs → (canonical alg, optional params token). */
-  // OID maps `pubkeyOidMap`, `sigAlgOidMap`, `ecCurveMap`, `ekuOidMap`
-  // moved to `CertificatesOidMaps.scala` (Phase-7 second-pass refactor
-  // to comply with inv #9 token limit; pure relocation).
-
   // ---------- per-cert derivation helpers ------------------------------
 
-  /** SHA-256, lowercase hex. */
-  private[strategies] def sha256Hex(bytes: Array[Byte]): String = {
-    val md = MessageDigest.getInstance("SHA-256")
-    md.digest(bytes).map(b => f"${b & 0xff}%02x").mkString
-  }
-
-  /** (alg, qualifier-map) for a public key. */
+  /** Extract (alg, qualifier-map) from a public key.
+    * @param pub
+    *   JCA PublicKey (may be null for composite/unsupported alg)
+    * @param cert
+    *   the certificate (used as fallback via SPKI OID)
+    */
   private[strategies] def keyAlgAndQualifier(
       pub: java.security.PublicKey | Null,
-      cert: X509Certificate,
+      cert: X509Certificate
   ): (String, Map[String, String]) = {
     if (pub == null) {
       // JCA returned no PublicKey — composite or other unsupported algorithm.
       // Resolve via raw SPKI OID.
       spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
-    } else pub match {
-      case rsa: RSAPublicKey =>
-        ("rsa", Map("size" -> rsa.getModulus.bitLength.toString))
-      case dsa: DSAPublicKey =>
-        ("dsa", Map("size" -> dsa.getY.bitLength.toString))
-      case _: ECPublicKey =>
-        val curveName = bcCurveNameFromCert(cert).getOrElse {
-          val raw = pub.getAlgorithm.toLowerCase
-          ecCurveMap.getOrElse(raw, raw)
-        }
-        val canonical = ecCurveMap.getOrElse(curveName.toLowerCase, curveName.toLowerCase)
-        ("ec", Map("curve" -> canonical))
-      case _ =>
-        pub.getAlgorithm.toLowerCase match {
-          case "ed25519" | "1.3.101.112" => ("ed25519", Map.empty)
-          case "ed448" | "1.3.101.113"   => ("ed448", Map.empty)
-          case "x25519"                   => ("x25519", Map.empty)
-          case "x448"                     => ("x448", Map.empty)
-          case _ => spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
-        }
-    }
+    } else
+      pub match {
+        case rsa: RSAPublicKey =>
+          ("rsa", Map("size" -> rsa.getModulus.bitLength.toString))
+        case dsa: DSAPublicKey =>
+          ("dsa", Map("size" -> dsa.getY.bitLength.toString))
+        case _: ECPublicKey =>
+          val curveName = bcCurveNameFromCert(cert).getOrElse {
+            val raw = pub.getAlgorithm.toLowerCase
+            ecCurveMap.getOrElse(raw, raw)
+          }
+          val canonical =
+            ecCurveMap.getOrElse(curveName.toLowerCase, curveName.toLowerCase)
+          ("ec", Map("curve" -> canonical))
+        case _ =>
+          pub.getAlgorithm.toLowerCase match {
+            case "ed25519" | "1.3.101.112" => ("ed25519", Map.empty)
+            case "ed448" | "1.3.101.113"   => ("ed448", Map.empty)
+            case "x25519"                  => ("x25519", Map.empty)
+            case "x448"                    => ("x448", Map.empty)
+            case _ => spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
+          }
+      }
   }
 
+  /** Resolve EC curve name via BC's ECNamedCurveTable. */
   private def bcCurveNameFromCert(cert: X509Certificate): Option[String] = Try {
     val spki = org.bouncycastle.asn1.x509.SubjectPublicKeyInfo.getInstance(
       cert.getPublicKey.getEncoded
@@ -1132,22 +1006,25 @@ object Certificates {
     } else None
   }.toOption.flatten
 
-  /** Extract SPKI DER bytes from a certificate without going through
-    * `cert.getPublicKey()` — JCA returns null for OIDs the JVM doesn't
-    * have a `KeyFactory` for (e.g., composite hybrid keys). BC's
-    * raw cert ASN.1 always has the bytes. */
-  private[strategies] def spkiBytesFromCert(cert: X509Certificate): Array[Byte] = {
-    val bcCert = org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
+  /** Extract SPKI DER bytes from a certificate (works even when getPublicKey
+    * returns null).
+    */
+  private[strategies] def spkiBytesFromCert(
+      cert: X509Certificate
+  ): Array[Byte] = {
+    val bcCert =
+      org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
     bcCert.getSubjectPublicKeyInfo.getEncoded
   }
 
-  /** Extract the SPKI's algorithm OID from a certificate without going
-    * through `cert.getPublicKey()`. */
+  /** Extract the SPKI algorithm OID from a certificate. */
   private[strategies] def spkiAlgOidFromCert(cert: X509Certificate): String = {
-    val bcCert = org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
+    val bcCert =
+      org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
     bcCert.getSubjectPublicKeyInfo.getAlgorithm.getAlgorithm.getId
   }
 
+  /** Resolve SPKI OID to (alg, qualifiers) via pubkeyOidMap. */
   private def spkiAlgFromCert(
       cert: X509Certificate
   ): Option[(String, Map[String, String])] = Try {
@@ -1158,6 +1035,7 @@ object Certificates {
     }
   }.toOption.flatten
 
+  /** Canonical signature algorithm name from a certificate. */
   private[strategies] def canonicalSigAlg(cert: X509Certificate): String = {
     sigAlgOidMap.getOrElse(
       cert.getSigAlgOID,
@@ -1165,6 +1043,7 @@ object Certificates {
     )
   }
 
+  /** Canonical signature algorithm name from a CRL. */
   private[strategies] def canonicalSigAlgCrl(crl: X509CRL): String = {
     sigAlgOidMap.getOrElse(
       crl.getSigAlgOID,
@@ -1172,22 +1051,22 @@ object Certificates {
     )
   }
 
+  /** True if subject == issuer and the signature verifies. */
   private[strategies] def isSelfSigned(cert: X509Certificate): Boolean = {
     if (cert.getSubjectX500Principal != cert.getIssuerX500Principal) false
     else {
       val pub = cert.getPublicKey
       if (pub == null) {
-        // Composite / unsupported alg — JCA can't verify. Accept the
-        // subject==issuer signal alone (consistent with how Phase 0b's
-        // `pqc_x509_sidecar` handles the same case in Python).
         true
-      } else Try {
-        cert.verify(pub, "BC")
-        true
-      }.getOrElse(false)
+      } else
+        Try {
+          cert.verify(pub, "BC")
+          true
+        }.getOrElse(false)
     }
   }
 
+  /** ISO-8601 UTC date string. */
   private[strategies] def isoUtc(d: java.util.Date): String = {
     val instant = d.toInstant
     DateTimeFormatter.ISO_INSTANT
@@ -1196,14 +1075,23 @@ object Certificates {
       .replaceAll("\\.\\d+Z$", "Z")
   }
 
-  private[strategies] def keyUsageNames(cert: X509Certificate): Option[String] = {
+  /** Key-usage bit names from the X.509 KeyUsage extension. */
+  private[strategies] def keyUsageNames(
+      cert: X509Certificate
+  ): Option[String] = {
     val ku = cert.getKeyUsage
     if (ku == null) None
     else {
       val labels = Seq(
-        "digital-signature", "non-repudiation", "key-encipherment",
-        "data-encipherment", "key-agreement", "key-cert-sign",
-        "crl-sign", "encipher-only", "decipher-only",
+        "digital-signature",
+        "non-repudiation",
+        "key-encipherment",
+        "data-encipherment",
+        "key-agreement",
+        "key-cert-sign",
+        "crl-sign",
+        "encipher-only",
+        "decipher-only"
       )
       val present = labels.zipWithIndex.collect {
         case (label, idx) if idx < ku.length && ku(idx) => label
@@ -1212,16 +1100,19 @@ object Certificates {
     }
   }
 
-  private[strategies] def ekuNames(cert: X509Certificate): Option[String] = Try {
-    val eku = cert.getExtendedKeyUsage
-    if (eku == null) None
-    else {
-      val ids = eku.asScala.toSeq
-      val mapped = ids.map(o => ekuOidMap.getOrElse(o, o))
-      if (mapped.isEmpty) None else Some(mapped.mkString(","))
-    }
-  }.toOption.flatten
+  /** Extended-key-usage OID → canonical name. */
+  private[strategies] def ekuNames(cert: X509Certificate): Option[String] =
+    Try {
+      val eku = cert.getExtendedKeyUsage
+      if (eku == null) None
+      else {
+        val ids = eku.asScala.toSeq
+        val mapped = ids.map(o => ekuOidMap.getOrElse(o, o))
+        if (mapped.isEmpty) None else Some(mapped.mkString(","))
+      }
+    }.toOption.flatten
 
+  /** Subject-Alternative-Names entries as type:value pairs. */
   private[strategies] def sanList(cert: X509Certificate): Option[String] = Try {
     val san = cert.getSubjectAlternativeNames
     if (san == null) None
@@ -1236,15 +1127,15 @@ object Certificates {
           // `type:value`; structured types (0/3/4/5/8) emit just the type
           // label (the inner value isn't a useful identifier on its own).
           tag match {
-            case 1 => Some(s"email:$value")
-            case 2 => Some(s"DNS:$value")
-            case 6 => Some(s"URI:$value")
-            case 7 => Some(s"IP:$value")
-            case 0 => Some("OTHER:OtherName")
-            case 3 => Some("OTHER:X400Address")
-            case 4 => Some("OTHER:DirectoryName")
-            case 5 => Some("OTHER:EDIPartyName")
-            case 8 => Some("OTHER:RegisteredID")
+            case 1     => Some(s"email:$value")
+            case 2     => Some(s"DNS:$value")
+            case 6     => Some(s"URI:$value")
+            case 7     => Some(s"IP:$value")
+            case 0     => Some("OTHER:OtherName")
+            case 3     => Some("OTHER:X400Address")
+            case 4     => Some("OTHER:DirectoryName")
+            case 5     => Some("OTHER:EDIPartyName")
+            case 8     => Some("OTHER:RegisteredID")
             case other => Some(s"OTHER-$other")
           }
         }
@@ -1253,38 +1144,40 @@ object Certificates {
     }
   }.toOption.flatten
 
-  /** RFC2253-style DN rendering that decodes JDK's `#hex` fallback for OID
-    * values the JDK doesn't recognize back to their text form. We keep
-    * JDK's output (most-specific-first ordering, escape rules) and only
-    * substitute the `#XXYY…` runs that decode to a text ASN.1 string type
-    * (PrintableString 0x13, UTF8String 0x0c, IA5String 0x16, TeletexString
-    * 0x14, BMPString 0x1e). Other types stay as `#hex`. */
-  private[strategies] def dnString(name: javax.security.auth.x500.X500Principal): String = {
+  /** RFC2253 DN with JDK #hex fallback decoded to text form. */
+  private[strategies] def dnString(
+      name: javax.security.auth.x500.X500Principal
+  ): String = {
     val rfc2253 = name.getName(javax.security.auth.x500.X500Principal.RFC2253)
     val hexRun = "#([0-9a-fA-F]{4,})".r
-    hexRun.replaceAllIn(rfc2253, m => {
-      val hex: String = m.group(1).nn
-      decodeAsn1HexString(hex) match {
-        case Some(decoded) => java.util.regex.Matcher.quoteReplacement(decoded)
-        case None => java.util.regex.Matcher.quoteReplacement(s"#$hex")
+    hexRun.replaceAllIn(
+      rfc2253,
+      m => {
+        val hex: String = m.group(1)
+        decodeAsn1HexString(hex) match {
+          case Some(decoded) =>
+            java.util.regex.Matcher.quoteReplacement(decoded)
+          case None => java.util.regex.Matcher.quoteReplacement(s"#$hex")
+        }
       }
-    })
+    )
   }
 
+  /** Decode an ASN.1 hex string if it represents a text type. */
   private def decodeAsn1HexString(hex: String): Option[String] = Try {
     val bytes = hex.grouped(2).map(p => Integer.parseInt(p, 16).toByte).toArray
     if (bytes.length < 2) None
     else {
-      val tag = bytes(0) & 0xFF
-      val lenByte = bytes(1) & 0xFF
+      val tag = bytes(0) & 0xff
+      val lenByte = bytes(1) & 0xff
       val (len, dataOff) =
         if ((lenByte & 0x80) == 0) (lenByte, 2)
         else {
-          val numLen = lenByte & 0x7F
+          val numLen = lenByte & 0x7f
           if (numLen == 0 || numLen > 4 || bytes.length < 2 + numLen) (-1, -1)
           else {
             var v = 0
-            (0 until numLen).foreach(i => v = (v << 8) | (bytes(2 + i) & 0xFF))
+            (0 until numLen).foreach(i => v = (v << 8) | (bytes(2 + i) & 0xff))
             (v, 2 + numLen)
           }
         }
@@ -1293,18 +1186,25 @@ object Certificates {
         val payload = bytes.slice(dataOff, dataOff + len)
         tag match {
           case 0x13 | 0x16 | 0x14 =>
-            Some(new String(payload, java.nio.charset.StandardCharsets.US_ASCII))
-          case 0x0C =>
+            Some(
+              new String(payload, java.nio.charset.StandardCharsets.US_ASCII)
+            )
+          case 0x0c =>
             Some(new String(payload, java.nio.charset.StandardCharsets.UTF_8))
-          case 0x1E =>
-            Some(new String(payload, java.nio.charset.StandardCharsets.UTF_16BE))
+          case 0x1e =>
+            Some(
+              new String(payload, java.nio.charset.StandardCharsets.UTF_16BE)
+            )
           case _ => None
         }
       }
     }
   }.toOption.flatten
 
-  private[strategies] def cnOrDn(name: javax.security.auth.x500.X500Principal): String = {
+  /** CN if present, else full DN. */
+  private[strategies] def cnOrDn(
+      name: javax.security.auth.x500.X500Principal
+  ): String = {
     val dn = dnString(name)
     val cnRegex = "CN=([^,]+)".r
     cnRegex.findFirstMatchIn(dn).flatMap(m => Option(m.group(1))).getOrElse(dn)
@@ -1319,18 +1219,10 @@ object Certificates {
     "MIIEvQIBADAN",
     "MIIEpAIBAAKCAQEA",
     "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
-    "openssh-key-v1",
+    "openssh-key-v1"
   ).map(p => Pattern.compile(p))
 
-  /** Metadata keys that MAY legitimately carry long lowercase-hex
-    * values (fingerprints, SHA-256 digests, X.509 serial numbers,
-    * comma-separated revoked-serial lists). Per Appendix C, every
-    * other metadata key with a 32+ char hex run is suspect (could
-    * be a serialized private scalar).
-    *
-    * The allowlist patterns use regex so that the namespaced forms
-    * emitted by Phases 4-6 (bundles use `:Cert:N:`, keystores use
-    * `:Entry:alias:`, PGP rings use `:Key:fp8:`) are accepted. */
+  /** Metadata keys that may legitimately carry long lowercase-hex values. */
   private[strategies] val longHexAllowedKeys: Seq[Pattern] = Seq(
     "^Certificates:SpkiSha256$",
     "^Certificates:CertSha256$",
@@ -1341,22 +1233,14 @@ object Certificates {
     "^Certificates:SshFingerprintSha256$",
     "^Certificates:SshCertSha256$",
     "^Certificates:SshCertCaFingerprint$",
-    // Phase-7 envelope-only metadata: salt + IV are PUBLIC components
-    // of the encryption envelope, not private-key material. Plan §
-    // "Encrypted path" enumerates them as KDF parameters to extract.
     "^Certificates:KdfSalt$",
     "^Certificates:Iv$",
-    // Phase-4 bundle namespacing: Certificates:Cert:0:Field, Cert:1:Field, …
     "^Certificates:Cert:[0-9]+:(SpkiSha256|CertSha256|Serial|Fingerprint)$",
-    // Phase-4 keystore namespacing: Certificates:Entry:alias:Field
     "^Certificates:Entry:[^:]+:(SpkiSha256|CertSha256|Serial|Fingerprint)$",
-    // Phase-6 PGP per-key namespacing: Certificates:Key:fp8:Fingerprint
-    "^Certificates:Key:[0-9a-f]+:Fingerprint$",
+    "^Certificates:Key:[0-9a-f]+:Fingerprint$"
   ).map(p => Pattern.compile(p))
 
-  /** Long-hex run pattern from Appendix C: 32+ consecutive lowercase
-    * hex characters. The leak sweep rejects any value matching this
-    * pattern UNLESS the metadata key is on the allowlist. */
+  /** Long-hex run pattern: 32+ consecutive lowercase hex characters. */
   private[strategies] val longHexPattern: Pattern =
     Pattern.compile("[0-9a-f]{32,}")
 
@@ -1367,8 +1251,8 @@ object Certificates {
       val keyAllowsLongHex = longHexAllowedKeys.exists(_.matcher(key).matches())
       values.foreach { v =>
         val text = v match {
-          case io.spicelabs.goatrodeo.omnibor.StringOf(s)        => s
-          case io.spicelabs.goatrodeo.omnibor.PairOf(_, s2)      => s2
+          case io.spicelabs.goatrodeo.omnibor.StringOf(s)   => s
+          case io.spicelabs.goatrodeo.omnibor.PairOf(_, s2) => s2
         }
         forbiddenPatterns.foreach { pat =>
           if (pat.matcher(text).find()) {
@@ -1378,9 +1262,6 @@ object Certificates {
             )
           }
         }
-        // Appendix C long-hex check: serialized private scalars
-        // (Ed25519 seeds, ECDSA P-256 scalars, etc.) appear as long
-        // hex runs. Only fingerprint-like keys may carry them.
         if (!keyAllowsLongHex && longHexPattern.matcher(text).find()) {
           throw new RuntimeException(
             s"Certificates leak guard: metadata key '$key' carries a " +
@@ -1392,24 +1273,7 @@ object Certificates {
     }
   }
 
-  // ---------- Phase-7: private-key parsing -----------------------------
-  //
-  // Two paths per Phase 7 plan:
-  //   - Unencrypted: derive public key, compute SPKI / SSH wire blob,
-  //     emit pURL identical in shape to the public-key counterpart.
-  //   - Encrypted:   parse the envelope only — KDF, cipher, iterations.
-  //                  No decryption, no password guessing, no pURL.
-  //
-  // Routing detail: the PEM detector emits `application/x-pem-private-key`
-  // for both legacy-unencrypted and legacy-encrypted (Proc-Type:4)
-  // bodies, because the BEGIN-banner alone doesn't disambiguate. The
-  // discrimination happens at parse time in `parsePemPrivateKey`.
-
-  /** Parse a PEM-private-key MIME (`application/x-pem-private-key`).
-    * Disambiguates legacy-unencrypted vs legacy-encrypted by checking
-    * for `Proc-Type: 4,ENCRYPTED` (and the companion `DEK-Info:` line)
-    * BEFORE invoking BC's PEMParser. PKCS#8 unencrypted bodies
-    * (`-----BEGIN PRIVATE KEY-----`) take the unencrypted path. */
+  /** Parse a PEM-private-key MIME; disambiguates encrypted vs unencrypted. */
   private[strategies] def parsePemPrivateKey(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
@@ -1424,20 +1288,21 @@ object Certificates {
     }
   }
 
-  /** Parse a PEM-encrypted-private-key MIME (always encrypted PKCS#8 —
-    * `-----BEGIN ENCRYPTED PRIVATE KEY-----`). Extracts envelope-only
-    * metadata via the outer ASN.1 `EncryptedPrivateKeyInfo`; never
-    * decrypts, never guesses passwords. */
+  /** Parse a PEM-encrypted-private-key MIME; extracts envelope only. */
   private[strategies] def parsePemEncryptedPrivateKey(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
     artifact.withFile { f =>
       val raw = java.nio.file.Files.readAllBytes(f.toPath)
       Try {
-        Using.resource(new PEMParser(new InputStreamReader(
-          new ByteArrayInputStream(raw),
-          java.nio.charset.StandardCharsets.ISO_8859_1,
-        ))) { parser =>
+        Using.resource(
+          new PEMParser(
+            new InputStreamReader(
+              new ByteArrayInputStream(raw),
+              java.nio.charset.StandardCharsets.ISO_8859_1
+            )
+          )
+        ) { parser =>
           parser.readObject() match {
             case epki: org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo =>
               Some(pkcs8EncryptedClaimFrom(epki))
@@ -1448,19 +1313,12 @@ object Certificates {
     }
   }
 
-  /** True if the PEM text contains a legacy `Proc-Type: 4,ENCRYPTED`
-    * header (RFC 1421 / OpenSSL legacy private-key format). The
-    * detector itself can't tell from the BEGIN line alone — the
-    * disambiguation header lives BELOW the BEGIN banner. */
+  /** True if PEM text contains a legacy Proc-Type: 4,ENCRYPTED header. */
   private def procTypeEncryptedHeaderPresent(text: String): Boolean =
     text.contains("Proc-Type: 4,ENCRYPTED") ||
       text.contains("Proc-Type:4,ENCRYPTED")
 
-  /** Build the legacy-PEM-encrypted claim. Parses the `DEK-Info:` line
-    * (if present) for the cipher name. Legacy PEM has no KDF
-    * descriptor: the password→key derivation is OpenSSL's MD5-based
-    * EVP_BytesToKey, hardcoded by convention. We do NOT name a KDF
-    * here; the `Certificates:KdfAlgorithm` field is omitted. */
+  /** Build the legacy-PEM-encrypted claim. */
   private def legacyEncryptedPemClaim(text: String): PrivateKeyEncrypted = {
     val (cipher, iv) = legacyDekCipherAndIv(text)
     PrivateKeyEncrypted(
@@ -1470,44 +1328,42 @@ object Certificates {
       kdfPrf = None,
       cipher = cipher,
       salt = None,
-      iv = iv,
+      iv = iv
     )
   }
 
-  /** Extract canonical cipher name AND IV (lowercase hex) from the
-    * `DEK-Info:` line. Format per RFC 1421:
-    *   `DEK-Info: AES-256-CBC,1A2B3C…` → cipher = `aes-256-cbc`, IV = `1a2b3c…`
-    */
-  private def legacyDekCipherAndIv(text: String): (Option[String], Option[String]) = {
+  /** Extract cipher name and IV from the DEK-Info line. */
+  private def legacyDekCipherAndIv(
+      text: String
+  ): (Option[String], Option[String]) = {
     val rx = "(?m)^DEK-Info:\\s*([A-Z0-9-]+),([0-9A-Fa-f]+)".r
     rx.findFirstMatchIn(text) match {
       case Some(m) =>
-        val cipher = Option(m.group(1)).map(_.nn.toLowerCase)
-        val iv = Option(m.group(2)).map(_.nn.toLowerCase)
+        val cipher = Option(m.group(1)).map(_.toLowerCase)
+        val iv = Option(m.group(2)).map(_.toLowerCase)
         (cipher, iv)
       case None =>
         // Fall back to cipher-only match (legacy formats may omit IV).
         val rxCipher = "(?m)^DEK-Info:\\s*([A-Z0-9-]+)".r
-        val cipher = rxCipher.findFirstMatchIn(text)
-          .flatMap(m => Option(m.group(1)).map(_.nn.toLowerCase))
+        val cipher = rxCipher
+          .findFirstMatchIn(text)
+          .flatMap(m => Option(m.group(1)).map(_.toLowerCase))
         (cipher, None)
     }
   }
 
-  /** Parse PEM-bytes as either:
-    *   - `PEMKeyPair` (legacy unencrypted: `BEGIN RSA/EC/DSA PRIVATE KEY`)
-    *   - `PrivateKeyInfo` (PKCS#8 unencrypted: `BEGIN PRIVATE KEY`)
-    *
-    * Either way, project to a `PrivateKeyPlaintextPem` carrying the
-    * derived public-key SPKI bytes + algorithm + qualifiers.
-    */
+  /** Parse PEM bytes as PEMKeyPair or PrivateKeyInfo; derive public SPKI. */
   private def parseUnencryptedPemBytes(
       raw: Array[Byte]
   ): Option[PrivateKeyPlaintextPem] = Try {
-    Using.resource(new PEMParser(new InputStreamReader(
-      new ByteArrayInputStream(raw),
-      java.nio.charset.StandardCharsets.ISO_8859_1,
-    ))) { parser =>
+    Using.resource(
+      new PEMParser(
+        new InputStreamReader(
+          new ByteArrayInputStream(raw),
+          java.nio.charset.StandardCharsets.ISO_8859_1
+        )
+      )
+    ) { parser =>
       val obj = parser.readObject()
       val spki: org.bouncycastle.asn1.x509.SubjectPublicKeyInfo | Null =
         obj match {
@@ -1525,17 +1381,13 @@ object Certificates {
           canonicalAlg = alg,
           keySize = sz,
           curve = curve,
-          params = params,
+          params = params
         )
       }
     }
   }.toOption.flatten
 
-  /** Derive SPKI from PKCS#8 `PrivateKeyInfo` without exposing private
-    * material. RSA: take public (modulus, e). EC: Q = d·G via
-    * `ECPoint.multiply` (private scalar consumed inside). EdDSA / X*:
-    * BC's `*PrivateKeyParameters.generatePublicKey()`. DSA: y = g^x
-    * mod p. See `phase-7-claims.md` claim #8 for the audit. */
+  /** Derive SPKI from PKCS#8 PrivateKeyInfo. */
   private def spkiFromPrivateKeyInfo(
       pki: org.bouncycastle.asn1.pkcs.PrivateKeyInfo
   ): org.bouncycastle.asn1.x509.SubjectPublicKeyInfo | Null = {
@@ -1571,9 +1423,7 @@ object Certificates {
     }.toOption.orNull
   }
 
-  /** Project SPKI ASN.1 → (canonical alg, size?, curve?, params?).
-    * Mirrors `keyAlgAndQualifier` but works without an X.509
-    * certificate context (private-key derivation has no cert). */
+  /** Project SPKI ASN.1 → (alg, size?, curve?, params?). */
   private[strategies] def algAndQualifierFromSpki(
       spki: org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
   ): (String, Option[Int], Option[String], Option[String]) = {
@@ -1621,14 +1471,12 @@ object Certificates {
           case "1.3.101.113" => ("ed448", None, None, None)
           case "1.3.101.110" => ("x25519", None, None, None)
           case "1.3.101.111" => ("x448", None, None, None)
-          case _ => ("unknown", None, None, None)
+          case _             => ("unknown", None, None, None)
         }
     }
   }
 
-  /** Build the encrypted-PKCS#8 claim from a parsed
-    * `PKCS8EncryptedPrivateKeyInfo`. Inspects the algorithm OID and
-    * the KDF/cipher inside `PBES2-params` (RFC 8018) when present. */
+  /** Build encrypted-PKCS#8 claim; inspects PBES2/PBES1 parameters. */
   private def pkcs8EncryptedClaimFrom(
       epki: org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo
   ): PrivateKeyEncrypted = {
@@ -1653,13 +1501,15 @@ object Certificates {
                 )
               }.toOption
               val iters = pbkdf2.flatMap(p =>
-                Try(p.getIterationCount.intValue.toLong).toOption)
+                Try(p.getIterationCount.intValue.toLong).toOption
+              )
               val prf = pbkdf2.flatMap { p =>
                 val prfOid = Try(p.getPrf.getAlgorithm.getId).toOption
                 prfOid.flatMap(prfOidToCanonicalHash.get)
               }
               val salt = pbkdf2.flatMap(p =>
-                Try(bytesToHex(p.getSalt)).toOption.filter(_.nonEmpty))
+                Try(Helpers.toHex(p.getSalt)).toOption.filter(_.nonEmpty)
+              )
               (Some("pbkdf2"), iters, prf, salt)
             case "1.3.6.1.4.1.11591.4.11" =>
               // scrypt — salt is in ScryptParams
@@ -1669,9 +1519,11 @@ object Certificates {
                 )
               }.toOption
               val salt = scrypt.flatMap(p =>
-                Try(bytesToHex(p.getSalt)).toOption.filter(_.nonEmpty))
+                Try(Helpers.toHex(p.getSalt)).toOption.filter(_.nonEmpty)
+              )
               val n = scrypt.flatMap(p =>
-                Try(p.getCostParameter.longValueExact).toOption)
+                Try(p.getCostParameter.longValueExact).toOption
+              )
               (Some("scrypt"), n, None, salt)
             case other => (Some(other), None, None, None)
           }
@@ -1687,8 +1539,9 @@ object Certificates {
           // case (others stay None).
           val iv = Try {
             val rawParams = p.getEncryptionScheme.getParameters
-            val asOctet = org.bouncycastle.asn1.ASN1OctetString.getInstance(rawParams)
-            bytesToHex(asOctet.getOctets)
+            val asOctet =
+              org.bouncycastle.asn1.ASN1OctetString.getInstance(rawParams)
+            Helpers.toHex(asOctet.getOctets)
           }.toOption.filter(_.nonEmpty)
           (cipher, iv)
         case None => (None, None)
@@ -1700,7 +1553,7 @@ object Certificates {
         kdfPrf = kdfPrf,
         cipher = cipherName,
         salt = kdfSalt,
-        iv = cipherIv,
+        iv = cipherIv
       )
     } else {
       // PBES1 path. RFC 8018 §A.3 PBES1 algorithms include
@@ -1713,9 +1566,10 @@ object Certificates {
         )
       }.toOption
       val salt = pbes1.flatMap(p =>
-        Try(bytesToHex(p.getSalt)).toOption.filter(_.nonEmpty))
-      val iters = pbes1.flatMap(p =>
-        Try(p.getIterationCount.longValueExact).toOption)
+        Try(Helpers.toHex(p.getSalt)).toOption.filter(_.nonEmpty)
+      )
+      val iters =
+        pbes1.flatMap(p => Try(p.getIterationCount.longValueExact).toOption)
       val cipher = pbes1OidToCanonicalCipher.get(algOid)
       PrivateKeyEncrypted(
         envelope = "pkcs8-encrypted",
@@ -1724,26 +1578,12 @@ object Certificates {
         kdfPrf = pbes1OidToPrf.get(algOid),
         cipher = cipher,
         salt = salt,
-        iv = None,
+        iv = None
       )
     }
   }
 
-  /** Lowercase-hex encoder. Salt and IV are emitted in hex per the
-    * canonical convention (Phase 3-6 fingerprints all use lowercase
-    * hex). */
-  private def bytesToHex(bytes: Array[Byte]): String =
-    bytes.map(b => f"${b & 0xff}%02x").mkString
-
-  // PKCS#5/PKCS#12 PBES1/PBES2 OID maps (`pbes1OidToCanonicalCipher`,
-  // `pbes1OidToPrf`, `prfOidToCanonicalHash`, `cipherOidToName`) moved
-  // to `CertificatesOidMaps.scala` (Phase-7 second-pass refactor to
-  // comply with inv #9; pure relocation).
-
-  /** Parse an OpenSSH-private-key MIME (`openssh-key-v1` envelope; see
-    * OpenSSH PROTOCOL.key for wire format). `kdfname == "none"` →
-    * unencrypted (publickey blob is in the clear); else encrypted
-    * (envelope-only emission). */
+  /** Parse an OpenSSH-private-key MIME (openssh-key-v1 envelope). */
   private[strategies] def parseOpenSshPrivateKey(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
@@ -1756,9 +1596,7 @@ object Certificates {
     }
   }
 
-  /** Strip the `-----BEGIN OPENSSH PRIVATE KEY-----` / `-----END...-----`
-    * armor and base64-decode the inner body. Returns the binary
-    * `openssh-key-v1\0…` envelope bytes. */
+  /** Strip PEM armor and base64-decode the inner body. */
   private def decodeOpenSshArmor(raw: Array[Byte]): Option[Array[Byte]] = {
     val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
     val begin = "-----BEGIN OPENSSH PRIVATE KEY-----"
@@ -1773,7 +1611,7 @@ object Certificates {
     }
   }
 
-  /** Parse an `openssh-key-v1` envelope. */
+  /** Parse an openssh-key-v1 envelope. */
   private def parseOpenSshV1Envelope(
       env: Array[Byte]
   ): Option[ClaimedContent] = {
@@ -1781,9 +1619,12 @@ object Certificates {
       java.nio.charset.StandardCharsets.US_ASCII
     )
     if (env.length < magic.length) None
-    else if (!java.util.Arrays.equals(
-              java.util.Arrays.copyOfRange(env, 0, magic.length),
-              magic)) None
+    else if (
+      !java.util.Arrays.equals(
+        java.util.Arrays.copyOfRange(env, 0, magic.length),
+        magic
+      )
+    ) None
     else {
       val body = java.util.Arrays.copyOfRange(env, magic.length, env.length)
       val r = new io.spicelabs.goatrodeo.util.SshWireReader(body)
@@ -1825,29 +1666,31 @@ object Certificates {
               val k = new io.spicelabs.goatrodeo.util.SshWireReader(kdfOptions)
               val saltBytes = k.readString()
               val rounds = k.readUInt32()
-              (Some(rounds), Some(bytesToHex(saltBytes)))
+              (Some(rounds), Some(Helpers.toHex(saltBytes)))
             }.toOption.getOrElse((None, None))
           } else (None, None)
         val canonicalCipher: Option[String] =
           if (cipherName.nonEmpty && cipherName != "none") Some(cipherName)
           else None
-        Some(PrivateKeyEncrypted(
-          envelope = "openssh-encrypted",
-          kdfAlgorithm = canonicalKdf,
-          kdfIterations = kdfIters,
-          kdfPrf = None,
-          cipher = canonicalCipher,
-          salt = kdfSalt,
-          iv = None,
-        ))
+        Some(
+          PrivateKeyEncrypted(
+            envelope = "openssh-encrypted",
+            kdfAlgorithm = canonicalKdf,
+            kdfIterations = kdfIters,
+            kdfPrf = None,
+            cipher = canonicalCipher,
+            salt = kdfSalt,
+            iv = None
+          )
+        )
       }
     }
   }
 
-  // ---------- emission helpers per claim variant -----------------------
-
   /** Emit the (spki, cert) pURL pair for a single X.509 cert. */
-  private[strategies] def purlsForCert(c: X509Certificate): Vector[PackageURL] = {
+  private[strategies] def purlsForCert(
+      c: X509Certificate
+  ): Vector[PackageURL] = {
     val derBytes = c.getEncoded
     val spkiBytes = spkiBytesFromCert(c)
     val certSha = sha256Hex(derBytes)
@@ -1859,33 +1702,36 @@ object Certificates {
 
     val companion: String =
       (qualMap.get("size").map("size=" + _) ++
-       qualMap.get("curve").map("curve=" + _) ++
-       qualMap.get("params").map("params=" + _)).mkString("&")
+        qualMap.get("curve").map("curve=" + _) ++
+        qualMap.get("params").map("params=" + _)).mkString("&")
 
     val spkiQuals: Seq[String] = Seq(
       Some(s"alg=$alg"),
       if (companion.nonEmpty) Some(companion) else None,
-      Some(s"version=$version"),
+      Some(s"version=$version")
     ).flatten
     val certQuals: Seq[String] = Seq(
       Some(s"alg=$alg"),
       if (companion.nonEmpty) Some(companion) else None,
       Some(s"sig-alg=$sigAlg"),
       Some(s"self-signed=$selfSigned"),
-      Some(s"version=$version"),
+      Some(s"version=$version")
     ).flatten
 
     Vector(
-      new PackageURL(s"pkg:x509/spki-sha256@$spkiSha?${spkiQuals.mkString("&")}"),
-      new PackageURL(s"pkg:x509/cert-sha256@$certSha?${certQuals.mkString("&")}"),
+      new PackageURL(
+        s"pkg:x509/spki-sha256@$spkiSha?${spkiQuals.mkString("&")}"
+      ),
+      new PackageURL(
+        s"pkg:x509/cert-sha256@$certSha?${certQuals.mkString("&")}"
+      )
     )
   }
 
-  /** Per-cert metadata block — Phase 3's inner table. Used by Phase 3
-    * single-cert AND Phase 4 keystore/bundle namespaced entries. */
+  /** Per-cert metadata block. */
   private[strategies] def perCertMetadata(
       adHoc: String => String,
-      c: X509Certificate,
+      c: X509Certificate
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val derBytes = c.getEncoded
     val spkiBytes = spkiBytesFromCert(c)
@@ -1901,18 +1747,28 @@ object Certificates {
 
     var tm: TreeMap[String, TreeSet[StringOrPair]] =
       TreeMap[String, TreeSet[StringOrPair]]() +?
-      Some(adHoc("SubjectDN") -> TreeSet(StringOrPair(dnString(subject)))) +?
-      Some(adHoc("IssuerDN") -> TreeSet(StringOrPair(dnString(issuer)))) +?
-      Some(adHoc("Serial") -> TreeSet(StringOrPair(c.getSerialNumber.toString(16)))) +?
-      Some(adHoc("NotBefore") -> TreeSet(StringOrPair(isoUtc(c.getNotBefore)))) +?
-      Some(adHoc("NotAfter") -> TreeSet(StringOrPair(isoUtc(c.getNotAfter)))) +?
-      Some(adHoc("KeyAlgorithm") -> TreeSet(StringOrPair(alg))) +?
-      Some(adHoc("SigAlgorithm") -> TreeSet(StringOrPair(sigAlg))) +?
-      Some(adHoc("SpkiSha256") -> TreeSet(StringOrPair(spkiSha))) +?
-      Some(adHoc("CertSha256") -> TreeSet(StringOrPair(certSha))) +?
-      Some(adHoc("IsCA") -> TreeSet(StringOrPair(isCa.toString))) +?
-      Some(adHoc("SelfSigned") -> TreeSet(StringOrPair(selfSigned.toString))) +?
-      Some(adHoc("Version") -> TreeSet(StringOrPair(version.toString)))
+        Some(adHoc("SubjectDN") -> TreeSet(StringOrPair(dnString(subject)))) +?
+        Some(adHoc("IssuerDN") -> TreeSet(StringOrPair(dnString(issuer)))) +?
+        Some(
+          adHoc("Serial") -> TreeSet(
+            StringOrPair(c.getSerialNumber.toString(16))
+          )
+        ) +?
+        Some(
+          adHoc("NotBefore") -> TreeSet(StringOrPair(isoUtc(c.getNotBefore)))
+        ) +?
+        Some(
+          adHoc("NotAfter") -> TreeSet(StringOrPair(isoUtc(c.getNotAfter)))
+        ) +?
+        Some(adHoc("KeyAlgorithm") -> TreeSet(StringOrPair(alg))) +?
+        Some(adHoc("SigAlgorithm") -> TreeSet(StringOrPair(sigAlg))) +?
+        Some(adHoc("SpkiSha256") -> TreeSet(StringOrPair(spkiSha))) +?
+        Some(adHoc("CertSha256") -> TreeSet(StringOrPair(certSha))) +?
+        Some(adHoc("IsCA") -> TreeSet(StringOrPair(isCa.toString))) +?
+        Some(
+          adHoc("SelfSigned") -> TreeSet(StringOrPair(selfSigned.toString))
+        ) +?
+        Some(adHoc("Version") -> TreeSet(StringOrPair(version.toString)))
 
     qualMap.get("size").foreach { v =>
       tm = tm + (adHoc("KeySize") -> TreeSet(StringOrPair(v)))
@@ -1935,20 +1791,21 @@ object Certificates {
     tm
   }
 
+  /** URL-encode a keystore alias. */
   private[strategies] def urlEncodeAlias(alias: String): String = {
     java.net.URLEncoder.encode(alias, "UTF-8")
   }
 }
 
 /** A single artifact claimed by the Certificates strategy.
-  *
-  * @param artifact the file the strategy claimed
-  * @param claim    the parsed cryptographic content (Phase 3 single
-  *                 cert; Phase 4 keystore / bundle / CRL)
+  * @param artifact
+  *   the file the strategy claimed
+  * @param claim
+  *   the parsed cryptographic content
   */
 class Certificates(
     artifact: ArtifactWrapper,
-    claim: Certificates.ClaimedContent,
+    claim: Certificates.ClaimedContent
 ) extends ToProcess {
 
   override def markSuccessfulCompletion(): Unit = artifact.finished()
@@ -1965,4 +1822,3 @@ class Certificates(
     Vector(artifact -> SingleMarker()) ->
       new CertificatesState(artifact, Some(claim))
 }
-

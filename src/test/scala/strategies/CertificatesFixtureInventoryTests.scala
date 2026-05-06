@@ -28,20 +28,21 @@ import java.nio.file.Files
   *
   * ## LLM-friendly summary of each test
   *
-  *   - "pairs fixture and sidecar sharing a stem" — the canonical happy
-  *     path (`foo.pem` + `foo.pem.expected.json`).
+  *   - "pairs fixture and sidecar sharing a stem" — the canonical happy path
+  *     (`foo.pem` + `foo.pem.expected.json`).
   *   - "handles fixtures without file extensions" —
-  *     `openssh-ed25519-unencrypted` + `openssh-ed25519-unencrypted.expected.json`.
+  *     `openssh-ed25519-unencrypted` +
+  *     `openssh-ed25519-unencrypted.expected.json`.
   *   - "orphan sidecar detected" — sidecar with no matching fixture.
   *   - "orphan fixture detected" — fixture with no matching sidecar.
-  *   - "excludes SOURCES.md / README.md / .gitkeep / generate.sh from
-  *     fixtures" — infrastructure-file filtering.
+  *   - "excludes SOURCES.md / README.md / .gitkeep / generate.sh from fixtures"
+  *     — infrastructure-file filtering.
   *   - "excludes files under tools/ from fixtures" — infrastructure-dir
   *     filtering.
-  *   - "category is the immediate subdirectory" — `pairs.category` equals
-  *     the directory name, not the full path.
-  *   - "countByCategory aggregates correctly" — multi-fixture, multi-
-  *     category scenario.
+  *   - "category is the immediate subdirectory" — `pairs.category` equals the
+  *     directory name, not the full path.
+  *   - "countByCategory aggregates correctly" — multi-fixture, multi- category
+  *     scenario.
   *   - "empty root reports zero fixtures" — boundary.
   *   - "nonexistent root reports zero fixtures" — boundary.
   */
@@ -82,8 +83,14 @@ class CertificatesFixtureInventoryTests extends FunSuite {
       assertEquals(pair.fixture.getName, "foo.pem")
       assertEquals(pair.sidecar.getName, "foo.pem.expected.json")
       assertEquals(pair.category, "x509")
-      assert(inv.orphanSidecars.isEmpty, s"orphanSidecars=${inv.orphanSidecars}")
-      assert(inv.orphanFixtures.isEmpty, s"orphanFixtures=${inv.orphanFixtures}")
+      assert(
+        inv.orphanSidecars.isEmpty,
+        s"orphanSidecars=${inv.orphanSidecars}"
+      )
+      assert(
+        inv.orphanFixtures.isEmpty,
+        s"orphanFixtures=${inv.orphanFixtures}"
+      )
     } finally cleanup()
   }
 
@@ -97,7 +104,10 @@ class CertificatesFixtureInventoryTests extends FunSuite {
     try {
       val inv = new CertificatesFixtureInventoryImpl(root)
       assertEquals(inv.pairs.size, 1)
-      assertEquals(inv.pairs.head.fixture.getName, "openssh-ed25519-unencrypted")
+      assertEquals(
+        inv.pairs.head.fixture.getName,
+        "openssh-ed25519-unencrypted"
+      )
     } finally cleanup()
   }
 
@@ -129,7 +139,9 @@ class CertificatesFixtureInventoryTests extends FunSuite {
     } finally cleanup()
   }
 
-  test("excludes SOURCES.md, README.md, README_llm.md, .gitkeep, generate.sh from fixture candidates") {
+  test(
+    "excludes SOURCES.md, README.md, README_llm.md, .gitkeep, generate.sh from fixture candidates"
+  ) {
     val (root, cleanup) = tmpCorpus { r =>
       val x509 = new File(r, "x509")
       x509.mkdirs()
@@ -211,7 +223,9 @@ class CertificatesFixtureInventoryTests extends FunSuite {
     assertEquals(inv.allFixtureCandidates, Vector.empty)
   }
 
-  test("sidecar in one directory does not pair with fixture in a different directory") {
+  test(
+    "sidecar in one directory does not pair with fixture in a different directory"
+  ) {
     val (root, cleanup) = tmpCorpus { r =>
       val x509 = new File(r, "x509")
       x509.mkdirs()
@@ -228,7 +242,9 @@ class CertificatesFixtureInventoryTests extends FunSuite {
     } finally cleanup()
   }
 
-  test("hidden files (starting with .) other than .gitkeep are not fixture candidates") {
+  test(
+    "hidden files (starting with .) other than .gitkeep are not fixture candidates"
+  ) {
     val (root, cleanup) = tmpCorpus { r =>
       val x509 = new File(r, "x509")
       x509.mkdirs()
