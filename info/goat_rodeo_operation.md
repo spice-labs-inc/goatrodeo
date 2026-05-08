@@ -161,6 +161,141 @@ Threads consume CPU, but there are also intermediate data structures (e.g., in-m
 consume memory. In terms of choosing the number of threads, it's not simply the number of logical CPUs, it's
 also the amount of RAM.
 
+## Certificates Strategy pURL Examples
+
+The Certificates strategy generates pURLs (package URLs) for various cryptographic artifacts. Below are examples of every pURL type generated:
+
+### X.509 Certificates
+
+Each X.509 certificate generates two pURLs - one for the full certificate and one for the Subject Public Key Info (SPKI):
+
+**RSA Certificate:**
+```
+pkg:x509/cert-sha256@568d6905a2c88708a4b3025190edcfedb1974a606a13c6e5290fcb2ae63edab5?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=2048&version=3
+pkg:x509/spki-sha256@2b071c59a0a0ae76b0eadb2bad23bad4580b69c3601b630c2eaf0613afa83f92?alg=rsa&size=2048&version=3
+```
+
+**EC Certificate (with curve):**
+```
+pkg:x509/cert-sha256@02ed0eb28c14da45165c566791700d6451d7fb56f0b2ab1d3b8eb070e56edff5?alg=ec&curve=p-384&self-signed=true&sig-alg=sha384-ecdsa&version=3
+pkg:x509/spki-sha256@fea2b7d645fba73d753c1ec9a7870c40e1f7b0c561e927b985bf711866e36f22?alg=ec&curve=p-384&version=3
+```
+
+### X.509 Certificate Revocation Lists (CRL)
+
+```
+pkg:x509/crl-sha256@d33aac05c6677837a6028d87dae34ef5229bac5f208acea95bd622c1a0dca030?sig-alg=sha256-rsa
+```
+
+### SSH Public Keys
+
+**Ed25519:**
+```
+pkg:ssh/sha256@Db31CxoP8DzjW%2FD7VJgyGO2ASZA%2FcxUQJBf7odnoEt0?alg=ed25519
+```
+
+**RSA (with size):**
+```
+pkg:ssh/sha256@9VAjeg9jcVjGFn2jX77k4h6DzFJf5UXz351tT1njVqo?alg=rsa&size=4096
+```
+
+**DSA (fixed 1024-bit):**
+```
+pkg:ssh/sha256@JpoF3tGwEESWo4cE6FJuyaD2oX8S9uElv2msJyFk6V4?alg=dsa&size=1024
+```
+
+**EC (with curve):**
+```
+pkg:ssh/sha256@<base64-sha256>?alg=ec&curve=p-256
+```
+
+**Security Key variants:**
+```
+pkg:ssh/sha256@<base64-sha256>?alg=ed25519&sk=true
+pkg:ssh/sha256@<base64-sha256>?alg=ec&curve=p-256&sk=true
+```
+
+### SSH Certificates
+
+Each SSH certificate generates two pURLs - one for the certificate and one for the signed key:
+
+**User Certificate (Ed25519):**
+```
+pkg:ssh/cert-sha256@00fd5a4b2b78a98b85d8a84c4b4f098e8afc66aad4c02604195ebed2eecc77c3?alg=ed25519&cert-type=user&sig-alg=ssh-ed25519
+pkg:ssh/sha256@kVSaQnN01FoMK0pdLrpUff7WML%2BtVX0Rk8TaQacCq9U?alg=ed25519
+```
+
+**Host Certificate (Ed25519):**
+```
+pkg:ssh/cert-sha256@580bec3021c054f9866890d2ef224ce3ed4ce52385db1759f2405cb7eb730203?alg=ed25519&cert-type=host&sig-alg=ssh-ed25519
+pkg:ssh/sha256@U8UZmmHxykCOTqkPSfY7w%2BRXjZbXDljK12KMOma39iA?alg=ed25519
+```
+
+### PGP Keys
+
+**RSA:**
+```
+pkg:pgp/fingerprint@9dc858229fc7dd38854ae2d88d81803c0ebfcd88?alg=rsa&size=4096&version=4
+```
+
+**Ed25519:**
+```
+pkg:pgp/fingerprint@6046c53c8df8c522076f8cd76d7faae796abc62e?alg=ed25519&curve=ed25519&version=4
+```
+
+**EC (X25519 for encryption):**
+```
+pkg:pgp/fingerprint@59915a0a243d30d5002d6aa58ed81ea8adfb3a65?alg=ec&curve=curve25519&version=4
+```
+
+### Private Keys (Unencrypted)
+
+Unencrypted private keys generate pURLs for the derived public key material:
+
+**PKCS#8 PEM (RSA):**
+```
+pkg:x509/spki-sha256@f43c197f37e71d23d15b686d6453947883c79011d766fc6433d58bb9815125c4?alg=rsa&size=2048
+```
+
+**OpenSSH format (RSA):**
+```
+pkg:ssh/sha256@t0%2FkOgTYoKNs5SqVqWSLJPoXV2gsRUIlrprl3Osdlfc?alg=rsa&size=2048
+```
+
+**PGP Secret Key Ring (unencrypted):**
+```
+pkg:pgp/fingerprint@6046c53c8df8c522076f8cd76d7faae796abc62e?alg=ed25519&curve=ed25519&version=4
+pkg:pgp/fingerprint@59915a0a243d30d5002d6aa58ed81ea8adfb3a65?alg=ec&curve=curve25519&version=4
+```
+
+### Encrypted Material (No pURLs)
+
+Encrypted keystores, encrypted private keys (PKCS#8, OpenSSH, PGP), and encrypted PEM files produce **no pURLs** - only envelope metadata:
+
+- Encrypted PKCS#12/JKS/JCEKS keystores: No pURLs
+- Encrypted PKCS#8 private keys: No pURLs
+- Encrypted OpenSSH private keys: No pURLs
+- Encrypted PGP secret keys: No pURLs
+- Legacy PEM encrypted private keys: No pURLs
+
+### PEM Bundles and Keystores
+
+PEM bundles and keystores generate pURLs for each certificate they contain:
+
+**PEM Bundle (2 certificates):**
+```
+pkg:x509/spki-sha256@4fc37b22c260f844c74e055259986a6c8ab2e90df82ea4dae330e47bc354f553?alg=rsa&size=2048&version=3
+pkg:x509/cert-sha256@11c1096ec324244d2dac18cea1131f20981580fb61b50e4cfb1a17f742fa949e?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=2048&version=3
+pkg:x509/spki-sha256@868110e436376a748166ecb7a511ada64c7d7a9b9ffc4a0b7fa85bbb8587020f?alg=rsa&size=2048&version=3
+pkg:x509/cert-sha256@d49630047cf9a19fb479d261dbd392fad25ce034f504f7a4cf76372bc57d8169?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3
+```
+
+**Unencrypted PKCS#12 (null-password):**
+```
+pkg:x509/spki-sha256@0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a39dad301c5afc3?alg=rsa&size=4096&version=3
+pkg:x509/cert-sha256@96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=4096&version=3
+```
+
 ## Tuning for performance
 
 If you're processing a few hundred artifacts, don't worry. Goat Rodeo will do the right thing.
