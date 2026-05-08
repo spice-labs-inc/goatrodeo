@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
+import com.github.packageurl.PackageURLBuilder
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -24,13 +25,32 @@ import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesOidMaps.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import io.spicelabs.goatrodeo.util.SshWireReader
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import org.bouncycastle.bcpg.ECPublicBCPGKey
+import org.bouncycastle.bcpg.EdDSAPublicBCPGKey
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
+import org.bouncycastle.crypto.params.*
+import org.bouncycastle.crypto.util.PrivateKeyFactory
+import org.bouncycastle.openpgp.PGPObjectFactory
+import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
+import org.bouncycastle.openpgp.PGPPublicKeyRingCollection
+import org.bouncycastle.openpgp.PGPSecretKey
+import org.bouncycastle.openpgp.PGPSecretKeyRing
+import org.bouncycastle.openpgp.PGPSecretKeyRingCollection
+import org.bouncycastle.openpgp.PGPUtil
+import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator
+import org.bouncycastle.openssl.PEMKeyPair
 import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo
 
 import java.io.ByteArrayInputStream
 import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 import java.security.cert.X509CRL
@@ -40,6 +60,8 @@ import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Base64
+import java.util.Date
 import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -263,8 +285,8 @@ object Certificates {
   private[strategies] def parseSingleCert(
       artifact: ArtifactWrapper
   ): Option[X509Certificate] = {
-    artifact.withFile { f =>
-      val bytes = java.nio.file.Files.readAllBytes(f.toPath)
+    artifact.withStream { f =>
+      val bytes = Helpers.slurpInput(f)
       tryParsePem(bytes).orElse(tryParseDer(bytes))
     }
   }
@@ -295,38 +317,44 @@ object Certificates {
       .asInstanceOf[X509Certificate]
   }.toOption
 
+  private def parserToVec(parser: PEMParser): Vector[Object] = {
+    var ret = Vector[Object]()
+    var next = parser.readObject()
+
+    while (next != null) {
+      ret = ret :+ next
+      next = parser.readObject()
+    }
+
+    ret
+  }
+
   /** Parse a multi-block PEM bundle; collects X509CertificateHolder objects
     * only.
     */
   private[strategies] def parseBundle(
       artifact: ArtifactWrapper
   ): Option[Bundle] = {
-    val collected = artifact.withFile { f =>
-      val bytes = java.nio.file.Files.readAllBytes(f.toPath)
+    val collected: Option[Vector[X509Certificate]] = artifact.withStream { f =>
       Try {
         Using.resource(
           new PEMParser(
             new InputStreamReader(
-              new ByteArrayInputStream(bytes),
+              f,
               "ISO-8859-1"
             )
           )
         ) { parser =>
-          val acc = scala.collection.mutable.ListBuffer[X509Certificate]()
-          var obj = parser.readObject()
-          while (obj != null) {
-            obj match {
-              case h: X509CertificateHolder =>
-                acc += converter.getCertificate(h)
-              case _ => // skip non-cert blocks (private keys, CSRs, etc.)
-            }
-            obj = parser.readObject()
+          val objects = parserToVec(parser)
+          objects.foldLeft(Vector[X509Certificate]()) {
+            case (v, h: X509CertificateHolder) =>
+              v :+ converter.getCertificate(h)
+            case (v, _) => v
           }
-          acc.toVector
         }
-      }.getOrElse(Vector.empty)
+      }.toOption
     }
-    if (collected.isEmpty) None else Some(Bundle(collected))
+    collected.filter(_.nonEmpty).map(Bundle(_))
   }
 
   /** Parse a keystore. Tries null password only. */
@@ -342,10 +370,10 @@ object Certificates {
       case other    => other.toLowerCase
     }
     val outcome: Try[KeyStore] = Try {
-      artifact.withFile { f =>
-        val bytes = java.nio.file.Files.readAllBytes(f.toPath)
+      artifact.withStream { f =>
+
         val ks = KeyStore.getInstance(format, "BC")
-        ks.load(new ByteArrayInputStream(bytes), null)
+        ks.load(f, null)
         ks
       }
     }
@@ -365,11 +393,10 @@ object Certificates {
   private[strategies] def parseCrl(
       artifact: ArtifactWrapper
   ): Option[Crl] = {
-    artifact.withFile { f =>
-      val bytes = java.nio.file.Files.readAllBytes(f.toPath)
+    artifact.withStream { f =>
       Try {
         val cf = CertificateFactory.getInstance("X.509", "BC")
-        cf.generateCRL(new ByteArrayInputStream(bytes))
+        cf.generateCRL(f)
           .asInstanceOf[X509CRL]
       }.toOption.map(Crl.apply)
     }
@@ -377,22 +404,31 @@ object Certificates {
 
   // ---------- SSH parsing ---------------------------------------------
 
+  private[strategies] case class SshAlgMap(
+      alg: String,
+      data: Option[(String, String)],
+      sk: Boolean
+  )
+
   /** SSH wire algorithm name → (canonical alg, optional companion qualifier,
     * security-key flag).
     */
-  private[strategies] val sshAlgMap
-      : Map[String, (String, Option[(String, String)], Boolean)] = Map(
-    "ssh-rsa" -> ("rsa", None, false),
-    "ssh-dss" -> ("dsa", Some(("size", "1024")), false),
-    "ssh-ed25519" -> ("ed25519", None, false),
-    "ssh-ed448" -> ("ed448", None, false),
-    "ecdsa-sha2-nistp256" -> ("ec", Some(("curve", "p-256")), false),
-    "ecdsa-sha2-nistp384" -> ("ec", Some(("curve", "p-384")), false),
-    "ecdsa-sha2-nistp521" -> ("ec", Some(("curve", "p-521")), false),
-    "sk-ssh-ed25519@openssh.com" -> ("ed25519", None, true),
-    "sk-ecdsa-sha2-nistp256@openssh.com" -> ("ec", Some(
-      ("curve", "p-256")
-    ), true)
+  private[strategies] val sshAlgMap: Map[String, SshAlgMap] = Map(
+    "ssh-rsa" -> SshAlgMap("rsa", None, false),
+    "ssh-dss" -> SshAlgMap("dsa", Some(("size", "1024")), false),
+    "ssh-ed25519" -> SshAlgMap("ed25519", None, false),
+    "ssh-ed448" -> SshAlgMap("ed448", None, false),
+    "ecdsa-sha2-nistp256" -> SshAlgMap("ec", Some(("curve", "p-256")), false),
+    "ecdsa-sha2-nistp384" -> SshAlgMap("ec", Some(("curve", "p-384")), false),
+    "ecdsa-sha2-nistp521" -> SshAlgMap("ec", Some(("curve", "p-521")), false),
+    "sk-ssh-ed25519@openssh.com" -> SshAlgMap("ed25519", None, true),
+    "sk-ecdsa-sha2-nistp256@openssh.com" -> SshAlgMap(
+      "ec",
+      Some(
+        ("curve", "p-256")
+      ),
+      true
+    )
   )
 
   /** Strip -cert-v01@openssh.com suffix to get the signed-key algorithm name.
@@ -410,19 +446,19 @@ object Certificates {
   private[strategies] def parseSshPubkey(
       artifact: ArtifactWrapper
   ): Option[SshPubkey] = {
-    artifact.withFile { f =>
+    artifact.withStream { f =>
       Try {
         val raw = new String(
-          java.nio.file.Files.readAllBytes(f.toPath),
+          Helpers.slurpInput(f),
           java.nio.charset.StandardCharsets.UTF_8
         )
-        io.spicelabs.goatrodeo.util.SshWireReader
+        SshWireReader
           .parseFirstKeyLine(raw)
           .flatMap { case (alg, wire, comment) =>
             // Sanity: the wire blob's first string must equal the alg
             // token. If it doesn't, decline (probably an `authorized_keys`
             // options line or a corrupted file).
-            val r = new io.spicelabs.goatrodeo.util.SshWireReader(wire)
+            val r = SshWireReader(wire)
             val innerAlg = r.readUtf8String()
             if (innerAlg != alg) None
             else if (!sshAlgMap.contains(alg)) None
@@ -432,7 +468,7 @@ object Certificates {
                   val _e = r.readMpint()
                   val n = r.readMpint()
                   Some(
-                    io.spicelabs.goatrodeo.util.SshWireReader.mpintBitLength(n)
+                    SshWireReader.mpintBitLength(n)
                   )
                 } else None
               Some(SshPubkey(wire, alg, comment, rsaBits))
@@ -446,13 +482,13 @@ object Certificates {
   private[strategies] def parseSshCert(
       artifact: ArtifactWrapper
   ): Option[SshCert] = {
-    artifact.withFile { f =>
+    artifact.withStream { f =>
       Try {
         val raw = new String(
-          java.nio.file.Files.readAllBytes(f.toPath),
+          Helpers.slurpInput(f),
           java.nio.charset.StandardCharsets.UTF_8
         )
-        io.spicelabs.goatrodeo.util.SshWireReader
+        SshWireReader
           .parseFirstKeyLine(raw)
           .flatMap { case (certTypeName, certBytes, comment) =>
             signedKeyAlgFromCertName(certTypeName).flatMap { signedAlg =>
@@ -471,7 +507,6 @@ object Certificates {
       certBytes: Array[Byte],
       comment: Option[String]
   ): Option[SshCert] = Try {
-    import io.spicelabs.goatrodeo.util.SshWireReader
     val r = new SshWireReader(certBytes)
     val innerType = r.readUtf8String()
     require(
@@ -565,7 +600,7 @@ object Certificates {
   private[strategies] def sshFingerprintB64(wire: Array[Byte]): String = {
     val md = java.security.MessageDigest.getInstance("SHA-256")
     val digest = md.digest(wire)
-    java.util.Base64.getEncoder.nn.withoutPadding.nn.encodeToString(digest).nn
+    Base64.getEncoder.nn.withoutPadding.nn.encodeToString(digest).nn
   }
 
   /** Render an OpenSSH cert validity timestamp, using sentinelLabel for
@@ -578,22 +613,29 @@ object Certificates {
     val isUnsignedMax = epochSec == -1L
     val isZero = epochSec == 0L
     if (isUnsignedMax || isZero) sentinelLabel
-    else isoUtc(java.util.Date.from(java.time.Instant.ofEpochSecond(epochSec)))
+    else isoUtc(Date.from(java.time.Instant.ofEpochSecond(epochSec)))
   }
+
+  private[strategies] case class KVPair(key: String, value: String)
 
   /** Companion-qualifier helper for SSH pURLs. */
   private[strategies] def sshKeyQualifiers(
       algName: String,
       rsaBits: Option[Int]
-  ): Vector[String] = {
-    val (canon, companion, sk) = sshAlgMap(algName)
-    val parts = scala.collection.mutable.ListBuffer[String](s"alg=$canon")
-    companion.foreach { case (k, v) => parts += s"$k=$v" }
-    if (algName == "ssh-rsa") {
-      rsaBits.foreach(b => parts += s"size=$b")
+  ): Vector[KVPair] = {
+    val SshAlgMap(canon, companion, sk) = sshAlgMap(algName)
+    val r1 = companion.foldLeft(Vector(KVPair("alg", canon))) {
+      case (parts, k -> v) => parts :+ KVPair(k, v)
     }
-    if (sk) parts += "sk=true"
-    parts.toVector
+
+    val r2 = (algName, rsaBits) match {
+      case ("ssh-rsa", Some(i)) => r1 :+ KVPair("size", i.toString)
+      case _                    => r1
+    }
+
+    if (sk) {
+      r2 :+ KVPair("sk", "true")
+    } else r2
   }
 
   // ---------- PGP parsing ---------------------------------------------
@@ -637,16 +679,15 @@ object Certificates {
   private[strategies] def parsePgpKeyRing(
       artifact: ArtifactWrapper
   ): Option[PgpKeyRing] = {
-    artifact.withFile { f =>
+    artifact.withStream { f =>
       Try {
-        val raw = java.nio.file.Files.readAllBytes(f.toPath)
-        val rings = scala.collection.mutable.ListBuffer[
-          org.bouncycastle.openpgp.PGPPublicKeyRing
-        ]()
+        val raw = Helpers.slurpInput(f)
+
         val segments = splitArmoredBlocks(raw)
-        segments.foreach { seg =>
-          parsePgpStream(seg, rings)
+        val rings = segments.foldLeft(Vector[PGPPublicKeyRing]()) {
+          case (rings, seg) => parsePgpStream(seg, rings)
         }
+
         if (rings.isEmpty) None
         else Some(buildPgpKeyRing(rings.toVector))
       }.toOption.flatten
@@ -678,30 +719,38 @@ object Certificates {
     }
   }
 
+  private def factoryToVec(factory: PGPObjectFactory): Vector[Object] = {
+    var ret = Vector[Object]()
+
+    val it = factory.iterator()
+
+    while (it.hasNext()) {
+      ret = ret :+ it.next()
+    }
+
+    ret
+  }
+
   /** Read every PGPPublicKeyRing from a decoder stream. */
   private def parsePgpStream(
       bytes: Array[Byte],
-      acc: scala.collection.mutable.ListBuffer[
-        org.bouncycastle.openpgp.PGPPublicKeyRing
-      ]
-  ): Unit = {
-    val decoded = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(
-      new java.io.ByteArrayInputStream(bytes)
+      acc: Vector[PGPPublicKeyRing]
+  ): Vector[PGPPublicKeyRing] = {
+    val decoded = PGPUtil.getDecoderStream(
+      new ByteArrayInputStream(bytes)
     )
-    val factory = new org.bouncycastle.openpgp.PGPObjectFactory(
+    val factory = PGPObjectFactory(
       decoded,
-      new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
+      new BcKeyFingerprintCalculator()
     )
-    var obj = factory.nextObject()
-    while (obj != null) {
-      obj match {
-        case kr: org.bouncycastle.openpgp.PGPPublicKeyRing =>
-          acc += kr
-        case krc: org.bouncycastle.openpgp.PGPPublicKeyRingCollection =>
-          krc.getKeyRings.asScala.foreach(acc += _)
-        case _ => ()
-      }
-      obj = factory.nextObject()
+    val items = factoryToVec(factory)
+    items.foldLeft(acc) {
+      case (acc, kr: PGPPublicKeyRing) => acc :+ kr
+      case (acc, krc: PGPPublicKeyRingCollection) =>
+        krc.getKeyRings.asScala.foldLeft(acc) { case (acc, kr) =>
+          acc :+ kr
+        }
+      case (acc, _) => acc
     }
   }
 
@@ -728,11 +777,11 @@ object Certificates {
   private[strategies] def parsePgpSecretKeyRing(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
-    artifact.withFile { f =>
+    artifact.withStream { f =>
       Try {
-        val raw = java.nio.file.Files.readAllBytes(f.toPath)
+        val raw = Helpers.slurpInput(f)
         val rings = scala.collection.mutable.ListBuffer[
-          org.bouncycastle.openpgp.PGPSecretKeyRing
+          PGPSecretKeyRing
         ]()
         val segments = splitArmoredBlocks(raw)
         segments.foreach { seg => parsePgpSecretStream(seg, rings) }
@@ -746,11 +795,11 @@ object Certificates {
   private def parsePgpSecretStream(
       bytes: Array[Byte],
       acc: scala.collection.mutable.ListBuffer[
-        org.bouncycastle.openpgp.PGPSecretKeyRing
+        PGPSecretKeyRing
       ]
   ): Unit = {
-    val decoded = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(
-      new java.io.ByteArrayInputStream(bytes)
+    val decoded = PGPUtil.getDecoderStream(
+      new ByteArrayInputStream(bytes)
     )
     val factory = new org.bouncycastle.openpgp.PGPObjectFactory(
       decoded,
@@ -759,9 +808,9 @@ object Certificates {
     var obj = factory.nextObject()
     while (obj != null) {
       obj match {
-        case sr: org.bouncycastle.openpgp.PGPSecretKeyRing =>
+        case sr: PGPSecretKeyRing =>
           acc += sr
-        case src: org.bouncycastle.openpgp.PGPSecretKeyRingCollection =>
+        case src: PGPSecretKeyRingCollection =>
           src.getKeyRings.asScala.foreach(acc += _)
         case _ => ()
       }
@@ -771,7 +820,7 @@ object Certificates {
 
   /** Build a ClaimedContent from PGPSecretKeyRings. */
   private def buildPgpSecretClaim(
-      rings: Vector[org.bouncycastle.openpgp.PGPSecretKeyRing]
+      rings: Vector[PGPSecretKeyRing]
   ): ClaimedContent = {
     val secretKeys = rings.flatMap(r => r.getSecretKeys.asScala.toVector)
     if (secretKeys.exists(isSecretKeyEncrypted)) {
@@ -794,7 +843,7 @@ object Certificates {
 
   /** True if the secret key has active S2K or non-zero encryption algorithm. */
   private def isSecretKeyEncrypted(
-      sk: org.bouncycastle.openpgp.PGPSecretKey
+      sk: PGPSecretKey
   ): Boolean = {
     val s2k = Try(sk.getS2K).toOption.flatMap(Option.apply)
     val encAlg = Try(sk.getKeyEncryptionAlgorithm).toOption.getOrElse(0)
@@ -805,7 +854,7 @@ object Certificates {
     * PGPSecretKey.
     */
   private def pgpSecretEncryptedClaim(
-      sk: org.bouncycastle.openpgp.PGPSecretKey
+      sk: PGPSecretKey
   ): PrivateKeyEncrypted = {
     val s2kOpt = Option(sk.getS2K)
     val cipher = Try(sk.getKeyEncryptionAlgorithm).toOption
@@ -872,7 +921,7 @@ object Certificates {
 
   /** Project a PGPPublicKey into a PgpKey. */
   private def pgpKeyOf(
-      pk: org.bouncycastle.openpgp.PGPPublicKey
+      pk: PGPPublicKey
   ): PgpKey = {
     val fpHex = pk.getFingerprint.map(b => f"${b & 0xff}%02x").mkString
     val algId = pk.getAlgorithm
@@ -887,7 +936,7 @@ object Certificates {
       case "ec" | "x25519" | "x448" =>
         Try {
           val key = pk.getPublicKeyPacket.getKey
-            .asInstanceOf[org.bouncycastle.bcpg.ECPublicBCPGKey]
+            .asInstanceOf[ECPublicBCPGKey]
           val oid = key.getCurveOID.getId
           pgpCurveOidMap.getOrElse(oid, oid)
         }.toOption
@@ -898,7 +947,7 @@ object Certificates {
       case "ed25519" =>
         Try {
           val key = pk.getPublicKeyPacket.getKey
-            .asInstanceOf[org.bouncycastle.bcpg.EdDSAPublicBCPGKey]
+            .asInstanceOf[EdDSAPublicBCPGKey]
           val oid = key.getCurveOID.getId
           pgpCurveOidMap.getOrElse(oid, oid)
         }.toOption
@@ -935,14 +984,18 @@ object Certificates {
   private[strategies] def purlForPgpKey(
       key: PgpKey
   ): PackageURL = {
-    val parts = scala.collection.mutable.ListBuffer[String](
-      s"alg=${key.canonicalAlg}",
-      s"version=${key.version}"
-    )
-    key.keySize.foreach(s => parts += s"size=$s")
-    key.curve.foreach(c => parts += s"curve=$c")
-    val qual = parts.sorted.mkString("&")
-    new PackageURL(s"pkg:pgp/fingerprint@${key.fingerprintHex}?$qual")
+    val parts = Vector(
+      KVPair("alg", key.canonicalAlg),
+      KVPair("version", key.version.toString())
+    ) ++ key.keySize.toVector.map(s => KVPair("size", s.toString())) ++
+      key.curve.toVector.map(c => KVPair("curve", c))
+    val builder = PackageURLBuilder
+      .aPackageURL()
+      .withType("pgp")
+      .withName("fingerprint")
+      .withVersion(key.fingerprintHex)
+    parts.foreach(q => builder.withQualifier(q.key, q.value))
+    builder.build()
   }
 
   /** First 8 hex chars of the key fingerprint. */
@@ -1153,7 +1206,7 @@ object Certificates {
     hexRun.replaceAllIn(
       rfc2253,
       m => {
-        val hex: String = m.group(1)
+        val hex: String = m.group(1).nn
         decodeAsn1HexString(hex) match {
           case Some(decoded) =>
             java.util.regex.Matcher.quoteReplacement(decoded)
@@ -1277,8 +1330,8 @@ object Certificates {
   private[strategies] def parsePemPrivateKey(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
-    artifact.withFile { f =>
-      val raw = java.nio.file.Files.readAllBytes(f.toPath)
+    artifact.withStream { f =>
+      val raw = Helpers.slurpInput(f)
       val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
       if (procTypeEncryptedHeaderPresent(text)) {
         Some(legacyEncryptedPemClaim(text))
@@ -1288,23 +1341,34 @@ object Certificates {
     }
   }
 
+  private def iteratorToVec[T](parser: java.util.Iterator[T]): Vector[T] = {
+    val iterator = parser
+    var ret = Vector[T]()
+    while (iterator.hasNext) {
+      ret = ret :+ iterator.next().asInstanceOf[T]
+    }
+
+    ret
+  }
+
   /** Parse a PEM-encrypted-private-key MIME; extracts envelope only. */
   private[strategies] def parsePemEncryptedPrivateKey(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
-    artifact.withFile { f =>
-      val raw = java.nio.file.Files.readAllBytes(f.toPath)
+    artifact.withStream { f =>
       Try {
         Using.resource(
           new PEMParser(
             new InputStreamReader(
-              new ByteArrayInputStream(raw),
-              java.nio.charset.StandardCharsets.ISO_8859_1
+              f,
+              StandardCharsets.ISO_8859_1
             )
           )
         ) { parser =>
-          parser.readObject() match {
-            case epki: org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo =>
+          val objects = parserToVec(parser)
+
+          objects.headOption match {
+            case Some(epki: PKCS8EncryptedPrivateKeyInfo) =>
               Some(pkcs8EncryptedClaimFrom(epki))
             case _ => None
           }
@@ -1364,18 +1428,17 @@ object Certificates {
         )
       )
     ) { parser =>
-      val obj = parser.readObject()
-      val spki: org.bouncycastle.asn1.x509.SubjectPublicKeyInfo | Null =
-        obj match {
-          case kp: org.bouncycastle.openssl.PEMKeyPair =>
-            kp.getPublicKeyInfo
-          case pki: org.bouncycastle.asn1.pkcs.PrivateKeyInfo =>
-            spkiFromPrivateKeyInfo(pki)
-          case _ => null
+      val objects = parserToVec(parser)
+
+      val spki: Option[SubjectPublicKeyInfo] =
+        objects.headOption match {
+          case Some(kp: PEMKeyPair)      => Some(kp.getPublicKeyInfo)
+          case Some(pki: PrivateKeyInfo) => spkiFromPrivateKeyInfo(pki)
+          case _                         => None
         }
-      Option(spki).map { s =>
+      spki.map { s =>
         val spkiBytes = s.getEncoded
-        val (alg, sz, curve, params) = algAndQualifierFromSpki(s)
+        val AlgAndQualifier(alg, sz, curve, params) = algAndQualifierFromSpki(s)
         PrivateKeyPlaintextPem(
           spkiBytes = spkiBytes,
           canonicalAlg = alg,
@@ -1389,47 +1452,52 @@ object Certificates {
 
   /** Derive SPKI from PKCS#8 PrivateKeyInfo. */
   private def spkiFromPrivateKeyInfo(
-      pki: org.bouncycastle.asn1.pkcs.PrivateKeyInfo
-  ): org.bouncycastle.asn1.x509.SubjectPublicKeyInfo | Null = {
-    import org.bouncycastle.crypto.params.*
+      pki: PrivateKeyInfo
+  ): Option[SubjectPublicKeyInfo] = {
+
     Try {
-      val priv = org.bouncycastle.crypto.util.PrivateKeyFactory.createKey(pki)
-      val pub: AsymmetricKeyParameter | Null = priv match {
+      val priv = PrivateKeyFactory.createKey(pki)
+      val pub: Option[AsymmetricKeyParameter] = priv match {
         case r: RSAPrivateCrtKeyParameters =>
-          new RSAKeyParameters(false, r.getModulus, r.getPublicExponent)
+          Some(new RSAKeyParameters(false, r.getModulus, r.getPublicExponent))
         case ec: ECPrivateKeyParameters =>
           val q = ec.getParameters.getG.multiply(ec.getD).normalize
-          new ECPublicKeyParameters(q, ec.getParameters)
+          Some(new ECPublicKeyParameters(q, ec.getParameters))
         case ed: Ed25519PrivateKeyParameters =>
-          ed.generatePublicKey
+          Some(ed.generatePublicKey)
         case ed: Ed448PrivateKeyParameters =>
-          ed.generatePublicKey
+          Some(ed.generatePublicKey)
         case x: X25519PrivateKeyParameters =>
-          x.generatePublicKey
+          Some(x.generatePublicKey)
         case x: X448PrivateKeyParameters =>
-          x.generatePublicKey
+          Some(x.generatePublicKey)
         case dsa: DSAPrivateKeyParameters =>
           // y = g^x mod p
           val params = dsa.getParameters
           val y = params.getG.modPow(dsa.getX, params.getP)
-          new DSAPublicKeyParameters(y, params)
-        case _ => null
+          Some(new DSAPublicKeyParameters(y, params))
+        case _ => None
       }
-      if (pub == null) null
-      else
+      pub.map(p =>
         org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory
-          .createSubjectPublicKeyInfo(pub)
-          .asInstanceOf[org.bouncycastle.asn1.x509.SubjectPublicKeyInfo | Null]
-    }.toOption.orNull
+          .createSubjectPublicKeyInfo(p)
+      )
+    }.toOption.flatten
   }
+  private[strategies] case class AlgAndQualifier(
+      alg: String,
+      bitLen: Option[Int],
+      curve: Option[String],
+      paramsTok: Option[String]
+  )
 
   /** Project SPKI ASN.1 → (alg, size?, curve?, params?). */
   private[strategies] def algAndQualifierFromSpki(
       spki: org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
-  ): (String, Option[Int], Option[String], Option[String]) = {
+  ): AlgAndQualifier = {
     val algOid = spki.getAlgorithm.getAlgorithm.getId
     pubkeyOidMap.get(algOid) match {
-      case Some((alg, paramsTok)) => (alg, None, None, paramsTok)
+      case Some((alg, paramsTok)) => AlgAndQualifier(alg, None, None, paramsTok)
       case None =>
         algOid match {
           case "1.2.840.113549.1.1.1" =>
@@ -1441,7 +1509,7 @@ object Certificates {
               )
               rsaPub.getModulus.bitLength
             }.toOption
-            ("rsa", sz, None, None)
+            AlgAndQualifier("rsa", sz, None, None)
           case "1.2.840.10045.2.1" =>
             // EC — algorithm parameters are an OID identifying the curve.
             // Resolve OID → standard curve name via BC's ECNamedCurveTable,
@@ -1457,7 +1525,7 @@ object Certificates {
                 else asOid.getId
               ecCurveMap.getOrElse(key, key)
             }.toOption
-            ("ec", None, curve, None)
+            AlgAndQualifier("ec", None, curve, None)
           case "1.2.840.10040.4.1" =>
             // DSA — size from parameter P
             val sz = Try {
@@ -1466,12 +1534,12 @@ object Certificates {
                 org.bouncycastle.asn1.x509.DSAParameter.getInstance(params)
               dsaParams.getP.bitLength
             }.toOption
-            ("dsa", sz, None, None)
-          case "1.3.101.112" => ("ed25519", None, None, None)
-          case "1.3.101.113" => ("ed448", None, None, None)
-          case "1.3.101.110" => ("x25519", None, None, None)
-          case "1.3.101.111" => ("x448", None, None, None)
-          case _             => ("unknown", None, None, None)
+            AlgAndQualifier("dsa", sz, None, None)
+          case "1.3.101.112" => AlgAndQualifier("ed25519", None, None, None)
+          case "1.3.101.113" => AlgAndQualifier("ed448", None, None, None)
+          case "1.3.101.110" => AlgAndQualifier("x25519", None, None, None)
+          case "1.3.101.111" => AlgAndQualifier("x448", None, None, None)
+          case _             => AlgAndQualifier("unknown", None, None, None)
         }
     }
   }
@@ -1587,8 +1655,8 @@ object Certificates {
   private[strategies] def parseOpenSshPrivateKey(
       artifact: ArtifactWrapper
   ): Option[ClaimedContent] = {
-    artifact.withFile { f =>
-      val raw = java.nio.file.Files.readAllBytes(f.toPath)
+    artifact.withStream { f =>
+      val raw = Helpers.slurpInput(f)
       Try {
         val envelope = decodeOpenSshArmor(raw)
         envelope.flatMap(parseOpenSshV1Envelope)
@@ -1627,7 +1695,7 @@ object Certificates {
     ) None
     else {
       val body = java.util.Arrays.copyOfRange(env, magic.length, env.length)
-      val r = new io.spicelabs.goatrodeo.util.SshWireReader(body)
+      val r = SshWireReader(body)
       val cipherName = Try(r.readUtf8String()).toOption.getOrElse("")
       val kdfName = Try(r.readUtf8String()).toOption.getOrElse("")
       val kdfOptions = Try(r.readString()).toOption.getOrElse(Array.empty[Byte])
@@ -1637,7 +1705,7 @@ object Certificates {
         if (numKeys < 1) None
         else {
           Try(r.readString()).toOption.flatMap { pubWire =>
-            val pr = new io.spicelabs.goatrodeo.util.SshWireReader(pubWire)
+            val pr = SshWireReader(pubWire)
             Try(pr.readUtf8String()).toOption.flatMap { algName =>
               if (!sshAlgMap.contains(algName)) None
               else {
@@ -1645,7 +1713,7 @@ object Certificates {
                   Try {
                     val _e = pr.readMpint()
                     val n = pr.readMpint()
-                    io.spicelabs.goatrodeo.util.SshWireReader.mpintBitLength(n)
+                    SshWireReader.mpintBitLength(n)
                   }.toOption
                 } else None
                 Some(PrivateKeyPlaintextOpenSsh(pubWire, algName, rsaBits))
@@ -1663,7 +1731,7 @@ object Certificates {
         val (kdfIters, kdfSalt): (Option[Long], Option[String]) =
           if (kdfName == "bcrypt") {
             Try {
-              val k = new io.spicelabs.goatrodeo.util.SshWireReader(kdfOptions)
+              val k = SshWireReader(kdfOptions)
               val saltBytes = k.readString()
               val rounds = k.readUInt32()
               (Some(rounds), Some(Helpers.toHex(saltBytes)))
@@ -1700,31 +1768,38 @@ object Certificates {
     val selfSigned = isSelfSigned(c)
     val version = c.getVersion
 
-    val companion: String =
-      (qualMap.get("size").map("size=" + _) ++
-        qualMap.get("curve").map("curve=" + _) ++
-        qualMap.get("params").map("params=" + _)).mkString("&")
+    val companion =
+      (qualMap.get("size").toVector.map(s => KVPair("size", s)) ++
+        qualMap.get("curve").toVector.map(c => KVPair("curve", c)) ++
+        qualMap.get("params").toVector.map(KVPair("params", _)))
 
-    val spkiQuals: Seq[String] = Seq(
-      Some(s"alg=$alg"),
-      if (companion.nonEmpty) Some(companion) else None,
-      Some(s"version=$version")
-    ).flatten
-    val certQuals: Seq[String] = Seq(
-      Some(s"alg=$alg"),
-      if (companion.nonEmpty) Some(companion) else None,
-      Some(s"sig-alg=$sigAlg"),
-      Some(s"self-signed=$selfSigned"),
-      Some(s"version=$version")
-    ).flatten
+    val spkiQuals = Vector(
+      KVPair("alg", alg),
+      KVPair("version", version.toString())
+    ) ++ companion
 
+    val certQuals = Vector(
+      KVPair("alg", alg),
+      KVPair("sig-alg", sigAlg),
+      KVPair(s"self-signed", selfSigned.toString()),
+      KVPair(s"version", version.toString())
+    ) ++ companion
+    val spkiBuilder = PackageURLBuilder
+      .aPackageURL()
+      .withType("x509")
+      .withName("spki-sha256")
+      .withVersion(spkiSha)
+    spkiQuals.foreach(q => spkiBuilder.withQualifier(q.key, q.value))
+
+    val certBuilder = PackageURLBuilder
+      .aPackageURL()
+      .withType("x509")
+      .withName("cert-sha256")
+      .withVersion(certSha)
+    certQuals.foreach(q => certBuilder.withQualifier(q.key, q.value))
     Vector(
-      new PackageURL(
-        s"pkg:x509/spki-sha256@$spkiSha?${spkiQuals.mkString("&")}"
-      ),
-      new PackageURL(
-        s"pkg:x509/cert-sha256@$certSha?${certQuals.mkString("&")}"
-      )
+      spkiBuilder.build(),
+      certBuilder.build()
     )
   }
 

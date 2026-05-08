@@ -318,19 +318,25 @@ object CryptoDetector {
   private def looksLikePkcs12(bytes: Array[Byte]): Boolean = {
     Try {
       // Outer SEQUENCE
-      if ((bytes(0) & 0xff) != 0x30) return false
-      val (_, contentStart) = readDerLength(bytes, 1)
-      // First inner element should be INTEGER (tag 0x02), version
-      val verTag = bytes(contentStart) & 0xff
-      if (verTag != 0x02) return false
-      val (verLen, verContentStart) = readDerLength(bytes, contentStart + 1)
-      // PKCS#12 version is 3 (single-byte integer). Accept any short
-      // length to cover future bumps.
-      if (verLen < 1 || verLen > 4) return false
-      val nextTagOff = verContentStart + verLen
-      // Second inner element should be SEQUENCE (ContentInfo), tag 0x30
-      val niTag = bytes(nextTagOff) & 0xff
-      niTag == 0x30
+      if ((bytes(0) & 0xff) != 0x30) false
+      else {
+        val (_, contentStart) = readDerLength(bytes, 1)
+        // First inner element should be INTEGER (tag 0x02), version
+        val verTag = bytes(contentStart) & 0xff
+        if (verTag != 0x02) false
+        else {
+          val (verLen, verContentStart) = readDerLength(bytes, contentStart + 1)
+          // PKCS#12 version is 3 (single-byte integer). Accept any short
+          // length to cover future bumps.
+          if (verLen < 1 || verLen > 4) false
+          else {
+            val nextTagOff = verContentStart + verLen
+            // Second inner element should be SEQUENCE (ContentInfo), tag 0x30
+            val niTag = bytes(nextTagOff) & 0xff
+            niTag == 0x30
+          }
+        }
+      }
     }.getOrElse(false)
   }
 

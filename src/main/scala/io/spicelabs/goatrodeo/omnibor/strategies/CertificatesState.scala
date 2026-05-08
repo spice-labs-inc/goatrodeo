@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
+import com.github.packageurl.PackageURLBuilder
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
@@ -22,6 +23,7 @@ import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.strategies.Certificates.KVPair
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
@@ -96,12 +98,21 @@ class CertificatesState(
   ): PackageURL = {
     val spkiSha = sha256Hex(p.spkiBytes)
     val parts =
-      scala.collection.mutable.ListBuffer[String](s"alg=${p.canonicalAlg}")
-    p.keySize.foreach(s => parts += s"size=$s")
-    p.curve.foreach(c => parts += s"curve=$c")
-    p.params.foreach(pa => parts += s"params=$pa")
-    val qual = parts.sorted.mkString("&")
-    new PackageURL(s"pkg:x509/spki-sha256@$spkiSha?$qual")
+      Vector(KVPair("alg", p.canonicalAlg)) ++ p.keySize.toVector.map(s =>
+        KVPair("size", s.toString())
+      ) ++
+        p.curve.toVector.map(c => KVPair("curve", c)) ++ p.params.toVector.map(
+          p => KVPair("params", p)
+        )
+    val builder = PackageURLBuilder
+      .aPackageURL()
+      .withName("spki-sha256")
+      .withType("x509")
+      .withVersion(spkiSha)
+
+    parts.foreach(p => builder.withQualifier(p.key, p.value))
+
+    builder.build()
   }
 
   /** Unencrypted-OpenSSH private key → SSH pURL. */
@@ -111,8 +122,13 @@ class CertificatesState(
     import Certificates.*
     val fp = sshFingerprintB64(p.wireBytes)
     val quals = sshKeyQualifiers(p.algName, p.rsaModulusBits)
-    val qualStr = quals.sorted.mkString("&")
-    new PackageURL(s"pkg:ssh/sha256@$fp?$qualStr")
+    val builder = PackageURLBuilder
+      .aPackageURL()
+      .withType("ssh")
+      .withName("sha256")
+      .withVersion(fp)
+    quals.foreach(q => builder.withQualifier(q.key, q.value))
+    builder.build()
   }
 
   /** `pkg:ssh/sha256@{b64}?alg=...&{companion}` */
@@ -122,8 +138,13 @@ class CertificatesState(
     import Certificates.*
     val fp = sshFingerprintB64(p.wireBytes)
     val quals = sshKeyQualifiers(p.algName, p.rsaModulusBits)
-    val qualStr = quals.sorted.mkString("&")
-    new PackageURL(s"pkg:ssh/sha256@$fp?$qualStr")
+    val builder = PackageURLBuilder
+      .aPackageURL()
+      .withType("ssh")
+      .withName("sha256")
+      .withVersion(fp)
+    quals.foreach(q => builder.withQualifier(q.key, q.value))
+    builder.build()
   }
 
   /** SSH cert pURLs: cert-sha256 + sha256 (signed-key fingerprint). */
@@ -134,22 +155,32 @@ class CertificatesState(
     val certHex = sha256Hex(c.certBytes)
     val signedKeyFp = sshFingerprintB64(c.signedKeyWire)
     val keyQuals = sshKeyQualifiers(c.signedKeyAlgName, c.rsaModulusBits)
-    val signedKeyQualStr = keyQuals.sorted.mkString("&")
+    val keyBuilder = PackageURLBuilder
+      .aPackageURL()
+      .withType("ssh")
+      .withName("sha256")
+      .withVersion(signedKeyFp)
+    keyQuals.foreach(q => keyBuilder.withQualifier(q.key, q.value))
+
     val certTypeLabel = c.certType match {
       case 1L    => "user"
       case 2L    => "host"
       case other => s"unknown-$other"
     }
     val certQuals = (keyQuals ++ Vector(
-      s"cert-type=$certTypeLabel",
-      s"sig-alg=${c.caSigAlgName}"
-    )).sorted
-    Vector(
-      new PackageURL(
-        s"pkg:ssh/cert-sha256@$certHex?${certQuals.mkString("&")}"
-      ),
-      new PackageURL(s"pkg:ssh/sha256@$signedKeyFp?$signedKeyQualStr")
-    )
+      KVPair("cert-type", certTypeLabel),
+      KVPair("sig-alg", c.caSigAlgName)
+    ))
+
+    val certBuilder = PackageURLBuilder
+      .aPackageURL()
+      .withType("ssh")
+      .withName("cert-sha256")
+      .withVersion(certHex)
+
+    certQuals.foreach(cq => certBuilder.withQualifier(cq.key, cq.value))
+
+    Vector(certBuilder.build(), keyBuilder.build())
   }
 
   /** Extract every X.509 cert from a loaded keystore, including key-entry chain
@@ -184,7 +215,15 @@ class CertificatesState(
     val derBytes = crl.getEncoded
     val crlSha = sha256Hex(derBytes)
     val sigAlg = canonicalSigAlgCrl(crl)
-    new PackageURL(s"pkg:x509/crl-sha256@$crlSha?sig-alg=$sigAlg")
+
+    PackageURLBuilder
+      .aPackageURL()
+      .withType("x509")
+      .withName("crl-sha256")
+      .withVersion(crlSha)
+      .withQualifier("sig-alg", sigAlg)
+      .build()
+
   }
 
   override def getMetadata(
@@ -254,7 +293,7 @@ class CertificatesState(
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     import Certificates.*
     val adHoc = MKC.adHoc("Certificates")
-    val (canon, companion, sk) = sshAlgMap(p.algName)
+    val SshAlgMap(canon, companion, sk) = sshAlgMap(p.algName)
     val fpFull = s"SHA-256:${sshFingerprintB64(p.wireBytes)}"
     var tm: TreeMap[String, TreeSet[StringOrPair]] =
       TreeMap[String, TreeSet[StringOrPair]]() +?
@@ -421,7 +460,7 @@ class CertificatesState(
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     import Certificates.*
     val adHoc = MKC.adHoc("Certificates")
-    val (canon, companion, sk) = sshAlgMap(p.algName)
+    val SshAlgMap(canon, companion, sk) = sshAlgMap(p.algName)
     val nameSource = p.comment.getOrElse(filenameStem(artifact.path()))
     val fpFull = s"SHA-256:${sshFingerprintB64(p.wireBytes)}"
     var tm: TreeMap[String, TreeSet[StringOrPair]] =
@@ -460,7 +499,7 @@ class CertificatesState(
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     import Certificates.*
     val adHoc = MKC.adHoc("Certificates")
-    val (canon, companion, sk) = sshAlgMap(c.signedKeyAlgName)
+    val SshAlgMap(canon, companion, sk) = sshAlgMap(c.signedKeyAlgName)
     val signedFp = s"SHA-256:${sshFingerprintB64(c.signedKeyWire)}"
     val caFp = s"SHA-256:${sshFingerprintB64(c.caKeyWire)}"
     val certHex = sha256Hex(c.certBytes)

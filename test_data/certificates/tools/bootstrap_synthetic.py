@@ -59,8 +59,7 @@ from pathlib import Path
 # Phase 0 plan: "If the generation requires randomness, the script
 # sets a pinned seed." We pin Python-level entropy here. Note that
 # external tools (ssh-keygen, gpg, keytool, openssl genpkey) do NOT
-# respect this seed and continue to use OS entropy — see ADR-002 for
-# the determinism gradient and the "committed bytes are canonical"
+# respect this seed and continue to use OS entropy — 
 # policy that closes the gap for non-seedable tools.
 PINNED_SEED = 0x60_47_47_47_47_47_47_47  # "GOAT" in repeated hex
 random.seed(PINNED_SEED)
@@ -946,7 +945,7 @@ def gen_keystores() -> list[str]:
         # `-storepass ""` is rejected; modern keytool insists on a
         # password >= 6 chars. We still commit the above as "encrypted"
         # coverage and document the null-readable case as a Phase 4
-        # follow-up — see docs/adrs/adr-001 follow-up.
+        # follow-up
         pass
     return rows
 

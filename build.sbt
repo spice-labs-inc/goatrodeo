@@ -132,7 +132,7 @@ ThisBuild / scalacOptions ++=
     "-Wunused:imports",
     "-feature",
     "-release",
-    "21",
+    "17",
     "-Yexplicit-nulls"
   )
 
@@ -182,43 +182,9 @@ lazy val root = project
     libraryDependencies += "io.spicelabs" % "baharat" % "0.0.4",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.1.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.2.3",
-
-    // Bouncy Castle (Phase 1 of certificates-strategy/phases-1-2-foundation-detector.md):
-    //   bcprov: X.509, keystores, SSH primitives
-    //   bcpkix: PKCS#7, PKCS#8, PKCS#12, PEM, CMS
-    //   bcpg:   OpenPGP (v4 + v6 via 1.80+)
-    //   bcutil: ASN.1 utilities (transitive of bcprov)
-    // 1.80 chosen because BC 1.80 introduced the v6 OpenPGP key generator
-    // we depend on for `tools/GeneratePgpV6.java`. Plan called for 1.79+;
-    // 1.80 satisfies "1.79.x+ line that supports Java 21".
-    //
-    // Version-conflict note (Phase-1 acceptance criterion: "Confirm no
-    // version conflicts with existing transitive deps"):
-    //   io.spicelabs:baharat:0.0.4 transitively depends on
-    //   bcpg-jdk18on:1.77 and bcprov-jdk18on:1.77. Our explicit 1.80
-    //   pinning evicts those upward (verified via `sbt evicted`).
-    //
-    //   Empirical binary-compat audit done at Phase-1 exit (G3
-    //   remediation): javap-extracted every BC method invocation
-    //   baharat makes from its 0.0.4 jar (13 unique
-    //   class-method pairs across PGPPublicKey, PGPSignature,
-    //   PGPSignatureList, PGPPublicKeyRing, PGPPublicKeyRingCollection,
-    //   PGPUtil, JcaPGPObjectFactory, JcaPGPPublicKeyRingCollection,
-    //   JcaPGPContentVerifierBuilderProvider, JcaKeyFingerprintCalculator,
-    //   PGPContentVerifierBuilderProvider, KeyFingerPrintCalculator,
-    //   BouncyCastleProvider). All 13 resolve to existing methods in
-    //   BC 1.80 (one `JcaPGPObjectFactory.nextObject` is inherited
-    //   from PGPObjectFactory parent, javap only shows declared
-    //   methods so it appears "missing" in a naive scan but is
-    //   inherited through the standard JVM lookup).
-    //
-    //   BC's release policy also maintains binary compatibility
-    //   across minor versions within the same major (1.x), so the
-    //   evicted 1.77 → 1.80 transition is benign. The `[warn]` line
-    //   from sbt evicted is informational only.
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.80",
     libraryDependencies += "org.bouncycastle" % "bcpkix-jdk18on" % "1.80",
-    libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on"   % "1.80",
+    libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on" % "1.80",
     libraryDependencies += "org.bouncycastle" % "bcutil-jdk18on" % "1.80",
     assembly / mainClass := Some("io.spicelabs.goatrodeo.Howdy"),
     assembly / assemblyJarName := s"${projectName}-${version.value}-fat.jar",

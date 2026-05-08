@@ -57,7 +57,11 @@ private[strategies] object CertificatesOidMaps {
 
   private[strategies] val sigAlgOidMap: Map[String, String] = Map(
     "1.2.840.113549.1.1.4" -> "md5-rsa",
+    "1.2.840.113549.1.1.2" -> "md2-rsa",
+    "1.2.840.113549.1.1.3" -> "md4-rsa",
+    "1.2.840.113549.1.1.4" -> "md5-rsa",
     "1.2.840.113549.1.1.5" -> "sha1-rsa",
+    "1.2.840.113549.1.1.14" -> "sha224-rsa",
     "1.2.840.113549.1.1.11" -> "sha256-rsa",
     "1.2.840.113549.1.1.12" -> "sha384-rsa",
     "1.2.840.113549.1.1.13" -> "sha512-rsa",

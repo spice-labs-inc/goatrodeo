@@ -13,7 +13,7 @@
  * ring (primary + subkeys; the secret half is never written to disk).
  *
  * Determinism: BC's keypair generation uses live entropy. The committed
- * `.asc` is one-time-canonical (see ADR-002).
+ * `.asc` is one-time-canonical 
  */
 
 import java.io.File;

@@ -22,7 +22,6 @@ import random
 
 # Phase 0 plan: 'the script sets a pinned seed' — pin Python entropy.
 # External tools (ssh-keygen, gpg, keytool, openssl) do not honor this
-# and rely on the committed-bytes-canonical policy in ADR-002.
 PINNED_SEED = 0x60_47_47_47_47_47_47_47
 random.seed(PINNED_SEED)
 import urllib.request

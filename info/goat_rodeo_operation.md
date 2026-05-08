@@ -93,16 +93,11 @@ differ from Maven/Docker:
   and metadata aggregated, not one Item per entry. Maven groups
   `(pom, jar, sources, javadocs)` into one Item-with-children;
   Certificates aggregates all entries in a JKS / PKCS#12 / etc.
-  into one Item with no children. See
-  [ADR-005](adrs/adr-005-keystore-flat-item.md).
+  into one Item with no children.
 - **Encrypted material is opaque.** Encrypted private keys and
   encrypted keystores produce envelope-only metadata (KDF, cipher,
   salt) and no pURL. The strategy never attempts decryption, never
-  guesses passwords, never logs encrypted content. See
-  [ADR-006](adrs/adr-006-encrypted-stays-opaque.md).
-
-See [`info/certificates_strategy.md`](certificates_strategy.md) for
-the user-facing strategy documentation.
+  guesses passwords, never logs encrypted content. 
 
 In the future, there may be ways to group files together (e.g., a yaml file associated with an ISO
 that describes the contents of the ISO, a `Dockerfile` associated with a Docker image, etc.)

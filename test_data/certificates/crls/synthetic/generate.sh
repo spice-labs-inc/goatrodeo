@@ -4,8 +4,7 @@
 #
 # This wrapper delegates to test_data/certificates/tools/bootstrap_synthetic.py
 # with the category name. The Python bootstrap is the actual source of truth
-# (see ADR-002 for the determinism policy — synthetic fixture bytes are
-# one-time-canonical, not byte-deterministic across runs).
+# 
 #
 # Usage (from repo root or from this directory):
 #   ./generate.sh
