@@ -305,11 +305,11 @@ object Certificates {
     ) { parser =>
       val obj = parser.readObject()
       obj match {
-        case h: X509CertificateHolder => converter.getCertificate(h)
-        case _                        => null
+        case h: X509CertificateHolder => Some(converter.getCertificate(h))
+        case _                        => None
       }
     }
-  }.toOption.filter(_ != null)
+  }.toOption.flatten
 
   private def tryParseDer(bytes: Array[Byte]): Option[X509Certificate] = Try {
     val cf = CertificateFactory.getInstance("X.509", "BC")
@@ -780,13 +780,13 @@ object Certificates {
     artifact.withStream { f =>
       Try {
         val raw = Helpers.slurpInput(f)
-        val rings = scala.collection.mutable.ListBuffer[
-          PGPSecretKeyRing
-        ]()
+
         val segments = splitArmoredBlocks(raw)
-        segments.foreach { seg => parsePgpSecretStream(seg, rings) }
+        val rings = segments.foldLeft(Vector[PGPSecretKeyRing]()) {
+          case (rings, seg) => parsePgpSecretStream(seg, rings)
+        }
         if (rings.isEmpty) None
-        else Some(buildPgpSecretClaim(rings.toVector))
+        else Some(buildPgpSecretClaim(rings))
       }.toOption.flatten
     }
   }
@@ -794,10 +794,8 @@ object Certificates {
   /** Read every PGPSecretKeyRing from a decoder stream. */
   private def parsePgpSecretStream(
       bytes: Array[Byte],
-      acc: scala.collection.mutable.ListBuffer[
-        PGPSecretKeyRing
-      ]
-  ): Unit = {
+      acc: Vector[PGPSecretKeyRing]
+  ): Vector[PGPSecretKeyRing] = {
     val decoded = PGPUtil.getDecoderStream(
       new ByteArrayInputStream(bytes)
     )
@@ -805,16 +803,12 @@ object Certificates {
       decoded,
       new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
     )
-    var obj = factory.nextObject()
-    while (obj != null) {
-      obj match {
-        case sr: PGPSecretKeyRing =>
-          acc += sr
-        case src: PGPSecretKeyRingCollection =>
-          src.getKeyRings.asScala.foreach(acc += _)
-        case _ => ()
-      }
-      obj = factory.nextObject()
+    val factoryObjs = factoryToVec(factory)
+    factoryObjs.foldLeft(acc) {
+      case (acc, sr: PGPSecretKeyRing) => acc :+ sr
+      case (acc, src: PGPSecretKeyRingCollection) =>
+        acc ++ src.getKeyRings.asScala.toVector
+      case (acc, _) => acc
     }
   }
 
@@ -1006,41 +1000,42 @@ object Certificates {
 
   /** Extract (alg, qualifier-map) from a public key.
     * @param pub
-    *   JCA PublicKey (may be null for composite/unsupported alg)
+    *   JCA PublicKey
     * @param cert
     *   the certificate (used as fallback via SPKI OID)
     */
   private[strategies] def keyAlgAndQualifier(
-      pub: java.security.PublicKey | Null,
+      pub: Option[java.security.PublicKey],
       cert: X509Certificate
   ): (String, Map[String, String]) = {
-    if (pub == null) {
-      // JCA returned no PublicKey — composite or other unsupported algorithm.
-      // Resolve via raw SPKI OID.
-      spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
-    } else
-      pub match {
-        case rsa: RSAPublicKey =>
-          ("rsa", Map("size" -> rsa.getModulus.bitLength.toString))
-        case dsa: DSAPublicKey =>
-          ("dsa", Map("size" -> dsa.getY.bitLength.toString))
-        case _: ECPublicKey =>
-          val curveName = bcCurveNameFromCert(cert).getOrElse {
-            val raw = pub.getAlgorithm.toLowerCase
-            ecCurveMap.getOrElse(raw, raw)
-          }
-          val canonical =
-            ecCurveMap.getOrElse(curveName.toLowerCase, curveName.toLowerCase)
-          ("ec", Map("curve" -> canonical))
-        case _ =>
-          pub.getAlgorithm.toLowerCase match {
-            case "ed25519" | "1.3.101.112" => ("ed25519", Map.empty)
-            case "ed448" | "1.3.101.113"   => ("ed448", Map.empty)
-            case "x25519"                  => ("x25519", Map.empty)
-            case "x448"                    => ("x448", Map.empty)
-            case _ => spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
-          }
-      }
+    pub match {
+      case None =>
+        // JCA returned no PublicKey — composite or other unsupported algorithm.
+        // Resolve via raw SPKI OID.
+        spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
+
+      case Some(rsa: RSAPublicKey) =>
+        ("rsa", Map("size" -> rsa.getModulus.bitLength.toString))
+      case Some(dsa: DSAPublicKey) =>
+        ("dsa", Map("size" -> dsa.getY.bitLength.toString))
+      case Some(_: ECPublicKey) =>
+        val curveName = bcCurveNameFromCert(cert).getOrElse {
+          val raw = pub.map(_.getAlgorithm.toLowerCase).getOrElse("n/a")
+          ecCurveMap.getOrElse(raw, raw)
+        }
+        val canonical =
+          ecCurveMap.getOrElse(curveName.toLowerCase, curveName.toLowerCase)
+        ("ec", Map("curve" -> canonical))
+      case _ =>
+        pub.map(_.getAlgorithm.toLowerCase) match {
+          case Some("ed25519") | Some("1.3.101.112") => ("ed25519", Map.empty)
+          case Some("ed448") | Some("1.3.101.113")   => ("ed448", Map.empty)
+          case Some("x25519")                        => ("x25519", Map.empty)
+          case Some("x448")                          => ("x448", Map.empty)
+          case _ => spkiAlgFromCert(cert).getOrElse(("unknown", Map.empty))
+        }
+
+    }
   }
 
   /** Resolve EC curve name via BC's ECNamedCurveTable. */
@@ -1763,7 +1758,7 @@ object Certificates {
     val spkiBytes = spkiBytesFromCert(c)
     val certSha = sha256Hex(derBytes)
     val spkiSha = sha256Hex(spkiBytes)
-    val (alg, qualMap) = keyAlgAndQualifier(c.getPublicKey, c)
+    val (alg, qualMap) = keyAlgAndQualifier(Option(c.getPublicKey), c)
     val sigAlg = canonicalSigAlg(c)
     val selfSigned = isSelfSigned(c)
     val version = c.getVersion
@@ -1812,7 +1807,7 @@ object Certificates {
     val spkiBytes = spkiBytesFromCert(c)
     val certSha = sha256Hex(derBytes)
     val spkiSha = sha256Hex(spkiBytes)
-    val (alg, qualMap) = keyAlgAndQualifier(c.getPublicKey, c)
+    val (alg, qualMap) = keyAlgAndQualifier(Option(c.getPublicKey), c)
     val sigAlg = canonicalSigAlg(c)
     val selfSigned = isSelfSigned(c)
     val version = c.getVersion

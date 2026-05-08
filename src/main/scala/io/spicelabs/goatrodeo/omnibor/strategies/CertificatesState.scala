@@ -188,25 +188,26 @@ class CertificatesState(
     */
   private def ksAllCerts(ks: KeyStore): Vector[X509Certificate] = {
     Try {
-      val acc = scala.collection.mutable.ListBuffer[X509Certificate]()
+
       val aliases = ks.aliases().asScala
-      aliases.foreach { alias =>
-        if (ks.isCertificateEntry(alias)) {
-          ks.getCertificate(alias) match {
-            case x: X509Certificate => acc += x
-            case _                  => ()
-          }
-        } else if (ks.isKeyEntry(alias)) {
-          val chain = Option(ks.getCertificateChain(alias))
-            .map(_.toIndexedSeq)
-            .getOrElse(IndexedSeq.empty)
-          chain
-            .collect { case x: X509Certificate => x }
-            .foreach(acc += _)
+      val acc: Vector[X509Certificate] =
+        aliases.foldLeft(Vector[X509Certificate]()) { case (acc, alias) =>
+          if (ks.isCertificateEntry(alias)) {
+            ks.getCertificate(alias) match {
+              case x: X509Certificate => acc :+ x
+              case _                  => acc
+            }
+          } else if (ks.isKeyEntry(alias)) {
+            val chain = Option(ks.getCertificateChain(alias))
+              .map(_.toIndexedSeq)
+              .getOrElse(IndexedSeq.empty)
+            acc ++ chain
+              .collect { case x: X509Certificate => x }
+
+          } else acc
         }
-      }
-      acc.toVector
-    }.getOrElse(Vector.empty)
+      acc
+    }.getOrElse(Vector())
   }
 
   /** Build the single CRL pURL. */
@@ -591,7 +592,7 @@ class CertificatesState(
     val subject = c.getSubjectX500Principal
     val issuer = c.getIssuerX500Principal
     val version = c.getVersion
-    val (alg, _) = keyAlgAndQualifier(c.getPublicKey, c)
+    val (alg, _) = keyAlgAndQualifier(Option(c.getPublicKey), c)
     // PQC and composite certs append the alg suffix so the inventory makes
     // PQC presence obvious; classical algs stay bare to match the
     // historical sidecar contract from Phase 0b's `cert_sidecar.py`.
