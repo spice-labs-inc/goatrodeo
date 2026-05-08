@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of cloudflare.com (GTS Root R4)",
+  "source": "openssl s_client -connect cloudflare.com:443 -showcerts (chain idx 2)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@9847e5653e5e9e847516e5cb818606aa7544a19be67fd7366d506988e8d84347?alg=ec&curve=p-384&version=3",
+      "pkg:x509/cert-sha256@76b27b80a58027dc3cf1da68dac17010ed93997d0b603e2fadbe85012493b5a7?alg=ec&curve=p-384&self-signed=false&sig-alg=sha256-rsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "GTS Root R4",
+      "Publisher": "GlobalSign Root CA",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=GTS Root R4,O=Google Trust Services LLC,C=US",
+      "Certificates:IssuerDN": "CN=GlobalSign Root CA,OU=Root CA,O=GlobalSign nv-sa,C=BE",
+      "Certificates:Serial": "7fe530bf331343bedd821610493d8a1b",
+      "Certificates:NotBefore": "2023-11-15T03:43:21Z",
+      "Certificates:NotAfter": "2028-01-28T00:00:42Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "9847e5653e5e9e847516e5cb818606aa7544a19be67fd7366d506988e8d84347",
+      "Certificates:CertSha256": "76b27b80a58027dc3cf1da68dac17010ed93997d0b603e2fadbe85012493b5a7",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-384",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

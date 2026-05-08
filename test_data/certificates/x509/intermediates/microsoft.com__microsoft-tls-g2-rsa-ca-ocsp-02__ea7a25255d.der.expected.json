@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of microsoft.com (Microsoft TLS G2 RSA CA OCSP 02)",
+  "source": "openssl s_client -connect microsoft.com:443 -showcerts (chain idx 1)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@5f411b87d15fdc3c730f3dcd19ab922c52e23def01b327118e865b57eb0543c4?alg=rsa&size=4096&version=3",
+      "pkg:x509/cert-sha256@ea7a25255d111fc3ce4cb8fabe3adf9c27bbe6db203f955066bab4c5a71f3d08?alg=rsa&self-signed=false&sig-alg=sha384-rsa&size=4096&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Microsoft TLS G2 RSA CA OCSP 02",
+      "Publisher": "Microsoft TLS RSA Root G2",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=Microsoft TLS G2 RSA CA OCSP 02,O=Microsoft Corporation,C=US",
+      "Certificates:IssuerDN": "CN=Microsoft TLS RSA Root G2,O=Microsoft Corporation,C=US",
+      "Certificates:Serial": "330000000c4964a16f44203b2200000000000c",
+      "Certificates:NotBefore": "2025-08-01T20:03:00Z",
+      "Certificates:NotAfter": "2029-06-03T20:03:00Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha384-rsa",
+      "Certificates:SpkiSha256": "5f411b87d15fdc3c730f3dcd19ab922c52e23def01b327118e865b57eb0543c4",
+      "Certificates:CertSha256": "ea7a25255d111fc3ce4cb8fabe3adf9c27bbe6db203f955066bab4c5a71f3d08",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "4096",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

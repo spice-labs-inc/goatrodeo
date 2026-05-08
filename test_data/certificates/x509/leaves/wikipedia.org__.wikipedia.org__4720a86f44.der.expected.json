@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from wikipedia.org (*.wikipedia.org)",
+  "source": "openssl s_client -connect wikipedia.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@2fa619400b110f7fb5ba0f21443e56051b040fcf5b14c5308af00603b640be9e?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@4720a86f440eb48c9792e5cba9c8fe8b127c806f15ea60750724bf3325497a9b?alg=ec&curve=p-256&self-signed=false&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "*.wikipedia.org",
+      "Publisher": "E7",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=*.wikipedia.org",
+      "Certificates:IssuerDN": "CN=E7,O=Let's Encrypt,C=US",
+      "Certificates:Serial": "6486c73514f21cde56e6d5fb2e92ab04e86",
+      "Certificates:NotBefore": "2026-04-07T20:52:30Z",
+      "Certificates:NotAfter": "2026-07-06T20:52:29Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "2fa619400b110f7fb5ba0f21443e56051b040fcf5b14c5308af00603b640be9e",
+      "Certificates:CertSha256": "4720a86f440eb48c9792e5cba9c8fe8b127c806f15ea60750724bf3325497a9b",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:*.m.mediawiki.org,DNS:*.m.wikibooks.org,DNS:*.m.wikidata.org,DNS:*.m.wikimedia.org,DNS:*.m.wikinews.org,DNS:*.m.wikipedia.org,DNS:*.m.wikiquote.org,DNS:*.m.wikisource.org,DNS:*.m.wikiversity.org,DNS:*.m.wikivoyage.org,DNS:*.m.wiktionary.org,DNS:*.mediawiki.org,DNS:*.planet.wikimedia.org,DNS:*.wikibooks.org,DNS:*.wikidata.org,DNS:*.wikifunctions.org,DNS:*.wikimedia.org,DNS:*.wikimediafoundation.org,DNS:*.wikinews.org,DNS:*.wikipedia.org,DNS:*.wikiquote.org,DNS:*.wikisource.org,DNS:*.wikiversity.org,DNS:*.wikivoyage.org,DNS:*.wiktionary.org,DNS:*.wmfusercontent.org,DNS:mediawiki.org,DNS:w.wiki,DNS:wikibooks.org,DNS:wikidata.org,DNS:wikifunctions.org,DNS:wikimedia.org,DNS:wikimediafoundation.org,DNS:wikinews.org,DNS:wikipedia.org,DNS:wikiquote.org,DNS:wikisource.org,DNS:wikiversity.org,DNS:wikivoyage.org,DNS:wiktionary.org,DNS:wmfusercontent.org",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

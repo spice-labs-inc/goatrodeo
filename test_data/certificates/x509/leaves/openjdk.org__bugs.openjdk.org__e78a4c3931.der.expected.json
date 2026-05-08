@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from openjdk.org (bugs.openjdk.org)",
+  "source": "openssl s_client -connect openjdk.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@aa827bb5bcb2ff690426836eeef82cac6cba6e6f69036c6a914b8e9ad6b0f08d?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@e78a4c3931e072ee6ee1f18f92fdf89eaff4e299f88fd60e32f9a207cb073376?alg=ec&curve=p-256&self-signed=false&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "bugs.openjdk.org",
+      "Publisher": "DigiCert Global G3 TLS ECC SHA384 2020 CA1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=bugs.openjdk.org,O=Oracle Corporation,L=Redwood City,ST=California,C=US",
+      "Certificates:IssuerDN": "CN=DigiCert Global G3 TLS ECC SHA384 2020 CA1,O=DigiCert Inc,C=US",
+      "Certificates:Serial": "5fe0699bd66d8b71b83ebd074fcdefe",
+      "Certificates:NotBefore": "2025-10-02T00:00:00Z",
+      "Certificates:NotAfter": "2026-10-04T23:59:59Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "aa827bb5bcb2ff690426836eeef82cac6cba6e6f69036c6a914b8e9ad6b0f08d",
+      "Certificates:CertSha256": "e78a4c3931e072ee6ee1f18f92fdf89eaff4e299f88fd60e32f9a207cb073376",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:bugs.openjdk.org,DNS:wiki.openjdk.org,DNS:bugs.openjdk.java.net,DNS:webrevs.openjdk.org,DNS:webrevs.openjdk.java.net,DNS:openjdk.org,DNS:openjdk.java.net,DNS:mail.openjdk.org,DNS:mail.openjdk.java.net,DNS:jdk.java.net,DNS:wiki.openjdk.java.net,DNS:jbs.oracle.com,DNS:id.openjdk.org,DNS:id.openjdk.java.net,DNS:hg.openjdk.org,DNS:hg.openjdk.java.net,DNS:git.openjdk.org,DNS:git.openjdk.java.net,DNS:db.openjdk.org,DNS:db.openjdk.java.net,DNS:cr.openjdk.org,DNS:cr.openjdk.java.net",
+      "Certificates:KeyUsage": "digital-signature,key-agreement",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

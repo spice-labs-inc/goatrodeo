@@ -1,0 +1,19 @@
+{
+  "description":"GlobalSign Root R3 CRL (DER)",
+  "source":"http://crl.globalsign.com/root-r3.crl",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pkix-crl"]
+  },
+  "purls":{
+    "mustContain":["pkg:x509/crl-sha256@67074b6abf9269cd3be0cd740de8ce3bf5eafbcc7d80d3d24aef34af526b1952?sig-alg=sha256-rsa"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:CrlSha256":"67074b6abf9269cd3be0cd740de8ce3bf5eafbcc7d80d3d24aef34af526b1952"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

@@ -1,0 +1,19 @@
+{
+  "description":"G4 \u2014 ECDSA P-521 SSH plain pubkey covering the ecdsa-sha2-nistp521 wire-name path",
+  "source":"ssh-keygen -t ecdsa -b 521 -N '' -C goatrodeo-ecdsa-nistp521@test",
+  "retrievedAt":"2026-04-30",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-public-key"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/sha256@Oz3zHuV%2BLw8Y0C7GBZXPjG5bpl4fQb2wssmAT%2BoSeEg?alg=ec&curve=p-521"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:KeyAlgorithm":"ec"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

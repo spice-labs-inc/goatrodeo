@@ -1,0 +1,49 @@
+{
+  "description": "Historical / pinned-vendor CA root: Microsoft ECC Root Certificate Authority 2017",
+  "source": "https://www.microsoft.com/pkiops/certs/Microsoft%20ECC%20Root%20Certificate%20Authority%202017.crt",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@35f53ce1264611e03340fe37e1ec7d4cc986c5613dca70fd04aa44545f2daf28?alg=ec&curve=p-384&version=3",
+      "pkg:x509/cert-sha256@358df39d764af9e1b766e9c972df352ee15cfac227af6ad1d70e8e4a6edcba02?alg=ec&curve=p-384&self-signed=true&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Microsoft ECC Root Certificate Authority 2017",
+      "Publisher": "Microsoft ECC Root Certificate Authority 2017",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=Microsoft ECC Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
+      "Certificates:IssuerDN": "CN=Microsoft ECC Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
+      "Certificates:Serial": "66f23daf87de8bb14aea0c573101c2ec",
+      "Certificates:NotBefore": "2019-12-18T23:06:45Z",
+      "Certificates:NotAfter": "2042-07-18T23:16:04Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "35f53ce1264611e03340fe37e1ec7d4cc986c5613dca70fd04aa44545f2daf28",
+      "Certificates:CertSha256": "358df39d764af9e1b766e9c972df352ee15cfac227af6ad1d70e8e4a6edcba02",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-384",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

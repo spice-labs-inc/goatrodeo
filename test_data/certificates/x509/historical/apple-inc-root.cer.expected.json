@@ -1,0 +1,49 @@
+{
+  "description": "Historical / pinned-vendor CA root: Apple Inc. Root Certificate",
+  "source": "https://www.apple.com/appleca/AppleIncRootCertificate.cer",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@eb4993efa9b089e593418aa893f8e93a7374d810e52fcbe01e7f1d7e92a6d024?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024?alg=rsa&self-signed=true&sig-alg=sha1-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Apple Root CA",
+      "Publisher": "Apple Root CA",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=Apple Root CA,OU=Apple Certification Authority,O=Apple Inc.,C=US",
+      "Certificates:IssuerDN": "CN=Apple Root CA,OU=Apple Certification Authority,O=Apple Inc.,C=US",
+      "Certificates:Serial": "2",
+      "Certificates:NotBefore": "2006-04-25T21:40:36Z",
+      "Certificates:NotAfter": "2035-02-09T21:40:36Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha1-rsa",
+      "Certificates:SpkiSha256": "eb4993efa9b089e593418aa893f8e93a7374d810e52fcbe01e7f1d7e92a6d024",
+      "Certificates:CertSha256": "b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:KeyUsage": "key-cert-sign,crl-sign"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

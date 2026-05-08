@@ -1,0 +1,33 @@
+# Binary-fixture markers for the Certificates test corpus.
+#
+# Policy: Git LFS MUST NOT be used for these files going forward.
+# Historical commits already store some of these as LFS pointers — that
+# is unavoidable for past commits but no future commit should add LFS
+# tracking. The `-text` attribute keeps Git from attempting line-ending
+# normalization or text diffs on binary content.
+#
+# When a new binary fixture type emerges (e.g., TPM 2.0 blobs), add it
+# here with `-text` only.
+#
+# PEM-formatted fixtures (.pem, .asc) stay in plain Git — they are text
+# and diff well.
+
+# DER-encoded X.509 artifacts
+*.der -text
+*.crl -text
+
+# Java keystores
+*.jks -text
+*.jceks -text
+*.bks -text
+
+# PKCS#12
+*.p12 -text
+*.pfx -text
+
+# PGP binary
+*.gpg -text
+*.pgp -text
+
+# Catch-all for random-noise edge-case binary fixtures
+*.bin -text

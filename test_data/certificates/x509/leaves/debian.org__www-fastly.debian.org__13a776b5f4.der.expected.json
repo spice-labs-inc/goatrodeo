@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from debian.org (www-fastly.debian.org)",
+  "source": "openssl s_client -connect debian.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@ee7e2463f3b5b5c04dd2b70baae97ac65467aab6bcc3c08ec96e255bebbf5299?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@13a776b5f4a08e28396d76bd3033e7cedeea9f889784032eaef593a5df3ac9e5?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "www-fastly.debian.org",
+      "Publisher": "R13",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=www-fastly.debian.org",
+      "Certificates:IssuerDN": "CN=R13,O=Let's Encrypt,C=US",
+      "Certificates:Serial": "60b532ae5733daad264f9f699f77d563563",
+      "Certificates:NotBefore": "2026-03-07T00:25:34Z",
+      "Certificates:NotAfter": "2026-06-05T00:25:33Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "ee7e2463f3b5b5c04dd2b70baae97ac65467aab6bcc3c08ec96e255bebbf5299",
+      "Certificates:CertSha256": "13a776b5f4a08e28396d76bd3033e7cedeea9f889784032eaef593a5df3ac9e5",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:debian.org,DNS:www-fastly.debian.org",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

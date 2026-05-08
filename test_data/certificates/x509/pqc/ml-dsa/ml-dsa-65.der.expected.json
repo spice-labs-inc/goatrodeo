@@ -1,0 +1,48 @@
+{
+  "description": "IETF Hackathon BC r5: ML-DSA-65 (Dilithium-3) self-signed trust anchor",
+  "source": "https://github.com/IETF-Hackathon/pqc-certificates/raw/master/providers/bc/artifacts_certs_r5.zip#artifacts/ml-dsa-65-2.16.840.1.101.3.4.3.18_ta.der",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@1689387355057232ca71fe205070e26ecaa4b674614ad301c2f11f77279ce576?alg=ml-dsa&params=65&version=3",
+      "pkg:x509/cert-sha256@a184f62cbfa477b54df83db964a4f6c2c7a0f3530c1895ed0376d31fd8e3d62b?alg=ml-dsa&params=65&self-signed=true&sig-alg=ml-dsa-65&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "BC ml-dsa-65 Test TA",
+      "Publisher": "BC ml-dsa-65 Test TA",
+      "Description": "X.509 v3 certificate (ml-dsa)",
+      "Certificates:SubjectDN": "CN=BC ml-dsa-65 Test TA",
+      "Certificates:IssuerDN": "CN=BC ml-dsa-65 Test TA",
+      "Certificates:Serial": "71cc4d55591b83c2e1a7712b57ec1888aab35d2e",
+      "Certificates:NotBefore": "2026-01-24T14:12:24Z",
+      "Certificates:NotAfter": "2027-01-24T14:13:24Z",
+      "Certificates:KeyAlgorithm": "ml-dsa",
+      "Certificates:SigAlgorithm": "ml-dsa-65",
+      "Certificates:SpkiSha256": "1689387355057232ca71fe205070e26ecaa4b674614ad301c2f11f77279ce576",
+      "Certificates:CertSha256": "a184f62cbfa477b54df83db964a4f6c2c7a0f3530c1895ed0376d31fd8e3d62b",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:Params": "65",
+      "Certificates:IsCA": "true"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

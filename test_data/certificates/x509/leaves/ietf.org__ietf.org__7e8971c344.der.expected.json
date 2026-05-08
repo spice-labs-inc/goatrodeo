@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from ietf.org (ietf.org)",
+  "source": "openssl s_client -connect ietf.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@71a96f14bc8d3ce208106dbf42f66e28ff77615d7a9b706fc195bb67322e3207?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@7e8971c3440e12cffcee60c133fb4e7bf2deb5e725357084f4cda9bed5fe7cd4?alg=ec&curve=p-256&self-signed=false&sig-alg=sha256-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "ietf.org",
+      "Publisher": "WE1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=ietf.org",
+      "Certificates:IssuerDN": "CN=WE1,O=Google Trust Services,C=US",
+      "Certificates:Serial": "defdb7607a264c641323c74f49f99a88",
+      "Certificates:NotBefore": "2026-04-19T18:57:08Z",
+      "Certificates:NotAfter": "2026-07-18T19:57:01Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-ecdsa",
+      "Certificates:SpkiSha256": "71a96f14bc8d3ce208106dbf42f66e28ff77615d7a9b706fc195bb67322e3207",
+      "Certificates:CertSha256": "7e8971c3440e12cffcee60c133fb4e7bf2deb5e725357084f4cda9bed5fe7cd4",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:ietf.org,DNS:get.staging.ietf.org",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

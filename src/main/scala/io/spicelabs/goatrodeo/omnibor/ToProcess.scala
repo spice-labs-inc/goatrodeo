@@ -516,6 +516,7 @@ object ToProcess {
       BaharatStrategy.computeBaharatFiles,
       DotnetFile.computeDotnetFiles,
       AnnattoStrategy.computeAnnattoFiles,
+      Certificates.computeCertificateFiles,
       GenericFile.computeGenericFiles
     )
   )
@@ -557,6 +558,7 @@ object ToProcess {
         BaharatStrategy.computeBaharatFiles,
         DotnetFile.computeDotnetFiles,
         AnnattoStrategy.computeAnnattoFiles,
+        Certificates.computeCertificateFiles,
         GenericFile.computeGenericFiles
       )
     })

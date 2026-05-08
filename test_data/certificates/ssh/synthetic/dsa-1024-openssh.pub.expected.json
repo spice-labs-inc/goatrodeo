@@ -1,0 +1,19 @@
+{
+  "description":"G4 \u2014 DSA-1024 SSH plain pubkey covering ssh-dss wire-name path; size hardcoded at 1024 per RFC 4253",
+  "source":"ssh-keygen -t dsa -N '' -C goatrodeo-dsa@test",
+  "retrievedAt":"2026-04-30",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-public-key"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/sha256@JpoF3tGwEESWo4cE6FJuyaD2oX8S9uElv2msJyFk6V4?alg=dsa&size=1024"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:KeyAlgorithm":"dsa"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

@@ -541,6 +541,13 @@ object Helpers {
     * @return
     *   the bytes of the sha256 hash
     */
+  def computeSHA256(bytes: Array[Byte]): Array[Byte] = {
+    val md = MessageDigest.getInstance("SHA256")
+    md.digest(bytes)
+  }
+
+  def sha256Hex(bytes: Array[Byte]): String = toHex(computeSHA256(bytes))
+
   def computeSHA256(in: InputStream): Array[Byte] = {
     val md = MessageDigest.getInstance("SHA256")
     val ba = new Array[Byte](4096)

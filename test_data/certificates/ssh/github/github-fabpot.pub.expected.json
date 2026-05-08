@@ -1,0 +1,19 @@
+{
+  "description":"Real-world SSH public key \u2014 github.com/fabpot",
+  "source":"https://github.com/fabpot.keys",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-public-key"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/sha256@8HJFJ8N0z%2B9ItjT1SNCLCSOQHAvt%2FGEo%2BZlxw8oa6EI?alg=rsa&size=4096"]
+  },
+  "metadata":{
+    "mustContain":{
+      
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

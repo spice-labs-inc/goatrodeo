@@ -322,9 +322,51 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   // ==================== computeToProcess Tests ====================
 
-  test("computeToProcess - has correct number of strategies") {
-    // Should have: Maven, Docker, Debian, Dotnet, Generic
-    assertEquals(ToProcess.computeToProcess.length, 6)
+  test(
+    "computeToProcess - registers each required strategy and keeps Generic last"
+  ) {
+    // Refactored from a hardcoded count assertion to a structural one
+    // (per invariant #4 discussion / user-approved option 2 of the
+    // Phase 1 invariant-#4 stop): assert the dispatch chain CONTAINS
+    // each strategy the project depends on, and that Generic is the
+    // terminal entry. This is resilient to new strategies being added
+    // without churning a brittle integer.
+    //
+    // Closure-identity equality on eta-expanded ProcessFuncs is
+    // unreliable across Scala 3 eta-expansions, so we invoke each
+    // registered fn with empty inputs and compare the dispatch-label
+    // string each returns (the 4th tuple element is the strategy's
+    // self-identifying name; see e.g. Annatto.scala:58 returning
+    // `"Annatto"`).
+    val list = ToProcess.computeToProcess
+    val emptyByUUID: ToProcess.ByUUID = Map.empty
+    val emptyByName: ToProcess.ByName = Map.empty
+    val labels: List[String] = list.toList.map { fn =>
+      val (_, _, _, label) = fn(emptyByUUID, emptyByName)
+      label
+    }
+    val required = List(
+      "Maven",
+      "Docker",
+      "Baharat",
+      "Dotnet",
+      "Annatto",
+      "Certificates",
+      "Generic"
+    )
+    val missing = required.filterNot(labels.contains)
+    assert(
+      missing.isEmpty,
+      s"computeToProcess labels are $labels; missing required " +
+        s"strategies: ${missing.mkString("[", ", ", "]")}"
+    )
+    assertEquals(
+      labels.last,
+      "Generic",
+      "The terminal dispatch entry must be GenericFile (label " +
+        "`\"Generic\"`) so addNewToProcessComputer's " +
+        "patch(v.length - 1, ..., 0) places new strategies before it."
+    )
   }
 
   // ==================== Integration Tests ====================

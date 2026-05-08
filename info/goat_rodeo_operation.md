@@ -66,12 +66,16 @@ The list is in the `ToProcess` object and it's currently:
       MavenToProcess.computeMavenFiles,
       DockerToProcess.computeDockerFiles,
       Debian.computeDebianFiles,
+      DotnetFile.computeDotnetFiles,
+      Annatto.computeAnnattoFiles,
+      BaharatStrategy.computeBaharatFiles,
+      Certificates.computeCertificateFiles,
       GenericFile.computeGenericFiles
     )
 ```
 
 As there are additional modules that can handle file processing, they can
-be added to this list. For example, an RPM processor or a Docker image processor.
+be added to this list. For example, an RPM processor.
 
 These functions create a list to `ToProcess` for its types.
 
@@ -81,6 +85,19 @@ others did not select.
 The `MavenToProcess` looks for groupings of `pom`, `jar`, `sources`, and `javadocs`. It processes
 these as a unit so that it can pull metadata from the pom file to insert into the `jar`'s ADG,
 associates a source file with a` `.class` file based on the class file's debug information, etc.
+
+The `Certificates` strategy is notable for two design choices that
+differ from Maven/Docker:
+
+- **Keystores produce a single flat Item** with all contained pURLs
+  and metadata aggregated, not one Item per entry. Maven groups
+  `(pom, jar, sources, javadocs)` into one Item-with-children;
+  Certificates aggregates all entries in a JKS / PKCS#12 / etc.
+  into one Item with no children.
+- **Encrypted material is opaque.** Encrypted private keys and
+  encrypted keystores produce envelope-only metadata (KDF, cipher,
+  salt) and no pURL. The strategy never attempts decryption, never
+  guesses passwords, never logs encrypted content. 
 
 In the future, there may be ways to group files together (e.g., a yaml file associated with an ISO
 that describes the contents of the ISO, a `Dockerfile` associated with a Docker image, etc.)

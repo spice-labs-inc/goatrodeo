@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from rfc-editor.org (rfc-editor.org)",
+  "source": "openssl s_client -connect rfc-editor.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@97af136a62de1177ba9c6a37818032e3d67146a0c5d7d805d080c3188e352675?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@e1b75d7ee989b44b7d1436d28e84c93478004b9b0bb4d43cada22ce251d9cbb1?alg=ec&curve=p-256&self-signed=false&sig-alg=sha256-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "rfc-editor.org",
+      "Publisher": "WE1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=rfc-editor.org",
+      "Certificates:IssuerDN": "CN=WE1,O=Google Trust Services,C=US",
+      "Certificates:Serial": "4074bb0df4f01d1b0eaeeb62625d4bc1",
+      "Certificates:NotBefore": "2026-04-28T09:13:30Z",
+      "Certificates:NotAfter": "2026-07-27T10:13:23Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-ecdsa",
+      "Certificates:SpkiSha256": "97af136a62de1177ba9c6a37818032e3d67146a0c5d7d805d080c3188e352675",
+      "Certificates:CertSha256": "e1b75d7ee989b44b7d1436d28e84c93478004b9b0bb4d43cada22ce251d9cbb1",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:rfc-editor.org,DNS:diff.staging.rfc-editor.org",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

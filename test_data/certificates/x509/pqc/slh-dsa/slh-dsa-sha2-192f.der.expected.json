@@ -1,0 +1,48 @@
+{
+  "description": "IETF Hackathon BC r5: SLH-DSA-SHA2-192f self-signed trust anchor",
+  "source": "https://github.com/IETF-Hackathon/pqc-certificates/raw/master/providers/bc/artifacts_certs_r5.zip#artifacts/slh-dsa-sha2-192f-2.16.840.1.101.3.4.3.23_ta.der",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@568e46d1f96b7aea730319e4276ecc391dbd28af862737edc20b944dd5b09c00?alg=slh-dsa&params=192f&version=3",
+      "pkg:x509/cert-sha256@f5239542851a818fb559f3f10e708e0ab99fcdaa31cdee631b1501f08f84f2eb?alg=slh-dsa&params=192f&self-signed=true&sig-alg=slh-dsa-sha2-192f&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "BC slh-dsa-sha2-192f Test TA",
+      "Publisher": "BC slh-dsa-sha2-192f Test TA",
+      "Description": "X.509 v3 certificate (slh-dsa)",
+      "Certificates:SubjectDN": "CN=BC slh-dsa-sha2-192f Test TA",
+      "Certificates:IssuerDN": "CN=BC slh-dsa-sha2-192f Test TA",
+      "Certificates:Serial": "62408929f4662f5e54083c3a77d458c7cac5a1b8",
+      "Certificates:NotBefore": "2026-01-24T14:12:25Z",
+      "Certificates:NotAfter": "2027-01-24T14:13:25Z",
+      "Certificates:KeyAlgorithm": "slh-dsa",
+      "Certificates:SigAlgorithm": "slh-dsa-sha2-192f",
+      "Certificates:SpkiSha256": "568e46d1f96b7aea730319e4276ecc391dbd28af862737edc20b944dd5b09c00",
+      "Certificates:CertSha256": "f5239542851a818fb559f3f10e708e0ab99fcdaa31cdee631b1501f08f84f2eb",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:Params": "192f",
+      "Certificates:IsCA": "true"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

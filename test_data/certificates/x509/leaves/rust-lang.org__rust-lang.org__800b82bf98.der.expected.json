@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from rust-lang.org (rust-lang.org)",
+  "source": "openssl s_client -connect rust-lang.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@0d073b9b73b4b0ee16e3f580e521c7b6c7aa20a48a764a758e1b31dff5043d90?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@800b82bf98a4a76caaae18c4bda55bc20ab1e6488b822e2d0c98cb11084b2956?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "rust-lang.org",
+      "Publisher": "R13",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=rust-lang.org",
+      "Certificates:IssuerDN": "CN=R13,O=Let's Encrypt,C=US",
+      "Certificates:Serial": "531088cb56faa775ded596993e7b941fa44",
+      "Certificates:NotBefore": "2026-03-25T12:49:42Z",
+      "Certificates:NotAfter": "2026-06-23T12:49:41Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "0d073b9b73b4b0ee16e3f580e521c7b6c7aa20a48a764a758e1b31dff5043d90",
+      "Certificates:CertSha256": "800b82bf98a4a76caaae18c4bda55bc20ab1e6488b822e2d0c98cb11084b2956",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:rust-lang.org,DNS:www.rust-lang.org",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

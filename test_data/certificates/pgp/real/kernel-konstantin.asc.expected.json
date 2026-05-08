@@ -1,0 +1,19 @@
+{
+  "description":"keys.openpgp.org PGP public key \u2014 Linus Torvalds Linux kernel signing key",
+  "source":"https://keys.openpgp.org/vks/v1/by-fingerprint/ABAF11C65A2970B130ABE3C479BE3E4300411886",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@abaf11c65a2970b130abe3c479be3e4300411886?alg=rsa&size=2048&version=4","pkg:pgp/fingerprint@aee416f7dccb753bb3d5609d88bce80f012f54ca?alg=rsa&size=2048&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"2"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

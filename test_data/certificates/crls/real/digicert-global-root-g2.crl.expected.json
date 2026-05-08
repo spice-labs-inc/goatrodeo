@@ -1,0 +1,19 @@
+{
+  "description":"DigiCert Global Root G2 CRL (DER)",
+  "source":"http://crl3.digicert.com/DigiCertGlobalRootG2.crl",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pkix-crl"]
+  },
+  "purls":{
+    "mustContain":["pkg:x509/crl-sha256@f0efadceab8237df452a2a201414a68196ea8b4c876c9c7af1e06a3ec3cf8f29?sig-alg=sha256-rsa"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:CrlSha256":"f0efadceab8237df452a2a201414a68196ea8b4c876c9c7af1e06a3ec3cf8f29"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

@@ -1,0 +1,19 @@
+{
+  "description":"Real-world SSH public key \u2014 github.com/torvalds",
+  "source":"https://github.com/torvalds.keys",
+  "retrievedAt":"2026-04-24",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-public-key"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/sha256@SlSdsTYgtT3jhz1QFhVbDqazjuoZLbtqMs8nIVqaL9A?alg=rsa&size=2048"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:KeyAlgorithm":"rsa"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

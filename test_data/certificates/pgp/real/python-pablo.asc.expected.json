@@ -1,0 +1,19 @@
+{
+  "description":"keys.openpgp.org PGP public key \u2014 Python release signing key (Pablo)",
+  "source":"https://keys.openpgp.org/vks/v1/by-fingerprint/E3FF2839C048B25C084DEBE9B26995E310250568",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@e3ff2839c048b25c084debe9b26995e310250568?alg=rsa&size=4096&version=4","pkg:pgp/fingerprint@19b8406bc9b7bfb19d43713e69abe47dd03b1a3c?alg=rsa&size=4096&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"2"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

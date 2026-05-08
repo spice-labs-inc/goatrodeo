@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of iana.org (Sectigo Public Server Authentication Root R46)",
+  "source": "openssl s_client iana.org:443 (chain idx 2)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@0e8bb18bbeefb381be21bfc1a206d317298462ad104855f04a0542699708d3d4?alg=rsa&size=4096&version=3",
+      "pkg:x509/cert-sha256@92f351bf3d54164dfa8dd8f9e1139d3150349786485d2b9eecd00e2971c1e6c5?alg=rsa&self-signed=false&sig-alg=sha384-rsa&size=4096&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Sectigo Public Server Authentication Root R46",
+      "Publisher": "USERTrust RSA Certification Authority",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=Sectigo Public Server Authentication Root R46,O=Sectigo Limited,C=GB",
+      "Certificates:IssuerDN": "CN=USERTrust RSA Certification Authority,O=The USERTRUST Network,L=Jersey City,ST=New Jersey,C=US",
+      "Certificates:Serial": "d27fbbc1de359e5216ad6149586099c4",
+      "Certificates:NotBefore": "2021-03-22T00:00:00Z",
+      "Certificates:NotAfter": "2038-01-18T23:59:59Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha384-rsa",
+      "Certificates:SpkiSha256": "0e8bb18bbeefb381be21bfc1a206d317298462ad104855f04a0542699708d3d4",
+      "Certificates:CertSha256": "92f351bf3d54164dfa8dd8f9e1139d3150349786485d2b9eecd00e2971c1e6c5",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "4096",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

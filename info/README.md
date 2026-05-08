@@ -14,6 +14,7 @@ This directory contains detailed documentation for Goat Rodeo. Use this index to
 | Tune performance for large datasets | [Performance Tuning](#performance-tuning) |
 | Understand the output format | [Data Formats](#data-formats) |
 | Learn about Hidden Reapers | [Security Use Cases](#security-use-cases) |
+| Audit cryptographic inventory | [Certificates Strategy](certificates_strategy.md) |
 | Contribute to the project | [Contributing](../CONTRIBUTING.md) |
 
 ---
@@ -107,6 +108,17 @@ Finding vulnerable dependencies hidden in artifacts:
 - Marker-based detection
 - Using the unmasking tool
 - Interpreting results
+
+### [Certificates Strategy](certificates_strategy.md)
+Cryptographic-inventory and post-quantum-crypto (PQC) readiness:
+- Artifact types claimed (X.509 certs/CRLs, keystores, PEM bundles,
+  SSH pubkeys + certs, PGP keys, private keys both encrypted and
+  unencrypted)
+- pURL types and qualifier reference (with corpus examples)
+- Per-claim-type metadata reference
+- Hard rules — never emit private-key material; encrypted material
+  stays opaque (no decryption, no password guessing)
+- Example BigTent `/purls` queries for crypto-inventory audits
 
 ---
 

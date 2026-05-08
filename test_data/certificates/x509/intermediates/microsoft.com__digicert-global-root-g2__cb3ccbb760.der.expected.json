@@ -1,0 +1,49 @@
+{
+  "description": "Intermediate CA from TLS chain of microsoft.com (DigiCert Global Root G2)",
+  "source": "openssl s_client -connect microsoft.com:443 -showcerts (chain idx 3)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@8bb593a93be1d0e8a822bb887c547890c3e706aad2dab76254f97fb36b82fc26?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@cb3ccbb76031e5e0138f8dd39a23f9de47ffc35e43c1144cea27d46a5ab1cb5f?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "DigiCert Global Root G2",
+      "Publisher": "DigiCert Global Root G2",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US",
+      "Certificates:IssuerDN": "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US",
+      "Certificates:Serial": "33af1e6a711a9a0bb2864b11d09fae5",
+      "Certificates:NotBefore": "2013-08-01T12:00:00Z",
+      "Certificates:NotAfter": "2038-01-15T12:00:00Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "8bb593a93be1d0e8a822bb887c547890c3e706aad2dab76254f97fb36b82fc26",
+      "Certificates:CertSha256": "cb3ccbb76031e5e0138f8dd39a23f9de47ffc35e43c1144cea27d46a5ab1cb5f",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

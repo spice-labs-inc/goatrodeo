@@ -1,0 +1,19 @@
+{
+  "description":"Real-world SSH public key \u2014 github.com/dpp",
+  "source":"https://github.com/dpp.keys",
+  "retrievedAt":"2026-04-24",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/x-openssh-public-key"]
+  },
+  "purls":{
+    "mustContain":["pkg:ssh/sha256@MY3TKgCa6RSI8OgOcyELusHfF%2B6cJDArzCbdhPUXuaM?alg=ed25519"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:KeyAlgorithm":"ed25519"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

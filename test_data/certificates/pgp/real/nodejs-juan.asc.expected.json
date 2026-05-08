@@ -1,0 +1,19 @@
+{
+  "description":"keys.openpgp.org PGP public key \u2014 Node.js release key (Juan Jose Comellas)",
+  "source":"https://keys.openpgp.org/vks/v1/by-fingerprint/108F52B48DB57BB0CC439B2997B01419BD92F80A",
+  "retrievedAt":"2026-04-28",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@108f52b48db57bb0cc439b2997b01419bd92f80a?alg=rsa&size=4096&version=4","pkg:pgp/fingerprint@9fc51cea112b1655fa9398e2e04111eee1a956a5?alg=rsa&size=4096&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"2"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

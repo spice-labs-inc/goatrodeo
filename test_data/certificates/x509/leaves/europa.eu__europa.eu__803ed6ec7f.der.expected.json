@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from europa.eu (europa.eu)",
+  "source": "openssl s_client -connect europa.eu:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@26e385ef441a8ecb1f0378c945201ef09791aa54ad7b628bb7851304a0c5dcfd?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@803ed6ec7f4f1c863b9a7b1e8c51f4f71f119e071aa2b9618fb6e29dee230059?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "europa.eu",
+      "Publisher": "GlobalSign Atlas R3 OV TLS CA 2025 Q3",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=europa.eu,O=European Commission,L=Brussels,ST=Brussels-Capital Region,C=BE",
+      "Certificates:IssuerDN": "CN=GlobalSign Atlas R3 OV TLS CA 2025 Q3,O=GlobalSign nv-sa,C=BE",
+      "Certificates:Serial": "164b292b174e1445123eca656816447",
+      "Certificates:NotBefore": "2025-08-07T13:20:53Z",
+      "Certificates:NotAfter": "2026-08-14T13:20:53Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "26e385ef441a8ecb1f0378c945201ef09791aa54ad7b628bb7851304a0c5dcfd",
+      "Certificates:CertSha256": "803ed6ec7f4f1c863b9a7b1e8c51f4f71f119e071aa2b9618fb6e29dee230059",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:europa.eu,DNS:www.europa.eu",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

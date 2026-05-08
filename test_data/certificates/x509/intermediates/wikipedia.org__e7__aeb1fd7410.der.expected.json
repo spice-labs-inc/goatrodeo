@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of wikipedia.org (E7)",
+  "source": "openssl s_client -connect wikipedia.org:443 -showcerts (chain idx 1)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@cbbc559b44d524d6a132bdac672744da3407f12aae5d5f722c5f6c7913871c75?alg=ec&curve=p-384&version=3",
+      "pkg:x509/cert-sha256@aeb1fd7410e83bc96f5da3c6a7c2c1bb836d1fa5cb86e708515890e428a8770b?alg=ec&curve=p-384&self-signed=false&sig-alg=sha256-rsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "E7",
+      "Publisher": "ISRG Root X1",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=E7,O=Let's Encrypt,C=US",
+      "Certificates:IssuerDN": "CN=ISRG Root X1,O=Internet Security Research Group,C=US",
+      "Certificates:Serial": "aa75f1e62b8f0a220966d38bbfd4baa1",
+      "Certificates:NotBefore": "2024-03-13T00:00:00Z",
+      "Certificates:NotAfter": "2027-03-12T23:59:59Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "cbbc559b44d524d6a132bdac672744da3407f12aae5d5f722c5f6c7913871c75",
+      "Certificates:CertSha256": "aeb1fd7410e83bc96f5da3c6a7c2c1bb836d1fa5cb86e708515890e428a8770b",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-384",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "client-auth,server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

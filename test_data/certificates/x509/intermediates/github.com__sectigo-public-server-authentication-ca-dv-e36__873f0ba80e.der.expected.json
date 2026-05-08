@@ -1,0 +1,50 @@
+{
+  "description": "Intermediate CA from TLS chain of github.com (Sectigo Public Server Authentication CA DV E36)",
+  "source": "openssl s_client -connect github.com:443 -showcerts (chain idx 1)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@6526a0bc3ce396d2e47b05c406e0f1233a56fdda55c3526ebef99dd21864cdd6?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@873f0ba80e3ac222656dfd04158cc15c2927d42d5d05f01dee4a47eb43a916df?alg=ec&curve=p-256&self-signed=false&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Sectigo Public Server Authentication CA DV E36",
+      "Publisher": "Sectigo Public Server Authentication Root E46",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=Sectigo Public Server Authentication CA DV E36,O=Sectigo Limited,C=GB",
+      "Certificates:IssuerDN": "CN=Sectigo Public Server Authentication Root E46,O=Sectigo Limited,C=GB",
+      "Certificates:Serial": "36e059ed888dd57aedd570b6727f9bda",
+      "Certificates:NotBefore": "2021-03-22T00:00:00Z",
+      "Certificates:NotAfter": "2036-03-21T23:59:59Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "6526a0bc3ce396d2e47b05c406e0f1233a56fdda55c3526ebef99dd21864cdd6",
+      "Certificates:CertSha256": "873f0ba80e3ac222656dfd04158cc15c2927d42d5d05f01dee4a47eb43a916df",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:KeyUsage": "digital-signature,key-cert-sign,crl-sign",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

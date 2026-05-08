@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from stackoverflow.com (stackoverflow.com)",
+  "source": "openssl s_client -connect stackoverflow.com:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@cd3038e10baa25403137634f4e4ed141e3937ceb6b9ac30c07d6ecc86e3555b9?alg=ec&curve=p-256&version=3",
+      "pkg:x509/cert-sha256@ba807e20197d99ae9d0e3600d2bb207f7296519fd3d743c280e582a0a8bf7068?alg=ec&curve=p-256&self-signed=false&sig-alg=sha384-ecdsa&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "stackoverflow.com",
+      "Publisher": "E7",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=stackoverflow.com",
+      "Certificates:IssuerDN": "CN=E7,O=Let's Encrypt,C=US",
+      "Certificates:Serial": "68b9728525592cdf2fbda8dc592edf391ea",
+      "Certificates:NotBefore": "2026-04-19T13:32:18Z",
+      "Certificates:NotAfter": "2026-07-18T13:32:17Z",
+      "Certificates:KeyAlgorithm": "ec",
+      "Certificates:SigAlgorithm": "sha384-ecdsa",
+      "Certificates:SpkiSha256": "cd3038e10baa25403137634f4e4ed141e3937ceb6b9ac30c07d6ecc86e3555b9",
+      "Certificates:CertSha256": "ba807e20197d99ae9d0e3600d2bb207f7296519fd3d743c280e582a0a8bf7068",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:Curve": "p-256",
+      "Certificates:SAN": "DNS:*.stackoverflow.com,DNS:stackoverflow.com",
+      "Certificates:KeyUsage": "digital-signature",
+      "Certificates:ExtendedKeyUsage": "server-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

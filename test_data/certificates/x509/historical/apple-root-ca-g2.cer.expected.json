@@ -1,0 +1,49 @@
+{
+  "description": "Historical / pinned-vendor CA root: Apple Root CA - G2",
+  "source": "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@674039e472561963c8cb00d21a97a90a18bb8a1c4c317ac67e382a652bb573c0?alg=rsa&size=4096&version=3",
+      "pkg:x509/cert-sha256@c2b9b042dd57830e7d117dac55ac8ae19407d38e41d88f3215bc3a890444a050?alg=rsa&self-signed=true&sig-alg=sha384-rsa&size=4096&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "Apple Root CA - G2",
+      "Publisher": "Apple Root CA - G2",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "C=US,O=Apple Inc.,OU=Apple Certification Authority,CN=Apple Root CA - G2",
+      "Certificates:IssuerDN": "C=US,O=Apple Inc.,OU=Apple Certification Authority,CN=Apple Root CA - G2",
+      "Certificates:Serial": "1e0e5b58367a3e0",
+      "Certificates:NotBefore": "2014-04-30T18:10:09Z",
+      "Certificates:NotAfter": "2039-04-30T18:10:09Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha384-rsa",
+      "Certificates:SpkiSha256": "674039e472561963c8cb00d21a97a90a18bb8a1c4c317ac67e382a652bb573c0",
+      "Certificates:CertSha256": "c2b9b042dd57830e7d117dac55ac8ae19407d38e41d88f3215bc3a890444a050",
+      "Certificates:IsCA": "true",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "4096",
+      "Certificates:KeyUsage": "key-cert-sign,crl-sign"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

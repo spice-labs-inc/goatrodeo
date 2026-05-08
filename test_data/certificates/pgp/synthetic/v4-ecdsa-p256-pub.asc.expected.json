@@ -1,0 +1,19 @@
+{
+  "description":"G1+G2 \u2014 PGP v4 ECDSA NIST P-256 primary + ECDH NIST P-256 subkey. Exercises pgpAlgIdMap entries 19 (ECDSA) and 18 (ECDH) plus pgpCurveOidMap NIST P-256 OID 1.2.840.10045.3.1.7.",
+  "source":"gpg --batch --gen-key with ECDSA + ECDH on nistp256",
+  "retrievedAt":"2026-05-01",
+  "itemCount":1,
+  "mimeTypes":{
+    "mustContain":["application/pgp-keys"]
+  },
+  "purls":{
+    "mustContain":["pkg:pgp/fingerprint@266a16a92e5f70a9303c3ac2e34585e3b7dd707a?alg=ec&curve=p-256&version=4","pkg:pgp/fingerprint@4e1bc8cdbe7ac3d0cf8372e9b4394101605b32ae?alg=ec&curve=p-256&version=4"]
+  },
+  "metadata":{
+    "mustContain":{
+      "Certificates:PgpKeyCount":"2"
+    }
+  },
+  "forbiddenMetadataKeys":[],
+  "forbiddenMetadataPatterns":["-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----","-----BEGIN ENCRYPTED PRIVATE KEY-----","-----BEGIN PGP PRIVATE KEY BLOCK-----","-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----","MIIEvQIBADAN","MIIEpAIBAAKCAQEA","MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+","openssh-key-v1"]
+}

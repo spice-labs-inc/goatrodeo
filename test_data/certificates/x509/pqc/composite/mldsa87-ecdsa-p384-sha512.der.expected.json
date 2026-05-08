@@ -1,0 +1,47 @@
+{
+  "description": "IETF Hackathon BC r5: Composite ML-DSA-87 + ECDSA-P384-SHA512 trust anchor",
+  "source": "https://github.com/IETF-Hackathon/pqc-certificates/raw/master/providers/bc/artifacts_certs_r5.zip#artifacts/MLDSA87-ECDSA-P384-SHA512-1.3.6.1.5.5.7.6.49_ta.der",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@da02cbff52921c5792bed3a5bd4a0b063b88ba7498dd22e71c1958d668dfde6a?alg=composite&version=3",
+      "pkg:x509/cert-sha256@e843297e4d9353289b85d595b778407ee05864675549a93c0d9e9470cdf146bf?alg=composite&self-signed=true&sig-alg=mldsa87-ecdsa-p384-sha512&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "BC MLDSA87-ECDSA-P384-SHA512 Test TA",
+      "Publisher": "BC MLDSA87-ECDSA-P384-SHA512 Test TA",
+      "Description": "X.509 v3 certificate (composite)",
+      "Certificates:SubjectDN": "CN=BC MLDSA87-ECDSA-P384-SHA512 Test TA",
+      "Certificates:IssuerDN": "CN=BC MLDSA87-ECDSA-P384-SHA512 Test TA",
+      "Certificates:Serial": "770d714a79450fe2a28642817dfe0e9faca3d75c",
+      "Certificates:NotBefore": "2026-01-24T14:12:47Z",
+      "Certificates:NotAfter": "2027-01-24T14:13:47Z",
+      "Certificates:KeyAlgorithm": "composite",
+      "Certificates:SigAlgorithm": "mldsa87-ecdsa-p384-sha512",
+      "Certificates:SpkiSha256": "da02cbff52921c5792bed3a5bd4a0b063b88ba7498dd22e71c1958d668dfde6a",
+      "Certificates:CertSha256": "e843297e4d9353289b85d595b778407ee05864675549a93c0d9e9470cdf146bf",
+      "Certificates:SelfSigned": "true",
+      "Certificates:Version": "3",
+      "Certificates:IsCA": "true"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}

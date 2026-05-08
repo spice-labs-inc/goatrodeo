@@ -1,0 +1,51 @@
+{
+  "description": "TLS leaf certificate from un.org (*.un.org)",
+  "source": "openssl s_client -connect un.org:443 -showcerts (chain idx 0)",
+  "retrievedAt": "2026-04-28",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:x509/spki-sha256@e724a21ff8e68bfd6c8fc11c1b75f0e07f9a4d1fb9bb0d8e4d7a3693b3bcc6c0?alg=rsa&size=2048&version=3",
+      "pkg:x509/cert-sha256@beb177054b0cd0856c0404fc49a3bc0b0fd2bbd8cd7f01721f2b9f93d141e96e?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "*.un.org",
+      "Publisher": "COMODO RSA Organization Validation Secure Server CA",
+      "Description": "X.509 v3 certificate",
+      "Certificates:SubjectDN": "CN=*.un.org,O=United Nations,ST=New York,C=US",
+      "Certificates:IssuerDN": "CN=COMODO RSA Organization Validation Secure Server CA,O=COMODO CA Limited,L=Salford,ST=Greater Manchester,C=GB",
+      "Certificates:Serial": "e786d4afdc26c3efbff441583b5bbd86",
+      "Certificates:NotBefore": "2025-09-05T00:00:00Z",
+      "Certificates:NotAfter": "2026-09-05T23:59:59Z",
+      "Certificates:KeyAlgorithm": "rsa",
+      "Certificates:SigAlgorithm": "sha256-rsa",
+      "Certificates:SpkiSha256": "e724a21ff8e68bfd6c8fc11c1b75f0e07f9a4d1fb9bb0d8e4d7a3693b3bcc6c0",
+      "Certificates:CertSha256": "beb177054b0cd0856c0404fc49a3bc0b0fd2bbd8cd7f01721f2b9f93d141e96e",
+      "Certificates:IsCA": "false",
+      "Certificates:SelfSigned": "false",
+      "Certificates:Version": "3",
+      "Certificates:KeySize": "2048",
+      "Certificates:SAN": "DNS:*.un.org,DNS:un.org",
+      "Certificates:KeyUsage": "digital-signature,key-encipherment",
+      "Certificates:ExtendedKeyUsage": "server-auth,client-auth"
+    }
+  },
+  "forbiddenMetadataKeys": [],
+  "forbiddenMetadataPatterns": [
+    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
+    "MIIEvQIBADAN",
+    "MIIEpAIBAAKCAQEA",
+    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
+    "openssh-key-v1"
+  ]
+}
