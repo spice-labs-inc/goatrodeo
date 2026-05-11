@@ -14,24 +14,23 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
+import io.spicelabs.goatrodeo.util.Config
 
 import java.util.Date
-import scala.collection.immutable.Vector
 
 /** Phase 1 TDD Tests: PackageTagInfo data structure and CLI parsing
   *
   * These tests verify:
-  * - PackageTagInfo case class with Option types
-  * - json4s serialization omits None fields
-  * - Config CLI options for --package-tags and --package-tags-short-name
-  * - GoatRodeoBuilder API methods
+  *   - PackageTagInfo case class with Option types
+  *   - json4s serialization omits None fields
+  *   - Config CLI options for --package-tags and --package-tags-short-name
+  *   - GoatRodeoBuilder API methods
   *
   * Requirement Traceability:
-  * - R1: --package-tags CLI option
-  * - R2: --package-tags-short-name CLI option
-  * - R3: Per-package tag JSON structure with optional version
+  *   - R1: --package-tags CLI option
+  *   - R2: --package-tags-short-name CLI option
+  *   - R3: Per-package tag JSON structure with optional version
   */
 class PackageTagInfoSuite extends munit.FunSuite {
 
@@ -85,9 +84,12 @@ class PackageTagInfoSuite extends munit.FunSuite {
     // Requirement: R3
     val info = PackageTagInfo("test-package", None, Some(new Date()))
     val json = PackageTagInfo.toJson(info)
-    
+
     // Should not contain version field
-    assert(!json.contains("\"version\""), s"JSON should not contain version field: $json")
+    assert(
+      !json.contains("\"version\""),
+      s"JSON should not contain version field: $json"
+    )
     assert(json.contains("\"tag\""), s"JSON should contain tag field: $json")
     assert(json.contains("\"date\""), s"JSON should contain date field: $json")
   }
@@ -98,9 +100,15 @@ class PackageTagInfoSuite extends munit.FunSuite {
     // Requirement: R3
     val info = PackageTagInfo("test-package", Some("1.0.0"), Some(new Date()))
     val json = PackageTagInfo.toJson(info)
-    
-    assert(json.contains("\"version\""), s"JSON should contain version field: $json")
-    assert(json.contains("\"version\":\"1.0.0\""), s"JSON should have version value: $json")
+
+    assert(
+      json.contains("\"version\""),
+      s"JSON should contain version field: $json"
+    )
+    assert(
+      json.contains("\"version\":\"1.0.0\""),
+      s"JSON should have version value: $json"
+    )
   }
 
   test("PackageTagInfo date converts to ISO 8601") {
@@ -110,7 +118,7 @@ class PackageTagInfoSuite extends munit.FunSuite {
     val date = new Date(1609459200000L) // 2021-01-01 00:00:00 UTC
     val info = PackageTagInfo("test", Some("1.0"), Some(date))
     val json = PackageTagInfo.toJson(info)
-    
+
     assert(json.contains("2021-01-01"), s"JSON should contain ISO date: $json")
     assert(json.contains("T"), s"ISO date should have T separator: $json")
     assert(json.contains("Z"), s"ISO date should end with Z: $json")

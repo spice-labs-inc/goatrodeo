@@ -133,12 +133,14 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
   ): ME
 
   /** Determine if this state should generate a per-package tag.
-    * 
+    *
     * Default implementation returns None - strategies that support per-package
     * tagging should override this method.
-    * 
-    * @param marker the processing marker for the current artifact
-    * @return Some(PackageTagInfo) if a tag should be generated, None otherwise
+    *
+    * @param marker
+    *   the processing marker for the current artifact
+    * @return
+    *   Some(PackageTagInfo) if a tag should be generated, None otherwise
     */
   def maybePackageTag(marker: PM): Option[PackageTagInfo] = None
 
@@ -392,7 +394,7 @@ trait ToProcess {
 
                     // Build tag JSON using borer Dom.Element
                     import io.bullet.borer.Dom
-                    
+
                     val tagJson: Dom.Element = info.version match {
                       case Some(ver) =>
                         Dom.MapElem.Unsized(
@@ -409,7 +411,8 @@ trait ToProcess {
 
                     import io.bullet.borer.Json
                     val jsonString = Json.encode(tagJson).toUtf8String
-                    val tagGitoid = io.spicelabs.goatrodeo.util.GitOIDUtils.urlForString(jsonString)
+                    val tagGitoid = io.spicelabs.goatrodeo.util.GitOIDUtils
+                      .urlForString(jsonString)
 
                     // Write tag item
                     store.write(
@@ -432,16 +435,20 @@ trait ToProcess {
                       itemOpt =>
                         itemOpt match {
                           case Some(item) =>
-                            Some(item.copy(connections =
-                              item.connections + (EdgeType.tagTo -> tagGitoid)
-                            ))
+                            Some(
+                              item.copy(connections =
+                                item.connections + (EdgeType.tagTo -> tagGitoid)
+                              )
+                            )
                           case None =>
-                            Some(Item(
-                              "packages",
-                              TreeSet(EdgeType.tagTo -> tagGitoid),
-                              None,
-                              None
-                            ))
+                            Some(
+                              Item(
+                                "packages",
+                                TreeSet(EdgeType.tagTo -> tagGitoid),
+                                None,
+                                None
+                              )
+                            )
                         },
                       _ => "packages index"
                     )

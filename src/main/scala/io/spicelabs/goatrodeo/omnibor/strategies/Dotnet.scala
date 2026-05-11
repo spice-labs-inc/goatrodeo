@@ -292,7 +292,7 @@ class DotnetState(
     assemblyOpt.map { assembly =>
       val name = assembly.name.name
       val version = assembly.name.version.toString()
-      
+
       PackageTagInfo(
         name = name,
         version = Some(version),

@@ -5,7 +5,6 @@ import com.github.packageurl.PackageURLBuilder
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
-import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
@@ -226,33 +225,37 @@ case class DockerState(
       marker: DockerMarkers
   ): DockerState = this
 
-  /** Generate per-package tag info for Docker images.
-    * Only Config marker produces a tag.
+  /** Generate per-package tag info for Docker images. Only Config marker
+    * produces a tag.
     */
-  override def maybePackageTag(marker: DockerMarkers): Option[PackageTagInfo] = marker match {
-    case DockerMarkers.Config(info) =>
-      // Extract name and version from RepoTags
-      val repoTags = for {
-        case JArray(tags) <- info.manifestConfig \ "RepoTags"
-        case JString(tag) <- tags
-      } yield tag
-      
-      repoTags.headOption.flatMap { tag =>
-        // For Docker, the tag includes both repository and version (e.g., "bigtent:2025_03_22")
-        // We extract the version portion but keep the full repository:tag as the name
-        val versionOpt = tag.lastIndexOf(":") match {
-          case x if x > 0 => Some(tag.substring(x + 1))
-          case _ => None
+  override def maybePackageTag(marker: DockerMarkers): Option[PackageTagInfo] =
+    marker match {
+      case DockerMarkers.Config(info) =>
+        // Extract name and version from RepoTags
+        val repoTags = for {
+          case JArray(tags) <- info.manifestConfig \ "RepoTags"
+          case JString(tag) <- tags
+        } yield tag
+
+        repoTags.headOption.flatMap { tag =>
+          // For Docker, the tag includes both repository and version (e.g., "bigtent:2025_03_22")
+          // We extract the version portion but keep the full repository:tag as the name
+          val versionOpt = tag.lastIndexOf(":") match {
+            case x if x > 0 => Some(tag.substring(x + 1))
+            case _          => None
+          }
+
+          Some(
+            PackageTagInfo(
+              name = tag, // Use full repository:tag format
+              version = versionOpt,
+              date =
+                None // Docker config doesn't consistently have created date in manifest.json
+            )
+          )
         }
-        
-        Some(PackageTagInfo(
-          name = tag, // Use full repository:tag format
-          version = versionOpt,
-          date = None // Docker config doesn't consistently have created date in manifest.json
-        ))
-      }
-    case _ => None
-  }
+      case _ => None
+    }
 
 }
 

@@ -24,6 +24,9 @@ This document describes how Goat Rodeo works and how to tune parameters.
   use the RAM disk as the `tempdir`
 * `--tag` : create a `tags` Item and link to `{iso 8601 date}/{text after tag param}` Item and link each Item representing a found file
   to that Item. This allows for the identification of all the top level files in a Goat Rodeo run on a particular day.
+* `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
+* `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
+  Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
 * `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet). Each package gets a tag Item
   with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
   is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.

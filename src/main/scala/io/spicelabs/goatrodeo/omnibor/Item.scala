@@ -561,9 +561,9 @@ case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])
   *   optional build/publish date (uses current date if None when creating tag)
   */
 case class PackageTagInfo(
-  name: String, 
-  version: Option[String], 
-  date: Option[java.util.Date]
+    name: String,
+    version: Option[String],
+    date: Option[java.util.Date]
 )
 
 object PackageTagInfo {
@@ -577,23 +577,24 @@ object PackageTagInfo {
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   /** Convert PackageTagInfo to JSON string.
-    * 
-    * Omits version field if None.
-    * Formats date as ISO 8601 UTC.
+    *
+    * Omits version field if None. Formats date as ISO 8601 UTC.
     */
   def toJson(info: PackageTagInfo): String = {
-    val dateStr = info.date.map(formatDateISO8601).getOrElse(formatDateISO8601(new java.util.Date()))
-    
+    val dateStr = info.date
+      .map(formatDateISO8601)
+      .getOrElse(formatDateISO8601(new java.util.Date()))
+
     val json = info.version match {
       case Some(ver) =>
         ("tag" -> info.name) ~
-        ("version" -> ver) ~
-        ("date" -> dateStr)
+          ("version" -> ver) ~
+          ("date" -> dateStr)
       case None =>
         ("tag" -> info.name) ~
-        ("date" -> dateStr)
+          ("date" -> dateStr)
     }
-    
+
     compact(render(json))
   }
 

@@ -147,14 +147,14 @@ class CertificatesStubTests extends FunSuite {
   // phases requires explicit user approval before it lands.
 
   test(
-    "[STUB] CryptoDetector.mimeTypeAugmenter returns currentMimes unchanged for empty set"
+    "CryptoDetector.mimeTypeAugmenter returns currentMimes unchanged for empty set"
   ) {
     val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), Set.empty)
     assertEquals(out, Set.empty[String])
   }
 
   test(
-    "[STUB] CryptoDetector.mimeTypeAugmenter on a typical Tika-ish set returns it identically (Phase 1 only — Phase 2 will add MIMEs for cert-shaped fixtures)"
+    "CryptoDetector.mimeTypeAugmenter on a typical Tika-ish set returns it identically (Phase 1 only — Phase 2 will add MIMEs for cert-shaped fixtures)"
   ) {
     val input = Set(
       "application/octet-stream",
@@ -171,7 +171,7 @@ class CertificatesStubTests extends FunSuite {
   // === SECTION B continued — Phase-1-STUB-specific (Certificates) ========
 
   test(
-    "[STUB] Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") at Phase 1 (claim-nothing dispatcher)"
+    "Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") at Phase 1 (claim-nothing dispatcher)"
   ) {
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
     val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName = Map.empty
@@ -196,7 +196,7 @@ class CertificatesStubTests extends FunSuite {
   }
 
   test(
-    "[STUB] Certificates.computeCertificateFiles preserves a single-entry byUUID map identity (claim-nothing → no map mutation)"
+    "Certificates.computeCertificateFiles preserves a single-entry byUUID map identity (claim-nothing → no map mutation)"
   ) {
     val art = syntheticArtifact()
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID =
@@ -212,7 +212,7 @@ class CertificatesStubTests extends FunSuite {
   }
 
   test(
-    "[STUB] Certificates.computeCertificateFiles preserves a single-entry byName map identity (claim-nothing → no map mutation)"
+    "Certificates.computeCertificateFiles preserves a single-entry byName map identity (claim-nothing → no map mutation)"
   ) {
     val art = syntheticArtifact("foo.pem")
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
@@ -226,7 +226,7 @@ class CertificatesStubTests extends FunSuite {
   // === SECTION B continued — Phase-1-STUB-specific (CertificatesState) ===
 
   test(
-    "[STUB] CertificatesState.beginProcessing returns this (identity pass-through; Phase 3+ will use this stage to cache parsed cert)"
+    "CertificatesState.beginProcessing returns this (identity pass-through; Phase 3+ will use this stage to cache parsed cert)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
@@ -235,7 +235,7 @@ class CertificatesStubTests extends FunSuite {
   }
 
   test(
-    "[STUB] CertificatesState.getPurls returns (empty Vector, this) at Phase 1 (Phase 3+ emits per-cert pURLs)"
+    "CertificatesState.getPurls returns (empty Vector, this) at Phase 1 (Phase 3+ emits per-cert pURLs)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
@@ -246,7 +246,7 @@ class CertificatesStubTests extends FunSuite {
   }
 
   test(
-    "[STUB] CertificatesState.getMetadata returns (empty TreeMap, this) at Phase 1 (Phase 3+ emits per-cert metadata)"
+    "CertificatesState.getMetadata returns (empty TreeMap, this) at Phase 1 (Phase 3+ emits per-cert metadata)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
@@ -257,7 +257,7 @@ class CertificatesStubTests extends FunSuite {
   }
 
   test(
-    "[STUB] CertificatesState.finalAugmentation returns the input Item unchanged at Phase 1 (Phase 3+ runs the leak sweep here)"
+    "CertificatesState.finalAugmentation returns the input Item unchanged at Phase 1 (Phase 3+ runs the leak sweep here)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)

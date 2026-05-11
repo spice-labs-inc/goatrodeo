@@ -243,16 +243,18 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
   override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
     val metadata = pkg.metadata()
     val buildTime = metadata.buildTime()
-    
+
     val date: Option[java.util.Date] = buildTime.toScala.map { instant =>
       new java.util.Date(instant.toEpochMilli())
     }
-    
-    Some(PackageTagInfo(
-      name = metadata.name(),
-      version = Some(metadata.version()),
-      date = date
-    ))
+
+    Some(
+      PackageTagInfo(
+        name = metadata.name(),
+        version = Some(metadata.version()),
+        date = date
+      )
+    )
   }
 
   // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].

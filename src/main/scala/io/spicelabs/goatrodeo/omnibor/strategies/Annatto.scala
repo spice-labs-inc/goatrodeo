@@ -140,16 +140,18 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
   override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
     val metadata = pkg.metadata()
     val publishedAt = metadata.publishedAt()
-    
+
     val date: Option[java.util.Date] = publishedAt.toScala.map { instant =>
       new java.util.Date(instant.toEpochMilli())
     }
-    
-    Some(PackageTagInfo(
-      name = metadata.name(),
-      version = Some(metadata.version()),
-      date = date
-    ))
+
+    Some(
+      PackageTagInfo(
+        name = metadata.name(),
+        version = Some(metadata.version()),
+        date = date
+      )
+    )
   }
 
   // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].

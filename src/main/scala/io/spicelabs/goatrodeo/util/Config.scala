@@ -11,6 +11,7 @@ import scopt.OParserBuilder
 import java.io.File
 import java.io.FileFilter
 import java.nio.file.Files
+import java.util.Date
 import java.util.regex.Pattern
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
@@ -66,6 +67,11 @@ import scala.util.Using
   *   whether to print component argument help
   * @param printComponentInfo
   *   whether to print component information
+  * @param tagVersion
+  *   optional version to include in top-level tag JSON
+  * @param tagDate
+  *   optional date to include in top-level tag JSON (parsed flexibly, stored as
+  *   Date)
   */
 case class Config(
     out: Option[File] = None,
@@ -91,7 +97,9 @@ case class Config(
     printComponentArgumentInfo: Boolean = false,
     printComponentInfo: Boolean = false,
     packageTags: Boolean = false,
-    packageTagsShortName: Boolean = false
+    packageTagsShortName: Boolean = false,
+    tagVersion: Option[String] = None,
+    tagDate: Option[Date] = None
 ) {
 
   /** Build a list of file list builders from the configuration.
@@ -281,8 +289,41 @@ object Config {
         .text("Create per-package tags for identified packages")
         .action((_, c) => c.copy(packageTags = true)),
       opt[Unit]("package-tags-short-name")
-        .text("Use short package names (e.g., artifactId) instead of full qualified names")
-        .action((_, c) => c.copy(packageTagsShortName = true))
+        .text(
+          "Use short package names (e.g., artifactId) instead of full qualified names"
+        )
+        .action((_, c) => c.copy(packageTagsShortName = true)),
+      opt[String]("tag-version")
+        .text("Set version field in top-level tag JSON (requires --tag)")
+        .action((v, c) => c.copy(tagVersion = Some(v))),
+      opt[String]("tag-date")
+        .text(
+          "Set date field in top-level tag JSON (requires --tag). Supports ISO8601, MM/DD/YYYY, DD/MM/YYYY, 'today', 'yesterday', 'now'"
+        )
+        .action((d, c) =>
+          DateParser.parse(d) match {
+            case Right(date) => c.copy(tagDate = Some(date))
+            case Left(error) =>
+              logger.error(error)
+              Helpers.exitWrapper(1)
+              c
+          }
+        )
+        .validate { d =>
+          DateParser.parse(d) match {
+            case Right(_)    => success
+            case Left(error) => failure(error)
+          }
+        },
+      checkConfig { c =>
+        if (c.tagVersion.isDefined && c.tag.isEmpty) {
+          failure("--tag-version requires --tag to be specified")
+        } else if (c.tagDate.isDefined && c.tag.isEmpty) {
+          failure("--tag-date requires --tag to be specified")
+        } else {
+          success
+        }
+      }
     )
   }
 

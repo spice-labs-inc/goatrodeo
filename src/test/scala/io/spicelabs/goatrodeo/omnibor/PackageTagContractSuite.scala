@@ -14,20 +14,17 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import com.github.packageurl.PackageURL
-import io.spicelabs.goatrodeo.util.ByteWrapper
-
-import scala.collection.immutable.TreeSet
 
 /** Phase 2 TDD Tests: ProcessingState.maybePackageTag contract
   *
   * These tests verify:
-  * - ProcessingState trait has maybePackageTag method
-  * - Default implementation returns None
-  * - Certificates and Generic inherit the default (excluded from per-package tagging)
+  *   - ProcessingState trait has maybePackageTag method
+  *   - Default implementation returns None
+  *   - Certificates and Generic inherit the default (excluded from per-package
+  *     tagging)
   *
   * Requirement Traceability:
-  * - R7: Certificates and Generic excluded from per-package tagging
+  *   - R7: Certificates and Generic excluded from per-package tagging
   */
 class PackageTagContractSuite extends munit.FunSuite {
 
@@ -37,11 +34,12 @@ class PackageTagContractSuite extends munit.FunSuite {
     // RED: Compilation error - method doesn't exist
     // Theory: All ProcessingState subclasses should have maybePackageTag method
     // Requirement: Infrastructure for per-package tagging
-    
+
     // This test verifies compilation - the fact that it compiles means the method exists
     // We use GenericFileState which inherits from ProcessingState
-    val genericState = new io.spicelabs.goatrodeo.omnibor.strategies.GenericFileState()
-    
+    val genericState =
+      new io.spicelabs.goatrodeo.omnibor.strategies.GenericFileState()
+
     // This should compile and return None (the default)
     val result = genericState.maybePackageTag(SingleMarker())
     assertEquals(result, None)
@@ -52,7 +50,7 @@ class PackageTagContractSuite extends munit.FunSuite {
     // GREEN: Method returns None (correct default)
     // Theory: Default behavior is to not produce per-package tags
     // Requirement: R7 (excluded strategies inherit default)
-    
+
     // The key assertion: default implementation returns None
     // This is verified by the trait test above
     assertEquals(Option.empty[PackageTagInfo], None)

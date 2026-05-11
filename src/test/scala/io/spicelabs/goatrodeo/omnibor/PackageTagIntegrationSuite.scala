@@ -14,42 +14,42 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.goatrodeo.util.{ByteWrapper, Config, FileWrapper}
+import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
-import java.nio.file.{Files, Path}
-import scala.collection.immutable.TreeSet
 
 /** Phase 7 Integration Tests: Per-Package Tagging with Real Test Data
   *
-  * These tests verify that the per-package tagging feature works correctly
-  * with actual test corpus files:
-  * - Maven JARs from test_data/pqc_jars
-  * - Linux packages (.deb, .rpm) from test_data/
-  * - Docker images from test_data/download/docker_tests
+  * These tests verify that the per-package tagging feature works correctly with
+  * actual test corpus files:
+  *   - Maven JARs from test_data/pqc_jars
+  *   - Linux packages (.deb, .rpm) from test_data/
+  *   - Docker images from test_data/download/docker_tests
   *
   * Each test verifies:
-  * - Package tags are created with correct name, version, and date
-  * - Tags have proper edge connections (tag:from -> packages, tag:to -> artifact)
-  * - Packages index is created and populated
-  * - Tag JSON structure follows the specification
+  *   - Package tags are created with correct name, version, and date
+  *   - Tags have proper edge connections (tag:from -> packages, tag:to ->
+  *     artifact)
+  *   - Packages index is created and populated
+  *   - Tag JSON structure follows the specification
   *
   * Requirement Traceability:
-  * - R1: --package-tags CLI option generates tags
-  * - R2: --package-tags-short-name generates short names
-  * - R3: Tag JSON has correct structure (tag, version, date)
-  * - R4: Maven strategy extracts GAV and build date
-  * - R5: Baharat strategy extracts name/version from .deb
-  * - R6: Docker strategy extracts repository:tag and created date
+  *   - R1: --package-tags CLI option generates tags
+  *   - R2: --package-tags-short-name generates short names
+  *   - R3: Tag JSON has correct structure (tag, version, date)
+  *   - R4: Maven strategy extracts GAV and build date
+  *   - R5: Baharat strategy extracts name/version from .deb
+  *   - R6: Docker strategy extracts repository:tag and created date
   */
 class PackageTagIntegrationSuite extends munit.FunSuite {
 
   // Helper to check if test files exist
   def checkTestFile(path: String): Boolean = new File(path).exists()
 
-  /** Helper to find package tags in storage
-    * Returns all items with body_mime_type = application/vnd.cc.goatrodeo.tag
-    * that are linked from the packages index
+  /** Helper to find package tags in storage Returns all items with
+    * body_mime_type = application/vnd.cc.goatrodeo.tag that are linked from the
+    * packages index
     */
   def findPackageTags(storage: Storage): Vector[Item] = {
     storage.read("packages") match {
@@ -87,76 +87,87 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   test("Maven JARs - package tags created for pqc_jars") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
-    
+
     val config = Config(packageTags = true, packageTagsShortName = false)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     // Should have tags for the 4 JAR versions (POMs are not main artifacts)
     assert(packageTags.nonEmpty, "Should create package tags")
-    
+
     // Verify tag structure
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
-      assert(content.isDefined, s"Tag should have content: ${tagItem.identifier}")
-      
+      assert(
+        content.isDefined,
+        s"Tag should have content: ${tagItem.identifier}"
+      )
+
       val fields = content.get
       assert(fields.contains("tag"), s"Tag should have 'tag' field")
       assert(fields.contains("date"), s"Tag should have 'date' field")
       assert(fields.contains("version"), s"Tag should have 'version' field")
-      
+
       // Verify full qualified name format
       val tagValue = fields("tag")
-      assert(tagValue.contains(":"), s"Full name should contain colon: $tagValue")
-      assert(tagValue.startsWith("io.spicelabs.pepperstorm:"), 
-        s"Should have groupId prefix: $tagValue")
+      assert(
+        tagValue.contains(":"),
+        s"Full name should contain colon: $tagValue"
+      )
+      assert(
+        tagValue.startsWith("io.spicelabs.pepperstorm:"),
+        s"Should have groupId prefix: $tagValue"
+      )
     }
   }
 
   test("Maven JARs - short names use artifactId only") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
-    
+
     val config = Config(packageTags = true, packageTagsShortName = true)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
       val tagValue = content.get("tag")
-      
+
       // Should NOT contain groupId prefix with short names
-      assert(!tagValue.contains(":"), s"Short name should not contain colon: $tagValue")
+      assert(
+        !tagValue.contains(":"),
+        s"Short name should not contain colon: $tagValue"
+      )
       assertEquals(tagValue, "ps-059-patient-matching-service")
     }
   }
 
   test("Maven JARs - tag edges point to correct artifacts") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
-    
+
     val config = Config(packageTags = true)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     // Each tag should have tag:from -> packages and tag:to -> some artifact
     packageTags.foreach { tagItem =>
       val edges = tagItem.connections
-      
-      val hasTagFromPackages = edges.exists {
-        case (edgeType, target) => edgeType == EdgeType.tagFrom && target == "packages"
+
+      val hasTagFromPackages = edges.exists { case (edgeType, target) =>
+        edgeType == EdgeType.tagFrom && target == "packages"
       }
       assert(hasTagFromPackages, s"Tag should have tag:from -> packages edge")
-      
-      val hasTagToArtifact = edges.exists {
-        case (edgeType, _) => edgeType == EdgeType.tagTo
+
+      val hasTagToArtifact = edges.exists { case (edgeType, _) =>
+        edgeType == EdgeType.tagTo
       }
       assert(hasTagToArtifact, s"Tag should have tag:to -> artifact edge")
     }
@@ -165,9 +176,11 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Linux Package Tests (.deb) ====================
 
   test("Debian packages - tags created with name and version") {
-    assume(checkTestFile("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"), 
-      "Debian test data exists")
-    
+    assume(
+      checkTestFile("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"),
+      "Debian test data exists"
+    )
+
     val config = Config(packageTags = true)
     val source = FileWrapper(
       new File("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"),
@@ -175,16 +188,16 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       None
     )
     val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     // Baharat strategy should create tags for .deb files
     assert(packageTags.nonEmpty, "Should create package tags for .deb")
-    
+
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
       assert(content.isDefined, "Tag should have content")
-      
+
       val fields = content.get
       assert(fields.contains("tag"), "Should have tag field")
       assert(fields.contains("version"), "Should have version field")
@@ -192,9 +205,11 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Debian with metadata - extracts build date") {
-    assume(checkTestFile("test_data/debwithmetadata.deb"),
-      "Debian with metadata test data exists")
-    
+    assume(
+      checkTestFile("test_data/debwithmetadata.deb"),
+      "Debian with metadata test data exists"
+    )
+
     val config = Config(packageTags = true)
     val source = FileWrapper(
       new File("test_data/debwithmetadata.deb"),
@@ -202,13 +217,13 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       None
     )
     val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
       val dateOpt = content.get.get("date")
-      
+
       // Date should be present and valid ISO 8601
       assert(dateOpt.isDefined, "Should extract build date")
       val dateStr = dateOpt.get
@@ -220,9 +235,11 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Linux Package Tests (.rpm) ====================
 
   test("RPM packages - tags created with name and version") {
-    assume(checkTestFile("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm"),
-      "RPM test data exists")
-    
+    assume(
+      checkTestFile("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm"),
+      "RPM test data exists"
+    )
+
     val config = Config(packageTags = true)
     val source = FileWrapper(
       new File("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm"),
@@ -230,11 +247,11 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       None
     )
     val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     assert(packageTags.nonEmpty, "Should create package tags for .rpm")
-    
+
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
       val fields = content.get
@@ -246,9 +263,13 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Docker Tests ====================
 
   test("Docker images - tags created with repository and tag") {
-    assume(checkTestFile("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"),
-      "Docker test data exists")
-    
+    assume(
+      checkTestFile(
+        "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
+      ),
+      "Docker test data exists"
+    )
+
     val config = Config(packageTags = true)
     val source = FileWrapper(
       new File("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"),
@@ -256,30 +277,37 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       None
     )
     val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     assert(packageTags.nonEmpty, "Should create package tags for Docker images")
-    
+
     // Find tag with "bigtent" in name
     val bigtentTag = packageTags.find { tagItem =>
       extractTagContent(tagItem).get.get("tag").exists(_.contains("bigtent"))
     }
-    
+
     assert(bigtentTag.isDefined, "Should have bigtent tag")
-    
+
     val content = extractTagContent(bigtentTag.get)
     val tagValue = content.get("tag")
-    
+
     // Docker tag format should be repository:tag
     assert(tagValue.contains(":"), s"Should have colon separator: $tagValue")
-    assert(tagValue.contains("bigtent"), s"Should contain repository name: $tagValue")
+    assert(
+      tagValue.contains("bigtent"),
+      s"Should contain repository name: $tagValue"
+    )
   }
 
   test("Docker images - extracts created date from config") {
-    assume(checkTestFile("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"),
-      "Docker test data exists")
-    
+    assume(
+      checkTestFile(
+        "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
+      ),
+      "Docker test data exists"
+    )
+
     val config = Config(packageTags = true)
     val source = FileWrapper(
       new File("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"),
@@ -287,13 +315,13 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       None
     )
     val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
       val dateOpt = content.get.get("date")
-      
+
       assert(dateOpt.isDefined, "Should have date from Docker config")
       val dateStr = dateOpt.get
       assert(dateStr.contains("T"), "Date should have T separator")
@@ -302,9 +330,11 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Docker complex image - multiple tags created") {
-    assume(checkTestFile("test_data/download/docker_tests/grinder_bt_pg_docker.tar"),
-      "Complex Docker test data exists")
-    
+    assume(
+      checkTestFile("test_data/download/docker_tests/grinder_bt_pg_docker.tar"),
+      "Complex Docker test data exists"
+    )
+
     val config = Config(packageTags = true)
     val source = FileWrapper(
       new File("test_data/download/docker_tests/grinder_bt_pg_docker.tar"),
@@ -312,14 +342,14 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       None
     )
     val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-    
+
     val packageTags = findPackageTags(storage)
-    
+
     // This image contains postgres, bigtent, and grinder
     val tagNames = packageTags.flatMap { tagItem =>
       extractTagContent(tagItem).get.get("tag")
     }
-    
+
     assert(tagNames.exists(_.contains("postgres")), "Should have postgres tag")
     assert(tagNames.exists(_.contains("bigtent")), "Should have bigtent tag")
     assert(tagNames.exists(_.contains("grinder")), "Should have grinder tag")
@@ -332,35 +362,46 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
     val testCases = Seq(
       ("test_data/pqc_jars", "Maven", true),
       ("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb", "Debian", false),
-      ("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar", "Docker", false)
+      (
+        "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar",
+        "Docker",
+        false
+      )
     ).filter { case (path, _, _) => checkTestFile(path) }
-    
+
     assume(testCases.nonEmpty, "At least one test file exists")
-    
+
     val config = Config(packageTags = true)
-    
+
     testCases.foreach { case (path, strategyName, isDirectory) =>
       val storage = if (isDirectory) {
-        val strategies = ToProcess.strategyForDirectory(new File(path), false, None)
+        val strategies =
+          ToProcess.strategyForDirectory(new File(path), false, None)
         ToProcess.buildGraphForToProcess(strategies, args = config)
       } else {
         val source = FileWrapper(new File(path), path, None)
         ToProcess.buildGraphFromArtifactWrapper(source, args = config)
       }
-      
+
       val packageTags = findPackageTags(storage)
-      
+
       packageTags.foreach { tagItem =>
         val content = extractTagContent(tagItem)
         assert(content.isDefined, s"$strategyName: Tag should have content")
-        
+
         val fields = content.get
         assert(fields.contains("tag"), s"$strategyName: Should have tag field")
-        assert(fields.contains("date"), s"$strategyName: Should have date field")
-        
+        assert(
+          fields.contains("date"),
+          s"$strategyName: Should have date field"
+        )
+
         // Version is optional - may or may not be present
         fields.get("version").foreach { version =>
-          assert(version.nonEmpty, s"$strategyName: Version should not be empty if present")
+          assert(
+            version.nonEmpty,
+            s"$strategyName: Version should not be empty if present"
+          )
         }
       }
     }
@@ -368,15 +409,15 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   test("Packages index - created on-demand when package-tags enabled") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
-    
+
     val config = Config(packageTags = true)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
-    
+
     val packagesItem = storage.read("packages")
     assert(packagesItem.isDefined, "Should create packages index")
-    
+
     // Should have tag:to edges to all package tags
     val tagEdges = packagesItem.get.connections.filter(_._1 == EdgeType.tagTo)
     assert(tagEdges.nonEmpty, "Packages index should have tag:to edges")
@@ -384,13 +425,16 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   test("Packages index - not created when package-tags disabled") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
-    
+
     val config = Config(packageTags = false)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
-    
+
     val packagesItem = storage.read("packages")
-    assert(packagesItem.isEmpty, "Should NOT create packages index when disabled")
+    assert(
+      packagesItem.isEmpty,
+      "Should NOT create packages index when disabled"
+    )
   }
 }
