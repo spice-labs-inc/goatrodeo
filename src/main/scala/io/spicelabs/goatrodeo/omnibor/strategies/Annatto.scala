@@ -7,6 +7,7 @@ import io.spicelabs.annatto.LanguagePackage
 import io.spicelabs.annatto.LanguagePackageReader
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
+import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
@@ -133,6 +134,25 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
       store: Storage,
       marker: SingleMarker
   ): AnnattoState = this
+
+  /** Generate per-package tag info for Annatto packages.
+    */
+  override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
+    val metadata = pkg.metadata()
+    val publishedAt = metadata.publishedAt()
+
+    val date: Option[java.util.Date] = publishedAt.toScala.map { instant =>
+      new java.util.Date(instant.toEpochMilli())
+    }
+
+    Some(
+      PackageTagInfo(
+        name = metadata.name(),
+        version = Some(metadata.version()),
+        date = date
+      )
+    )
+  }
 
   // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].
   // These three cases are the most common output from metadata and the output of thisfunction

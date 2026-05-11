@@ -111,6 +111,20 @@ object Builder {
         ("tag" -> Dom.StringElem(tag.name)),
         ("date" -> Dom.StringElem(Helpers.currentDate8601()))
       )
+
+      // Add version and date from Config if provided
+      val withVersion = args.tagVersion match {
+        case Some(version) => base + ("version" -> Dom.StringElem(version))
+        case None          => base
+      }
+
+      val withConfigDate = args.tagDate match {
+        case Some(date) =>
+          import io.spicelabs.goatrodeo.util.DateParser
+          withVersion + ("date" -> Dom.StringElem(DateParser.toIso8601(date)))
+        case None => withVersion
+      }
+
       val toAppend: Map[String, Dom.Element] = tag.extra match {
         case None => Map()
         case Some(me: Dom.MapElem) =>
@@ -120,7 +134,7 @@ object Builder {
           }.toMap
         case Some(v) => Map(("extra" -> v))
       }
-    val fieldMap = toAppend.foldLeft(base) { case (curr, (k, v)) =>
+    val fieldMap = toAppend.foldLeft(withConfigDate) { case (curr, (k, v)) =>
       curr + (k -> v)
     }
     val json: Dom.MapElem = Dom.MapElem.Unsized(fieldMap.toVector*)

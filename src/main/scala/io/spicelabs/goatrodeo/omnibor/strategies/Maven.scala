@@ -5,6 +5,7 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
@@ -65,7 +66,11 @@ case class MavenState(
     pomFile: String = "",
     pomXml: NodeSeq = NodeSeq.Empty,
     sources: Map[String, Item] = Map(),
-    sourceGitoids: Map[String, GitOID] = Map()
+    sourceGitoids: Map[String, GitOID] = Map(),
+    groupId: Option[String] = None,
+    artifactId: Option[String] = None,
+    version: Option[String] = None,
+    buildDate: Option[java.util.Date] = None
 ) extends ProcessingState[MavenMarkers, MavenState] {
   private lazy val logger = Logger(getClass())
 
@@ -92,9 +97,56 @@ case class MavenState(
       val pomString = artifact.withStream(Helpers.slurpInputToString(_))
       val xml =
         Try { XML.loadString(pomString) }.toOption.getOrElse(NodeSeq.Empty)
-      this.copy(pomFile = pomString, pomXml = xml)
+
+      // Extract GAV coordinates
+      val grp = findTag(xml, "groupId")
+      val art = findTag(xml, "artifactId")
+      val ver = tryToFixVersion(
+        findTag(xml, "version"),
+        artifact.filenameWithNoPath
+      )
+
+      // Extract build date from POM properties
+      val buildDateFromPom = extractBuildDateFromPom(xml)
+
+      this.copy(
+        pomFile = pomString,
+        pomXml = xml,
+        groupId = grp,
+        artifactId = art,
+        version = ver,
+        buildDate = buildDateFromPom
+      )
 
     case _ => this
+  }
+
+  /** Extract build date from POM properties section. Looks for buildDate or
+    * maven.build.timestamp properties.
+    */
+  private def extractBuildDateFromPom(xml: NodeSeq): Option[java.util.Date] = {
+    val buildDateProp =
+      (xml \ "properties" \ "buildDate").headOption.map(_.text)
+    val timestampProp =
+      (xml \ "properties" \ "maven.build.timestamp").headOption.map(_.text)
+
+    // Try buildDate first, then maven.build.timestamp
+    val dateStr = buildDateProp.orElse(timestampProp)
+
+    dateStr.flatMap { str =>
+      Try {
+        // Try ISO 8601 format first
+        val isoFormat =
+          new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+        isoFormat.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+        isoFormat.parse(str)
+      }.orElse(Try {
+        // Try simple date format
+        val simpleFormat = new java.text.SimpleDateFormat("yyyy-MM-dd")
+        simpleFormat.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+        simpleFormat.parse(str)
+      }).toOption
+    }
   }
   override def getPurls(
       artifact: ArtifactWrapper,
@@ -172,26 +224,72 @@ case class MavenState(
       )
     } else TreeMap[String, TreeSet[StringOrPair]]()
 
-    val manifest: TreeMap[String, TreeSet[StringOrPair]] = marker match {
-      case MavenMarkers.POM => TreeMap()
+    val (
+      manifest: TreeMap[String, TreeSet[StringOrPair]],
+      manifestBuildDate: Option[java.util.Date]
+    ) = marker match {
+      case MavenMarkers.POM => (TreeMap[String, TreeSet[StringOrPair]](), None)
       case _ =>
         FileWalker
           .withinArchiveStream(artifact) { files =>
             files
               .filter(_.path().toUpperCase() == "META-INF/MANIFEST.MF")
               .headOption match {
-              case Some(manifest) =>
-                Helpers.treeInfoFromManifest(manifest.withStream(stream => {
+              case Some(manifestFile) =>
+                val manifestStr = manifestFile.withStream(stream => {
                   Helpers.slurpInputToString(stream)
-                }))
+                })
+                val manifestMap = Helpers.treeInfoFromManifest(manifestStr)
+                val buildDate = extractBuildDateFromManifest(manifestMap)
+                (manifestMap, buildDate)
 
-              case None => TreeMap[String, TreeSet[StringOrPair]]()
+              case None => (TreeMap[String, TreeSet[StringOrPair]](), None)
             }
           }
-          .getOrElse(TreeMap[String, TreeSet[StringOrPair]]())
+          .getOrElse((TreeMap[String, TreeSet[StringOrPair]](), None))
     }
 
-    Helpers.mergeTreeMaps(baseTree, manifest) -> this
+    // MANIFEST build date takes precedence over POM build date
+    val finalBuildDate = manifestBuildDate.orElse(this.buildDate)
+
+    val updatedState = this.copy(buildDate = finalBuildDate)
+
+    Helpers.mergeTreeMaps(baseTree, manifest) -> updatedState
+  }
+
+  /** Extract build date from MANIFEST.MF attributes. Looks for Buid-Date
+    * (common Maven typo) or Build-Date.
+    */
+  private def extractBuildDateFromManifest(
+      manifest: TreeMap[String, TreeSet[StringOrPair]]
+  ): Option[java.util.Date] = {
+    // Try common build date keys (case-insensitive, as manifest keys are lowercased)
+    val buildDateKeys =
+      Seq("buid-date", "build-date", "implementation-date", "built-date")
+
+    val dateStr = buildDateKeys.view
+      .flatMap(key => manifest.get(key).flatMap(_.headOption).map(_.value))
+      .headOption
+
+    dateStr.flatMap { str =>
+      Try {
+        // Try ISO 8601 format
+        val isoFormat =
+          new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+        isoFormat.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+        isoFormat.parse(str)
+      }.orElse(Try {
+        // Try simple date format
+        val simpleFormat = new java.text.SimpleDateFormat("yyyy-MM-dd")
+        simpleFormat.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
+        simpleFormat.parse(str)
+      }).orElse(Try {
+        // Try RFC 2822 format (common in manifests)
+        val rfcFormat =
+          new java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z")
+        rfcFormat.parse(str)
+      }).toOption
+    }
   }
 
   override def finalAugmentation(
@@ -221,6 +319,26 @@ case class MavenState(
       ret
     case _ => this
   }
+
+  /** Determine if this Maven package should generate a per-package tag.
+    *
+    * Only the JAR marker produces a tag. Requires groupId, artifactId, and
+    * version.
+    */
+  override def maybePackageTag(marker: MavenMarkers): Option[PackageTagInfo] =
+    marker match {
+      case MavenMarkers.JAR
+          if groupId.isDefined && artifactId.isDefined && version.isDefined =>
+        val fullName = s"${groupId.get}:${artifactId.get}"
+        Some(
+          PackageTagInfo(
+            name = fullName,
+            version = version,
+            date = buildDate
+          )
+        )
+      case _ => None
+    }
 
   override def generateParentScope(
       artifact: ArtifactWrapper,

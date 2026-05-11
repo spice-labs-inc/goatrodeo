@@ -220,6 +220,58 @@ class GoatRodeoBuilder {
     this
   }
 
+  /** Enable per-package tagging.
+    *
+    * @return
+    *   this builder
+    */
+  def withPackageTags(): GoatRodeoBuilder = {
+    config = config.copy(packageTags = true)
+    this
+  }
+
+  /** Use short package names (e.g., artifactId) instead of full qualified
+    * names.
+    *
+    * @return
+    *   this builder
+    */
+  def withPackageTagsShortName(): GoatRodeoBuilder = {
+    config = config.copy(packageTagsShortName = true)
+    this
+  }
+
+  /** Set the version for the top-level tag (requires tag to be set).
+    *
+    * @param v
+    *   the version string
+    * @return
+    *   this builder
+    */
+  def withTagVersion(v: String): GoatRodeoBuilder = {
+    config = config.copy(tagVersion = Some(v))
+    this
+  }
+
+  /** Set the date for the top-level tag (requires tag to be set).
+    *
+    * @param d
+    *   the date string (parsed flexibly, e.g., "2024-01-15", "today", "now")
+    * @return
+    *   this builder
+    * @throws IllegalArgumentException
+    *   if the date cannot be parsed
+    */
+  def withTagDate(d: String): GoatRodeoBuilder = {
+    io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
+      case Right(date) =>
+        config = config.copy(tagDate = Some(date))
+        this
+      case Left(error) =>
+        throw new IllegalArgumentException(error)
+    }
+  }
+
   /** Add a MIME type filter predicate.
     *
     * @param filter
@@ -282,20 +334,22 @@ class GoatRodeoBuilder {
     */
   def withExtraArg(key: String, value: String): GoatRodeoBuilder = {
     key match {
-      case "payload"        => withPayload(value)
-      case "output"         => withOutput(value)
-      case "threads"        => withThreads(value.toInt)
-      case "maxRecords"     => withMaxRecords(value.toInt)
-      case "ingested"       => withIngested(value)
-      case "ignore"         => withIgnore(value)
-      case "fileList"       => withFileList(value)
-      case "excludePattern" => withExcludePattern(value)
-      case "blockList"      => withBlockList(value)
-      case "tempDir"        => withTempDir(value)
-      case "tag-json"       => withTagJson(value)
-      case "tag"            => withTag(value)
-      case "mimeFilter"     => withMimeFilter(value)
-      case "mimeFilterFile" => withMimeFilterFile(value)
+      case "payload"                 => withPayload(value)
+      case "output"                  => withOutput(value)
+      case "threads"                 => withThreads(value.toInt)
+      case "maxRecords"              => withMaxRecords(value.toInt)
+      case "ingested"                => withIngested(value)
+      case "ignore"                  => withIgnore(value)
+      case "fileList"                => withFileList(value)
+      case "excludePattern"          => withExcludePattern(value)
+      case "blockList"               => withBlockList(value)
+      case "tempDir"                 => withTempDir(value)
+      case "tag-json"                => withTagJson(value)
+      case "tag"                     => withTag(value)
+      case "package-tags"            => withPackageTags()
+      case "package-tags-short-name" => withPackageTagsShortName()
+      case "mimeFilter"              => withMimeFilter(value)
+      case "mimeFilterFile"          => withMimeFilterFile(value)
       case "emitJsonDir" =>
         config = config.copy(emitJsonDir = Some(Paths.get(value).toFile()))
         this

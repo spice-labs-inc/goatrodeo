@@ -23,6 +23,7 @@ This directory contains detailed documentation for Goat Rodeo. Use this index to
 
 ### [Goat Rodeo Operation](goat_rodeo_operation.md)
 Complete guide to how Goat Rodeo processes artifacts:
+- [Survey tags vs. sub-tags](goat_rodeo_operation.md#tags) — when to use `--tag` vs. `--package-tags`
 - CLI parameters and their effects
 - File discovery phase
 - Strategy determination (Maven, Docker, Debian, Generic)

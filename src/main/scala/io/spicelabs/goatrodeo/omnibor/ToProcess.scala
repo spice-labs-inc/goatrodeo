@@ -132,6 +132,18 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       marker: PM
   ): ME
 
+  /** Determine if this state should generate a per-package tag.
+    *
+    * Default implementation returns None - strategies that support per-package
+    * tagging should override this method.
+    *
+    * @param marker
+    *   the processing marker for the current artifact
+    * @return
+    *   Some(PackageTagInfo) if a tag should be generated, None otherwise
+    */
+  def maybePackageTag(marker: PM): Option[PackageTagInfo] = None
+
   def generateParentScope(
       artifact: ArtifactWrapper,
       item: Item,
@@ -364,11 +376,98 @@ trait ToProcess {
                   )
               }
 
+              // update per-package tags
+              val itemScope3WithPackageTag = if (args.packageTags) {
+                state3.maybePackageTag(marker) match {
+                  case Some(info) =>
+                    // Resolve short vs full name
+                    val resolvedName = if (args.packageTagsShortName) {
+                      // Extract portion after last : or /
+                      info.name.split("[:/]").last
+                    } else {
+                      info.name
+                    }
+
+                    // Resolve date (use provided or current)
+                    val resolvedDate = info.date.getOrElse(new java.util.Date())
+                    val dateStr = PackageTagInfo.toIso8601(resolvedDate)
+
+                    // Build tag JSON using borer Dom.Element
+                    import io.bullet.borer.Dom
+
+                    val tagJson: Dom.Element = info.version match {
+                      case Some(ver) =>
+                        Dom.MapElem.Unsized(
+                          Dom.StringElem("tag") -> Dom.StringElem(resolvedName),
+                          Dom.StringElem("version") -> Dom.StringElem(ver),
+                          Dom.StringElem("date") -> Dom.StringElem(dateStr),
+                          Dom.StringElem("package_tag") -> Dom.BooleanElem(true)
+                        )
+                      case None =>
+                        Dom.MapElem.Unsized(
+                          Dom.StringElem("tag") -> Dom.StringElem(resolvedName),
+                          Dom.StringElem("date") -> Dom.StringElem(dateStr),
+                          Dom.StringElem("package_tag") -> Dom.BooleanElem(true)
+                        )
+                    }
+
+                    import io.bullet.borer.Json
+                    val jsonString = Json.encode(tagJson).toUtf8String
+                    val tagGitoid = io.spicelabs.goatrodeo.util.GitOIDUtils
+                      .urlForString(jsonString)
+
+                    // Write tag item — unified with "tags" root
+                    store.write(
+                      tagGitoid,
+                      item =>
+                        Some(
+                          Item(
+                            tagGitoid,
+                            TreeSet(EdgeType.tagFrom -> "tags"),
+                            Some(ItemTagData.mimeType),
+                            Some(ItemTagData(tagJson))
+                          )
+                        ),
+                      _ => "package tag"
+                    )
+
+                    // Update tags index (same root as survey tags)
+                    store.write(
+                      "tags",
+                      itemOpt =>
+                        itemOpt match {
+                          case Some(item) =>
+                            Some(
+                              item.copy(connections =
+                                item.connections + (EdgeType.tagTo -> tagGitoid)
+                              )
+                            )
+                          case None =>
+                            Some(
+                              Item(
+                                "tags",
+                                TreeSet(EdgeType.tagTo -> tagGitoid),
+                                None,
+                                None
+                              )
+                            )
+                        },
+                      _ => "tags index"
+                    )
+
+                    // Add tagFrom to main artifact
+                    itemScope3.copy(connections =
+                      itemScope3.connections + (EdgeType.tagFrom -> tagGitoid)
+                    )
+                  case None => itemScope3
+                }
+              } else itemScope3
+
               // do final augmentation (e.g., mapping source to classes)
               val (item4, state4) =
                 state3.finalAugmentation(
                   artifact,
-                  itemScope3,
+                  itemScope3WithPackageTag,
                   marker,
                   parentScope,
                   store

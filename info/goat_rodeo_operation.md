@@ -8,6 +8,32 @@ has certain operational characteristics.
 
 This document describes how Goat Rodeo works and how to tune parameters.
 
+## Tags
+
+Goat Rodeo supports two kinds of tags, which serve different purposes:
+
+### Survey Tags (top-level)
+
+Tags as they were initially conceived represented an **entire survey** — a single Goat Rodeo run. A survey tag provides an anchor, a connection point for the whole run.
+
+Survey tags are created with `--tag` and can optionally include `--tag-version` and `--tag-date`.
+
+### Sub-Tags (per-package)
+
+As we start working on surveying in bulk (downloading hundreds of artifacts from Docker Hub, etc.), we need a more granular meaning of "tag" — in this case the individual artifact that's being tagged rather than the whole survey. A **sub-tag** is a tag associated with a single artifact (a Docker image, a JAR file, etc.) so that for bulk operations, there might be many sub-tags.
+
+Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects a package (Maven JAR, Docker image, Linux package, .NET assembly). Each sub-tag captures the package name, version, and build date from the artifact's own metadata.
+
+### Relationship
+
+| | Survey Tag | Sub-Tag |
+|---|---|---|
+| Scope | Entire run | Single package |
+| Source | CLI (`--tag`) | Artifact metadata (`--package-tags`) |
+| Index item | `tags` | `tags` (same root) |
+| Edge type | `tag:from` → `tags` | `tag:from` → `tags` |
+| JSON marker | — | `"package_tag": true` |
+
 ## CLI parameters:
 
      
@@ -24,6 +50,14 @@ This document describes how Goat Rodeo works and how to tune parameters.
   use the RAM disk as the `tempdir`
 * `--tag` : create a `tags` Item and link to `{iso 8601 date}/{text after tag param}` Item and link each Item representing a found file
   to that Item. This allows for the identification of all the top level files in a Goat Rodeo run on a particular day.
+* `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
+* `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
+  Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
+* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet). Each package gets a tag Item
+  with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
+  is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.
+* `--package-tags-short-name` : Use short package names (e.g., `artifactId` for Maven) instead of fully qualified names
+  (e.g., `groupId:artifactId`). Applies when `--package-tags` is enabled.
 * `--ingested` : Append all the ingested files to this file on successful completion
 * `--ignore` : A file containing paths to ignore, likely because they have been processed in the past. This can be used in conjunction
   with `--ingested` (they can point to the same file) to record the files that were processed by Goat Rodeo such that those files

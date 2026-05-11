@@ -550,3 +550,62 @@ object Item {
   *   optional additional JSON/CBOR data to include with the tag
   */
 case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])
+
+/** Information for per-package tagging.
+  *
+  * @param name
+  *   the package name (e.g., "org.example:artifact" or "artifact")
+  * @param version
+  *   optional package version (omitted from JSON if None)
+  * @param date
+  *   optional build/publish date (uses current date if None when creating tag)
+  */
+case class PackageTagInfo(
+    name: String,
+    version: Option[String],
+    date: Option[java.util.Date]
+)
+
+object PackageTagInfo {
+  import org.json4s._
+  import org.json4s.native.JsonMethods._
+  import org.json4s.native.Serialization
+  import org.json4s.JsonDSL._
+  import java.text.SimpleDateFormat
+  import java.util.TimeZone
+
+  implicit val formats: Formats = Serialization.formats(NoTypeHints)
+
+  /** Convert PackageTagInfo to JSON string.
+    *
+    * Omits version field if None. Formats date as ISO 8601 UTC.
+    */
+  def toJson(info: PackageTagInfo): String = {
+    val dateStr = info.date
+      .map(formatDateISO8601)
+      .getOrElse(formatDateISO8601(new java.util.Date()))
+
+    val json = info.version match {
+      case Some(ver) =>
+        ("tag" -> info.name) ~
+          ("version" -> ver) ~
+          ("date" -> dateStr)
+      case None =>
+        ("tag" -> info.name) ~
+          ("date" -> dateStr)
+    }
+
+    compact(render(json))
+  }
+
+  /** Format a Date as ISO 8601 string (public version).
+    */
+  def toIso8601(date: java.util.Date): String = formatDateISO8601(date)
+
+  private def formatDateISO8601(date: java.util.Date): String = {
+    val tz = TimeZone.getTimeZone("UTC")
+    val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    df.setTimeZone(tz)
+    df.format(date)
+  }
+}
