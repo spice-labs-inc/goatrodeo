@@ -8,6 +8,32 @@ has certain operational characteristics.
 
 This document describes how Goat Rodeo works and how to tune parameters.
 
+## Tags
+
+Goat Rodeo supports two kinds of tags, which serve different purposes:
+
+### Survey Tags (top-level)
+
+Tags as they were initially conceived represented an **entire survey** — a single Goat Rodeo run. A survey tag provides an anchor, a connection point for the whole run.
+
+Survey tags are created with `--tag` and can optionally include `--tag-version` and `--tag-date`.
+
+### Sub-Tags (per-package)
+
+As we start working on surveying in bulk (downloading hundreds of artifacts from Docker Hub, etc.), we need a more granular meaning of "tag" — in this case the individual artifact that's being tagged rather than the whole survey. A **sub-tag** is a tag associated with a single artifact (a Docker image, a JAR file, etc.) so that for bulk operations, there might be many sub-tags.
+
+Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects a package (Maven JAR, Docker image, Linux package, .NET assembly). Each sub-tag captures the package name, version, and build date from the artifact's own metadata.
+
+### Relationship
+
+| | Survey Tag | Sub-Tag |
+|---|---|---|
+| Scope | Entire run | Single package |
+| Source | CLI (`--tag`) | Artifact metadata (`--package-tags`) |
+| Index item | `tags` | `tags` (same root) |
+| Edge type | `tag:from` → `tags` | `tag:from` → `tags` |
+| JSON marker | — | `"package_tag": true` |
+
 ## CLI parameters:
 
      

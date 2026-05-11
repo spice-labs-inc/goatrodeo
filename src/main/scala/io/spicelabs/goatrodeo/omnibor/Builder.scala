@@ -280,9 +280,6 @@ object Builder {
         )
     }
 
-    // Note: "packages" index is created on-demand during processing
-    // when --package-tags is enabled and packages are encountered
-
     // start time
     val start = Instant.now()
 

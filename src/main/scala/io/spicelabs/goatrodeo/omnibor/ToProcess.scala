@@ -400,12 +400,14 @@ trait ToProcess {
                         Dom.MapElem.Unsized(
                           Dom.StringElem("tag") -> Dom.StringElem(resolvedName),
                           Dom.StringElem("version") -> Dom.StringElem(ver),
-                          Dom.StringElem("date") -> Dom.StringElem(dateStr)
+                          Dom.StringElem("date") -> Dom.StringElem(dateStr),
+                          Dom.StringElem("package_tag") -> Dom.BooleanElem(true)
                         )
                       case None =>
                         Dom.MapElem.Unsized(
                           Dom.StringElem("tag") -> Dom.StringElem(resolvedName),
-                          Dom.StringElem("date") -> Dom.StringElem(dateStr)
+                          Dom.StringElem("date") -> Dom.StringElem(dateStr),
+                          Dom.StringElem("package_tag") -> Dom.BooleanElem(true)
                         )
                     }
 
@@ -414,14 +416,14 @@ trait ToProcess {
                     val tagGitoid = io.spicelabs.goatrodeo.util.GitOIDUtils
                       .urlForString(jsonString)
 
-                    // Write tag item
+                    // Write tag item — unified with "tags" root
                     store.write(
                       tagGitoid,
                       item =>
                         Some(
                           Item(
                             tagGitoid,
-                            TreeSet(EdgeType.tagFrom -> "packages"),
+                            TreeSet(EdgeType.tagFrom -> "tags"),
                             Some(ItemTagData.mimeType),
                             Some(ItemTagData(tagJson))
                           )
@@ -429,9 +431,9 @@ trait ToProcess {
                       _ => "package tag"
                     )
 
-                    // Update packages index
+                    // Update tags index (same root as survey tags)
                     store.write(
-                      "packages",
+                      "tags",
                       itemOpt =>
                         itemOpt match {
                           case Some(item) =>
@@ -443,14 +445,14 @@ trait ToProcess {
                           case None =>
                             Some(
                               Item(
-                                "packages",
+                                "tags",
                                 TreeSet(EdgeType.tagTo -> tagGitoid),
                                 None,
                                 None
                               )
                             )
                         },
-                      _ => "packages index"
+                      _ => "tags index"
                     )
 
                     // Add tagFrom to main artifact

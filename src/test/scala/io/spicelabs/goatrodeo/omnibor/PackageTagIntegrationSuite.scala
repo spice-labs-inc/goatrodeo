@@ -29,8 +29,7 @@ import java.io.File
   *
   * Each test verifies:
   *   - Package tags are created with correct name, version, and date
-  *   - Tags have proper edge connections (tag:from -> packages, tag:to ->
-  *     artifact)
+  *   - Tags have proper edge connections (tag:from -> tags, tag:to -> artifact)
   *   - Packages index is created and populated
   *   - Tag JSON structure follows the specification
   *
@@ -49,32 +48,34 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   /** Helper to find package tags in storage Returns all items with
     * body_mime_type = application/vnd.cc.goatrodeo.tag that are linked from the
-    * packages index
+    * tags index and have package_tag field
     */
   def findPackageTags(storage: Storage): Vector[Item] = {
-    storage.read("packages") match {
-      case Some(packagesItem) =>
+    storage.read("tags") match {
+      case Some(tagsItem) =>
         val items = for {
-          (edgeType, target) <- packagesItem.connections.toVector
+          (edgeType, target) <- tagsItem.connections.toVector
           if edgeType == EdgeType.tagTo
           item <- storage.read(target)
+          content <- extractTagContent(item)
+          if isBooleanTrue(content, "package_tag")
         } yield item
         items
       case None => Vector.empty
     }
   }
 
-  /** Helper to extract tag content from item */
-  def extractTagContent(item: Item): Option[Map[String, String]] = {
+  /** Helper to extract tag content from item as Map[String, Dom.Element] */
+  def extractTagContent(
+      item: Item
+  ): Option[Map[String, io.bullet.borer.Dom.Element]] = {
     item.body.flatMap {
       case tagData: ItemTagData =>
-        // Parse the borer Dom.Element to extract fields
         import io.bullet.borer.Dom
         tagData.tag match {
           case mapElem: Dom.MapElem =>
-            val fields = mapElem.toMap.collect {
-              case (Dom.StringElem(key), Dom.StringElem(value)) =>
-                key -> value
+            val fields = mapElem.members.collect {
+              case (Dom.StringElem(key), value) => key -> value
             }
             Some(fields.toMap)
           case _ => None
@@ -82,6 +83,25 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       case _ => None
     }
   }
+
+  /** Helper to extract a string field from tag content */
+  def stringField(
+      content: Map[String, io.bullet.borer.Dom.Element],
+      key: String
+  ): Option[String] =
+    content.get(key).collect { case io.bullet.borer.Dom.StringElem(value) =>
+      value
+    }
+
+  /** Helper to check if a boolean field is true */
+  def isBooleanTrue(
+      content: Map[String, io.bullet.borer.Dom.Element],
+      key: String
+  ): Boolean =
+    content.get(key) match {
+      case Some(io.bullet.borer.Dom.BooleanElem(value)) => value
+      case _                                            => false
+    }
 
   // ==================== Maven JAR Tests ====================
 
@@ -112,7 +132,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       assert(fields.contains("version"), s"Tag should have 'version' field")
 
       // Verify full qualified name format
-      val tagValue = fields("tag")
+      val tagValue = stringField(fields, "tag").get
       assert(
         tagValue.contains(":"),
         s"Full name should contain colon: $tagValue"
@@ -136,7 +156,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
-      val tagValue = content.get("tag")
+      val tagValue = stringField(content.get, "tag").get
 
       // Should NOT contain groupId prefix with short names
       assert(
@@ -157,14 +177,14 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     val packageTags = findPackageTags(storage)
 
-    // Each tag should have tag:from -> packages and tag:to -> some artifact
+    // Each tag should have tag:from -> tags and tag:to -> some artifact
     packageTags.foreach { tagItem =>
       val edges = tagItem.connections
 
-      val hasTagFromPackages = edges.exists { case (edgeType, target) =>
-        edgeType == EdgeType.tagFrom && target == "packages"
+      val hasTagFromTags = edges.exists { case (edgeType, target) =>
+        edgeType == EdgeType.tagFrom && target == "tags"
       }
-      assert(hasTagFromPackages, s"Tag should have tag:from -> packages edge")
+      assert(hasTagFromTags, s"Tag should have tag:from -> tags edge")
 
       val hasTagToArtifact = edges.exists { case (edgeType, _) =>
         edgeType == EdgeType.tagTo
@@ -222,7 +242,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
-      val dateOpt = content.get.get("date")
+      val dateOpt = stringField(content.get, "date")
 
       // Date should be present and valid ISO 8601
       assert(dateOpt.isDefined, "Should extract build date")
@@ -284,13 +304,14 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     // Find tag with "bigtent" in name
     val bigtentTag = packageTags.find { tagItem =>
-      extractTagContent(tagItem).get.get("tag").exists(_.contains("bigtent"))
+      stringField(extractTagContent(tagItem).get, "tag")
+        .exists(_.contains("bigtent"))
     }
 
     assert(bigtentTag.isDefined, "Should have bigtent tag")
 
     val content = extractTagContent(bigtentTag.get)
-    val tagValue = content.get("tag")
+    val tagValue = stringField(content.get, "tag").get
 
     // Docker tag format should be repository:tag
     assert(tagValue.contains(":"), s"Should have colon separator: $tagValue")
@@ -320,7 +341,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     packageTags.foreach { tagItem =>
       val content = extractTagContent(tagItem)
-      val dateOpt = content.get.get("date")
+      val dateOpt = stringField(content.get, "date")
 
       assert(dateOpt.isDefined, "Should have date from Docker config")
       val dateStr = dateOpt.get
@@ -347,7 +368,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     // This image contains postgres, bigtent, and grinder
     val tagNames = packageTags.flatMap { tagItem =>
-      extractTagContent(tagItem).get.get("tag")
+      stringField(extractTagContent(tagItem).get, "tag")
     }
 
     assert(tagNames.exists(_.contains("postgres")), "Should have postgres tag")
@@ -397,7 +418,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
         )
 
         // Version is optional - may or may not be present
-        fields.get("version").foreach { version =>
+        stringField(fields, "version").foreach { version =>
           assert(
             version.nonEmpty,
             s"$strategyName: Version should not be empty if present"
@@ -407,7 +428,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
     }
   }
 
-  test("Packages index - created on-demand when package-tags enabled") {
+  test("Tags index - contains package tags when package-tags enabled") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Config(packageTags = true)
@@ -415,15 +436,18 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
 
-    val packagesItem = storage.read("packages")
-    assert(packagesItem.isDefined, "Should create packages index")
+    val tagsItem = storage.read("tags")
+    assert(tagsItem.isDefined, "Should create tags index")
 
-    // Should have tag:to edges to all package tags
-    val tagEdges = packagesItem.get.connections.filter(_._1 == EdgeType.tagTo)
-    assert(tagEdges.nonEmpty, "Packages index should have tag:to edges")
+    // Should have tag:to edges to package tags
+    val tagEdges = tagsItem.get.connections.filter(_._1 == EdgeType.tagTo)
+    assert(
+      tagEdges.nonEmpty,
+      "Tags index should have tag:to edges to package tags"
+    )
   }
 
-  test("Packages index - not created when package-tags disabled") {
+  test("Tags index - no package tag edges when package-tags disabled") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Config(packageTags = false)
@@ -431,10 +455,11 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
     val strategies = ToProcess.strategyForDirectory(source, false, None)
     val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
 
-    val packagesItem = storage.read("packages")
+    // Without --tag or --package-tags, tags index should not exist
+    val tagsItem = storage.read("tags")
     assert(
-      packagesItem.isEmpty,
-      "Should NOT create packages index when disabled"
+      tagsItem.isEmpty,
+      "Should NOT create tags index when neither --tag nor --package-tags enabled"
     )
   }
 }
