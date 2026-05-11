@@ -89,7 +89,9 @@ case class Config(
     filenameFilter: IncludeExclude = IncludeExclude(),
     componentArgs: Map[String, Vector[Array[String]]] = Map(),
     printComponentArgumentInfo: Boolean = false,
-    printComponentInfo: Boolean = false
+    printComponentInfo: Boolean = false,
+    packageTags: Boolean = false,
+    packageTagsShortName: Boolean = false
 ) {
 
   /** Build a list of file list builders from the configuration.
@@ -274,7 +276,13 @@ object Config {
         .action((_, c) => c.copy(printComponentInfo = true)),
       opt[Unit]("print-component-arg-help")
         .text("print component argument help")
-        .action((_, c) => c.copy(printComponentArgumentInfo = true))
+        .action((_, c) => c.copy(printComponentArgumentInfo = true)),
+      opt[Unit]("package-tags")
+        .text("Create per-package tags for identified packages")
+        .action((_, c) => c.copy(packageTags = true)),
+      opt[Unit]("package-tags-short-name")
+        .text("Use short package names (e.g., artifactId) instead of full qualified names")
+        .action((_, c) => c.copy(packageTagsShortName = true))
     )
   }
 

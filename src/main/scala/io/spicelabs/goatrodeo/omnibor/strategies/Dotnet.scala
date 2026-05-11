@@ -8,6 +8,7 @@ import io.spicelabs.cilantro.CSVersion
 import io.spicelabs.cilantro.CustomAttribute
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
+import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
@@ -283,6 +284,21 @@ class DotnetState(
   ): DotnetState = {
     streamOpt.foreach(fs => fs.close())
     DotnetState()
+  }
+
+  /** Generate per-package tag info for .NET assemblies.
+    */
+  override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
+    assemblyOpt.map { assembly =>
+      val name = assembly.name.name
+      val version = assembly.name.version.toString()
+      
+      PackageTagInfo(
+        name = name,
+        version = Some(version),
+        date = None // .NET assemblies don't have built-in build dates
+      )
+    }
   }
 }
 

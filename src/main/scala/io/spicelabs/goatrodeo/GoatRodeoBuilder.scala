@@ -220,6 +220,26 @@ class GoatRodeoBuilder {
     this
   }
 
+  /** Enable per-package tagging.
+    *
+    * @return
+    *   this builder
+    */
+  def withPackageTags(): GoatRodeoBuilder = {
+    config = config.copy(packageTags = true)
+    this
+  }
+
+  /** Use short package names (e.g., artifactId) instead of full qualified names.
+    *
+    * @return
+    *   this builder
+    */
+  def withPackageTagsShortName(): GoatRodeoBuilder = {
+    config = config.copy(packageTagsShortName = true)
+    this
+  }
+
   /** Add a MIME type filter predicate.
     *
     * @param filter
@@ -294,6 +314,8 @@ class GoatRodeoBuilder {
       case "tempDir"        => withTempDir(value)
       case "tag-json"       => withTagJson(value)
       case "tag"            => withTag(value)
+      case "package-tags"   => withPackageTags()
+      case "package-tags-short-name" => withPackageTagsShortName()
       case "mimeFilter"     => withMimeFilter(value)
       case "mimeFilterFile" => withMimeFilterFile(value)
       case "emitJsonDir" =>

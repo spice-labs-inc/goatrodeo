@@ -24,6 +24,11 @@ This document describes how Goat Rodeo works and how to tune parameters.
   use the RAM disk as the `tempdir`
 * `--tag` : create a `tags` Item and link to `{iso 8601 date}/{text after tag param}` Item and link each Item representing a found file
   to that Item. This allows for the identification of all the top level files in a Goat Rodeo run on a particular day.
+* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet). Each package gets a tag Item
+  with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
+  is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.
+* `--package-tags-short-name` : Use short package names (e.g., `artifactId` for Maven) instead of fully qualified names
+  (e.g., `groupId:artifactId`). Applies when `--package-tags` is enabled.
 * `--ingested` : Append all the ingested files to this file on successful completion
 * `--ignore` : A file containing paths to ignore, likely because they have been processed in the past. This can be used in conjunction
   with `--ingested` (they can point to the same file) to record the files that were processed by Goat Rodeo such that those files

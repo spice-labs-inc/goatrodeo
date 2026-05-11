@@ -67,3 +67,5 @@ test_data/iso_tests/*
 test_data/gem_tests/*
 test_data/download/*
 
+/housekeeping/
+

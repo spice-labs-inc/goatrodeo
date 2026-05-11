@@ -6,6 +6,7 @@ import io.spicelabs.baharat.Package
 import io.spicelabs.baharat.PackageReader
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
+import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
@@ -236,6 +237,23 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       store: Storage,
       marker: SingleMarker
   ): BaharatState = this
+
+  /** Generate per-package tag info for Baharat packages.
+    */
+  override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
+    val metadata = pkg.metadata()
+    val buildTime = metadata.buildTime()
+    
+    val date: Option[java.util.Date] = buildTime.toScala.map { instant =>
+      new java.util.Date(instant.toEpochMilli())
+    }
+    
+    Some(PackageTagInfo(
+      name = metadata.name(),
+      version = Some(metadata.version()),
+      date = date
+    ))
+  }
 
   // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].
   // These three cases are the most common output from metadata and the output of thisfunction
