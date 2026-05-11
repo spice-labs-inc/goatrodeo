@@ -238,13 +238,15 @@ case class DockerState(
       } yield tag
       
       repoTags.headOption.flatMap { tag =>
-        val (base, versionOpt) = tag.lastIndexOf(":") match {
-          case x if x > 0 => (tag.substring(0, x), Some(tag.substring(x + 1)))
-          case _ => (tag, None)
+        // For Docker, the tag includes both repository and version (e.g., "bigtent:2025_03_22")
+        // We extract the version portion but keep the full repository:tag as the name
+        val versionOpt = tag.lastIndexOf(":") match {
+          case x if x > 0 => Some(tag.substring(x + 1))
+          case _ => None
         }
         
         Some(PackageTagInfo(
-          name = base,
+          name = tag, // Use full repository:tag format
           version = versionOpt,
           date = None // Docker config doesn't consistently have created date in manifest.json
         ))
