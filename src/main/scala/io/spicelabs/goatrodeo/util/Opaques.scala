@@ -329,6 +329,58 @@ object Opaques {
     def startsWith(prefix: String): Boolean =
       Gitoid.toUrlString(g).startsWith(prefix)
   }
+
+  /** A canonical Package URL (https://github.com/package-url/purl-spec).
+    *
+    * Internally just the canonical `String` — `PackageURL` objects are
+    * ephemeral and we never carry them around in long-lived state; the
+    * canonical form is the wire format and the in-memory representation alike.
+    * The opaque type adds compile-time type safety at API boundaries (so a
+    * stray non-pURL String can't end up in a pURL position) without changing
+    * any byte on disk or in memory. */
+  opaque type PackageUrl = String
+
+  object PackageUrl {
+
+    /** Wrap a canonical `pkg:...` String. Validates by round-tripping the
+      * input through `com.github.packageurl.PackageURL` and re-canonicalising;
+      * throws `IllegalArgumentException` if the input is malformed or not
+      * already in canonical form. */
+    def apply(canonical: String): PackageUrl = {
+      val parsed = new com.github.packageurl.PackageURL(canonical)
+      val again = parsed.canonicalize()
+      if (again != canonical)
+        throw new IllegalArgumentException(
+          s"Not a canonical PackageURL: '$canonical' canonicalises to '$again'"
+        )
+      canonical
+    }
+
+    /** Wrap a `PackageURL` directly — the common case in production where
+      * we build pURLs via `PackageURLBuilder`. */
+    def apply(purl: com.github.packageurl.PackageURL): PackageUrl =
+      purl.canonicalize()
+
+    given Ordering[PackageUrl] = Ordering.String
+
+    given Encoder[PackageUrl] =
+      Encoder.forString.asInstanceOf[Encoder[PackageUrl]]
+    given Decoder[PackageUrl] =
+      Decoder.forString.asInstanceOf[Decoder[PackageUrl]]
+  }
+
+  extension (p: PackageUrl) {
+    /** The canonical `pkg:...` String form. */
+    def apply(): String = p
+
+    /** Parse the canonical form back into a mutable `PackageURL` object for
+      * field access (`getType`, `getNamespace`, `getQualifiers`, etc.). */
+    def parsed: com.github.packageurl.PackageURL =
+      new com.github.packageurl.PackageURL(p)
+
+    def startsWith(prefix: String): Boolean = (p: String).startsWith(prefix)
+  }
 }
 
 export Opaques.Gitoid
+export Opaques.PackageUrl

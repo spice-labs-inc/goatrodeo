@@ -19,6 +19,7 @@ import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PackageUrl
 
 import java.io.BufferedOutputStream
 import java.io.File
@@ -110,9 +111,9 @@ trait Storage {
   /** Get the purls
     *
     * @return
-    *   the purls
+    *   the purls (each a validated canonical pURL string)
     */
-  def purls(): TreeSet[String]
+  def purls(): TreeSet[PackageUrl]
 
   def emitRootsToDir(dir: File): Unit = {
     dir.mkdirs()
@@ -221,9 +222,8 @@ class MemStorage(val targetDir: Option[File])
   // synchronize access to the database
   private val dbSync = new Object()
   private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
-  private var thePurls: AtomicReference[TreeSet[String]] = AtomicReference(
-    TreeSet()
-  )
+  private var thePurls: AtomicReference[TreeSet[PackageUrl]] =
+    AtomicReference(TreeSet())
   private val locks: java.util.HashMap[String, AtomicInteger] =
     java.util.HashMap()
   def keys(): Set[String] = {
@@ -246,12 +246,12 @@ class MemStorage(val targetDir: Option[File])
     */
   def addPurl(purl: PackageURL): Unit = {
     thePurls.synchronized {
-      val next = thePurls.get() + purl.canonicalize()
+      val next = thePurls.get() + PackageUrl(purl)
       thePurls.set(next)
     }
   }
 
-  def purls(): TreeSet[String] = thePurls.get()
+  def purls(): TreeSet[PackageUrl] = thePurls.get()
 
   override def size(): Int = db.get().size
 
@@ -326,7 +326,7 @@ class MemStorage(val targetDir: Option[File])
     db.set(Map()); locks.clear()
   }
 
-  def getPurls(): Set[String] = {
+  def getPurls(): Set[PackageUrl] = {
     thePurls.synchronized {
       thePurls.get()
     }

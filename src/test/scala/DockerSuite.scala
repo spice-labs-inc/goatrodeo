@@ -12,6 +12,7 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Gitoid
+import io.spicelabs.goatrodeo.util.PackageUrl
 import org.json4s.*
 import org.json4s.JsonAST.*
 import org.json4s.native.*
@@ -49,7 +50,7 @@ class DockerSuite extends munit.FunSuite {
 
     assertEquals(
       result,
-      TreeSet("pkg:docker/bigtent@2025_03_22")
+      TreeSet(PackageUrl("pkg:docker/bigtent@2025_03_22"))
     )
 
     val item = store1.read("pkg:docker/bigtent@2025_03_22").get
@@ -94,12 +95,12 @@ class DockerSuite extends munit.FunSuite {
 
     val result = store1.purls().filter(_.startsWith("pkg:docker"))
     val expectedpurls = TreeSet(
-      "pkg:docker/postgres@16.6",
-      "pkg:docker/postgres@9.6.12",
-      "pkg:docker/spicelabs%2Fbigtent@0.8.3",
-      "pkg:docker/spicelabs%2Fbigtent@latest",
-      "pkg:docker/spicelabs%2Fgrinder@0.1.0",
-      "pkg:docker/spicelabs%2Fgrinder@latest"
+      PackageUrl("pkg:docker/postgres@16.6"),
+      PackageUrl("pkg:docker/postgres@9.6.12"),
+      PackageUrl("pkg:docker/spicelabs%2Fbigtent@0.8.3"),
+      PackageUrl("pkg:docker/spicelabs%2Fbigtent@latest"),
+      PackageUrl("pkg:docker/spicelabs%2Fgrinder@0.1.0"),
+      PackageUrl("pkg:docker/spicelabs%2Fgrinder@latest")
     )
 
     assertEquals(result, expectedpurls)
@@ -107,7 +108,7 @@ class DockerSuite extends munit.FunSuite {
     for {
       purl <- expectedpurls
     } {
-      val item = store1.read(purl).get
+      val item = store1.read(purl()).get
       val aliasTo = item.connections
         .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
         .headOption

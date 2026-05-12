@@ -205,7 +205,7 @@ class StorageTestSuite extends munit.FunSuite {
 
     val purls = storage.purls()
     assertEquals(purls.size, 1)
-    assert(purls.contains(purl.canonicalize()))
+    assert(purls.contains(io.spicelabs.goatrodeo.util.PackageUrl(purl)))
   }
 
   test("MemStorage - purls returns all added purls") {

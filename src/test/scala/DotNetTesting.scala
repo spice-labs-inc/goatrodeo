@@ -245,6 +245,6 @@ class DotNetTesting extends munit.FunSuite {
 
     val result = store1.purls()
     assertEquals(result.size, 1)
-    result.foreach(s => assertEquals(s, "pkg:nuget/BDInfo@0.8.0"))
+    result.foreach(s => assertEquals(s(), "pkg:nuget/BDInfo@0.8.0"))
   }
 }
