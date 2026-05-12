@@ -525,7 +525,7 @@ the performance, all instances of the terminal are sharing a single process."""
       mainItemKey: String
   ): ItemMetaData = {
     val purls = store.purls()
-    assertEquals(TreeSet(expectedPurl), purls)
+    assertEquals(TreeSet(io.spicelabs.goatrodeo.util.PackageUrl(expectedPurl)), purls)
     val mainItemOpt = store.read(mainItemKey)
     assert(mainItemOpt.isDefined)
     val metadataOpt = mainItemOpt.get.bodyAsItemMetaData
