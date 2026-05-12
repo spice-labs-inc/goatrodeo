@@ -56,7 +56,7 @@ class CertificatesAssertionsTests extends FunSuite {
     val connections =
       TreeSet.from(purls.map(p => EdgeType.aliasFrom -> p))
     Item(
-      identifier = Gitoid("gitoid:blob:sha256:test"),
+      identifier = "gitoid:blob:sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
       connections = connections,
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(
@@ -166,9 +166,9 @@ class CertificatesAssertionsTests extends FunSuite {
   test("purlsOf does not include non-pkg: edges") {
     // alias:from edges may legitimately carry gitoid: hashes too.
     val item = Item(
-      identifier = Gitoid("gitoid:blob:sha256:test"),
+      identifier = "gitoid:blob:sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
       connections = TreeSet(
-        EdgeType.aliasFrom -> "gitoid:blob:sha1:hashA",
+        EdgeType.aliasFrom -> "gitoid:blob:sha1:7bec97ea6269f46f9778a3b063c2fddb74f48730",
         EdgeType.aliasFrom -> "pkg:generic/x509/spki-sha256@abc"
       ),
       bodyMimeType = Some(ItemMetaData.mimeType),

@@ -76,7 +76,7 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
     FileWrapper(f, f.getName, None)
 
   private def stubItem(): Item = Item(
-    identifier = Gitoid("gitoid:blob:sha256:phase7-prop-stub"),
+    identifier = "gitoid:blob:sha256:d589945ab6586fdfdfc7c727c260e7dfe63f6520df3e5de4c1d88b470d9e6f28",
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

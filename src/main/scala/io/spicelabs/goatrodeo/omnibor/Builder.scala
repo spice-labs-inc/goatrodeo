@@ -268,7 +268,7 @@ object Builder {
           "tags",
           item =>
             Some(
-              Item(Gitoid("tags"), TreeSet(EdgeType.tagTo -> tag.gitoid()), None, None)
+              Item(Item.tagsRootIdentifier, TreeSet(EdgeType.tagTo -> tag.gitoid()), None, None)
             ),
           item => "set up tags"
         )
@@ -277,7 +277,7 @@ object Builder {
           item =>
             Some(
               Item(
-                tag.gitoid,
+                tag.gitoid(),
                 TreeSet(EdgeType.tagFrom -> "tags"),
                 Some(ItemTagData.mimeType),
                 Some(ItemTagData(tag.json))

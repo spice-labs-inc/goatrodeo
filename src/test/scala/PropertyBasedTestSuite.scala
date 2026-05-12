@@ -138,7 +138,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     metadata <-
       if (hasMetadata) genItemMetaData.map(Some(_)) else Gen.const(None)
   } yield Item(
-    identifier = Gitoid(identifier),
+    identifier = identifier,
     connections = connections,
     bodyMimeType = metadata.map(_ => ItemMetaData.mimeType),
     body = metadata
@@ -181,7 +181,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     forAll(genItemMetaData) { metadata =>
       val encoded = metadata.encodeCBOR()
       val item = Item(
-        identifier = Gitoid("gitoid:blob:sha256:" + "a" * 64),
+        identifier = "gitoid:blob:sha256:" + "a" * 64,
         connections = TreeSet(),
         bodyMimeType = Some(ItemMetaData.mimeType),
         body = Some(metadata)
@@ -465,8 +465,8 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   property("Different identifiers produce different MD5s") {
     forAll(genItem, genGitOID) { (item, newId) =>
-      if (item.identifier() != newId) {
-        val item2 = item.copy(identifier = Gitoid(newId))
+      if (item.identifier != newId) {
+        val item2 = item.copy(identifier = newId)
         !item.identifierMD5().sameElements(item2.identifierMD5())
       } else {
         true

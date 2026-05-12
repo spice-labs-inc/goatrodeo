@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.GitOIDUtils.HashType
 import io.spicelabs.goatrodeo.util.GitOIDUtils.ObjectType
+import io.spicelabs.goatrodeo.util.GitOIDUtils.{getDigest, hashTypeName, gitoidName}
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.ByteArrayInputStream
@@ -87,20 +88,20 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
   // ==================== HashType Tests ====================
 
   test("HashType.hashTypeName - returns sha1 for SHA1") {
-    assertEquals(HashType.SHA1.hashTypeName(), "sha1")
+    assertEquals(HashType.Sha1.hashTypeName(), "sha1")
   }
 
   test("HashType.hashTypeName - returns sha256 for SHA256") {
-    assertEquals(HashType.SHA256.hashTypeName(), "sha256")
+    assertEquals(HashType.Sha256.hashTypeName(), "sha256")
   }
 
   test("HashType.getDigest - returns SHA1 digest") {
-    val digest = HashType.SHA1.getDigest()
+    val digest = HashType.Sha1.getDigest()
     assertEquals(digest.getAlgorithm(), "SHA-1")
   }
 
   test("HashType.getDigest - returns SHA256 digest") {
-    val digest = HashType.SHA256.getDigest()
+    val digest = HashType.Sha256.getDigest()
     assertEquals(digest.getAlgorithm(), "SHA-256")
   }
 
@@ -118,7 +119,7 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
     val input = "hello"
     val bytes = input.getBytes("UTF-8")
     val stream = new ByteArrayInputStream(bytes)
-    val result = GitOIDUtils.computeGitOID(stream, bytes.length, HashType.SHA1)
+    val result = GitOIDUtils.computeGitOID(stream, bytes.length, HashType.Sha1)
     assertEquals(result.length, 20, "SHA1 should produce 20 bytes")
   }
 
@@ -162,18 +163,18 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
     val input = "test"
     val bytes = input.getBytes("UTF-8")
     val stream = new ByteArrayInputStream(bytes)
-    val result = GitOIDUtils.url(stream, bytes.length, HashType.SHA256)
+    val result = GitOIDUtils.url(stream, bytes.length, HashType.Sha256)
     assert(result.startsWith("gitoid:blob:sha256:"))
-    assertEquals(result.length, "gitoid:blob:sha256:".length + 64)
+    assertEquals(result().length, "gitoid:blob:sha256:".length + 64)
   }
 
   test("url - generates SHA1 URL") {
     val input = "test"
     val bytes = input.getBytes("UTF-8")
     val stream = new ByteArrayInputStream(bytes)
-    val result = GitOIDUtils.url(stream, bytes.length, HashType.SHA1)
+    val result = GitOIDUtils.url(stream, bytes.length, HashType.Sha1)
     assert(result.startsWith("gitoid:blob:sha1:"))
-    assertEquals(result.length, "gitoid:blob:sha1:".length + 40)
+    assertEquals(result().length, "gitoid:blob:sha1:".length + 40)
   }
 
   test("url - generates tree object URL") {
@@ -181,7 +182,7 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
     val bytes = input.getBytes("UTF-8")
     val stream = new ByteArrayInputStream(bytes)
     val result =
-      GitOIDUtils.url(stream, bytes.length, HashType.SHA256, ObjectType.Tree)
+      GitOIDUtils.url(stream, bytes.length, HashType.Sha256, ObjectType.Tree)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 
@@ -191,7 +192,7 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
   }
 
   test("urlForString - generates SHA1 URL") {
-    val result = GitOIDUtils.urlForString("test", HashType.SHA1)
+    val result = GitOIDUtils.urlForString("test", HashType.Sha1)
     assert(result.startsWith("gitoid:blob:sha1:"))
   }
 
@@ -243,15 +244,15 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
   test("merkleTreeFromGitoids - computes tree hash from gitoids") {
     val gitoids: Vector[Gitoid] = Vector(
       Gitoid("gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
-      Gitoid("gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2")
+      Gitoid("gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2")
     )
     val result = GitOIDUtils.merkleTreeFromGitoids(gitoids)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 
   test("merkleTreeFromGitoids - sorts gitoids before hashing") {
-    val gitoids1: Vector[Gitoid] = Vector(Gitoid("aaaa"), Gitoid("bbbb"))
-    val gitoids2: Vector[Gitoid] = Vector(Gitoid("bbbb"), Gitoid("aaaa"))
+    val gitoids1: Vector[Gitoid] = Vector(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("aaaa"), io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("bbbb"))
+    val gitoids2: Vector[Gitoid] = Vector(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("bbbb"), io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("aaaa"))
     val result1 = GitOIDUtils.merkleTreeFromGitoids(gitoids1)
     val result2 = GitOIDUtils.merkleTreeFromGitoids(gitoids2)
     assertEquals(result1, result2, "Order should not matter")
@@ -264,14 +265,14 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
   }
 
   test("merkleTreeFromGitoids - handles single gitoid") {
-    val gitoids: Vector[Gitoid] = Vector(Gitoid("aabbccdd"))
+    val gitoids: Vector[Gitoid] = Vector(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("aabbccdd"))
     val result = GitOIDUtils.merkleTreeFromGitoids(gitoids)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 
   test("merkleTreeFromGitoids - can use SHA1") {
-    val gitoids: Vector[Gitoid] = Vector(Gitoid("aabbccdd"), Gitoid("eeff0011"))
-    val result = GitOIDUtils.merkleTreeFromGitoids(gitoids, HashType.SHA1)
+    val gitoids: Vector[Gitoid] = Vector(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("aabbccdd"), io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("eeff0011"))
+    val result = GitOIDUtils.merkleTreeFromGitoids(gitoids, HashType.Sha1)
     assert(result.startsWith("gitoid:tree:sha1:"))
   }
 
@@ -293,8 +294,8 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
 
   test("url - empty content produces valid URL") {
     val stream = new ByteArrayInputStream(Array[Byte]())
-    val result = GitOIDUtils.url(stream, 0, HashType.SHA256)
+    val result = GitOIDUtils.url(stream, 0, HashType.Sha256)
     assert(result.startsWith("gitoid:blob:sha256:"))
-    assertEquals(result.length, "gitoid:blob:sha256:".length + 64)
+    assertEquals(result().length, "gitoid:blob:sha256:".length + 64)
   }
 }

@@ -33,7 +33,7 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   def createTestItem(id: String): Item = {
     Item(
-      Gitoid(id),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -206,7 +206,7 @@ class ToProcessTestSuite extends munit.FunSuite {
     val store = ToProcess.buildGraphForToProcess(
       toProcess,
       args = Config(),
-      block = Set(Gitoid("gitoid:blob:sha256:abc123"))
+      block = Set(Gitoid("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090"))
     )
 
     assert(store.size() > 0)

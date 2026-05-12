@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.*
+import io.spicelabs.goatrodeo.util.GitOIDUtils.{getDigest, hashTypeName, gitoidName}
 import io.spicelabs.goatrodeo.util.Config
 
 import java.io.ByteArrayInputStream
@@ -54,7 +55,7 @@ class MySuite extends munit.FunSuite {
 
   test("SHA256 hash produces correct hex output") {
     val txt = Array[Byte](49, 50, 51, 10)
-    val digest = GitOIDUtils.HashType.SHA256.getDigest()
+    val digest = GitOIDUtils.HashType.Sha256.getDigest()
     assertEquals(
       Helpers.toHex(digest.digest(txt)),
       "181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b"

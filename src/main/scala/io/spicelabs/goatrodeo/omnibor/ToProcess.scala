@@ -152,7 +152,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       parent: Option[ParentScope],
       augmentationByHash: Map[String, Vector[Augmentation]]
   ): ParentScope =
-    ParentScope.forAndWith(item.identifier(), parent, augmentationByHash)
+    ParentScope.forAndWith(item.identifier, parent, augmentationByHash)
 }
 
 abstract class ParentScope(
@@ -317,6 +317,12 @@ trait ToProcess {
   ): Seq[Gitoid] = {
     if (keepRunning()) {
 
+      // `blockList` is `Set[Gitoid]` (validated gitoid URLs from the user). Item
+      // identifiers, however, are plain Strings — sometimes gitoid URLs,
+      // sometimes alias hashes ("md5:..." etc.) for back-reference stubs. We
+      // compare in String space.
+      val blockListAsStrings: Set[String] = blockList.map(_())
+
       val (elements, initialState) = getElementsToProcess()
       val (finalState, ret) =
         elements.foldLeft(initialState -> Vector[Gitoid]()) {
@@ -324,7 +330,7 @@ trait ToProcess {
             val itemRaw = Item.itemFrom(artifact, parentId)
 
             // in blocklist do nothing
-            if (blockList.contains(itemRaw.identifier)) {
+            if (blockListAsStrings.contains(itemRaw.identifier)) {
               orgState -> alreadyDone
             } else {
               val aliases = itemRaw.connections.toVector
@@ -422,7 +428,7 @@ trait ToProcess {
                       item =>
                         Some(
                           Item(
-                            tagGitoid,
+                            tagGitoid(),
                             TreeSet(EdgeType.tagFrom -> "tags"),
                             Some(ItemTagData.mimeType),
                             Some(ItemTagData(tagJson))
@@ -445,7 +451,7 @@ trait ToProcess {
                           case None =>
                             Some(
                               Item(
-                                Gitoid("tags"),
+                                Item.tagsRootIdentifier,
                                 TreeSet(EdgeType.tagTo -> tagGitoid()),
                                 None,
                                 None
@@ -477,7 +483,7 @@ trait ToProcess {
                 parentScope.finalAugmentation(store, artifact, item4)
 
               // if we've seen the gitoid before we write it
-              val hasBeenSeen = store.contains(itemScope4.identifier())
+              val hasBeenSeen = store.contains(itemScope4.identifier)
 
               // update back-references for this item
               // this is *only* for the the pre-merged `Item`
@@ -494,15 +500,15 @@ trait ToProcess {
                       case Some(item) =>
                         Some(
                           item.copy(connections =
-                            item.connections + (aliasType -> itemScope4.identifier())
+                            item.connections + (aliasType -> itemScope4.identifier)
                           )
                         )
                       case None =>
                         Some(
                           Item(
-                            Gitoid(itemNeedingAlias),
+                            itemNeedingAlias,
                             // noopLocationReference,
-                            TreeSet(aliasType -> itemScope4.identifier()),
+                            TreeSet(aliasType -> itemScope4.identifier),
                             None,
                             None
                           )
@@ -523,7 +529,7 @@ trait ToProcess {
               // write
               val answerItem = store
                 .write(
-                  itemScope4.identifier(),
+                  itemScope4.identifier,
                   {
                     case None            => Some(itemScope4)
                     case Some(otherItem) => Some(otherItem.merge(itemScope4))
@@ -569,7 +575,7 @@ trait ToProcess {
                       )
                       processSet.flatMap(tp =>
                         tp.process(
-                          Some(answerItem.identifier),
+                          Some(Gitoid(answerItem.identifier)),
                           store,
                           thisParentScope,
                           None,
@@ -585,7 +591,7 @@ trait ToProcess {
               val state5 =
                 state4.postChildProcessing(childGitoids, store, marker)
 
-              state5 -> (alreadyDone :+ answerItem.identifier)
+              state5 -> (alreadyDone :+ Gitoid(answerItem.identifier))
             }
         }
 

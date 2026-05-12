@@ -32,7 +32,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       connections: TreeSet[(String, String)] = TreeSet()
   ): Item = {
     Item(
-      Gitoid(id),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
       connections,
       Some(ItemMetaData.mimeType),
       Some(
@@ -177,7 +177,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       val connections = TreeSet(
         EdgeType.aliasFrom -> "sha256:alias1",
-        EdgeType.containedBy -> "gitoid:blob:sha256:parent"
+        EdgeType.containedBy -> "gitoid:blob:sha256:e47125968b3b71049fbc4802d1e40a71ea1359decfabacf70b34588037d4ff0c"
       )
       val items = Vector(
         createTestItem(
@@ -254,7 +254,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Use simple items without metadata for reliable serialization
       val item = Item(
-        Gitoid("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
         TreeSet(),
         None,
         None
@@ -274,7 +274,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Use simple items without metadata for reliable serialization
       val item = Item(
-        Gitoid("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
         TreeSet(),
         None,
         None
@@ -296,7 +296,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Simple test with minimal items - complex items have encoding issues
       val item = Item(
-        Gitoid("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
         TreeSet(),
         None,
         None
@@ -316,7 +316,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       val connections = TreeSet(
         EdgeType.aliasFrom -> "sha256:hash1",
-        EdgeType.containedBy -> "gitoid:blob:sha256:parent123"
+        EdgeType.containedBy -> "gitoid:blob:sha256:82e3edf5f5f3a46b5f94579b61817fd9a1f356adcef5ee22da3b96ef775c4860"
       )
       val item = createTestItem(
         "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",

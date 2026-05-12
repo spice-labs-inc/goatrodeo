@@ -27,7 +27,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   def createBasicItem(id: String): Item = {
     Item(
-      Gitoid(id),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -46,7 +46,7 @@ class ItemTestSuite extends munit.FunSuite {
       connections: TreeSet[(String, String)]
   ): Item = {
     Item(
-      Gitoid(id),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
       connections,
       Some(ItemMetaData.mimeType),
       Some(
@@ -73,7 +73,7 @@ class ItemTestSuite extends munit.FunSuite {
     val bytes = item.encodeCBOR()
     val decoded = Item.decode(bytes)
     assert(decoded.isSuccess)
-    assertEquals(decoded.get.identifier(), "test-id")
+    assertEquals(decoded.get.identifier, io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("test-id"))
   }
 
   test("Item - round-trip CBOR preserves identifier") {
@@ -86,7 +86,7 @@ class ItemTestSuite extends munit.FunSuite {
   test("Item - round-trip CBOR preserves connections") {
     val connections = TreeSet(
       EdgeType.aliasFrom -> "sha256:abc123",
-      EdgeType.containedBy -> "gitoid:blob:sha256:parent"
+      EdgeType.containedBy -> "gitoid:blob:sha256:e47125968b3b71049fbc4802d1e40a71ea1359decfabacf70b34588037d4ff0c"
     )
     val item = createItemWithConnections("test-id", connections)
     val bytes = item.encodeCBOR()
@@ -123,7 +123,7 @@ class ItemTestSuite extends munit.FunSuite {
   test("Item.itemFrom - includes container if provided") {
     val data = "test content".getBytes("UTF-8")
     val wrapper = ByteWrapper(data, "test.txt", None)
-    val container: Option[Gitoid] = Some(Gitoid("gitoid:blob:sha256:parent123"))
+    val container: Option[Gitoid] = Some(Gitoid("gitoid:blob:sha256:82e3edf5f5f3a46b5f94579b61817fd9a1f356adcef5ee22da3b96ef775c4860"))
     val item = Item.itemFrom(wrapper, container)
 
     assert(
@@ -167,27 +167,27 @@ class ItemTestSuite extends munit.FunSuite {
   // ==================== isRoot Tests ====================
 
   test("Item.isRoot - returns true for root item") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
     assert(item.isRoot())
   }
 
   test("Item.isRoot - returns false for item with aliasTo") {
-    val connections = TreeSet(EdgeType.aliasTo -> "gitoid:blob:sha256:target")
+    val connections = TreeSet(EdgeType.aliasTo -> "gitoid:blob:sha256:34a04005bcaf206eec990bd9637d9fdb6725e0a0c0d4aebf003f17f4c956eb5c")
     val item = createItemWithConnections("sha256:abc123", connections)
     assert(!item.isRoot())
   }
 
   test("Item.isRoot - returns false for item with containedBy") {
     val connections =
-      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
+      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:e47125968b3b71049fbc4802d1e40a71ea1359decfabacf70b34588037d4ff0c")
     val item =
-      createItemWithConnections("gitoid:blob:sha256:abc123", connections)
+      createItemWithConnections("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090", connections)
     assert(!item.isRoot())
   }
 
   test("Item.isRoot - returns false for tags identifier") {
     val item = Item(
-      Gitoid("tags"),
+      Item.tagsRootIdentifier,
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet(), TreeSet(), 0, TreeMap()))
@@ -196,7 +196,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.isRoot - returns false for non-metadata body type") {
-    val item = Item(Gitoid("test-id"), TreeSet(), None, None)
+    val item = Item(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("test-id"), TreeSet(), None, None)
     assert(!item.isRoot())
   }
 
@@ -204,35 +204,35 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("buildListOfReferences - returns aliasTo for aliasFrom") {
     val connections = TreeSet(EdgeType.aliasFrom -> "sha256:abc123")
-    val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
+    val item = createItemWithConnections("gitoid:blob:sha256:0d6e4079e36703ebd37c00722f5891d28b0e2811dc114b129215123adcce3605", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
     assert(refs.contains(EdgeType.aliasTo -> "sha256:abc123"))
   }
 
   test("buildListOfReferences - returns buildsTo for builtFrom") {
-    val connections = TreeSet(EdgeType.builtFrom -> "gitoid:blob:sha256:source")
-    val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
+    val connections = TreeSet(EdgeType.builtFrom -> "gitoid:blob:sha256:41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d")
+    val item = createItemWithConnections("gitoid:blob:sha256:0d6e4079e36703ebd37c00722f5891d28b0e2811dc114b129215123adcce3605", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
-    assert(refs.contains(EdgeType.buildsTo -> "gitoid:blob:sha256:source"))
+    assert(refs.contains(EdgeType.buildsTo -> "gitoid:blob:sha256:41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d"))
   }
 
   test("buildListOfReferences - returns contains for containedBy") {
     val connections =
-      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
-    val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
+      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:e47125968b3b71049fbc4802d1e40a71ea1359decfabacf70b34588037d4ff0c")
+    val item = createItemWithConnections("gitoid:blob:sha256:0d6e4079e36703ebd37c00722f5891d28b0e2811dc114b129215123adcce3605", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
-    assert(refs.contains(EdgeType.contains -> "gitoid:blob:sha256:parent"))
+    assert(refs.contains(EdgeType.contains -> "gitoid:blob:sha256:e47125968b3b71049fbc4802d1e40a71ea1359decfabacf70b34588037d4ff0c"))
   }
 
   test("buildListOfReferences - returns tagTo for tagFrom") {
-    val connections = TreeSet(EdgeType.tagFrom -> "gitoid:blob:sha256:tag")
-    val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
+    val connections = TreeSet(EdgeType.tagFrom -> "gitoid:blob:sha256:2a1073a6e67f0e5f09a5957c659503c690efe7272be8313df872556a9a684d8c")
+    val item = createItemWithConnections("gitoid:blob:sha256:0d6e4079e36703ebd37c00722f5891d28b0e2811dc114b129215123adcce3605", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
-    assert(refs.contains(EdgeType.tagTo -> "gitoid:blob:sha256:tag"))
+    assert(refs.contains(EdgeType.tagTo -> "gitoid:blob:sha256:2a1073a6e67f0e5f09a5957c659503c690efe7272be8313df872556a9a684d8c"))
   }
 
   test("buildListOfReferences - handles multiple connections") {
@@ -241,7 +241,7 @@ class ItemTestSuite extends munit.FunSuite {
       EdgeType.aliasFrom -> "sha1:def",
       EdgeType.containedBy -> "parent"
     )
-    val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
+    val item = createItemWithConnections("gitoid:blob:sha256:0d6e4079e36703ebd37c00722f5891d28b0e2811dc114b129215123adcce3605", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
     assertEquals(refs.length, 3)
@@ -262,13 +262,13 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("Item.merge - merges metadata bodies") {
     val item1 = Item(
-      Gitoid("id"),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, TreeMap()))
     )
     val item2 = Item(
-      Gitoid("id"),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, TreeMap()))
@@ -285,12 +285,12 @@ class ItemTestSuite extends munit.FunSuite {
     val item2 = createBasicItem("id-2")
 
     val merged = item1.merge(item2)
-    assertEquals(merged.identifier(), "id-1")
+    assertEquals(merged.identifier, io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id-1"))
   }
 
   test("Item.merge - handles None body") {
     val item1 = createBasicItem("id")
-    val item2 = Item(Gitoid("id"), TreeSet(), None, None)
+    val item2 = Item(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"), TreeSet(), None, None)
 
     val merged = item1.merge(item2)
     assert(merged.bodyAsItemMetaData.isDefined)
@@ -301,13 +301,13 @@ class ItemTestSuite extends munit.FunSuite {
     val extra2 = TreeMap("key2" -> TreeSet(StringOrPair("val2")))
     // ItemMetaData.merge requires non-empty fileNames
     val item1 = Item(
-      Gitoid("id"),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, extra1))
     )
     val item2 = Item(
-      Gitoid("id"),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, extra2))
@@ -322,7 +322,7 @@ class ItemTestSuite extends munit.FunSuite {
   // ==================== enhanceItemWithPurls Tests ====================
 
   test("enhanceItemWithPurls - adds purl connections") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
     val purl = PackageURLBuilder
       .aPackageURL()
       .withType("deb")
@@ -337,7 +337,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("enhanceItemWithPurls - adds purl to filenames") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
     val purl = PackageURLBuilder
       .aPackageURL()
       .withType("deb")
@@ -352,13 +352,13 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("enhanceItemWithPurls - handles empty purls") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
     val enhanced = item.enhanceItemWithPurls(Seq())
     assertEquals(enhanced, item)
   }
 
   test("enhanceItemWithPurls - handles multiple purls") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
     val purl1 = PackageURLBuilder
       .aPackageURL()
       .withType("deb")
@@ -379,7 +379,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("enhanceItemWithPurls - creates body if none exists") {
-    val item = Item(Gitoid("id"), TreeSet(), None, None)
+    val item = Item(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"), TreeSet(), None, None)
     val purl = PackageURLBuilder
       .aPackageURL()
       .withType("deb")
@@ -395,7 +395,7 @@ class ItemTestSuite extends munit.FunSuite {
   // ==================== enhanceWithMetadata Tests ====================
 
   test("enhanceWithMetadata - adds extra metadata") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
     val extra = TreeMap("key" -> TreeSet(StringOrPair("value")))
 
     val enhanced = item.enhanceWithMetadata(extra = extra)
@@ -403,21 +403,21 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("enhanceWithMetadata - adds filenames") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
 
     val enhanced = item.enhanceWithMetadata(filenames = Seq("newfile.txt"))
     assert(enhanced.bodyAsItemMetaData.get.fileNames.contains("newfile.txt"))
   }
 
   test("enhanceWithMetadata - adds mime types") {
-    val item = createBasicItem("gitoid:blob:sha256:abc123")
+    val item = createBasicItem("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")
 
     val enhanced = item.enhanceWithMetadata(mimeTypes = Seq("text/plain"))
     assert(enhanced.bodyAsItemMetaData.get.mimeType.contains("text/plain"))
   }
 
   test("enhanceWithMetadata - creates body if none exists") {
-    val item = Item(Gitoid("id"), TreeSet(), None, None)
+    val item = Item(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"), TreeSet(), None, None)
 
     val enhanced = item.enhanceWithMetadata(filenames = Seq("file.txt"))
     assert(enhanced.bodyAsItemMetaData.isDefined)
@@ -426,46 +426,46 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceWithMetadata - includes parent gitoid for duplicate filenames") {
     val item = Item(
-      Gitoid("id"),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, TreeMap()))
     )
 
-    val parent: Option[Gitoid] = Some(Gitoid("gitoid:blob:sha256:parent123"))
+    val parent: Option[Gitoid] = Some(Gitoid("gitoid:blob:sha256:82e3edf5f5f3a46b5f94579b61817fd9a1f356adcef5ee22da3b96ef775c4860"))
     val enhanced = item.enhanceWithMetadata(
       maybeParent = parent,
       filenames = Seq("newfile.txt")
     )
     val fileNames = enhanced.bodyAsItemMetaData.get.fileNames
     // Should include parent-qualified filename
-    assert(fileNames.exists(_.contains("parent123")))
+    assert(fileNames.exists(_.contains("82e3edf5")))
   }
 
   // ==================== itemsToFilenameGitOIDMap Tests ====================
 
   test("itemsToFilenameGitOIDMap - creates filename to gitoid map") {
     val item1 = Item(
-      Gitoid("gitoid:blob:sha256:abc123"),
+      "gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090",
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1.txt"), TreeSet(), 100, TreeMap()))
     )
     val item2 = Item(
-      Gitoid("gitoid:blob:sha256:def456"),
+      "gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587",
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2.txt"), TreeSet(), 100, TreeMap()))
     )
 
     val map = Item.itemsToFilenameGitOIDMap(Seq(item1, item2))
-    assertEquals(map.get("file1.txt"), Some(Gitoid("gitoid:blob:sha256:abc123")))
-    assertEquals(map.get("file2.txt"), Some(Gitoid("gitoid:blob:sha256:def456")))
+    assertEquals(map.get("file1.txt"), Some(Gitoid("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")))
+    assertEquals(map.get("file2.txt"), Some(Gitoid("gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587")))
   }
 
   test("itemsToFilenameGitOIDMap - applies name filter") {
     val item = Item(
-      Gitoid("gitoid:blob:sha256:abc123"),
+      "gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090",
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -485,7 +485,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("itemsToFilenameGitOIDMap - applies mime filter") {
     val item1 = Item(
-      Gitoid("gitoid:blob:sha256:abc123"),
+      "gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090",
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -498,7 +498,7 @@ class ItemTestSuite extends munit.FunSuite {
       )
     )
     val item2 = Item(
-      Gitoid("gitoid:blob:sha256:def456"),
+      "gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587",
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -515,7 +515,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("itemsToFilenameGitOIDMap - handles items without body") {
-    val item = Item(Gitoid("id"), TreeSet(), None, None)
+    val item = Item(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"), TreeSet(), None, None)
     val map = Item.itemsToFilenameGitOIDMap(Seq(item))
     assert(map.isEmpty)
   }
@@ -528,7 +528,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.bodyAsItemMetaData - returns None for no body") {
-    val item = Item(Gitoid("id"), TreeSet(), None, None)
+    val item = Item(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor("id"), TreeSet(), None, None)
     assertEquals(item.bodyAsItemMetaData, None)
   }
 
