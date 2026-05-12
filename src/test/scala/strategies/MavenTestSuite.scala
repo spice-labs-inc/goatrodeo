@@ -41,8 +41,7 @@ class MavenTestSuite extends munit.FunSuite {
 </project>"""
 
   def createTestItem(id: String): Item = {
-    Item(
-      Gitoid(id),
+    Item(      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -227,16 +226,15 @@ class MavenTestSuite extends munit.FunSuite {
 
   test("MavenState.postChildProcessing - captures sources for Sources marker") {
     val storage = MemStorage(None)
-    val sourceItem = Item(
-      Gitoid("gitoid:blob:sha256:source123"),
+    val sourceItem = Item(      "gitoid:blob:sha256:66b242a56899be4c47f7825315f721c0401ccaeeb6410c16f8175678b3317459",
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("Source.java"), TreeSet(), 100, TreeMap()))
     )
-    storage.write(sourceItem.identifier(), _ => Some(sourceItem), _ => "")
+    storage.write(sourceItem.identifier, _ => Some(sourceItem), _ => "")
 
     val state = MavenState()
-    val kids = Some(Vector(sourceItem.identifier))
+    val kids: Some[Vector[Gitoid]] = Some(Vector(Gitoid(sourceItem.identifier)))
     val newState =
       state.postChildProcessing(kids, storage, MavenMarkers.Sources)
 

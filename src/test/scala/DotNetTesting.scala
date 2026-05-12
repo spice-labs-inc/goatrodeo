@@ -21,7 +21,7 @@ class DotNetTesting extends munit.FunSuite {
 
   def createTestItem(id: String): Item = {
     Item(
-      Gitoid(id),
+      io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(

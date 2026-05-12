@@ -163,7 +163,7 @@ case class DockerState(
 
       // Associate the item's hash with the item's gitoid/identifier
       updatedItem -> this.copy(layerToGitoidMapping =
-        this.layerToGitoidMapping + (hash -> updatedItem.identifier)
+        this.layerToGitoidMapping + (hash -> Gitoid(updatedItem.identifier))
       )
 
     case DockerMarkers.Config(info) =>
@@ -191,7 +191,7 @@ case class DockerState(
             )
           case None => None
         },
-        _.identifier()
+        _.identifier
       )
       val updatedItem = item.enhanceWithMetadata(mimeTypes =
         Vector(

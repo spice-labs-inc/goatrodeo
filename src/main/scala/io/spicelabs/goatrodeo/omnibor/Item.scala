@@ -34,7 +34,7 @@ import scala.util.Try
   *   optional metadata about this Item (either ItemMetaData or ItemTagData)
   */
 case class Item(
-    identifier: Gitoid,
+    identifier: String,
     // reference: LocationReference,
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
@@ -70,7 +70,7 @@ case class Item(
   def withConnection(edgeType: String, id: String): Item =
     this.copy(connections = this.connections + (edgeType -> id))
 
-  private lazy val md5 = Helpers.computeMD5(identifier())
+  private lazy val md5 = Helpers.computeMD5(identifier)
 
   /** Lazily cached CBOR-encoded representation of this Item. */
   lazy val cachedCBOR: Array[Byte] = Cbor.encode(this).toByteArray
@@ -90,8 +90,8 @@ case class Item(
     *   true if this Item's hash is lexicographically less than the other's
     */
   def cmpMd5(that: Item): Boolean = {
-    val myHash = Helpers.md5hashHex(identifier())
-    val thatHash = Helpers.md5hashHex(that.identifier())
+    val myHash = Helpers.md5hashHex(identifier)
+    val thatHash = Helpers.md5hashHex(that.identifier)
     myHash < thatHash
   }
 
@@ -102,7 +102,7 @@ case class Item(
   def isRoot(): Boolean = {
     if (this.bodyMimeType != Some(ItemMetaData.mimeType)) {
       false
-    } else if (this.identifier() == "tags") {
+    } else if (this.identifier == Item.tagsRootIdentifier) {
       false
     } else if (
       this.connections
@@ -169,7 +169,7 @@ case class Item(
   def createOrUpdateInStore(store: Storage, context: Item => String): Item = {
     store
       .write(
-        identifier(),
+        identifier,
         {
           case None        => Some(this)
           case Some(other) => Some(this.merge(other))
@@ -189,15 +189,15 @@ case class Item(
             case Some(item) =>
               Some(
                 item.copy(connections =
-                  item.connections + (aliasType -> this.identifier())
+                  item.connections + (aliasType -> this.identifier)
                 )
               )
             case None =>
               Some(
                 Item(
-                  Gitoid(itemNeedingAlias),
+                  itemNeedingAlias,
                   // noopLocationReference,
-                  TreeSet(aliasType -> this.identifier()),
+                  TreeSet(aliasType -> this.identifier),
                   None,
                   None
                 )
@@ -343,7 +343,7 @@ case class Item(
             case Some(parent)
                 if baseFileNames.size > 1 || (baseFileNames.size == 1 && !baseFileNames
                   .contains(name)) =>
-              Vector(name, f"${parent}/${name}")
+              Vector(name, f"${parent()}/${name}")
             case _ => Vector(name)
           }
         )
@@ -359,7 +359,7 @@ case class Item(
   }
 
   def getMd5(): Array[Byte] = this.md5
-  def getIdentifier(): String = identifier()
+  def getIdentifier(): String = identifier
   def isRootWorkItem(): Boolean = isRoot()
 }
 
@@ -367,6 +367,10 @@ case class Item(
   * utilities.
   */
 object Item {
+
+  /** The sentinel identifier used for the "tags" root Item — the Item under
+    * which per-package tag references are anchored. Not a real gitoid URL. */
+  val tagsRootIdentifier: String = "tags"
   protected val logger: Logger = Logger(getClass())
 
   /** Given an ArtifactWrapper, create an `Item` based on the hashes/gitoids for
@@ -383,7 +387,7 @@ object Item {
   def itemFrom(artifact: ArtifactWrapper, container: Option[Gitoid]): Item = {
     val (id, hashes) = GitOIDUtils.computeAllHashes(artifact)
     Item(
-      id,
+      id(),
       // Item.noopLocationReference,
       TreeSet(
         hashes.map(hash => EdgeType.aliasFrom -> hash)*
@@ -427,7 +431,7 @@ object Item {
         case _ => None.toSeq
       }
       filename <- metadata.fileNames.toSeq if nameFilter(filename)
-    } yield filename -> item.identifier
+    } yield filename -> Gitoid(item.identifier)
 
     Map(mapping*)
   }
@@ -505,7 +509,7 @@ object Item {
         assert(r.readString() == "connections")
         val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
         assert(r.readString() == "identifier")
-        val identifier = Gitoid(r.readString())
+        val identifier = r.readString()
 
         val ret = Item(
           identifier,

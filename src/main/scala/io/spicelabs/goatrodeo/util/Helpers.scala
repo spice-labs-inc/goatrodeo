@@ -1178,78 +1178,45 @@ object GitOIDUtils {
     (str.substring(0, 3), str.substring(3, 6), str.substring(6))
   }
 
-  /** The object type
-    */
-  enum ObjectType {
-    case Blob, Tree, Commit, Tag
+  // Aliases to the canonical Gitoid enums. The legacy `.gitoidName()` /
+  // `.hashTypeName()` methods are preserved via extension methods below so
+  // existing call sites keep working without source changes.
+  type ObjectType = Gitoid.ObjectType
+  val ObjectType: Gitoid.ObjectType.type = Gitoid.ObjectType
 
-    /** Get the canonical name for the Object Type
-      *
-      * @return
-      *   the canonical name for the object type
-      */
-    def gitoidName(): String = {
-      this match {
-        case Blob   => "blob"
-        case Tree   => "tree"
-        case Commit => "commit"
-        case Tag    => "tag"
-      }
+  type HashType = Gitoid.HashAlgorithm
+  val HashType: Gitoid.HashAlgorithm.type = Gitoid.HashAlgorithm
+  // Legacy enum-value names (SHA1 / SHA256) used at call sites.
+  val SHA1 = Gitoid.HashAlgorithm.Sha1
+  val SHA256 = Gitoid.HashAlgorithm.Sha256
+
+  extension (t: Gitoid.ObjectType) def gitoidName(): String = t.name
+  extension (a: Gitoid.HashAlgorithm) {
+    def hashTypeName(): String = a.name
+    def getDigest(): MessageDigest = a match {
+      case Gitoid.HashAlgorithm.Sha1   => MessageDigest.getInstance("SHA-1")
+      case Gitoid.HashAlgorithm.Sha256 => MessageDigest.getInstance("SHA-256")
     }
   }
 
-  /** Takes a set of gitoids, sorts them, converts to binary, and generates the
-    * Gitoid tree
-    *
-    * @param gitoids
-    *   the gitoids to build the tree for
-    *
-    * @return
-    *   the computed tree
-    */
+  /** Takes a set of gitoids, sorts them, and generates the merkle Gitoid tree.
+    * Each gitoid contributes its raw hash bytes directly — no hex round-trip. */
   def merkleTreeFromGitoids(
       gitoids: Vector[Gitoid],
-      hashType: HashType = HashType.SHA256
+      hashType: HashType = HashType.Sha256
   ): Gitoid = {
     val sorted = gitoids.sorted
-    val out = new ByteArrayOutputStream()
+    val md = hashType.getDigest()
+    var totalLen = 0L
+    for (gitoid <- sorted) totalLen += gitoid.hash.length
+    val prefix =
+      String.format("%s %d ", ObjectType.Tree.name, totalLen).getBytes()
+    md.update(prefix)
     for (gitoid <- sorted) {
-      Helpers.convertHexToBinaryAndAppendToStream(gitoid(), out)
+      val h = gitoid.hash.asInstanceOf[Array[Byte]]
+      md.update(h, 0, h.length)
     }
-    out.flush()
-    val ba = out.toByteArray()
-    val in = new ByteArrayInputStream(ba)
-    url(in, ba.length, hashType, ObjectType.Tree)
-  }
-
-  /** The hash type
-    */
-  enum HashType {
-    case SHA1, SHA256
-
-    /** Based on the hash type, get the MessageDigest
-      *
-      * @return
-      *   the MessageDigest for the type
-      */
-    def getDigest(): MessageDigest = {
-      this match {
-        case SHA1   => MessageDigest.getInstance("SHA-1")
-        case SHA256 => MessageDigest.getInstance("SHA-256")
-      }
-    }
-
-    /** Get the canonical name for the hash type
-      *
-      * @return
-      *   the canonical name
-      */
-    def hashTypeName(): String = {
-      this match {
-        case SHA1   => "sha1"
-        case SHA256 => "sha256"
-      }
-    }
+    Gitoid(ObjectType.Tree, hashType, md.digest())
   }
 
   /** Given an object type, String, and a hash type, compute the GitOID
@@ -1265,7 +1232,7 @@ object GitOIDUtils {
     */
   def computeGitOIDForString(
       str: String,
-      hashType: HashType = HashType.SHA256,
+      hashType: HashType = HashType.Sha256,
       tpe: ObjectType = ObjectType.Blob
   ): Array[Byte] = {
     val bytes = str.getBytes("UTF-8")
@@ -1287,7 +1254,7 @@ object GitOIDUtils {
   def computeGitOID(
       bytes: InputStream,
       len: Long,
-      hashType: HashType = HashType.SHA256,
+      hashType: HashType = HashType.Sha256,
       tpe: ObjectType = ObjectType.Blob
   ): Array[Byte] = {
     // get the prefix bytes in local encoding... which should be okay given that
@@ -1327,7 +1294,7 @@ object GitOIDUtils {
   def hashAsHex(
       bytes: InputStream,
       len: Long,
-      hashType: HashType = HashType.SHA256,
+      hashType: HashType = HashType.Sha256,
       tpe: ObjectType = ObjectType.Blob
   ): String = {
     Helpers.toHex(
@@ -1349,7 +1316,7 @@ object GitOIDUtils {
     */
   def hashAsHexForString(
       str: String,
-      hashType: HashType = HashType.SHA256,
+      hashType: HashType = HashType.Sha256,
       tpe: ObjectType = ObjectType.Blob
   ): String = {
     Helpers.toHex(
@@ -1368,16 +1335,7 @@ object GitOIDUtils {
       len: Long,
       hashType: HashType,
       tpe: ObjectType = ObjectType.Blob
-  ): Gitoid = {
-    Gitoid(
-      String.format(
-        "gitoid:%s:%s:%s",
-        tpe.gitoidName(),
-        hashType.hashTypeName(),
-        hashAsHex(inputStream, len, hashType, tpe)
-      )
-    )
-  }
+  ): Gitoid = Gitoid(tpe, hashType, computeGitOID(inputStream, len, hashType, tpe))
 
   /** A `gitoid` URL. See
     * https://www.iana.org/assignments/uri-schemes/prov/gitoid
@@ -1387,18 +1345,10 @@ object GitOIDUtils {
     */
   def urlForString(
       str: String,
-      hashType: HashType = HashType.SHA256,
+      hashType: HashType = HashType.Sha256,
       tpe: ObjectType = ObjectType.Blob
-  ): Gitoid = {
-    Gitoid(
-      String.format(
-        "gitoid:%s:%s:%s",
-        tpe.gitoidName(),
-        hashType.hashTypeName(),
-        hashAsHexForString(str, hashType, tpe)
-      )
-    )
-  }
+  ): Gitoid =
+    Gitoid(tpe, hashType, computeGitOIDForString(str, hashType, tpe))
 
   def computeAllHashes(
       theFile: ArtifactWrapper
@@ -1431,22 +1381,16 @@ object GitOIDUtils {
       }
     }
 
-    val gitoidSha256Str = Gitoid(
-      String.format(
-        "gitoid:%s:%s:%s",
-        ObjectType.Blob.gitoidName(),
-        HashType.SHA256.hashTypeName(),
-        Helpers.toHex(gitoidSha256.digest())
-      )
-    )
+    val gitoidSha256Result =
+      Gitoid(ObjectType.Blob, HashType.Sha256, gitoidSha256.digest())
 
     (
-      gitoidSha256Str,
+      gitoidSha256Result,
       Vector(
         String.format(
           "gitoid:%s:%s:%s",
           ObjectType.Blob.gitoidName(),
-          HashType.SHA1.hashTypeName(),
+          HashType.Sha1.hashTypeName(),
           Helpers.toHex(gitoidSha1.digest())
         ),
         String.format("sha1:%s", Helpers.toHex(sha1.digest())),

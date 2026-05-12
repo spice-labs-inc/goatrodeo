@@ -63,7 +63,7 @@ class PrivateKeyLogCaptureTests extends FunSuite {
   }
 
   private def stubItem(): Item = Item(
-    identifier = Gitoid("gitoid:blob:sha256:phase7-log-capture-stub"),
+    identifier = "gitoid:blob:sha256:dc88a2967453fc0e5270985c475b412dbf7f47a24432bb8cf5177441758bb0f5",
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

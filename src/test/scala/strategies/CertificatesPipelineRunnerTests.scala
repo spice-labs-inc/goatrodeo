@@ -57,7 +57,7 @@ import scala.collection.immutable.TreeSet
 class CertificatesPipelineRunnerTests extends FunSuite {
 
   private def primaryItem(id: String): Item = Item(
-    identifier = Gitoid(id),
+    identifier = io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(
@@ -71,14 +71,14 @@ class CertificatesPipelineRunnerTests extends FunSuite {
   )
 
   private def aliasStubItem(id: String): Item = Item(
-    identifier = Gitoid(id),
+    identifier = io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
     connections = TreeSet.empty,
     bodyMimeType = None,
     body = None
   )
 
   private def tagItem(id: String): Item = Item(
-    identifier = Gitoid(id),
+    identifier = io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidFor(id),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemTagData.mimeType),
     body = Some(ItemTagData(Dom.NullElem))

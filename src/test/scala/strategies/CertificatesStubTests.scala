@@ -74,7 +74,7 @@ class CertificatesStubTests extends FunSuite {
     ByteWrapper("hello goat rodeo".getBytes("UTF-8"), name, None)
 
   private def syntheticItem(): Item = Item(
-    identifier = Gitoid("gitoid:blob:sha256:phase1-stub"),
+    identifier = "gitoid:blob:sha256:a5ab2af4d45fb8b97fdfd0b9ae633211884b0f1a765c8bae85b1d5aea257b1e0",
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

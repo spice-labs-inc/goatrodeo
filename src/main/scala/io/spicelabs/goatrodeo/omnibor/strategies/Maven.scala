@@ -314,7 +314,7 @@ case class MavenState(
       } yield filename -> item
       val ret = this.copy(
         sources = Map(items*),
-        sourceGitoids = Map(items.map { case (k, v) => k -> v.identifier }*)
+        sourceGitoids = Map(items.map { case (k, v) => k -> Gitoid(v.identifier) }*)
       )
       ret
     case _ => this
@@ -352,11 +352,11 @@ case class MavenState(
       // the code that associates source with class files
       new ParentScope(augmentationByHash) {
 
-        def scopeFor(): String = item.identifier()
+        def scopeFor(): String = item.identifier
         def parentOfParentScope(): Option[ParentScope] = parentScope
 
         def parentScopeInformation(): String =
-          f"Maven/JAR Scope for ${item.identifier()}${parentScope match {
+          f"Maven/JAR Scope for ${item.identifier}${parentScope match {
               case None     => ""
               case Some(ps) => f" Parent: ${ps.parentScopeInformation()}"
             }}"
@@ -375,7 +375,7 @@ case class MavenState(
           }
         }
       }
-    case _ => ParentScope.forAndWith(item.identifier(), parentScope, Map())
+    case _ => ParentScope.forAndWith(item.identifier, parentScope, Map())
   }
 
 }
