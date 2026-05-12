@@ -17,7 +17,7 @@ package io.spicelabs.goatrodeo.omnibor
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Json
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.BufferedOutputStream
@@ -94,8 +94,10 @@ trait Storage {
     *
     * @return
     */
-  def gitoidKeys(): Set[GitOID] =
-    keys().filter(_.startsWith("gitoid:blob:sha256:"))
+  def gitoidKeys(): Set[Gitoid] =
+    keys().collect {
+      case k if k.startsWith("gitoid:blob:sha256:") => Gitoid(k)
+    }
 
   def destDirectory(): Option[File]
 

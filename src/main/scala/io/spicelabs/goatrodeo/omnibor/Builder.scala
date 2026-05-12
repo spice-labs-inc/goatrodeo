@@ -19,6 +19,7 @@ import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -148,14 +149,14 @@ object Builder {
     }
 
     // Get the gitoids to block
-    val blockGitoids: Set[String] = blockList match {
+    val blockGitoids: Set[Gitoid] = blockList match {
       case None => Set()
       case Some(file) =>
         Try {
           import scala.jdk.CollectionConverters.CollectionHasAsScala
 
           val lines = Files.readAllLines(file.toPath()).asScala.toSet
-          lines
+          lines.map(Gitoid(_))
         }.toOption match {
           case None    => Set()
           case Some(s) => s
@@ -243,7 +244,7 @@ object Builder {
       maxRecords: Int,
       queue: ConcurrentLinkedQueue[ToProcess],
       stillWorking: AtomicBoolean,
-      blockGitoids: Set[String],
+      blockGitoids: Set[Gitoid],
       cnt: AtomicInteger,
       tag: Option[TagPass],
       runningCnt: AtomicInteger,
@@ -267,12 +268,12 @@ object Builder {
           "tags",
           item =>
             Some(
-              Item("tags", TreeSet(EdgeType.tagTo -> tag.gitoid), None, None)
+              Item(Gitoid("tags"), TreeSet(EdgeType.tagTo -> tag.gitoid()), None, None)
             ),
           item => "set up tags"
         )
         storage.write(
-          tag.gitoid,
+          tag.gitoid(),
           item =>
             Some(
               Item(
@@ -563,4 +564,4 @@ object Builder {
   }
 }
 
-case class TagPass(gitoid: String, jsonStr: String, json: Dom.Element)
+case class TagPass(gitoid: Gitoid, jsonStr: String, json: Dom.Element)

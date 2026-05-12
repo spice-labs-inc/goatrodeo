@@ -648,8 +648,9 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
 
   private def stubItem(): io.spicelabs.goatrodeo.omnibor.Item = {
     import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData}
+    import io.spicelabs.goatrodeo.util.Gitoid
     Item(
-      identifier = "gitoid:blob:sha256:phase8-property-stub",
+      identifier = Gitoid("gitoid:blob:sha256:phase8-property-stub"),
       connections = TreeSet.empty,
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(

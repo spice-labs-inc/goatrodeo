@@ -17,7 +17,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
 import scala.collection.immutable.TreeMap
@@ -130,7 +130,7 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
     item -> this
 
   override def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: SingleMarker
   ): AnnattoState = this

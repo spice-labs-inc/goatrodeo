@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 
 import java.io.File
 import scala.collection.immutable.TreeMap
@@ -20,7 +21,7 @@ class DotNetTesting extends munit.FunSuite {
 
   def createTestItem(id: String): Item = {
     Item(
-      id,
+      Gitoid(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(

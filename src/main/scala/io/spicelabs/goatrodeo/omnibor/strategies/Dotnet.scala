@@ -19,7 +19,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.DotnetDetector
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.toHex
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
@@ -278,7 +278,7 @@ class DotnetState(
   ): (Item, DotnetState) = item -> this
 
   override def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: SingleMarker
   ): DotnetState = {

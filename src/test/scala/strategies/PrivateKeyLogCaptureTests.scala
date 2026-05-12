@@ -7,6 +7,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.FunSuite
 
 import java.io.File
@@ -62,7 +63,7 @@ class PrivateKeyLogCaptureTests extends FunSuite {
   }
 
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:phase7-log-capture-stub",
+    identifier = Gitoid("gitoid:blob:sha256:phase7-log-capture-stub"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

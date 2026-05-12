@@ -14,6 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+
 /** Phase 2 TDD Tests: ProcessingState.maybePackageTag contract
   *
   * These tests verify:

@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -26,7 +27,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   def createBasicItem(id: String): Item = {
     Item(
-      id,
+      Gitoid(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -45,7 +46,7 @@ class ItemTestSuite extends munit.FunSuite {
       connections: TreeSet[(String, String)]
   ): Item = {
     Item(
-      id,
+      Gitoid(id),
       connections,
       Some(ItemMetaData.mimeType),
       Some(
@@ -72,7 +73,7 @@ class ItemTestSuite extends munit.FunSuite {
     val bytes = item.encodeCBOR()
     val decoded = Item.decode(bytes)
     assert(decoded.isSuccess)
-    assertEquals(decoded.get.identifier, "test-id")
+    assertEquals(decoded.get.identifier(), "test-id")
   }
 
   test("Item - round-trip CBOR preserves identifier") {
@@ -122,12 +123,12 @@ class ItemTestSuite extends munit.FunSuite {
   test("Item.itemFrom - includes container if provided") {
     val data = "test content".getBytes("UTF-8")
     val wrapper = ByteWrapper(data, "test.txt", None)
-    val container = Some("gitoid:blob:sha256:parent123")
+    val container: Option[Gitoid] = Some(Gitoid("gitoid:blob:sha256:parent123"))
     val item = Item.itemFrom(wrapper, container)
 
     assert(
       item.connections.exists(e =>
-        e._1 == EdgeType.containedBy && e._2 == container.get
+        e._1 == EdgeType.containedBy && e._2 == container.get()
       )
     )
   }
@@ -186,7 +187,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("Item.isRoot - returns false for tags identifier") {
     val item = Item(
-      "tags",
+      Gitoid("tags"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet(), TreeSet(), 0, TreeMap()))
@@ -195,7 +196,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.isRoot - returns false for non-metadata body type") {
-    val item = Item("test-id", TreeSet(), None, None)
+    val item = Item(Gitoid("test-id"), TreeSet(), None, None)
     assert(!item.isRoot())
   }
 
@@ -261,13 +262,13 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("Item.merge - merges metadata bodies") {
     val item1 = Item(
-      "id",
+      Gitoid("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, TreeMap()))
     )
     val item2 = Item(
-      "id",
+      Gitoid("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, TreeMap()))
@@ -284,12 +285,12 @@ class ItemTestSuite extends munit.FunSuite {
     val item2 = createBasicItem("id-2")
 
     val merged = item1.merge(item2)
-    assertEquals(merged.identifier, "id-1")
+    assertEquals(merged.identifier(), "id-1")
   }
 
   test("Item.merge - handles None body") {
     val item1 = createBasicItem("id")
-    val item2 = Item("id", TreeSet(), None, None)
+    val item2 = Item(Gitoid("id"), TreeSet(), None, None)
 
     val merged = item1.merge(item2)
     assert(merged.bodyAsItemMetaData.isDefined)
@@ -300,13 +301,13 @@ class ItemTestSuite extends munit.FunSuite {
     val extra2 = TreeMap("key2" -> TreeSet(StringOrPair("val2")))
     // ItemMetaData.merge requires non-empty fileNames
     val item1 = Item(
-      "id",
+      Gitoid("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, extra1))
     )
     val item2 = Item(
-      "id",
+      Gitoid("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, extra2))
@@ -378,7 +379,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("enhanceItemWithPurls - creates body if none exists") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item(Gitoid("id"), TreeSet(), None, None)
     val purl = PackageURLBuilder
       .aPackageURL()
       .withType("deb")
@@ -416,7 +417,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("enhanceWithMetadata - creates body if none exists") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item(Gitoid("id"), TreeSet(), None, None)
 
     val enhanced = item.enhanceWithMetadata(filenames = Seq("file.txt"))
     assert(enhanced.bodyAsItemMetaData.isDefined)
@@ -425,13 +426,13 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceWithMetadata - includes parent gitoid for duplicate filenames") {
     val item = Item(
-      "id",
+      Gitoid("id"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, TreeMap()))
     )
 
-    val parent = Some("gitoid:blob:sha256:parent123")
+    val parent: Option[Gitoid] = Some(Gitoid("gitoid:blob:sha256:parent123"))
     val enhanced = item.enhanceWithMetadata(
       maybeParent = parent,
       filenames = Seq("newfile.txt")
@@ -445,26 +446,26 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("itemsToFilenameGitOIDMap - creates filename to gitoid map") {
     val item1 = Item(
-      "gitoid:blob:sha256:abc123",
+      Gitoid("gitoid:blob:sha256:abc123"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1.txt"), TreeSet(), 100, TreeMap()))
     )
     val item2 = Item(
-      "gitoid:blob:sha256:def456",
+      Gitoid("gitoid:blob:sha256:def456"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2.txt"), TreeSet(), 100, TreeMap()))
     )
 
     val map = Item.itemsToFilenameGitOIDMap(Seq(item1, item2))
-    assertEquals(map.get("file1.txt"), Some("gitoid:blob:sha256:abc123"))
-    assertEquals(map.get("file2.txt"), Some("gitoid:blob:sha256:def456"))
+    assertEquals(map.get("file1.txt"), Some(Gitoid("gitoid:blob:sha256:abc123")))
+    assertEquals(map.get("file2.txt"), Some(Gitoid("gitoid:blob:sha256:def456")))
   }
 
   test("itemsToFilenameGitOIDMap - applies name filter") {
     val item = Item(
-      "gitoid:blob:sha256:abc123",
+      Gitoid("gitoid:blob:sha256:abc123"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -484,7 +485,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("itemsToFilenameGitOIDMap - applies mime filter") {
     val item1 = Item(
-      "gitoid:blob:sha256:abc123",
+      Gitoid("gitoid:blob:sha256:abc123"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -497,7 +498,7 @@ class ItemTestSuite extends munit.FunSuite {
       )
     )
     val item2 = Item(
-      "gitoid:blob:sha256:def456",
+      Gitoid("gitoid:blob:sha256:def456"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -514,7 +515,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("itemsToFilenameGitOIDMap - handles items without body") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item(Gitoid("id"), TreeSet(), None, None)
     val map = Item.itemsToFilenameGitOIDMap(Seq(item))
     assert(map.isEmpty)
   }
@@ -527,7 +528,7 @@ class ItemTestSuite extends munit.FunSuite {
   }
 
   test("Item.bodyAsItemMetaData - returns None for no body") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item(Gitoid("id"), TreeSet(), None, None)
     assertEquals(item.bodyAsItemMetaData, None)
   }
 

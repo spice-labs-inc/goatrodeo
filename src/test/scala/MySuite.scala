@@ -321,7 +321,7 @@ class MySuite extends munit.FunSuite {
       nested,
       args = Config(),
       block = Set(
-        "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
+        Gitoid("gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4")
       )
     )
 

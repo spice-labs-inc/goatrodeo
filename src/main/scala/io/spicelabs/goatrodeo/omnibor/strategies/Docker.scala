@@ -15,7 +15,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -56,7 +56,7 @@ enum DockerMarkers extends ProcessingMarker {
   *   map of layer SHA256 hashes to their GitOIDs
   */
 case class DockerState(
-    layerToGitoidMapping: Map[String, String],
+    layerToGitoidMapping: Map[String, Gitoid],
     configInfo: Option[ManifestInfo] = None
 ) extends ProcessingState[DockerMarkers, DockerState] {
 
@@ -191,7 +191,7 @@ case class DockerState(
             )
           case None => None
         },
-        _.identifier
+        _.identifier()
       )
       val updatedItem = item.enhanceWithMetadata(mimeTypes =
         Vector(
@@ -209,7 +209,7 @@ case class DockerState(
             case None => item
             case Some(gitoid) =>
               item.copy(connections =
-                item.connections + (EdgeType.contains -> gitoid)
+                item.connections + (EdgeType.contains -> gitoid())
               )
           }
       }
@@ -220,7 +220,7 @@ case class DockerState(
   }
 
   override def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: DockerMarkers
   ): DockerState = this

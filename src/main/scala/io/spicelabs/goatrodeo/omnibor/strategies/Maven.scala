@@ -16,7 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
@@ -66,7 +66,7 @@ case class MavenState(
     pomFile: String = "",
     pomXml: NodeSeq = NodeSeq.Empty,
     sources: Map[String, Item] = Map(),
-    sourceGitoids: Map[String, GitOID] = Map(),
+    sourceGitoids: Map[String, Gitoid] = Map(),
     groupId: Option[String] = None,
     artifactId: Option[String] = None,
     version: Option[String] = None,
@@ -301,14 +301,14 @@ case class MavenState(
   ): (Item, MavenState) = item -> this
 
   override def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: MavenMarkers
   ): MavenState = (marker, kids) match {
     case (MavenMarkers.Sources, Some(kids)) =>
       val items = for {
         gitoid <- kids
-        item <- store.read(gitoid).toVector
+        item <- store.read(gitoid()).toVector
         metadata <- item.bodyAsItemMetaData.toVector
         filename <- metadata.fileNames.toVector
       } yield filename -> item
@@ -352,11 +352,11 @@ case class MavenState(
       // the code that associates source with class files
       new ParentScope(augmentationByHash) {
 
-        def scopeFor(): String = item.identifier
+        def scopeFor(): String = item.identifier()
         def parentOfParentScope(): Option[ParentScope] = parentScope
 
         def parentScopeInformation(): String =
-          f"Maven/JAR Scope for ${item.identifier}${parentScope match {
+          f"Maven/JAR Scope for ${item.identifier()}${parentScope match {
               case None     => ""
               case Some(ps) => f" Parent: ${ps.parentScopeInformation()}"
             }}"
@@ -371,11 +371,11 @@ case class MavenState(
             associatedFiles = sourceGitoids
           )
           sources.foldLeft(item) { case (item, source) =>
-            item.withConnection(EdgeType.builtFrom, source)
+            item.withConnection(EdgeType.builtFrom, source())
           }
         }
       }
-    case _ => ParentScope.forAndWith(item.identifier, parentScope, Map())
+    case _ => ParentScope.forAndWith(item.identifier(), parentScope, Map())
   }
 
 }

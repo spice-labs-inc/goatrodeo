@@ -24,6 +24,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesState
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoDetector
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
@@ -73,7 +74,7 @@ class CertificatesStubTests extends FunSuite {
     ByteWrapper("hello goat rodeo".getBytes("UTF-8"), name, None)
 
   private def syntheticItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:phase1-stub",
+    identifier = Gitoid("gitoid:blob:sha256:phase1-stub"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

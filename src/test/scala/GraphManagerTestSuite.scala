@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.omnibor.GRDWalker
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.FileInputStream
@@ -31,7 +32,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       connections: TreeSet[(String, String)] = TreeSet()
   ): Item = {
     Item(
-      id,
+      Gitoid(id),
       connections,
       Some(ItemMetaData.mimeType),
       Some(
@@ -253,7 +254,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Use simple items without metadata for reliable serialization
       val item = Item(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        Gitoid("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
         TreeSet(),
         None,
         None
@@ -273,7 +274,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Use simple items without metadata for reliable serialization
       val item = Item(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        Gitoid("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
         TreeSet(),
         None,
         None
@@ -295,7 +296,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Simple test with minimal items - complex items have encoding issues
       val item = Item(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        Gitoid("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
         TreeSet(),
         None,
         None

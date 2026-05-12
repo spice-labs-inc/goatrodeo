@@ -11,6 +11,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import org.json4s.*
 import org.json4s.JsonAST.*
 import org.json4s.native.*
@@ -23,7 +24,7 @@ class DockerSuite extends munit.FunSuite {
 
   def createTestItem(id: String): Item = {
     Item(
-      id,
+      Gitoid(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(

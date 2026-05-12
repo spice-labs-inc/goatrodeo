@@ -50,11 +50,6 @@ import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
 import scala.util.Try
 
-/** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
-  * content-addressable identifier based on Git's object hashing scheme.
-  */
-type GitOID = String
-
 /** A collection of utility functions for file I/O, hashing, byte manipulation,
   * and various helper operations used throughout the Goat Rodeo project.
   *
@@ -198,8 +193,8 @@ object Helpers {
     */
   def computeAssociatedSource(
       file: ArtifactWrapper,
-      associatedFiles: Map[String, GitOID]
-  ): TreeSet[GitOID] = {
+      associatedFiles: Map[String, Gitoid]
+  ): TreeSet[Gitoid] = {
     file.mimeType match {
       case maybeClass if javaClassMimeTypes.intersect(maybeClass).nonEmpty =>
         val sourceName: Option[String] =
@@ -1213,13 +1208,13 @@ object GitOIDUtils {
     *   the computed tree
     */
   def merkleTreeFromGitoids(
-      gitoids: Vector[String],
+      gitoids: Vector[Gitoid],
       hashType: HashType = HashType.SHA256
-  ): String = {
+  ): Gitoid = {
     val sorted = gitoids.sorted
     val out = new ByteArrayOutputStream()
     for (gitoid <- sorted) {
-      Helpers.convertHexToBinaryAndAppendToStream(gitoid, out)
+      Helpers.convertHexToBinaryAndAppendToStream(gitoid(), out)
     }
     out.flush()
     val ba = out.toByteArray()
@@ -1373,12 +1368,14 @@ object GitOIDUtils {
       len: Long,
       hashType: HashType,
       tpe: ObjectType = ObjectType.Blob
-  ): String = {
-    String.format(
-      "gitoid:%s:%s:%s",
-      tpe.gitoidName(),
-      hashType.hashTypeName(),
-      hashAsHex(inputStream, len, hashType, tpe)
+  ): Gitoid = {
+    Gitoid(
+      String.format(
+        "gitoid:%s:%s:%s",
+        tpe.gitoidName(),
+        hashType.hashTypeName(),
+        hashAsHex(inputStream, len, hashType, tpe)
+      )
     )
   }
 
@@ -1392,46 +1389,70 @@ object GitOIDUtils {
       str: String,
       hashType: HashType = HashType.SHA256,
       tpe: ObjectType = ObjectType.Blob
-  ): String = {
-    String.format(
-      "gitoid:%s:%s:%s",
-      tpe.gitoidName(),
-      hashType.hashTypeName(),
-      hashAsHexForString(str, hashType, tpe)
+  ): Gitoid = {
+    Gitoid(
+      String.format(
+        "gitoid:%s:%s:%s",
+        tpe.gitoidName(),
+        hashType.hashTypeName(),
+        hashAsHexForString(str, hashType, tpe)
+      )
     )
   }
 
   def computeAllHashes(
       theFile: ArtifactWrapper
-  ): (String, Vector[String]) = {
+  ): (Gitoid, Vector[String]) = {
+    val len = theFile.size()
+    val gitoidPrefix =
+      String.format("%s %d ", ObjectType.Blob.gitoidName(), len).getBytes()
 
-    val gitoidSha256 =
-      theFile.withStream(url(_, theFile.size(), HashType.SHA256))
+    val gitoidSha1 = MessageDigest.getInstance("SHA-1")
+    val gitoidSha256 = MessageDigest.getInstance("SHA-256")
+    val sha1 = MessageDigest.getInstance("SHA-1")
+    val sha256 = MessageDigest.getInstance("SHA-256")
+    val sha512 = MessageDigest.getInstance("SHA-512")
+    val md5 = MessageDigest.getInstance("MD5")
+
+    gitoidSha1.update(gitoidPrefix)
+    gitoidSha256.update(gitoidPrefix)
+
+    theFile.withStream { in =>
+      val buf = new Array[Byte](64 * 1024)
+      var read = in.read(buf)
+      while (read > 0) {
+        gitoidSha1.update(buf, 0, read)
+        gitoidSha256.update(buf, 0, read)
+        sha1.update(buf, 0, read)
+        sha256.update(buf, 0, read)
+        sha512.update(buf, 0, read)
+        md5.update(buf, 0, read)
+        read = in.read(buf)
+      }
+    }
+
+    val gitoidSha256Str = Gitoid(
+      String.format(
+        "gitoid:%s:%s:%s",
+        ObjectType.Blob.gitoidName(),
+        HashType.SHA256.hashTypeName(),
+        Helpers.toHex(gitoidSha256.digest())
+      )
+    )
 
     (
-      gitoidSha256,
+      gitoidSha256Str,
       Vector(
-        theFile.withStream(url(_, theFile.size(), HashType.SHA1)),
-        String
-          .format(
-            "sha1:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeSHA1(_)))
-          ),
-        String
-          .format(
-            "sha256:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeSHA256(_)))
-          ),
-        String
-          .format(
-            "sha512:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeSHA512(_)))
-          ),
-        String
-          .format(
-            "md5:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeMD5(_)))
-          )
+        String.format(
+          "gitoid:%s:%s:%s",
+          ObjectType.Blob.gitoidName(),
+          HashType.SHA1.hashTypeName(),
+          Helpers.toHex(gitoidSha1.digest())
+        ),
+        String.format("sha1:%s", Helpers.toHex(sha1.digest())),
+        String.format("sha256:%s", Helpers.toHex(sha256.digest())),
+        String.format("sha512:%s", Helpers.toHex(sha512.digest())),
+        String.format("md5:%s", Helpers.toHex(md5.digest()))
       )
     )
   }

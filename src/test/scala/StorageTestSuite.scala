@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.nio.file.Files
@@ -27,7 +28,7 @@ class StorageTestSuite extends munit.FunSuite {
 
   def createTestItem(id: String, fileNames: Set[String] = Set()): Item = {
     Item(
-      id,
+      Gitoid(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -66,7 +67,7 @@ class StorageTestSuite extends munit.FunSuite {
     storage.write("test-id", _ => Some(item), _ => "")
     val result = storage.read("test-id")
     assert(result.isDefined)
-    assertEquals(result.get.identifier, "test-id")
+    assertEquals(result.get.identifier(), "test-id")
   }
 
   test("MemStorage - write creates new item") {
@@ -74,7 +75,7 @@ class StorageTestSuite extends munit.FunSuite {
     val item = createTestItem("new-id")
     val result = storage.write("new-id", _ => Some(item), _ => "")
     assert(result.isDefined)
-    assertEquals(result.get.identifier, "new-id")
+    assertEquals(result.get.identifier(), "new-id")
   }
 
   test("MemStorage - write updates existing item") {
@@ -173,9 +174,9 @@ class StorageTestSuite extends munit.FunSuite {
 
     val gitoids = storage.gitoidKeys()
     assertEquals(gitoids.size, 1)
-    assert(gitoids.contains("gitoid:blob:sha256:abc123"))
-    assert(!gitoids.contains("sha256:def456"))
-    assert(!gitoids.contains("pkg:maven/group/artifact@1.0"))
+    assert(gitoids.contains(Gitoid("gitoid:blob:sha256:abc123")))
+    assert(!gitoids.contains(Gitoid("sha256:def456")))
+    assert(!gitoids.contains(Gitoid("pkg:maven/group/artifact@1.0")))
   }
 
   test("MemStorage - gitoidKeys returns empty for no gitoids") {
@@ -410,7 +411,7 @@ class StorageTestSuite extends munit.FunSuite {
       val storage = MemStorage(None)
       // Create a root item (no aliasTo or containedBy edges)
       val rootItem = Item(
-        "gitoid:blob:sha256:root123",
+        Gitoid("gitoid:blob:sha256:root123"),
         TreeSet(),
         Some(ItemMetaData.mimeType),
         Some(ItemMetaData(TreeSet(), TreeSet(), 100, TreeMap()))
