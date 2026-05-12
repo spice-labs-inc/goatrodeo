@@ -640,9 +640,10 @@ class PrivateKeyStrategyTests extends FunSuite {
 
   private def stubItem(): io.spicelabs.goatrodeo.omnibor.Item = {
     import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData}
+    import io.spicelabs.goatrodeo.util.Gitoid
     import scala.collection.immutable.{TreeMap, TreeSet}
     Item(
-      identifier = "gitoid:blob:sha256:phase7-test-stub",
+      identifier = Gitoid("gitoid:blob:sha256:phase7-test-stub"),
       connections = TreeSet.empty,
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(

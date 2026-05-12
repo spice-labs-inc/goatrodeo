@@ -7,6 +7,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
@@ -75,7 +76,7 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
     FileWrapper(f, f.getName, None)
 
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:phase7-prop-stub",
+    identifier = Gitoid("gitoid:blob:sha256:phase7-prop-stub"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

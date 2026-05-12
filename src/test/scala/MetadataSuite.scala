@@ -261,7 +261,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
 
     var meta = gitoids
       .map(oid => {
-        store.read(oid)
+        store.read(oid())
       })
       .flatten
       .map(item => item.body)

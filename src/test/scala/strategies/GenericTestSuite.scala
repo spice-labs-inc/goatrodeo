@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFileState
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -29,7 +30,7 @@ class GenericTestSuite extends munit.FunSuite {
 
   def createTestItem(id: String): Item = {
     Item(
-      id,
+      Gitoid(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(

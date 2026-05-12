@@ -7,6 +7,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
@@ -195,7 +196,7 @@ class PgpPropertyTests extends ScalaCheckSuite {
     * actually read the Item, but the signature requires one.
     */
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:pgp-property-test",
+    identifier = Gitoid("gitoid:blob:sha256:pgp-property-test"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

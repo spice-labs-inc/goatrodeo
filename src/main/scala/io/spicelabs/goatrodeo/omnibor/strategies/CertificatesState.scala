@@ -25,7 +25,7 @@ import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates.KVPair
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
@@ -787,7 +787,7 @@ class CertificatesState(
 
   /** Certificates never recurses into child Items. */
   override def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: SingleMarker
   ): CertificatesState = this

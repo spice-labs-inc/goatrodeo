@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.FunSuite
 
 import java.io.File
@@ -60,7 +61,7 @@ class CertificatesLeakSuite extends FunSuite {
   ).map(Pattern.compile)
 
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:phase8-leak-suite-stub",
+    identifier = Gitoid("gitoid:blob:sha256:phase8-leak-suite-stub"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

@@ -9,7 +9,7 @@ import io.bullet.borer.Reader
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -34,7 +34,7 @@ import scala.util.Try
   *   optional metadata about this Item (either ItemMetaData or ItemTagData)
   */
 case class Item(
-    identifier: String,
+    identifier: Gitoid,
     // reference: LocationReference,
     connections: TreeSet[Edge],
     @key("body_mime_type") bodyMimeType: Option[String],
@@ -70,7 +70,7 @@ case class Item(
   def withConnection(edgeType: String, id: String): Item =
     this.copy(connections = this.connections + (edgeType -> id))
 
-  private lazy val md5 = Helpers.computeMD5(identifier)
+  private lazy val md5 = Helpers.computeMD5(identifier())
 
   /** Lazily cached CBOR-encoded representation of this Item. */
   lazy val cachedCBOR: Array[Byte] = Cbor.encode(this).toByteArray
@@ -90,8 +90,8 @@ case class Item(
     *   true if this Item's hash is lexicographically less than the other's
     */
   def cmpMd5(that: Item): Boolean = {
-    val myHash = Helpers.md5hashHex(identifier)
-    val thatHash = Helpers.md5hashHex(that.identifier)
+    val myHash = Helpers.md5hashHex(identifier())
+    val thatHash = Helpers.md5hashHex(that.identifier())
     myHash < thatHash
   }
 
@@ -102,7 +102,7 @@ case class Item(
   def isRoot(): Boolean = {
     if (this.bodyMimeType != Some(ItemMetaData.mimeType)) {
       false
-    } else if (this.identifier == "tags") {
+    } else if (this.identifier() == "tags") {
       false
     } else if (
       this.connections
@@ -169,7 +169,7 @@ case class Item(
   def createOrUpdateInStore(store: Storage, context: Item => String): Item = {
     store
       .write(
-        identifier,
+        identifier(),
         {
           case None        => Some(this)
           case Some(other) => Some(this.merge(other))
@@ -189,15 +189,15 @@ case class Item(
             case Some(item) =>
               Some(
                 item.copy(connections =
-                  item.connections + (aliasType -> this.identifier)
+                  item.connections + (aliasType -> this.identifier())
                 )
               )
             case None =>
               Some(
                 Item(
-                  itemNeedingAlias,
+                  Gitoid(itemNeedingAlias),
                   // noopLocationReference,
-                  TreeSet(aliasType -> this.identifier),
+                  TreeSet(aliasType -> this.identifier()),
                   None,
                   None
                 )
@@ -311,7 +311,7 @@ case class Item(
     *   the enhanced `Item`
     */
   def enhanceWithMetadata(
-      maybeParent: Option[GitOID] = None,
+      maybeParent: Option[Gitoid] = None,
       extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap(),
       filenames: Seq[String] = Vector(),
       mimeTypes: Seq[String] = Vector()
@@ -359,7 +359,7 @@ case class Item(
   }
 
   def getMd5(): Array[Byte] = this.md5
-  def getIdentifier(): String = identifier
+  def getIdentifier(): String = identifier()
   def isRootWorkItem(): Boolean = isRoot()
 }
 
@@ -380,14 +380,14 @@ object Item {
     * @return
     *   the created item
     */
-  def itemFrom(artifact: ArtifactWrapper, container: Option[GitOID]): Item = {
+  def itemFrom(artifact: ArtifactWrapper, container: Option[Gitoid]): Item = {
     val (id, hashes) = GitOIDUtils.computeAllHashes(artifact)
     Item(
       id,
       // Item.noopLocationReference,
       TreeSet(
         hashes.map(hash => EdgeType.aliasFrom -> hash)*
-      ) ++ container.toSeq.map(c => EdgeType.containedBy -> c),
+      ) ++ container.toSeq.map(c => EdgeType.containedBy -> c()),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -418,7 +418,7 @@ object Item {
       items: Seq[Item],
       nameFilter: String => Boolean = s => true,
       mimeFilter: Set[String] => Boolean = s => true
-  ): Map[String, GitOID] = {
+  ): Map[String, Gitoid] = {
     val mapping = for {
       item <- items
       metadata <- item.body match {
@@ -505,7 +505,7 @@ object Item {
         assert(r.readString() == "connections")
         val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
         assert(r.readString() == "identifier")
-        val identifier = r.readString()
+        val identifier = Gitoid(r.readString())
 
         val ret = Item(
           identifier,

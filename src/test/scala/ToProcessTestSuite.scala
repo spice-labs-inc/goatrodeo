@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
@@ -32,7 +33,7 @@ class ToProcessTestSuite extends munit.FunSuite {
 
   def createTestItem(id: String): Item = {
     Item(
-      id,
+      Gitoid(id),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -205,7 +206,7 @@ class ToProcessTestSuite extends munit.FunSuite {
     val store = ToProcess.buildGraphForToProcess(
       toProcess,
       args = Config(),
-      block = Set("gitoid:blob:sha256:abc123")
+      block = Set(Gitoid("gitoid:blob:sha256:abc123"))
     )
 
     assert(store.size() > 0)

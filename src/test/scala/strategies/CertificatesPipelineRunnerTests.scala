@@ -18,6 +18,7 @@ import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ItemTagData
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.FunSuite
 
 import java.io.File
@@ -56,7 +57,7 @@ import scala.collection.immutable.TreeSet
 class CertificatesPipelineRunnerTests extends FunSuite {
 
   private def primaryItem(id: String): Item = Item(
-    identifier = id,
+    identifier = Gitoid(id),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(
@@ -70,14 +71,14 @@ class CertificatesPipelineRunnerTests extends FunSuite {
   )
 
   private def aliasStubItem(id: String): Item = Item(
-    identifier = id,
+    identifier = Gitoid(id),
     connections = TreeSet.empty,
     bodyMimeType = None,
     body = None
   )
 
   private def tagItem(id: String): Item = Item(
-    identifier = id,
+    identifier = Gitoid(id),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemTagData.mimeType),
     body = Some(ItemTagData(Dom.NullElem))

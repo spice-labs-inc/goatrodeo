@@ -16,7 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
@@ -233,7 +233,7 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
   ): (Item, BaharatState) = item -> this
 
   override def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: SingleMarker
   ): BaharatState = this

@@ -14,6 +14,7 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.GitOIDUtils.HashType
 import io.spicelabs.goatrodeo.util.GitOIDUtils.ObjectType
@@ -240,36 +241,36 @@ class GitOIDUtilsTestSuite extends munit.FunSuite {
   // ==================== merkleTreeFromGitoids Tests ====================
 
   test("merkleTreeFromGitoids - computes tree hash from gitoids") {
-    val gitoids = Vector(
-      "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
-      "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2"
+    val gitoids: Vector[Gitoid] = Vector(
+      Gitoid("gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+      Gitoid("gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2")
     )
     val result = GitOIDUtils.merkleTreeFromGitoids(gitoids)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 
   test("merkleTreeFromGitoids - sorts gitoids before hashing") {
-    val gitoids1 = Vector("aaaa", "bbbb")
-    val gitoids2 = Vector("bbbb", "aaaa")
+    val gitoids1: Vector[Gitoid] = Vector(Gitoid("aaaa"), Gitoid("bbbb"))
+    val gitoids2: Vector[Gitoid] = Vector(Gitoid("bbbb"), Gitoid("aaaa"))
     val result1 = GitOIDUtils.merkleTreeFromGitoids(gitoids1)
     val result2 = GitOIDUtils.merkleTreeFromGitoids(gitoids2)
     assertEquals(result1, result2, "Order should not matter")
   }
 
   test("merkleTreeFromGitoids - handles empty vector") {
-    val gitoids = Vector[String]()
+    val gitoids = Vector[Gitoid]()
     val result = GitOIDUtils.merkleTreeFromGitoids(gitoids)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 
   test("merkleTreeFromGitoids - handles single gitoid") {
-    val gitoids = Vector("aabbccdd")
+    val gitoids: Vector[Gitoid] = Vector(Gitoid("aabbccdd"))
     val result = GitOIDUtils.merkleTreeFromGitoids(gitoids)
     assert(result.startsWith("gitoid:tree:sha256:"))
   }
 
   test("merkleTreeFromGitoids - can use SHA1") {
-    val gitoids = Vector("aabbccdd", "eeff0011")
+    val gitoids: Vector[Gitoid] = Vector(Gitoid("aabbccdd"), Gitoid("eeff0011"))
     val result = GitOIDUtils.merkleTreeFromGitoids(gitoids, HashType.SHA1)
     assert(result.startsWith("gitoid:tree:sha1:"))
   }

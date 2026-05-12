@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.util.Gitoid
 import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
@@ -55,7 +56,7 @@ class CertificatesAssertionsTests extends FunSuite {
     val connections =
       TreeSet.from(purls.map(p => EdgeType.aliasFrom -> p))
     Item(
-      identifier = "gitoid:blob:sha256:test",
+      identifier = Gitoid("gitoid:blob:sha256:test"),
       connections = connections,
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(
@@ -165,7 +166,7 @@ class CertificatesAssertionsTests extends FunSuite {
   test("purlsOf does not include non-pkg: edges") {
     // alias:from edges may legitimately carry gitoid: hashes too.
     val item = Item(
-      identifier = "gitoid:blob:sha256:test",
+      identifier = Gitoid("gitoid:blob:sha256:test"),
       connections = TreeSet(
         EdgeType.aliasFrom -> "gitoid:blob:sha1:hashA",
         EdgeType.aliasFrom -> "pkg:generic/x509/spki-sha256@abc"

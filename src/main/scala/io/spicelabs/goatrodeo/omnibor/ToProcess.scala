@@ -7,7 +7,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
-import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
@@ -127,7 +127,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
     *   an updated state
     */
   def postChildProcessing(
-      kids: Option[Vector[GitOID]],
+      kids: Option[Vector[Gitoid]],
       store: Storage,
       marker: PM
   ): ME
@@ -152,7 +152,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       parent: Option[ParentScope],
       augmentationByHash: Map[String, Vector[Augmentation]]
   ): ParentScope =
-    ParentScope.forAndWith(item.identifier, parent, augmentationByHash)
+    ParentScope.forAndWith(item.identifier(), parent, augmentationByHash)
 }
 
 abstract class ParentScope(
@@ -306,20 +306,20 @@ trait ToProcess {
     * @return
     */
   def process(
-      parentId: Option[GitOID],
+      parentId: Option[Gitoid],
       store: Storage,
       parentScope: ParentScope,
       tag: Option[TagPass],
       args: Config,
-      blockList: Set[GitOID] = Set(),
+      blockList: Set[Gitoid] = Set(),
       keepRunning: () => Boolean = () => true,
-      atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
-  ): Seq[GitOID] = {
+      atEnd: (Option[Gitoid], Item) => Unit = (_, _) => ()
+  ): Seq[Gitoid] = {
     if (keepRunning()) {
 
       val (elements, initialState) = getElementsToProcess()
       val (finalState, ret) =
-        elements.foldLeft(initialState -> Vector[GitOID]()) {
+        elements.foldLeft(initialState -> Vector[Gitoid]()) {
           case ((orgState, alreadyDone), (artifact, marker)) =>
             val itemRaw = Item.itemFrom(artifact, parentId)
 
@@ -372,7 +372,7 @@ trait ToProcess {
                 case None => itemScopePre3
                 case Some(tag) =>
                   itemScopePre3.copy(connections =
-                    itemScopePre3.connections + (EdgeType.tagFrom -> tag.gitoid)
+                    itemScopePre3.connections + (EdgeType.tagFrom -> tag.gitoid())
                   )
               }
 
@@ -418,7 +418,7 @@ trait ToProcess {
 
                     // Write tag item — unified with "tags" root
                     store.write(
-                      tagGitoid,
+                      tagGitoid(),
                       item =>
                         Some(
                           Item(
@@ -439,14 +439,14 @@ trait ToProcess {
                           case Some(item) =>
                             Some(
                               item.copy(connections =
-                                item.connections + (EdgeType.tagTo -> tagGitoid)
+                                item.connections + (EdgeType.tagTo -> tagGitoid())
                               )
                             )
                           case None =>
                             Some(
                               Item(
-                                "tags",
-                                TreeSet(EdgeType.tagTo -> tagGitoid),
+                                Gitoid("tags"),
+                                TreeSet(EdgeType.tagTo -> tagGitoid()),
                                 None,
                                 None
                               )
@@ -457,7 +457,7 @@ trait ToProcess {
 
                     // Add tagFrom to main artifact
                     itemScope3.copy(connections =
-                      itemScope3.connections + (EdgeType.tagFrom -> tagGitoid)
+                      itemScope3.connections + (EdgeType.tagFrom -> tagGitoid())
                     )
                   case None => itemScope3
                 }
@@ -477,7 +477,7 @@ trait ToProcess {
                 parentScope.finalAugmentation(store, artifact, item4)
 
               // if we've seen the gitoid before we write it
-              val hasBeenSeen = store.contains(itemScope4.identifier)
+              val hasBeenSeen = store.contains(itemScope4.identifier())
 
               // update back-references for this item
               // this is *only* for the the pre-merged `Item`
@@ -494,15 +494,15 @@ trait ToProcess {
                       case Some(item) =>
                         Some(
                           item.copy(connections =
-                            item.connections + (aliasType -> itemScope4.identifier)
+                            item.connections + (aliasType -> itemScope4.identifier())
                           )
                         )
                       case None =>
                         Some(
                           Item(
-                            itemNeedingAlias,
+                            Gitoid(itemNeedingAlias),
                             // noopLocationReference,
-                            TreeSet(aliasType -> itemScope4.identifier),
+                            TreeSet(aliasType -> itemScope4.identifier()),
                             None,
                             None
                           )
@@ -523,7 +523,7 @@ trait ToProcess {
               // write
               val answerItem = store
                 .write(
-                  itemScope4.identifier,
+                  itemScope4.identifier(),
                   {
                     case None            => Some(itemScope4)
                     case Some(otherItem) => Some(otherItem.merge(itemScope4))
@@ -544,7 +544,7 @@ trait ToProcess {
 
               atEnd(parentId, answerItem)
 
-              val childGitoids: Option[Vector[GitOID]] =
+              val childGitoids: Option[Vector[Gitoid]] =
                 // if the gitoid has already been seen, do not recurse into the potential child
                 if (hasBeenSeen) None
                 else {
@@ -854,7 +854,7 @@ object ToProcess {
       store: Storage = MemStorage(None),
       args: Config,
       purlOut: PackageURL => Unit = _ => (),
-      block: Set[GitOID] = Set()
+      block: Set[Gitoid] = Set()
   ): Storage = {
 
     for { individual <- toProcess } {
@@ -895,7 +895,7 @@ object ToProcess {
       args: Config,
       store: Storage = MemStorage(None),
       purlOut: PackageURL => Unit = _ => (),
-      block: Set[GitOID] = Set()
+      block: Set[Gitoid] = Set()
   ): Storage = {
 
     // generate the strategy
