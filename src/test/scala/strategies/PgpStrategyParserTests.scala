@@ -263,7 +263,7 @@ class PgpStrategyParserTests extends FunSuite {
     val purl = Certificates.purlForPgpKey(r.keys.head).canonicalize().nn
     assertEquals(
       purl,
-      "pkg:pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4"
+      "pkg:generic/pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4"
     )
   }
 

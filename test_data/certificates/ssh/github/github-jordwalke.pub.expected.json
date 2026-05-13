@@ -7,7 +7,7 @@
     "mustContain":["application/x-openssh-public-key"]
   },
   "purls":{
-    "mustContain":["pkg:ssh/sha256@5NY%2F3SBDzW7m3D9EBijm739glqXaNEBgHlTiUCFxFRA?alg=ed25519"]
+    "mustContain":["pkg:generic/ssh/sha256@5NY%2F3SBDzW7m3D9EBijm739glqXaNEBgHlTiUCFxFRA?alg=ed25519"]
   },
   "metadata":{
     "mustContain":{

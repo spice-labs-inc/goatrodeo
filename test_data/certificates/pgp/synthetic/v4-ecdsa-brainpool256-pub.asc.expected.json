@@ -7,7 +7,7 @@
     "mustContain":["application/pgp-keys"]
   },
   "purls":{
-    "mustContain":["pkg:pgp/fingerprint@7c17c305167ef3aeffaedff35eb17155e6176ddd?alg=ec&curve=brainpoolp256r1&version=4","pkg:pgp/fingerprint@ef1d71cd7c609251485f3d071ff7ec16d8c4d8df?alg=ec&curve=brainpoolp256r1&version=4"]
+    "mustContain":["pkg:generic/pgp/fingerprint@7c17c305167ef3aeffaedff35eb17155e6176ddd?alg=ec&curve=brainpoolp256r1&version=4","pkg:generic/pgp/fingerprint@ef1d71cd7c609251485f3d071ff7ec16d8c4d8df?alg=ec&curve=brainpoolp256r1&version=4"]
   },
   "metadata":{
     "mustContain":{

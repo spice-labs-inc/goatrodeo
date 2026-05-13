@@ -38,7 +38,7 @@ import scala.collection.immutable.TreeSet
   *      any non-deterministic decode of algorithm/curve/size/ timestamps
   *      between parses. 3. *pURL canonical-form structural invariant* — every
   *      emitted pURL parses to a string that:
-  *      - starts with `pkg:pgp/fingerprint@`
+  *      - starts with `pkg:generic/pgp/fingerprint@`
   *      - contains the lowercase fingerprint hex
   *      - has alphabetically-sorted qualifiers
   *      - includes both `alg=` and `version=` qualifiers Strengthened from G6's
@@ -149,8 +149,10 @@ class PgpPropertyTests extends ScalaCheckSuite {
         case Some(r) =>
           r.keys.forall { k =>
             val purl = Certificates.purlForPgpKey(k).canonicalize().nn
-            // (a) shape: pkg:pgp/fingerprint@{hex}?...
-            purl.startsWith(s"pkg:pgp/fingerprint@${k.fingerprintHex}?") &&
+            // (a) shape: pkg:generic/pgp/fingerprint@{hex}?...
+            purl.startsWith(
+              s"pkg:generic/pgp/fingerprint@${k.fingerprintHex}?"
+            ) &&
             // (b) the alg= qualifier is present and matches canonical
             purl.contains(s"alg=${k.canonicalAlg}") &&
             // (c) the version= qualifier is present and matches

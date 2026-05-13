@@ -10,8 +10,8 @@
   },
   "purls": {
     "mustContain": [
-      "pkg:x509/spki-sha256@fbfc983af7dc8d795af2ed48b6d1e6edf6735f2a2e63d041b7f1d049b2a1f130?alg=falcon&params=512&version=3",
-      "pkg:x509/cert-sha256@00cafb388889cf07ec6e2c5abef9b5f99b03e41ffa982af749ce1c0807b3f847?alg=falcon&params=512&self-signed=true&sig-alg=falcon-512&version=3"
+      "pkg:generic/x509/spki-sha256@fbfc983af7dc8d795af2ed48b6d1e6edf6735f2a2e63d041b7f1d049b2a1f130?alg=falcon&params=512&version=3",
+      "pkg:generic/x509/cert-sha256@00cafb388889cf07ec6e2c5abef9b5f99b03e41ffa982af749ce1c0807b3f847?alg=falcon&params=512&self-signed=true&sig-alg=falcon-512&version=3"
     ]
   },
   "metadata": {

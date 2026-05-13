@@ -460,7 +460,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
         .iterator()
         .asScala
         .filter(p => p.toString.endsWith(".expected.json"))
-        // SSH cert fixtures emit pkg:ssh/cert-sha256@... — the literal
+        // SSH cert fixtures emit pkg:generic/ssh/cert-sha256@... — the literal
         // substring `cert-sha256` appears in the sidecar's pURL value
         // for cert fixtures (and never for plain-pubkey fixtures).
         .filter(p =>

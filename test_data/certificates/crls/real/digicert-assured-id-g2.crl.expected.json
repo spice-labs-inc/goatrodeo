@@ -7,7 +7,7 @@
     "mustContain":["application/pkix-crl"]
   },
   "purls":{
-    "mustContain":["pkg:x509/crl-sha256@34a09519341e05dda0290f6fcd23847893bac589f2cfa37014a96a0cac2d709c?sig-alg=sha256-rsa"]
+    "mustContain":["pkg:generic/x509/crl-sha256@34a09519341e05dda0290f6fcd23847893bac589f2cfa37014a96a0cac2d709c?sig-alg=sha256-rsa"]
   },
   "metadata":{
     "mustContain":{

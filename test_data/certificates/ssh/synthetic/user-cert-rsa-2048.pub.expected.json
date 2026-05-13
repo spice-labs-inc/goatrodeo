@@ -7,7 +7,7 @@
     "mustContain":["application/x-openssh-certificate"]
   },
   "purls":{
-    "mustContain":["pkg:ssh/cert-sha256@e8d4c11d2a1b5b267bc4f2eff35ab02e7d3cc1824386900b768ba1f7f915065d?alg=rsa&cert-type=user&sig-alg=rsa-sha2-512&size=2048","pkg:ssh/sha256@hSbVYjWvEkUZRI8ckR73WjQ1Hu%2B1kreW8NpYUtZppR4?alg=rsa&size=2048"]
+    "mustContain":["pkg:generic/ssh/cert-sha256@e8d4c11d2a1b5b267bc4f2eff35ab02e7d3cc1824386900b768ba1f7f915065d?alg=rsa&cert-type=user&sig-alg=rsa-sha2-512&size=2048","pkg:generic/ssh/sha256@hSbVYjWvEkUZRI8ckR73WjQ1Hu%2B1kreW8NpYUtZppR4?alg=rsa&size=2048"]
   },
   "metadata":{
     "mustContain":{

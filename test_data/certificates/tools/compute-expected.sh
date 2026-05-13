@@ -176,8 +176,8 @@ x509_fields() {
   },
   "purls": {
     "mustContain": [
-      "pkg:x509/spki-sha256@${spkiSha}?alg=<review>&<review>&version=<review>",
-      "pkg:x509/cert-sha256@${cert_der_sha}?alg=<review>&<review>&sig-alg=<review>&self-signed=<review>&version=<review>"
+      "pkg:generic/x509/spki-sha256@${spkiSha}?alg=<review>&<review>&version=<review>",
+      "pkg:generic/x509/cert-sha256@${cert_der_sha}?alg=<review>&<review>&sig-alg=<review>&self-signed=<review>&version=<review>"
     ]
   },
   "metadata": {
@@ -215,7 +215,7 @@ case "$kind" in
   "mimeTypes": { "mustContain": ["application/x-openssh-public-key"] },
   "purls": {
     "mustContain": [
-      "pkg:ssh/sha256@${fp#SHA256:}?alg=<review>&<review>"
+      "pkg:generic/ssh/sha256@${fp#SHA256:}?alg=<review>&<review>"
     ]
   },
   "metadata": {

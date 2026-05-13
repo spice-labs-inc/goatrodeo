@@ -96,7 +96,7 @@ class X509ClaimWhiteboxTests extends FunSuite {
     assertEquals(
       purls.length,
       2,
-      "Phase 3 plan: emit both pkg:x509/spki-sha256 and pkg:x509/cert-sha256"
+      "Phase 3 plan: emit both pkg:generic/x509/spki-sha256 and pkg:generic/x509/cert-sha256"
     )
     val spkiPurl =
       purls.find(_.toString.contains("spki-sha256")).get.canonicalize().nn

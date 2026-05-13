@@ -98,8 +98,8 @@ class CertificatesSidecarTests extends FunSuite {
         |    "mustNotContain": ["text/plain"]
         |  },
         |  "purls": {
-        |    "mustContain": ["pkg:x509/spki-sha256@abc?alg=rsa"],
-        |    "mustNotContain": ["pkg:ssh/sha256@xyz"]
+         |    "mustContain": ["pkg:generic/x509/spki-sha256@abc?alg=rsa"],
+         |    "mustNotContain": ["pkg:generic/ssh/sha256@xyz"]
         |  },
         |  "metadata": {
         |    "mustContain": { "Name": "Example", "Certificates:Version": "3" },
@@ -116,9 +116,9 @@ class CertificatesSidecarTests extends FunSuite {
     assertEquals(sc.mimeTypes.mustNotContain, List("text/plain"))
     assertEquals(
       sc.purls.mustContain,
-      List("pkg:x509/spki-sha256@abc?alg=rsa")
+      List("pkg:generic/x509/spki-sha256@abc?alg=rsa")
     )
-    assertEquals(sc.purls.mustNotContain, List("pkg:ssh/sha256@xyz"))
+    assertEquals(sc.purls.mustNotContain, List("pkg:generic/ssh/sha256@xyz"))
     assertEquals(
       sc.metadata.mustContain,
       Map("Name" -> "Example", "Certificates:Version" -> "3")
