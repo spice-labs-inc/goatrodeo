@@ -92,11 +92,13 @@ class CertificatesCoverageSuite extends FunSuite {
 
   // ===== pURL qualifier extraction =======================================
 
-  /** Parse `pkg:scheme/identifier@hex?qual1=val1&qual2=val2` into `(scheme,
-    * qualifiers)` where qualifiers is a Map[String, String].
+  /** Parse `pkg:generic/scheme/identifier@hex?qual1=val1&qual2=val2` into
+    * `(scheme, qualifiers)` where qualifiers is a Map[String, String]. The
+    * crypto scheme (x509, pgp, ssh) is in the namespace position under the
+    * `generic` pURL type.
     */
   private def parsePurl(purl: String): Option[(String, Map[String, String])] = {
-    val schemeRx = "^pkg:([a-z0-9-]+)/".r
+    val schemeRx = "^pkg:generic/([a-z0-9-]+)/".r
     val schemeMatch = schemeRx.findFirstMatchIn(purl)
     schemeMatch.map { sm =>
       val scheme = sm.group(1).nn
@@ -305,7 +307,7 @@ class CertificatesCoverageSuite extends FunSuite {
   test(
     "[COVERAGE] SSH certificate cross-algorithm: at least one cert where signed-key alg differs from CA-sig alg"
   ) {
-    // pkg:ssh/cert-sha256@... has both `alg` (signed key) and `sig-alg` (CA sig).
+    // pkg:generic/ssh/cert-sha256@... has both `alg` (signed key) and `sig-alg` (CA sig).
     // A cross-algorithm cert is one where, e.g., alg=rsa and sig-alg=ssh-ed25519.
     val sshCerts = purlsByScheme
       .getOrElse("ssh", Vector.empty)

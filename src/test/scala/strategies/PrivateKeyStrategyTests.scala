@@ -601,7 +601,7 @@ class PrivateKeyStrategyTests extends FunSuite {
     val canon = purls.head.canonicalize().nn
     assertEquals(
       canon,
-      "pkg:x509/spki-sha256@23061b4699527614aba79f341cccd03865af660ffe4e90b972733a3e5cfd4104?alg=ed25519"
+      "pkg:generic/x509/spki-sha256@23061b4699527614aba79f341cccd03865af660ffe4e90b972733a3e5cfd4104?alg=ed25519"
     )
   }
 

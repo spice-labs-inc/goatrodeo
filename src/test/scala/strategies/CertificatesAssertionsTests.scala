@@ -105,20 +105,22 @@ class CertificatesAssertionsTests extends FunSuite {
 
   test("assertPurlsContain passes when all required pURLs are present") {
     val item =
-      mkItem(purls = Set("pkg:x509/spki-sha256@abc", "pkg:ssh/sha256@xyz"))
+      mkItem(purls =
+        Set("pkg:generic/x509/spki-sha256@abc", "pkg:generic/ssh/sha256@xyz")
+      )
     CertificatesAssertions.assertPurlsContain(
       item,
-      List("pkg:x509/spki-sha256@abc"),
+      List("pkg:generic/x509/spki-sha256@abc"),
       "t"
     )
   }
 
   test("assertPurlsContain throws when a required pURL is missing") {
-    val item = mkItem(purls = Set("pkg:x509/spki-sha256@abc"))
+    val item = mkItem(purls = Set("pkg:generic/x509/spki-sha256@abc"))
     intercept[AssertionError] {
       CertificatesAssertions.assertPurlsContain(
         item,
-        List("pkg:pgp/fingerprint@deadbeef"),
+        List("pkg:generic/pgp/fingerprint@deadbeef"),
         "t"
       )
     }
@@ -127,10 +129,11 @@ class CertificatesAssertionsTests extends FunSuite {
   test(
     "assertPurlsContain accepts <computed> placeholder when some pURL matches the surrounding segments"
   ) {
-    val item = mkItem(purls = Set("pkg:x509/spki-sha256@abc123?alg=rsa"))
+    val item =
+      mkItem(purls = Set("pkg:generic/x509/spki-sha256@abc123?alg=rsa"))
     CertificatesAssertions.assertPurlsContain(
       item,
-      List("pkg:x509/spki-sha256@<computed>?alg=rsa"),
+      List("pkg:generic/x509/spki-sha256@<computed>?alg=rsa"),
       "t"
     )
   }
@@ -138,22 +141,22 @@ class CertificatesAssertionsTests extends FunSuite {
   test(
     "assertPurlsContain with <computed> still throws when no pURL matches prefix or suffix"
   ) {
-    val item = mkItem(purls = Set("pkg:ssh/sha256@xxx"))
+    val item = mkItem(purls = Set("pkg:generic/ssh/sha256@xxx"))
     intercept[AssertionError] {
       CertificatesAssertions.assertPurlsContain(
         item,
-        List("pkg:x509/spki-sha256@<computed>?alg=rsa"),
+        List("pkg:generic/x509/spki-sha256@<computed>?alg=rsa"),
         "t"
       )
     }
   }
 
   test("assertPurlsAbsent throws when a forbidden pURL is present") {
-    val item = mkItem(purls = Set("pkg:x509/spki-sha256@abc"))
+    val item = mkItem(purls = Set("pkg:generic/x509/spki-sha256@abc"))
     intercept[AssertionError] {
       CertificatesAssertions.assertPurlsAbsent(
         item,
-        List("pkg:x509/spki-sha256@abc"),
+        List("pkg:generic/x509/spki-sha256@abc"),
         "t"
       )
     }
@@ -165,7 +168,7 @@ class CertificatesAssertionsTests extends FunSuite {
       identifier = "gitoid:blob:sha256:test",
       connections = TreeSet(
         EdgeType.aliasFrom -> "gitoid:blob:sha1:hashA",
-        EdgeType.aliasFrom -> "pkg:x509/spki-sha256@abc"
+        EdgeType.aliasFrom -> "pkg:generic/x509/spki-sha256@abc"
       ),
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(
@@ -178,7 +181,7 @@ class CertificatesAssertionsTests extends FunSuite {
       )
     )
     val purls = CertificatesAssertions.purlsOf(item)
-    assertEquals(purls, Set("pkg:x509/spki-sha256@abc"))
+    assertEquals(purls, Set("pkg:generic/x509/spki-sha256@abc"))
   }
 
   // ---------- metadata helpers ----------

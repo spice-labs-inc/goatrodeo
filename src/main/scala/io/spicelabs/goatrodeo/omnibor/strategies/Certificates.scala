@@ -974,7 +974,7 @@ object Certificates {
     )
   }
 
-  /** Build the pkg:pgp/fingerprint@{hex}?... pURL for a PGP key. */
+  /** Build the pkg:generic/pgp/fingerprint@{hex}?... pURL for a PGP key. */
   private[strategies] def purlForPgpKey(
       key: PgpKey
   ): PackageURL = {
@@ -985,7 +985,8 @@ object Certificates {
       key.curve.toVector.map(c => KVPair("curve", c))
     val builder = PackageURLBuilder
       .aPackageURL()
-      .withType("pgp")
+      .withType("generic")
+      .withNamespace("pgp")
       .withName("fingerprint")
       .withVersion(key.fingerprintHex)
     parts.foreach(q => builder.withQualifier(q.key, q.value))
@@ -1781,14 +1782,16 @@ object Certificates {
     ) ++ companion
     val spkiBuilder = PackageURLBuilder
       .aPackageURL()
-      .withType("x509")
+      .withType("generic")
+      .withNamespace("x509")
       .withName("spki-sha256")
       .withVersion(spkiSha)
     spkiQuals.foreach(q => spkiBuilder.withQualifier(q.key, q.value))
 
     val certBuilder = PackageURLBuilder
       .aPackageURL()
-      .withType("x509")
+      .withType("generic")
+      .withNamespace("x509")
       .withName("cert-sha256")
       .withVersion(certSha)
     certQuals.foreach(q => certBuilder.withQualifier(q.key, q.value))

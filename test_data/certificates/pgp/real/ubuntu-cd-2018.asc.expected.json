@@ -7,7 +7,7 @@
     "mustContain":["application/pgp-keys"]
   },
   "purls":{
-    "mustContain":["pkg:pgp/fingerprint@843938df228d22f7b3742bc0d94aa3f0efe21092?alg=rsa&size=4096&version=4"]
+    "mustContain":["pkg:generic/pgp/fingerprint@843938df228d22f7b3742bc0d94aa3f0efe21092?alg=rsa&size=4096&version=4"]
   },
   "metadata":{
     "mustContain":{

@@ -152,15 +152,17 @@ class ComputeExpectedToolTests extends FunSuite {
     Files.writeString(tmp.toPath, stdout)
     try {
       val parsed = CertificatesSidecar.parse(tmp)
-      // The tool emits `pkg:x509/cert-sha256@{hex}?...` strings — extract
+      // The tool emits `pkg:generic/x509/cert-sha256@{hex}?...` strings — extract
       // the hex value from the cert-sha256 pURL.
       val certPurl = parsed.purls.mustContain
-        .find(_.startsWith("pkg:x509/cert-sha256@"))
+        .find(_.startsWith("pkg:generic/x509/cert-sha256@"))
         .getOrElse(
-          fail("expected a pkg:x509/cert-sha256@... pURL in tool output")
+          fail(
+            "expected a pkg:generic/x509/cert-sha256@... pURL in tool output"
+          )
         )
       val toolHex = certPurl
-        .stripPrefix("pkg:x509/cert-sha256@")
+        .stripPrefix("pkg:generic/x509/cert-sha256@")
         .takeWhile(_ != '?')
       // Independently parse the same fixture with the JDK and compute
       // SHA-256 of the DER form.

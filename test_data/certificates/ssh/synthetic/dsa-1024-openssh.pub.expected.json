@@ -7,7 +7,7 @@
     "mustContain":["application/x-openssh-public-key"]
   },
   "purls":{
-    "mustContain":["pkg:ssh/sha256@JpoF3tGwEESWo4cE6FJuyaD2oX8S9uElv2msJyFk6V4?alg=dsa&size=1024"]
+    "mustContain":["pkg:generic/ssh/sha256@JpoF3tGwEESWo4cE6FJuyaD2oX8S9uElv2msJyFk6V4?alg=dsa&size=1024"]
   },
   "metadata":{
     "mustContain":{

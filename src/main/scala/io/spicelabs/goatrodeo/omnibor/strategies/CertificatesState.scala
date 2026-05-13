@@ -106,8 +106,9 @@ class CertificatesState(
         )
     val builder = PackageURLBuilder
       .aPackageURL()
+      .withType("generic")
+      .withNamespace("x509")
       .withName("spki-sha256")
-      .withType("x509")
       .withVersion(spkiSha)
 
     parts.foreach(p => builder.withQualifier(p.key, p.value))
@@ -124,14 +125,15 @@ class CertificatesState(
     val quals = sshKeyQualifiers(p.algName, p.rsaModulusBits)
     val builder = PackageURLBuilder
       .aPackageURL()
-      .withType("ssh")
+      .withType("generic")
+      .withNamespace("ssh")
       .withName("sha256")
       .withVersion(fp)
     quals.foreach(q => builder.withQualifier(q.key, q.value))
     builder.build()
   }
 
-  /** `pkg:ssh/sha256@{b64}?alg=...&{companion}` */
+  /** `pkg:generic/ssh/sha256@{b64}?alg=...&{companion}` */
   private[strategies] def purlForSshPubkey(
       p: Certificates.SshPubkey
   ): PackageURL = {
@@ -140,7 +142,8 @@ class CertificatesState(
     val quals = sshKeyQualifiers(p.algName, p.rsaModulusBits)
     val builder = PackageURLBuilder
       .aPackageURL()
-      .withType("ssh")
+      .withType("generic")
+      .withNamespace("ssh")
       .withName("sha256")
       .withVersion(fp)
     quals.foreach(q => builder.withQualifier(q.key, q.value))
@@ -157,7 +160,8 @@ class CertificatesState(
     val keyQuals = sshKeyQualifiers(c.signedKeyAlgName, c.rsaModulusBits)
     val keyBuilder = PackageURLBuilder
       .aPackageURL()
-      .withType("ssh")
+      .withType("generic")
+      .withNamespace("ssh")
       .withName("sha256")
       .withVersion(signedKeyFp)
     keyQuals.foreach(q => keyBuilder.withQualifier(q.key, q.value))
@@ -174,7 +178,8 @@ class CertificatesState(
 
     val certBuilder = PackageURLBuilder
       .aPackageURL()
-      .withType("ssh")
+      .withType("generic")
+      .withNamespace("ssh")
       .withName("cert-sha256")
       .withVersion(certHex)
 
@@ -219,7 +224,8 @@ class CertificatesState(
 
     PackageURLBuilder
       .aPackageURL()
-      .withType("x509")
+      .withType("generic")
+      .withNamespace("x509")
       .withName("crl-sha256")
       .withVersion(crlSha)
       .withQualifier("sig-alg", sigAlg)

@@ -110,7 +110,7 @@ class PurlConstructionTests extends FunSuite {
   ) {
     intercept[MalformedPackageURLException] {
       new PackageURL(
-        "pkg:x509/spki-sha256@abc?alg=ec&params=<unknown-1.2.3>"
+        "pkg:generic/x509/spki-sha256@abc?alg=ec&params=<unknown-1.2.3>"
       )
     }
   }
@@ -183,7 +183,7 @@ class PurlConstructionTests extends FunSuite {
 
   // ===== Test 2: purlForPgpKey with angle-bracket canonicalAlg =========
   //
-  // `purlForPgpKey` uses `new PackageURL(s"pkg:pgp/fingerprint@...?$qual")`
+  // `purlForPgpKey` uses `new PackageURL(s"pkg:generic/pgp/fingerprint@...?$qual")`
   // where `qual` is built from `ListBuffer[String]` of `"key=value"` pairs
   // concatenated with `&`. If any qualifier value contains `<` or `>`,
   // the `PackageURL(String)` constructor throws `MalformedPackageURLException`.
@@ -217,7 +217,7 @@ class PurlConstructionTests extends FunSuite {
 
   // ===== Test 3: purlsForCert with unknown sig OID =====================
   //
-  // `purlsForCert` uses `new PackageURL(s"pkg:x509/cert-sha256@...?$qual")`
+  // `purlsForCert` uses `new PackageURL(s"pkg:generic/x509/cert-sha256@...?$qual")`
   // where `qual` is built from `Seq[String]` of `"key=value"` pairs. The
   // `sig-alg` qualifier receives the output of `canonicalSigAlg`, which
   // returns `<unknown-sig-oid-...>` for OIDs not in `sigAlgOidMap`. The
@@ -251,7 +251,7 @@ class PurlConstructionTests extends FunSuite {
   // ===== Test 4: purlForCrl with unknown sig OID =======================
   //
   // Same crash pattern as test 3 but on the CRL path. `purlForCrl` uses
-  // `new PackageURL(s"pkg:x509/crl-sha256@...?sig-alg=$sigAlg")` where
+  // `new PackageURL(s"pkg:generic/x509/crl-sha256@...?sig-alg=$sigAlg")` where
   // `sigAlg` comes from `canonicalSigAlgCrl` with the same fallback.
 
   test(
@@ -368,6 +368,203 @@ class PurlConstructionTests extends FunSuite {
     val state = new CertificatesState(dummyArtifact)
     val purl = state.purlForPrivateKeyPem(pem)
     assertRoundTrips(purl, "Private key pURL with OID params")
+  }
+
+  // ===== Structural invariant tests: pkg:generic/{namespace}/{name}@... ====
+  //
+  // These tests verify the pURL object structure (type, namespace, name)
+  // for every crypto pURL construction method. They enforce the migration
+  // from `pkg:{type}/{name}@...` to `pkg:generic/{namespace}/{name}@...`
+  // per the user request.
+  //
+  // ## What these tests test
+  //
+  // Each test constructs a minimal input, calls the pURL construction method,
+  // and asserts on the PackageURL field accessors (getType, getNamespace,
+  // getName) rather than on string content. This is a stronger invariant
+  // than string matching because it verifies the structural decomposition
+  // the library performs, not just the serialized form.
+  //
+  // ## Why these tests exist
+  //
+  // The pURL spec defines `generic` as the correct type for non-ecosystem
+  // identifiers. The crypto types (pgp, x509, ssh) are not registered pURL
+  // types, so they must be expressed as namespaces under `generic`:
+  //   pkg:generic/pgp/fingerprint@...
+  //   pkg:generic/x509/spki-sha256@...
+  //   pkg:generic/x509/cert-sha256@...
+  //   pkg:generic/x509/crl-sha256@...
+  //   pkg:generic/ssh/sha256@...
+  //   pkg:generic/ssh/cert-sha256@...
+
+  test(
+    "purlForPgpKey returns pURL with type=generic, namespace=pgp, name=fingerprint"
+  ) {
+    val key = Certificates.PgpKey(
+      fingerprintHex = "aabbccdd" * 8,
+      version = 4,
+      pgpAlgId = 1,
+      canonicalAlg = "rsa",
+      keySize = Some(2048),
+      curve = None,
+      isPrimary = true,
+      creationTime = new Date(),
+      expirationTime = None,
+      userIds = Vector("test@example.com")
+    )
+    val purl = Certificates.purlForPgpKey(key)
+    assertEquals(purl.getType(), "generic")
+    assertEquals(purl.getNamespace(), "pgp")
+    assertEquals(purl.getName(), "fingerprint")
+    assertRoundTrips(purl, "PGP pURL structural invariant")
+  }
+
+  test(
+    "purlsForCert returns pURLs with type=generic, namespace=x509"
+  ) {
+    val kp = KeyPairGenerator.getInstance("RSA").nn
+    kp.initialize(2048, new SecureRandom())
+    val pair = kp.generateKeyPair()
+    val cert = buildCertWithUnknownSigOid(pair)
+    val purls = Certificates.purlsForCert(cert)
+    assertEquals(purls.length, 2)
+    purls.foreach { purl =>
+      assertEquals(
+        purl.getType(),
+        "generic",
+        s"cert pURL type must be generic, got ${purl.getType()}"
+      )
+      assertEquals(
+        purl.getNamespace(),
+        "x509",
+        s"cert pURL namespace must be x509, got ${purl.getNamespace()}"
+      )
+    }
+    val names = purls.map(_.getName()).toSet
+    assert(
+      names.contains("spki-sha256"),
+      s"must contain spki-sha256 name, got: $names"
+    )
+    assert(
+      names.contains("cert-sha256"),
+      s"must contain cert-sha256 name, got: $names"
+    )
+    purls.foreach(p =>
+      assertRoundTrips(p, "X.509 cert pURL structural invariant")
+    )
+  }
+
+  test(
+    "purlForCrl returns pURL with type=generic, namespace=x509, name=crl-sha256"
+  ) {
+    val kp = KeyPairGenerator.getInstance("RSA").nn
+    kp.initialize(2048, new SecureRandom())
+    val pair = kp.generateKeyPair()
+    val crl = buildCrlWithUnknownSigOid(pair)
+    val state = new CertificatesState(dummyArtifact)
+    val purl = state.purlForCrl(crl)
+    assertEquals(purl.getType(), "generic")
+    assertEquals(purl.getNamespace(), "x509")
+    assertEquals(purl.getName(), "crl-sha256")
+    assertRoundTrips(purl, "CRL pURL structural invariant")
+  }
+
+  test(
+    "purlForSshPubkey returns pURL with type=generic, namespace=ssh, name=sha256"
+  ) {
+    val pubkey = Certificates.SshPubkey(
+      wireBytes = Array(0x00, 0x01, 0x02, 0x03),
+      algName = "ssh-ed25519",
+      comment = None,
+      rsaModulusBits = None
+    )
+    val state = new CertificatesState(dummyArtifact)
+    val purl = state.purlForSshPubkey(pubkey)
+    assertEquals(purl.getType(), "generic")
+    assertEquals(purl.getNamespace(), "ssh")
+    assertEquals(purl.getName(), "sha256")
+    assertRoundTrips(purl, "SSH pubkey pURL structural invariant")
+  }
+
+  test(
+    "purlsForSshCert returns pURLs with type=generic, namespace=ssh"
+  ) {
+    val cert = Certificates.SshCert(
+      certBytes = Array(0x00, 0x01, 0x02),
+      certTypeName = "ssh-rsa-cert-v01@openssh.com",
+      signedKeyWire = Array(0x03, 0x04, 0x05),
+      signedKeyAlgName = "ssh-rsa",
+      rsaModulusBits = Some(2048),
+      serial = BigInt(0),
+      certType = 1L,
+      keyId = "test",
+      principals = Vector.empty,
+      validAfter = 0L,
+      validBefore = 0L,
+      criticalOptions = Vector.empty,
+      extensions = Vector.empty,
+      caKeyWire = Array(0x06, 0x07),
+      caSigAlgName = "ssh-rsa",
+      comment = None
+    )
+    val state = new CertificatesState(dummyArtifact)
+    val purls = state.purlsForSshCert(cert)
+    assertEquals(purls.length, 2)
+    purls.foreach { purl =>
+      assertEquals(
+        purl.getType(),
+        "generic",
+        s"SSH cert pURL type must be generic, got ${purl.getType()}"
+      )
+      assertEquals(
+        purl.getNamespace(),
+        "ssh",
+        s"SSH cert pURL namespace must be ssh, got ${purl.getNamespace()}"
+      )
+    }
+    val names = purls.map(_.getName()).toSet
+    assert(
+      names.contains("cert-sha256"),
+      s"must contain cert-sha256 name, got: $names"
+    )
+    assert(names.contains("sha256"), s"must contain sha256 name, got: $names")
+    purls.foreach(p =>
+      assertRoundTrips(p, "SSH cert pURL structural invariant")
+    )
+  }
+
+  test(
+    "purlForPrivateKeyPem returns pURL with type=generic, namespace=x509, name=spki-sha256"
+  ) {
+    val pem = Certificates.PrivateKeyPlaintextPem(
+      spkiBytes = Array.fill[Byte](32)(0x42),
+      canonicalAlg = "rsa",
+      keySize = Some(2048),
+      curve = None,
+      params = None
+    )
+    val state = new CertificatesState(dummyArtifact)
+    val purl = state.purlForPrivateKeyPem(pem)
+    assertEquals(purl.getType(), "generic")
+    assertEquals(purl.getNamespace(), "x509")
+    assertEquals(purl.getName(), "spki-sha256")
+    assertRoundTrips(purl, "Private key PEM pURL structural invariant")
+  }
+
+  test(
+    "purlForPrivateKeyOpenSsh returns pURL with type=generic, namespace=ssh, name=sha256"
+  ) {
+    val key = Certificates.PrivateKeyPlaintextOpenSsh(
+      wireBytes = Array(0x00, 0x01, 0x02, 0x03),
+      algName = "ssh-ed25519",
+      rsaModulusBits = None
+    )
+    val state = new CertificatesState(dummyArtifact)
+    val purl = state.purlForPrivateKeyOpenSsh(key)
+    assertEquals(purl.getType(), "generic")
+    assertEquals(purl.getNamespace(), "ssh")
+    assertEquals(purl.getName(), "sha256")
+    assertRoundTrips(purl, "Private key OpenSSH pURL structural invariant")
   }
 
   // ===== Helpers ========================================================
