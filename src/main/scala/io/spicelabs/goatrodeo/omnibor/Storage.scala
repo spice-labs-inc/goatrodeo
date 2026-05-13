@@ -299,11 +299,27 @@ trait ListFileNames extends Storage {
       }
     }
 
+    /** Strip the inverse half of every content-edge pair (`contained:down`
+      * = `contains`, and `build:up` = `buildsTo`). With items written in
+      * forward topological order, each `A contains B` edge is redundant
+      * with the `B containedBy A` edge already encoded on B; same for
+      * builds. A consumer that needs reverse lookups should use a
+      * cluster-level `reverseEdges` helper, which we can synthesise from
+      * the forward edges in one pass. */
+    def stripInverseContentEdges(it: Item): Item = {
+      val newConns = it.connections.filterNot { case (et, _) =>
+        et == EdgeType.contains || et == EdgeType.buildsTo
+      }
+      if (newConns.size == it.connections.size) it
+      else it.copy(connections = newConns)
+    }
+
     val workingItems: Vector[Item] = rawItems.flatMap { it =>
       val id = it.identifierString
       if (droppedIds.contains(id)) None
-      else if (collapsed.contains(id)) Some(stripIfCollapsed(collapsed(id)))
-      else Some(it)
+      else if (collapsed.contains(id))
+        Some(stripInverseContentEdges(stripIfCollapsed(collapsed(id))))
+      else Some(stripInverseContentEdges(it))
     }
 
     // --- 4. Topological sort along forward content edges ---
