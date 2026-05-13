@@ -17,6 +17,7 @@ package io.spicelabs.goatrodeo.omnibor
 import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.util.EdgeTypeId
 import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PackageUrl
@@ -27,6 +28,7 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 
@@ -123,7 +125,7 @@ trait Storage {
     val rootItems = for {
       key <- keys().toVector
       item <- read(key) if item.isRoot()
-    } yield item.identifier
+    } yield item.identifierString
 
     Files.writeString(file.toPath(), Json.encode(rootItems).toUtf8String)
   }
@@ -171,6 +173,219 @@ trait ListFileNames extends Storage {
     *   sorted vector of Tuples (MD5 of the path, the path)
     */
   def pathsSortedWithMD5(): Vector[(String, String)]
+
+  /** Prepare the store's contents for a v3 streamed write.
+    *
+    * Performs three things:
+    *   1. **Alias-class detection.** Runs union-find across `alias:from` /
+    *      `alias:to` edges to group identifiers that refer to the same
+    *      content into equivalence classes.
+    *   2. **Item collapse.** For every class with two or more identifiers
+    *      backed by an Item in the store, the alternate-form Items are
+    *      merged into a single canonical Item via `Item.merge`, and the
+    *      alternate Items are dropped from the output. Singleton classes
+    *      and classes with only one Item-backed member are left alone (the
+    *      alias relationships still get recorded in the table, but no
+    *      Item-level merging happens). Choice of canonical prefers the
+    *      `gitoid:blob:sha256:` form, falling back to the lex-smallest
+    *      Item-backed identifier.
+    *   3. **Alias-edge stripping + alias map.** From every Item that
+    *      participates in a multi-member class, all `alias:from` /
+    *      `alias:to` edges are stripped — the equivalence information now
+    *      lives in `aliasMap` (`canonical → alternates`). On read,
+    *      `GRDWalker` reconstructs the `alias:from` edges from this map so
+    *      `Item.connections` round-trips byte-for-byte from the caller's
+    *      perspective.
+    *
+    * The returned `items` are then topologically sorted along forward
+    * content edges, identical to the v2 path. */
+  def prepareForWrite(): (Vector[Item], TreeMap[String, TreeSet[String]]) = {
+    val md5Sorted: Vector[String] = pathsSortedWithMD5().map(_._2)
+    val rawItems: Vector[Item] = md5Sorted.flatMap(read)
+    if (rawItems.isEmpty) return (Vector.empty, TreeMap.empty)
+
+    // --- 1. Union-find over alias edges ---
+    val parent = scala.collection.mutable.HashMap.empty[String, String]
+    def find(x: String): String = {
+      if (!parent.contains(x)) { parent.update(x, x); return x }
+      var cur = x
+      while (parent(cur) != cur) cur = parent(cur)
+      val root = cur
+      cur = x
+      while (parent(cur) != root) {
+        val nxt = parent(cur)
+        parent.update(cur, root)
+        cur = nxt
+      }
+      root
+    }
+    def union(a: String, b: String): Unit = {
+      val ra = find(a); val rb = find(b)
+      if (ra != rb) parent.update(ra, rb)
+    }
+
+    for (item <- rawItems) {
+      val id = item.identifierString
+      find(id)
+      for ((et, target) <- item.connections.iterator) {
+        if (et == EdgeType.aliasFrom || et == EdgeType.aliasTo) {
+          find(target); union(id, target)
+        }
+      }
+    }
+
+    // --- 2. Build equivalence classes ---
+    val classes =
+      scala.collection.mutable.HashMap
+        .empty[String, scala.collection.mutable.Set[String]]
+    for (k <- parent.keys) {
+      classes
+        .getOrElseUpdate(find(k), scala.collection.mutable.Set.empty) += k
+    }
+
+    val itemById: Map[String, Item] =
+      rawItems.iterator.map(it => it.identifierString -> it).toMap
+
+    def pickCanonical(members: Set[String], itemBacked: Set[String]): String =
+      if (itemBacked.isEmpty) {
+        // shouldn't happen for classes encountered via items, but defensive
+        members.min
+      } else {
+        // Prefer item-backed gitoid:blob:sha256:... form; else lex-smallest item-backed.
+        val gitoidBacked = itemBacked.filter(_.startsWith("gitoid:blob:sha256:"))
+        if (gitoidBacked.nonEmpty) gitoidBacked.min else itemBacked.min
+      }
+
+    // --- 3. Collapse + alias-edge stripping ---
+    val aliasMapBuilder = TreeMap.newBuilder[String, TreeSet[String]]
+    val collapsed = scala.collection.mutable.HashMap.empty[String, Item]
+    val droppedIds = scala.collection.mutable.Set.empty[String]
+    val canonicalOf = scala.collection.mutable.HashMap.empty[String, String]
+
+    for ((_, membersMut) <- classes) {
+      val members = membersMut.toSet
+      val itemBacked = members.filter(itemById.contains)
+      if (members.size <= 1 || itemBacked.size <= 1) {
+        // Singleton class, or only one Item-backed identifier: no collapse,
+        // no alias map entry. Keep the existing Item(s) untouched.
+        ()
+      } else {
+        val canon = pickCanonical(members, itemBacked)
+        val baseItem = itemById(canon)
+        val others = (itemBacked - canon).iterator.map(itemById)
+        val merged =
+          others.foldLeft(baseItem)((acc, o) => acc.merge(o))
+        collapsed.update(canon, merged)
+        for (id <- itemBacked if id != canon) droppedIds += id
+        for (m <- members) canonicalOf.update(m, canon)
+        val aliases = members - canon
+        if (aliases.nonEmpty)
+          aliasMapBuilder += (canon -> TreeSet.from(aliases))
+      }
+    }
+
+    val aliasMap: TreeMap[String, TreeSet[String]] = aliasMapBuilder.result()
+    val collapsedCanonicals: Set[String] = collapsed.keySet.toSet
+
+    def stripIfCollapsed(it: Item): Item = {
+      val id = it.identifierString
+      if (!collapsedCanonicals.contains(id)) it
+      else {
+        val newConns = it.connections.filterNot { case (et, _) =>
+          et == EdgeType.aliasFrom || et == EdgeType.aliasTo
+        }
+        if (newConns.size == it.connections.size) it
+        else it.copy(connections = newConns)
+      }
+    }
+
+    val workingItems: Vector[Item] = rawItems.flatMap { it =>
+      val id = it.identifierString
+      if (droppedIds.contains(id)) None
+      else if (collapsed.contains(id)) Some(stripIfCollapsed(collapsed(id)))
+      else Some(it)
+    }
+
+    // --- 4. Topological sort along forward content edges ---
+    val items = workingItems
+    val n = items.size
+    val indexOf: scala.collection.mutable.HashMap[String, Int] =
+      scala.collection.mutable.HashMap.empty
+    indexOf.sizeHint(n)
+    for (i <- 0 until n) indexOf.update(items(i).identifierString, i)
+
+    val successors: Array[scala.collection.mutable.ArrayBuffer[Int]] =
+      Array.fill(n)(scala.collection.mutable.ArrayBuffer.empty[Int])
+    val inDegree: Array[Int] = Array.fill(n)(0)
+
+    for (i <- 0 until n) {
+      val item = items(i)
+      for ((edgeType, target) <- item.connections.iterator) {
+        if (EdgeTypeId.isForwardContentEdge(edgeType)) {
+          indexOf.get(target) match {
+            case Some(j) if j != i =>
+              successors(j) += i
+              inDegree(i) += 1
+            case _ => ()
+          }
+        }
+      }
+    }
+
+    val ready = scala.collection.mutable.TreeSet.empty[Int]
+    for (i <- 0 until n) if (inDegree(i) == 0) ready += i
+
+    val out = scala.collection.mutable.ArrayBuffer.empty[Int]
+    out.sizeHint(n)
+    def drain(): Unit = {
+      while (ready.nonEmpty) {
+        val pick = ready.head
+        ready.remove(pick)
+        out += pick
+        for (s <- successors(pick)) {
+          val nd = inDegree(s) - 1
+          inDegree(s) = nd
+          if (nd == 0) ready += s
+        }
+      }
+    }
+    drain()
+    while (out.size < n) {
+      var pick = -1
+      var i = 0
+      while (i < n && pick == -1) {
+        if (inDegree(i) > 0) pick = i
+        i += 1
+      }
+      inDegree(pick) = 0
+      ready += pick
+      drain()
+    }
+
+    val resultBuilder = Vector.newBuilder[Item]
+    resultBuilder.sizeHint(n)
+    for (idx <- out) resultBuilder += items(idx)
+    (resultBuilder.result(), aliasMap)
+  }
+
+  /** Items in a deterministic order suitable for the v2 streamed write path.
+    *
+    * For every "forward content edge" (`contained:up` / `build:down` per
+    * `EdgeTypeId.isForwardContentEdge`) `A -> B`, item `B` appears strictly
+    * before item `A` in the result. Items not reachable via content edges are
+    * placed by their `pathsSortedWithMD5` order (the v1 tie-breaker), so the
+    * output is reproducible bit-for-bit across runs on the same input.
+    *
+    * Edges whose target identifier is not itself an Item in the store
+    * (synthetic alias targets, external references) are ignored for sort
+    * purposes — they'll be encoded as `WireEdge.External` at write time.
+    *
+    * Cycles (self-loops or genuine bidirectional content edges through
+    * pathological data) are broken by MD5 tie-break: when no item has zero
+    * outstanding dependencies, the next item is picked by lowest MD5 among
+    * those remaining.
+    */
+  def topologicallySortedForWrite(): Vector[Item] = prepareForWrite()._1
 
   /** The target output filename for the Storage
     *

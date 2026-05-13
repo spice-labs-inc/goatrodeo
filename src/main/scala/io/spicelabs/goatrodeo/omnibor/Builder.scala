@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeSet
-import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
 import scala.util.Try
 
 /** Build the GitOIDs the container and all the sub-elements found in the
@@ -271,7 +270,7 @@ object Builder {
           item =>
             Some(
               Item(
-                tag.gitoid(),
+                io.spicelabs.goatrodeo.util.Identifier.fromGitoid(tag.gitoid),
                 TreeSet(EdgeType.tagFrom -> "tags"),
                 Some(ItemTagData.mimeType),
                 Some(ItemTagData(tag.json))
@@ -520,29 +519,18 @@ object Builder {
 
         // make sure the destination exists
         target.getAbsoluteFile().mkdirs()
-        val sorted = {
-          val allItems = store
-            .pathsSortedWithMD5()
-            .flatMap(v => store.read(v._2))
-
-          allItems
-        }
+        val (sorted, aliasMap) = store.prepareForWrite()
 
         logger.info(
-          f"Post-sort at ${Duration.between(start, Instant.now())}"
-        )
-
-        sorted.par.foreach(_.cachedCBOR)
-
-        logger.info(
-          f"Post CBOR cache at ${Duration.between(start, Instant.now())}"
+          f"Post-sort at ${Duration.between(start, Instant.now())} (aliasMap entries: ${aliasMap.size}, items after collapse: ${sorted.length})"
         )
 
         val cnt = sorted.length
 
         val ret = GraphManager.writeEntries(
           target,
-          sorted.iterator
+          sorted.iterator,
+          aliasMap
         )
 
         logger.info(

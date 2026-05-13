@@ -9,6 +9,9 @@ import io.spicelabs.goatrodeo.util.Helpers
 import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
 
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
+
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -67,7 +70,9 @@ object GraphManager {
       targetDirectory: File,
       items: Iterator[Item],
       previous: Long,
-      afterWrite: Item => Unit
+      afterWrite: Item => Unit,
+      writeCtx: WriteContext,
+      aliasMap: TreeMap[String, TreeSet[String]]
   ): DataAndIndexFiles = {
     val start = Instant.now()
     // create temporary file
@@ -81,7 +86,8 @@ object GraphManager {
     val dataFileEnvelope =
       DataFileEnvelope.build(
         previous = previous,
-        builtFromMerge = false
+        builtFromMerge = false,
+        aliasMap = aliasMap
       )
     val envelopeBytes = dataFileEnvelope.encode()
     // write the DataFileEnvelope length
@@ -99,7 +105,7 @@ object GraphManager {
       val currentPosition = writer.position()
       val entry = orgEntry
       val md5 = entry.identifierMD5()
-      val entryBytes = entry.encodeCBOR()
+      val entryBytes = Item.encodeStreamed(entry, writeCtx)
 
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
 
@@ -112,6 +118,13 @@ object GraphManager {
       bb.flip()
 
       writer.write(bb)
+
+      // Record this item's location for backref encoding of items later in
+      // the stream. The recorded offset is the start of the length-prefixed
+      // frame (currentPosition), so the read path's `ReadContext.record`
+      // can match positions exactly without having to skip the frame
+      // header.
+      writeCtx.record(entry.identifierString, currentPosition)
 
       previousPosition = currentPosition; // itemEnvelope.position;
 
@@ -214,7 +227,8 @@ object GraphManager {
     */
   def writeEntries(
       targetDirectory: File,
-      entries: Iterator[Item]
+      entries: Iterator[Item],
+      aliasMap: TreeMap[String, TreeSet[String]] = TreeMap.empty
   ): (Seq[DataAndIndexFiles], File) = {
     var previousInChain: Long = 0L
     var biggest: Vector[(Item, Int)] = Vector()
@@ -231,16 +245,26 @@ object GraphManager {
     }
 
     var fileSet: List[DataAndIndexFiles] = Nil
+    val writeCtx = new WriteContext()
     while (entries.hasNext) {
       val dataAndIndex = writeABlock(
         targetDirectory,
         entries,
         previous = previousInChain,
-        updateBiggest
+        updateBiggest,
+        writeCtx,
+        aliasMap
       )
       previousInChain = dataAndIndex.dataFile
       fileSet = dataAndIndex :: fileSet
-
+      // Next DataFile in this cluster gets a fresh ordinal so cross-file
+      // backrefs are unambiguous. We cap at Byte.MaxValue; a cluster with
+      // more than 127 DataFiles (each up to 15 GB → ~2 TB cluster) is
+      // beyond the design target, but rather than truncate we fall back
+      // to External edges past the cap.
+      if (writeCtx.currentFileOrdinal < Byte.MaxValue)
+        writeCtx.currentFileOrdinal =
+          (writeCtx.currentFileOrdinal + 1).toByte
     }
 
     val tempFile =
@@ -315,10 +339,18 @@ object GraphManager {
   * validate the file and read the envelope, then `readNext()` or `items()` to
   * iterate through Items.
   *
+  * For v2 GRD files, the walker maintains an internal `ReadContext` so that
+  * `WireEdge.SameFile` / `CrossFile` backrefs can be resolved as items are
+  * streamed in. Callers that need cross-DataFile resolution should supply a
+  * shared `ReadContext` via `open(sharedCtx)`.
+  *
   * @param source
   *   the FileChannel to read from
   */
 class GRDWalker(source: FileChannel) {
+
+  private var envelopeOpt: Option[DataFileEnvelope] = None
+  private var readCtx: ReadContext = new ReadContext()
 
   /** Open the GRD file and read its envelope.
     *
@@ -327,7 +359,14 @@ class GRDWalker(source: FileChannel) {
     * @return
     *   a Try containing the envelope on success, or an error on failure
     */
-  def open(): Try[DataFileEnvelope] = {
+  def open(): Try[DataFileEnvelope] = open(new ReadContext())
+
+  /** Open the GRD file with an externally-managed `ReadContext`. Useful when
+    * reading multiple DataFiles of a cluster sequentially: pass the same
+    * context to each walker so cross-file backrefs resolve correctly. Caller
+    * is responsible for bumping `ctx.currentFileOrdinal` between files. */
+  def open(ctx: ReadContext): Try[DataFileEnvelope] = {
+    readCtx = ctx
     val magic_? = Helpers.readInt(source)
     if (magic_? != GraphManager.Consts.DataFileMagicNumber) {
       // FIXME log the error
@@ -340,7 +379,9 @@ class GRDWalker(source: FileChannel) {
     if (len != readLen) {
       throw new Exception(f"Wanted ${len} bytes got ${readLen}")
     }
-    DataFileEnvelope.decode(ba.position(0).array())
+    val env = DataFileEnvelope.decode(ba.position(0).array())
+    env.foreach(e => envelopeOpt = Some(e))
+    env
   }
 
   /** Read the next Item from the file.
@@ -352,6 +393,7 @@ class GRDWalker(source: FileChannel) {
     if (source.position() == source.size()) {
       None
     } else {
+      val frameStart = source.position()
       val entryLen = Helpers.readInt(source)
       if (entryLen == -1) {
         None
@@ -360,7 +402,35 @@ class GRDWalker(source: FileChannel) {
         source.read(entryByteBuffer)
 
         val entryBytes = entryByteBuffer.array()
-        val entry = Item.decode(entryBytes).get
+        val rawItem: Item = envelopeOpt match {
+          case Some(env) if env.version >= 2 =>
+            Item.decodeStreamed(entryBytes, readCtx).get
+          case _ =>
+            Item.decode(entryBytes).get
+        }
+        // Record this item's identifier against the frame-start offset so
+        // any later backref edges pointing here can resolve. Mirrors the
+        // write side, which records `currentPosition` before writing.
+        readCtx.record(frameStart, rawItem.identifierString)
+
+        // v3: reconstruct alias edges from the envelope's aliasMap. Items
+        // that were a canonical of a collapsed equivalence class have
+        // their `alias:from` edges synthesised back, so consumers see
+        // `connections` exactly as it would have been before the
+        // collapse.
+        val entry = envelopeOpt match {
+          case Some(env) if env.version >= 3 && env.aliasMap.nonEmpty =>
+            env.aliasMap.get(rawItem.identifierString) match {
+              case Some(aliases) if aliases.nonEmpty =>
+                val added = aliases.iterator
+                  .map(a => (EdgeType.aliasFrom, a))
+                rawItem.copy(
+                  connections = rawItem.connections ++ added
+                )
+              case _ => rawItem
+            }
+          case _ => rawItem
+        }
         Some(entry)
       }
     }

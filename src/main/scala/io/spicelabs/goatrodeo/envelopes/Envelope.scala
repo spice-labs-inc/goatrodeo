@@ -110,27 +110,43 @@ case class DataFileEnvelope(
     previous: Long,
     @key("depends_on") dependsOn: TreeSet[Long],
     @key("built_from_merge") builtFromMerge: Boolean,
-    info: TreeMap[String, String]
+    info: TreeMap[String, String],
+    @key("alias_map") aliasMap: TreeMap[String, TreeSet[String]] = TreeMap.empty
 ) derives Codec {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 }
 
 object DataFileEnvelope {
-  val DataFileEnvelopeVersion = 1
+  /** v1: legacy edge encoding (each connection is a `(String, String)` tuple
+    * with the target gitoid repeated in full).
+    *
+    * v2: streamed encoding with `WireEdge`. Items are written in topological
+    * order along forward content edges (`contained:up` / `build:down`), and
+    * each connection is encoded as a compact tagged array — `SameFile`,
+    * `CrossFile`, `External`, or `UnknownType` per `WireEdge`.
+    *
+    * v3: adds `aliasMap` (canonical id → set of alternate identifiers).
+    * Alternate-form Items (one per non-canonical identifier) are collapsed
+    * into their canonical at write time; the alias relationships move into
+    * the table. On read, the alias edges (`alias:from` / `alias:to`) are
+    * synthesised back into `Item.connections` from this table. */
+  val DataFileEnvelopeVersion = 3
   def build(
       version: Int = DataFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.DataFileMagicNumber,
       previous: Long,
       dependsOn: TreeSet[Long] = TreeSet(),
       builtFromMerge: Boolean,
-      info: TreeMap[String, String] = TreeMap()
+      info: TreeMap[String, String] = TreeMap(),
+      aliasMap: TreeMap[String, TreeSet[String]] = TreeMap.empty
   ): DataFileEnvelope = DataFileEnvelope(
     version,
     magic,
     previous,
     dependsOn,
     builtFromMerge,
-    info
+    info,
+    aliasMap
   )
 
   def decode(bytes: Array[Byte]): Try[DataFileEnvelope] = {

@@ -431,3 +431,126 @@ enum IndexLoc {
   *   the location where the Item data can be found
   */
 case class ItemOffset(hashHi: Long, hashLow: Long, loc: IndexLoc)
+
+/** Compact on-disk representation of an `Edge`, used by the v2 streamed
+  * encode/decode path in `GraphManager`.
+  *
+  * Edges are encoded as a CBOR array whose first element is a `uint8`
+  * discriminator:
+  *
+  *   - `[0, edgeTypeId: uint8, offset: uint]` — same-DataFile backref
+  *   - `[1, edgeTypeId: uint8, fileOrdinal: uint8, offset: uint]` — cross-file
+  *   - `[2, edgeTypeId: uint8, targetGitoid: string]` — full string fallback
+  *   - `[3, edgeTypeStr: string, targetGitoid: string]` — unrecognised edge
+  *     type, round-trips verbatim
+  *
+  * The in-memory `Edge` (`(String, String)`) API is unaffected; this type only
+  * exists at the wire boundary.
+  */
+sealed trait WireEdge
+object WireEdge {
+  case class SameFile(edgeType: Byte, offset: Long) extends WireEdge
+  case class CrossFile(edgeType: Byte, fileOrdinal: Byte, offset: Long)
+      extends WireEdge
+  case class External(edgeType: Byte, targetGitoid: String) extends WireEdge
+  case class UnknownType(edgeType: String, targetGitoid: String) extends WireEdge
+
+  given Encoder[WireEdge] = { (w, edge) =>
+    edge match {
+      case SameFile(et, off) =>
+        w.writeArrayOpen(3)
+          .writeInt(0)
+          .writeInt(et.toInt & 0xff)
+          .writeLong(off)
+          .writeArrayClose()
+      case CrossFile(et, fo, off) =>
+        w.writeArrayOpen(4)
+          .writeInt(1)
+          .writeInt(et.toInt & 0xff)
+          .writeInt(fo.toInt & 0xff)
+          .writeLong(off)
+          .writeArrayClose()
+      case External(et, gid) =>
+        w.writeArrayOpen(3)
+          .writeInt(2)
+          .writeInt(et.toInt & 0xff)
+          .writeString(gid)
+          .writeArrayClose()
+      case UnknownType(et, gid) =>
+        w.writeArrayOpen(3)
+          .writeInt(3)
+          .writeString(et)
+          .writeString(gid)
+          .writeArrayClose()
+    }
+  }
+
+  given Decoder[WireEdge] = { r =>
+    val unbounded = r.readArrayOpen(3)
+    val tag = r.readInt()
+    val ret: WireEdge = tag match {
+      case 0 =>
+        SameFile(r.readInt().toByte, r.readLong())
+      case 1 =>
+        CrossFile(r.readInt().toByte, r.readInt().toByte, r.readLong())
+      case 2 =>
+        External(r.readInt().toByte, r.readString())
+      case 3 =>
+        UnknownType(r.readString(), r.readString())
+      case other =>
+        r.unexpectedDataItem(
+          f"Unknown WireEdge discriminator ${other}"
+        )
+    }
+    r.readArrayClose(unbounded, ret)
+  }
+}
+
+/** Resolution context for **encoding** an Item's `connections` into `WireEdge`s
+  * during a streamed cluster write.
+  *
+  * As items are written sequentially within a DataFile, `gitoidToLoc` is
+  * populated with `(identifierString -> (fileOrdinal, byteOffset))`. When
+  * encoding an edge whose target is already in the map, the edge becomes a
+  * `SameFile` or `CrossFile` backref; otherwise it falls back to `External`.
+  *
+  * `currentFileOrdinal` is the ordinal of the DataFile being written right
+  * now within the cluster (0 for the first DataFile, etc.).
+  */
+class WriteContext(
+    val gitoidToLoc: scala.collection.mutable.HashMap[
+      String,
+      (Byte, Long)
+    ] = scala.collection.mutable.HashMap.empty,
+    var currentFileOrdinal: Byte = 0
+) {
+  def record(identifierString: String, offset: Long): Unit =
+    gitoidToLoc.update(identifierString, (currentFileOrdinal, offset))
+}
+
+/** Resolution context for **decoding** WireEdges back into legacy
+  * `(String, String)` `Edge`s during a streamed cluster read.
+  *
+  * Maintains the inverse table: `(fileOrdinal, byteOffset) -> targetGitoid`.
+  * Populated incrementally as items are read (the identifier of each Item is
+  * known the moment it's decoded), then consulted when resolving backref
+  * edges encountered later in the stream.
+  *
+  * For random-access reads via the IndexFile, the consumer is expected to
+  * populate the relevant per-DataFile portion of `locToGitoid` ahead of time
+  * (e.g. by streaming the DataFile once to gather identifiers) or to perform
+  * targeted seek-and-decode lookups.
+  */
+class ReadContext(
+    val locToGitoid: scala.collection.mutable.HashMap[
+      (Byte, Long),
+      String
+    ] = scala.collection.mutable.HashMap.empty,
+    var currentFileOrdinal: Byte = 0
+) {
+  def record(offset: Long, identifierString: String): Unit =
+    locToGitoid.update((currentFileOrdinal, offset), identifierString)
+
+  def resolve(fileOrdinal: Byte, offset: Long): Option[String] =
+    locToGitoid.get((fileOrdinal, offset))
+}
