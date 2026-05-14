@@ -137,7 +137,11 @@ object GraphManager {
       }
     }
 
-    Helpers.writeShort(writer, -1) // a marker that says end of file
+    // 4-byte -1 sentinel — matches the 4-byte length prefix `readNext`
+    // expects for each item frame, so the reader can detect end-of-file
+    // by reading -1 here. (Older revisions of this file wrote a 2-byte
+    // short, which `readNext`'s `Helpers.readInt` could not recognise.)
+    Helpers.writeInt(writer, -1)
 
     // write final back-pointer (to the last entry record)
     Helpers.writeLong(writer, previousPosition)

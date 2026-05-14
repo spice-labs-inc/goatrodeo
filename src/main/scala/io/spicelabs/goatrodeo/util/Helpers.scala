@@ -954,7 +954,9 @@ object Helpers {
     if (bytesRead != len) {
       throw Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
     }
-    Cbor.decode(dest).to[A].value
+    // Reset position to the start of what we just read so the CBOR decoder
+    // sees the bytes, not the empty tail of the buffer.
+    Cbor.decode(dest.position(0)).to[A].value
   }
 
   /** Slurp the contents of a File

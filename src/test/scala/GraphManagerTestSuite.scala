@@ -14,6 +14,7 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.GRDWalker
+import io.spicelabs.goatrodeo.omnibor.GoatRodeoCluster
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -180,9 +181,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
         EdgeType.containedBy -> "gitoid:blob:sha256:e47125968b3b71049fbc4802d1e40a71ea1359decfabacf70b34588037d4ff0c"
       )
       val items = Vector(
-        createTestItem(
-          "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
-          connections
+        createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111", connections
         )
       )
       val (dataAndIndex, clusterFile) =
@@ -254,7 +253,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Use simple items without metadata for reliable serialization
       val item = Item(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
         TreeSet(),
         None,
         None
@@ -274,7 +273,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Use simple items without metadata for reliable serialization
       val item = Item(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
         TreeSet(),
         None,
         None
@@ -296,7 +295,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
     try {
       // Simple test with minimal items - complex items have encoding issues
       val item = Item(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
+        io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"),
         TreeSet(),
         None,
         None
@@ -318,9 +317,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
         EdgeType.aliasFrom -> "sha256:hash1",
         EdgeType.containedBy -> "gitoid:blob:sha256:82e3edf5f5f3a46b5f94579b61817fd9a1f356adcef5ee22da3b96ef775c4860"
       )
-      val item = createTestItem(
-        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
-        connections
+      val item = createTestItem("gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111", connections
       )
       val (dataAndIndex, _) =
         GraphManager.writeEntries(tempDir, Vector(item).iterator)
@@ -385,6 +382,65 @@ class GraphManagerTestSuite extends munit.FunSuite {
       } finally {
         channel.close()
       }
+    } finally {
+      Helpers.deleteDirectory(tempDir.toPath())
+    }
+  }
+
+  // ==================== Cluster helper tests ====================
+
+  test("GoatRodeoCluster.reverseEdges - inverts containedBy across cluster") {
+    val tempDir = Files.createTempDirectory("revedges").toFile()
+    try {
+      val containerId =
+        "gitoid:blob:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      val child1Id =
+        "gitoid:blob:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      val child2Id =
+        "gitoid:blob:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+
+      val container = createTestItem(containerId)
+      val child1 = createTestItem(
+        child1Id,
+        TreeSet(EdgeType.containedBy -> containerId)
+      )
+      val child2 = createTestItem(
+        child2Id,
+        TreeSet(EdgeType.containedBy -> containerId)
+      )
+
+      val (_, clusterFile) = GraphManager.writeEntries(
+        tempDir,
+        Vector(container, child1, child2).iterator
+      )
+
+      val cluster = GoatRodeoCluster.open(clusterFile)
+      // "what does containerId contain?" — both children, synthesised from
+      // their forward `containedBy` edges.
+      assertEquals(
+        cluster.reverseEdges(containerId, EdgeType.contains),
+        Set(child1Id, child2Id)
+      )
+      // Leaf items have no children.
+      assertEquals(cluster.reverseEdges(child1Id, EdgeType.contains), Set.empty[String])
+    } finally {
+      Helpers.deleteDirectory(tempDir.toPath())
+    }
+  }
+
+  test("GoatRodeoCluster.canonicalise - returns input when no aliases") {
+    val tempDir = Files.createTempDirectory("canon-noop").toFile()
+    try {
+      val id =
+        "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
+      val (_, clusterFile) =
+        GraphManager.writeEntries(tempDir, Vector(createTestItem(id)).iterator)
+      val cluster = GoatRodeoCluster.open(clusterFile)
+      assertEquals(cluster.canonicalise(id), id)
+      assertEquals(
+        cluster.canonicalise("gitoid:blob:sha256:00"),
+        "gitoid:blob:sha256:00"
+      )
     } finally {
       Helpers.deleteDirectory(tempDir.toPath())
     }
