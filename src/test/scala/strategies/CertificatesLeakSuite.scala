@@ -61,7 +61,7 @@ class CertificatesLeakSuite extends FunSuite {
   ).map(Pattern.compile)
 
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:1738f894c151411b2c2dbc1d824894212453b8e1c7817d6ef7eda2253aeb7d64",
+    identifier = io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:1738f894c151411b2c2dbc1d824894212453b8e1c7817d6ef7eda2253aeb7d64"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

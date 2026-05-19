@@ -196,7 +196,7 @@ class PgpPropertyTests extends ScalaCheckSuite {
     * actually read the Item, but the signature requires one.
     */
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:576b69f3080f6cb38372ca5b9e08fce957f5d00b0c1ff9e40029b74cccbac4af",
+    identifier = io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:576b69f3080f6cb38372ca5b9e08fce957f5d00b0c1ff9e40029b74cccbac4af"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

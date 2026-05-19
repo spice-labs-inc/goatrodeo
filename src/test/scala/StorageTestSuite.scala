@@ -174,8 +174,8 @@ class StorageTestSuite extends munit.FunSuite {
     val gitoids = storage.gitoidKeys()
     assertEquals(gitoids.size, 1)
     assert(gitoids.contains(Gitoid("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090")))
-    assert(!gitoids.contains(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("sha256:def456")))
-    assert(!gitoids.contains(io.spicelabs.goatrodeo.test.GitoidFixtures.gitoidForAsGitoid("pkg:maven/group/artifact@1.0")))
+    // The `sha256:def456` and `pkg:maven/...` keys must NOT appear in gitoidKeys;
+    // size==1 above already covers that.
   }
 
   test("MemStorage - gitoidKeys returns empty for no gitoids") {
@@ -409,7 +409,7 @@ class StorageTestSuite extends munit.FunSuite {
     try {
       val storage = MemStorage(None)
       // Create a root item (no aliasTo or containedBy edges)
-      val rootItem = Item(        "gitoid:blob:sha256:e14cb9e5c0eeee0ea313a4e04fbd10aa17ac17aa33a3cad4bdfe74b87ca18ef8",
+      val rootItem = Item(io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:e14cb9e5c0eeee0ea313a4e04fbd10aa17ac17aa33a3cad4bdfe74b87ca18ef8"),
         TreeSet(),
         Some(ItemMetaData.mimeType),
         Some(ItemMetaData(TreeSet(), TreeSet(), 100, TreeMap()))

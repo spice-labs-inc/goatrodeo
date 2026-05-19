@@ -446,13 +446,13 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("itemsToFilenameGitOIDMap - creates filename to gitoid map") {
     val item1 = Item(
-      "gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090",
+      io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1.txt"), TreeSet(), 100, TreeMap()))
     )
     val item2 = Item(
-      "gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587",
+      io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2.txt"), TreeSet(), 100, TreeMap()))
@@ -465,7 +465,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("itemsToFilenameGitOIDMap - applies name filter") {
     val item = Item(
-      "gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090",
+      io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -485,7 +485,7 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("itemsToFilenameGitOIDMap - applies mime filter") {
     val item1 = Item(
-      "gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090",
+      io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:6ca13d52ca70c883e0f0bb101e425a89e8624de51db2d2392593af6a84118090"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(
@@ -498,7 +498,7 @@ class ItemTestSuite extends munit.FunSuite {
       )
     )
     val item2 = Item(
-      "gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587",
+      io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:8f61ad5cfa0c471c8cbf810ea285cb1e5f9c2c5e5e5e4f58a3229667703e1587"),
       TreeSet(),
       Some(ItemMetaData.mimeType),
       Some(

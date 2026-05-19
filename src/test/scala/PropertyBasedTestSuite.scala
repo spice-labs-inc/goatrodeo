@@ -44,14 +44,13 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   // ==================== Generators ====================
   // Because ScalaCheck needs to know how to create random instances
 
-  /** Generate valid GitOID-like identifiers */
+  /** Generate valid GitOID-like identifiers. Limited to the algorithms our
+    * Gitoid type supports (sha1, sha256). */
   val genGitOID: Gen[String] = for {
-    hashType <- Gen.oneOf("sha256", "sha1", "sha512")
-    // Generate hex string of appropriate length
+    hashType <- Gen.oneOf("sha256", "sha1")
     hexLength = hashType match {
       case "sha256" => 64
       case "sha1"   => 40
-      case "sha512" => 128
       case _        => 64
     }
     hexChars <- Gen.listOfN(hexLength, Gen.hexChar)
@@ -138,7 +137,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     metadata <-
       if (hasMetadata) genItemMetaData.map(Some(_)) else Gen.const(None)
   } yield Item(
-    identifier = identifier,
+    identifier = io.spicelabs.goatrodeo.util.Identifier(identifier),
     connections = connections,
     bodyMimeType = metadata.map(_ => ItemMetaData.mimeType),
     body = metadata
@@ -181,7 +180,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
     forAll(genItemMetaData) { metadata =>
       val encoded = metadata.encodeCBOR()
       val item = Item(
-        identifier = "gitoid:blob:sha256:" + "a" * 64,
+        identifier = io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:" + "a" * 64),
         connections = TreeSet(),
         bodyMimeType = Some(ItemMetaData.mimeType),
         body = Some(metadata)
@@ -465,8 +464,8 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   property("Different identifiers produce different MD5s") {
     forAll(genItem, genGitOID) { (item, newId) =>
-      if (item.identifier != newId) {
-        val item2 = item.copy(identifier = newId)
+      if (item.identifierString != newId) {
+        val item2 = item.copy(identifier = io.spicelabs.goatrodeo.util.Identifier(newId))
         !item.identifierMD5().sameElements(item2.identifierMD5())
       } else {
         true

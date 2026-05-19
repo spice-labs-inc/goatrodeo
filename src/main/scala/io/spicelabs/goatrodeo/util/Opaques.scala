@@ -17,21 +17,49 @@ package io.spicelabs.goatrodeo.util
 import io.bullet.borer.Decoder
 import io.bullet.borer.Encoder
 
+import java.security.MessageDigest
 import scala.annotation.targetName
 import scala.collection.immutable.ArraySeq
 
 object Opaques {
 
-  /** A Gitoid — a content-addressable identifier with an object type and hash
-    * algorithm.
+  /** Shared header-byte layout for both `Gitoid` and `Identifier`.
     *
-    * Internally a single `ArraySeq.ofByte` of length `1 + algorithm.byteLength`:
-    *   - byte 0: header — high nibble = `ObjectType.ordinal`, low nibble = `HashAlgorithm.ordinal`
+    * byte 0:
+    *   high nibble (bits 7..4) — IdentifierKind ordinal
+    *     0 = Gitoid
+    *     1 = RawHash
+    *     2 = PackageUrl
+    *     3 = Sentinel
+    *   low nibble (bits 3..0) — kind-specific sub-encoding
+    *     Gitoid:     (ObjectType.ordinal << 2) | HashAlgorithm.ordinal
+    *     RawHash:    RawHashAlgorithm.ordinal
+    *     PackageUrl: 0 (reserved)
+    *     Sentinel:   0 (reserved)
+    *
+    * bytes 1..n:
+    *   Gitoid / RawHash: raw hash bytes (length determined by algorithm)
+    *   PackageUrl / Sentinel: UTF-8 bytes of the canonical text form
+    */
+  private inline val KindGitoid = 0
+  private inline val KindRawHash = 1
+  private inline val KindPackageUrl = 2
+  private inline val KindSentinel = 3
+
+  // ============================================================================
+  // Gitoid
+  // ============================================================================
+
+  /** A Gitoid — a content-addressable git-style identifier with an object type
+    * and hash algorithm.
+    *
+    * Internally `ArraySeq.ofByte` of length `1 + algorithm.byteLength`:
+    *   - byte 0: high nibble = 0 (Identifier.Kind.Gitoid), low nibble =
+    *     `(ObjectType.ordinal << 2) | HashAlgorithm.ordinal`
     *   - bytes 1..n: raw hash bytes
     *
-    * `ArraySeq.ofByte` is backed by a single `Array[Byte]` (no per-element
-    * boxing) and provides structural equality / hashCode, which is required
-    * for `Set[Gitoid]` and `Map[Gitoid, _]` semantics.
+    * Identical wire layout to an `Identifier` whose `kind == Kind.Gitoid`, so
+    * conversion to/from `Identifier` is zero-copy.
     */
   opaque type Gitoid = ArraySeq.ofByte
 
@@ -63,53 +91,10 @@ object Opaques {
     }
 
     private inline def headerByte(t: ObjectType, a: HashAlgorithm): Byte =
-      (((t.ordinal & 0xf) << 4) | (a.ordinal & 0xf)).toByte
+      ((KindGitoid << 4) | ((t.ordinal & 0x3) << 2) | (a.ordinal & 0x3)).toByte
 
-    /** Internal byte accessor — returns the backing array directly (zero-copy).
-      * Do not mutate. */
     private[Opaques] inline def bytes(g: Gitoid): Array[Byte] = g.unsafeArray
 
-    private inline def hexNibble(c: Char): Int = c match {
-      case '0'       => 0
-      case '1'       => 1
-      case '2'       => 2
-      case '3'       => 3
-      case '4'       => 4
-      case '5'       => 5
-      case '6'       => 6
-      case '7'       => 7
-      case '8'       => 8
-      case '9'       => 9
-      case 'a' | 'A' => 10
-      case 'b' | 'B' => 11
-      case 'c' | 'C' => 12
-      case 'd' | 'D' => 13
-      case 'e' | 'E' => 14
-      case 'f' | 'F' => 15
-      case _ =>
-        throw new IllegalArgumentException(s"Invalid hex character: '$c'")
-    }
-
-    private inline def hexChar(b: Int): Char = (b & 0xf) match {
-      case 0  => '0'
-      case 1  => '1'
-      case 2  => '2'
-      case 3  => '3'
-      case 4  => '4'
-      case 5  => '5'
-      case 6  => '6'
-      case 7  => '7'
-      case 8  => '8'
-      case 9  => '9'
-      case 10 => 'a'
-      case 11 => 'b'
-      case 12 => 'c'
-      case 13 => 'd'
-      case 14 => 'e'
-      case 15 => 'f'
-    }
-
-    /** Build a Gitoid directly from binary hash bytes — no String materialised. */
     @targetName("fromIArray")
     def apply(
         objectType: ObjectType,
@@ -118,8 +103,6 @@ object Opaques {
     ): Gitoid =
       apply(objectType, algorithm, hash.asInstanceOf[Array[Byte]])
 
-    /** Build a Gitoid from a mutable `Array[Byte]` (e.g. straight from
-      * `MessageDigest.digest()`). Defensive copy. */
     @targetName("fromArray")
     def apply(
         objectType: ObjectType,
@@ -137,9 +120,7 @@ object Opaques {
       new ArraySeq.ofByte(out)
     }
 
-    /** Parse a `gitoid:<type>:<algo>:<hex>` URL into a Gitoid. Walks the input
-      * character by character; one final `Array[Byte]` allocation. Throws
-      * `IllegalArgumentException` on malformed input. */
+    /** Parse a `gitoid:<type>:<algo>:<hex>` URL into a Gitoid. */
     def apply(s: String): Gitoid = {
       val len = s.length
       val prefix = "gitoid:"
@@ -170,8 +151,8 @@ object Opaques {
       out(0) = headerByte(objectType, algorithm)
       var j = 0
       while (j < algorithm.byteLength) {
-        val hi = hexNibble(s.charAt(i + j * 2))
-        val lo = hexNibble(s.charAt(i + j * 2 + 1))
+        val hi = HexUtil.nibble(s.charAt(i + j * 2))
+        val lo = HexUtil.nibble(s.charAt(i + j * 2 + 1))
         out(1 + j) = ((hi << 4) | lo).toByte
         j += 1
       }
@@ -222,35 +203,29 @@ object Opaques {
       } else throw new IllegalArgumentException(s"Unknown hash algorithm token in '$s'")
     }
 
-    /** Pattern-match accessor. Returns `(objectType, algorithm, hash)`. */
     def unapply(g: Gitoid): Some[(ObjectType, HashAlgorithm, IArray[Byte])] = {
       val gb = bytes(g)
-      val header = gb(0) & 0xff
-      val objectType = ObjectType.fromOrdinal((header >>> 4) & 0xf)
-      val algorithm = HashAlgorithm.fromOrdinal(header & 0xf)
+      val sub = gb(0) & 0xf
+      val objectType = ObjectType.fromOrdinal((sub >>> 2) & 0x3)
+      val algorithm = HashAlgorithm.fromOrdinal(sub & 0x3)
       val n = algorithm.byteLength
       val hashCopy = new Array[Byte](n)
-      var i = 0
-      while (i < n) {
-        hashCopy(i) = gb(1 + i)
-        i += 1
-      }
+      System.arraycopy(gb, 1, hashCopy, 0, n)
       Some((objectType, algorithm, IArray.unsafeFromArray(hashCopy)))
     }
 
-    /** URL-form-equivalent ordering: by type name, then algo name, then hash
-      * bytes (unsigned). Matches the prior `Ordering.String` over URL strings
-      * for any two well-formed gitoids, keeping merkle outputs stable. */
     given Ordering[Gitoid] = (a: Gitoid, b: Gitoid) => {
       val ab = bytes(a)
       val bb = bytes(b)
-      val aType = ObjectType.fromOrdinal((ab(0) & 0xff) >>> 4 & 0xf)
-      val bType = ObjectType.fromOrdinal((bb(0) & 0xff) >>> 4 & 0xf)
+      val aSub = ab(0) & 0xf
+      val bSub = bb(0) & 0xf
+      val aType = ObjectType.fromOrdinal((aSub >>> 2) & 0x3)
+      val bType = ObjectType.fromOrdinal((bSub >>> 2) & 0x3)
       val typeCmp = aType.name.compareTo(bType.name)
       if (typeCmp != 0) typeCmp
       else {
-        val aAlgo = HashAlgorithm.fromOrdinal(ab(0) & 0xf)
-        val bAlgo = HashAlgorithm.fromOrdinal(bb(0) & 0xf)
+        val aAlgo = HashAlgorithm.fromOrdinal(aSub & 0x3)
+        val bAlgo = HashAlgorithm.fromOrdinal(bSub & 0x3)
         val algoCmp = aAlgo.name.compareTo(bAlgo.name)
         if (algoCmp != 0) algoCmp
         else {
@@ -266,20 +241,33 @@ object Opaques {
       }
     }
 
-    /** Borer wire format: encode/decode as the URL string. Preserves on-disk
-      * compatibility with existing ADGs. */
-    given Encoder[Gitoid] =
-      Encoder.forString.contramap[Gitoid](toUrlString)
-    given Decoder[Gitoid] =
-      Decoder.forString.map(Gitoid(_))
+    given Encoder[Gitoid] = new Encoder[Gitoid] {
+      def write(w: io.bullet.borer.Writer, g: Gitoid): w.type =
+        w.writeBytes(bytes(g))
+    }
+    given Decoder[Gitoid] = new Decoder[Gitoid] {
+      def read(r: io.bullet.borer.Reader): Gitoid = {
+        val raw = r.readByteArray()
+        if (raw.length < 1) throw new IllegalArgumentException("Empty gitoid bytes")
+        val kind = (raw(0) & 0xff) >>> 4
+        if (kind != KindGitoid)
+          throw new IllegalArgumentException(s"Bytes are not a Gitoid (kind=$kind)")
+        val sub = raw(0) & 0xf
+        val algo = HashAlgorithm.fromOrdinal(sub & 0x3)
+        if (raw.length != 1 + algo.byteLength)
+          throw new IllegalArgumentException(
+            s"Gitoid bytes length ${raw.length} does not match header (expects ${1 + algo.byteLength})"
+          )
+        new ArraySeq.ofByte(raw)
+      }
+    }
 
-    /** Reconstruct the `gitoid:<type>:<algo>:<hex>` URL. One `StringBuilder`
-      * allocation sized exactly. */
+    /** Reconstruct the `gitoid:<type>:<algo>:<hex>` URL. */
     private[Opaques] def toUrlString(g: Gitoid): String = {
       val gb = bytes(g)
-      val header = gb(0) & 0xff
-      val objectType = ObjectType.fromOrdinal((header >>> 4) & 0xf)
-      val algorithm = HashAlgorithm.fromOrdinal(header & 0xf)
+      val sub = gb(0) & 0xf
+      val objectType = ObjectType.fromOrdinal((sub >>> 2) & 0x3)
+      val algorithm = HashAlgorithm.fromOrdinal(sub & 0x3)
       val typeName = objectType.name
       val algoName = algorithm.name
       val n = algorithm.byteLength
@@ -290,8 +278,8 @@ object Opaques {
       var i = 0
       while (i < n) {
         val b = gb(1 + i) & 0xff
-        sb.append(hexChar(b >>> 4))
-        sb.append(hexChar(b & 0xf))
+        sb.append(HexUtil.char(b >>> 4))
+        sb.append(HexUtil.char(b & 0xf))
         i += 1
       }
       sb.toString
@@ -299,53 +287,261 @@ object Opaques {
   }
 
   extension (g: Gitoid) {
-    /** Reconstruct the URL form. Allocates a fresh String. */
     def apply(): String = Gitoid.toUrlString(g)
 
     def objectType: Gitoid.ObjectType =
-      Gitoid.ObjectType.fromOrdinal((Gitoid.bytes(g)(0) & 0xff) >>> 4 & 0xf)
+      Gitoid.ObjectType.fromOrdinal(((Gitoid.bytes(g)(0) & 0xf) >>> 2) & 0x3)
 
     def hashAlgorithm: Gitoid.HashAlgorithm =
-      Gitoid.HashAlgorithm.fromOrdinal(Gitoid.bytes(g)(0) & 0xf)
+      Gitoid.HashAlgorithm.fromOrdinal(Gitoid.bytes(g)(0) & 0x3)
 
-    /** A copy of the hash bytes (without the header). */
     def hash: IArray[Byte] = {
       val gb = Gitoid.bytes(g)
       val n = gb.length - 1
       val out = new Array[Byte](n)
-      var i = 0
-      while (i < n) {
-        out(i) = gb(1 + i)
-        i += 1
-      }
+      System.arraycopy(gb, 1, out, 0, n)
       IArray.unsafeFromArray(out)
     }
 
-    def isBlobSha256: Boolean = Gitoid.bytes(g)(0) == ((0 << 4) | 1).toByte
+    /** A Gitoid is "blob+sha256" iff sub-encoding bits are `(Blob.ordinal << 2)
+      * | Sha256.ordinal` = `(0 << 2) | 1` = 1. */
+    def isBlobSha256: Boolean =
+      Gitoid.bytes(g)(0) == ((KindGitoid << 4) | 1).toByte
 
-    /** Does the URL form start with the given prefix? Materialises the URL
-      * string — callers in performance-sensitive paths should prefer
-      * `objectType` / `hashAlgorithm` checks. */
     def startsWith(prefix: String): Boolean =
       Gitoid.toUrlString(g).startsWith(prefix)
   }
 
-  /** A canonical Package URL (https://github.com/package-url/purl-spec).
+  // ============================================================================
+  // Identifier
+  // ============================================================================
+
+  /** A general-purpose `Item` identifier — Gitoid, raw hash alias, package URL,
+    * or sentinel string. Byte-encoded as a single `ArraySeq.ofByte` whose first
+    * byte tags the kind (see top-of-file layout comment); the remaining bytes
+    * are kind-dependent.
     *
-    * Internally just the canonical `String` — `PackageURL` objects are
-    * ephemeral and we never carry them around in long-lived state; the
-    * canonical form is the wire format and the in-memory representation alike.
-    * The opaque type adds compile-time type safety at API boundaries (so a
-    * stray non-pURL String can't end up in a pURL position) without changing
-    * any byte on disk or in memory. */
+    * Sharing the wire layout with `Gitoid` means converting between them is
+    * zero-copy when the underlying bytes are valid for both. */
+  opaque type Identifier = ArraySeq.ofByte
+
+  object Identifier {
+
+    enum Kind {
+      case Gitoid, RawHash, PackageUrl, Sentinel
+    }
+
+    enum RawHashAlgorithm {
+      case Md5, Sha1, Sha256, Sha512
+
+      def byteLength: Int = this match {
+        case Md5    => 16
+        case Sha1   => 20
+        case Sha256 => 32
+        case Sha512 => 64
+      }
+
+      def name: String = this match {
+        case Md5    => "md5"
+        case Sha1   => "sha1"
+        case Sha256 => "sha256"
+        case Sha512 => "sha512"
+      }
+    }
+
+    private[Opaques] inline def bytes(id: Identifier): Array[Byte] = id.unsafeArray
+
+    private inline def headerByte(kind: Int, sub: Int): Byte =
+      (((kind & 0xf) << 4) | (sub & 0xf)).toByte
+
+    // ---- Construction from typed sources (cheap, no parsing) ---------------
+
+    /** Zero-copy: the underlying `ArraySeq.ofByte` is already valid as both
+      * `Gitoid` and `Identifier` because they share the byte layout. */
+    def fromGitoid(g: Gitoid): Identifier = g.asInstanceOf[Identifier]
+
+    def fromPackageUrl(p: PackageUrl): Identifier = {
+      val utf8 = p.apply().getBytes("UTF-8")
+      val out = new Array[Byte](1 + utf8.length)
+      out(0) = headerByte(KindPackageUrl, 0)
+      System.arraycopy(utf8, 0, out, 1, utf8.length)
+      new ArraySeq.ofByte(out)
+    }
+
+    def sentinel(text: String): Identifier = {
+      val utf8 = text.getBytes("UTF-8")
+      val out = new Array[Byte](1 + utf8.length)
+      out(0) = headerByte(KindSentinel, 0)
+      System.arraycopy(utf8, 0, out, 1, utf8.length)
+      new ArraySeq.ofByte(out)
+    }
+
+    def rawHash(algo: RawHashAlgorithm, hash: Array[Byte]): Identifier = {
+      if (hash.length != algo.byteLength)
+        throw new IllegalArgumentException(
+          s"Hash length ${hash.length} does not match ${algo.name} byte length ${algo.byteLength}"
+        )
+      val out = new Array[Byte](1 + algo.byteLength)
+      out(0) = headerByte(KindRawHash, algo.ordinal & 0xf)
+      System.arraycopy(hash, 0, out, 1, algo.byteLength)
+      new ArraySeq.ofByte(out)
+    }
+
+    // ---- Construction from canonical String (dispatches on prefix) ---------
+
+    /** Parse a canonical identifier string into the appropriate kind:
+      *
+      *   "gitoid:…"   → Gitoid
+      *   "md5:…" / "sha1:…" / "sha256:…" / "sha512:…" → RawHash
+      *   "pkg:…"      → PackageUrl
+      *   otherwise    → Sentinel (free-form text, tolerates "tags" et al.)
+      */
+    def apply(canonical: String): Identifier = {
+      if (canonical.startsWith("gitoid:")) {
+        fromGitoid(Gitoid(canonical))
+      } else if (canonical.startsWith("pkg:")) {
+        fromPackageUrl(PackageUrl(canonical))
+      } else {
+        // Possible raw-hash prefixes.
+        val algoOpt: Option[RawHashAlgorithm] =
+          if (canonical.startsWith("md5:")) Some(RawHashAlgorithm.Md5)
+          else if (canonical.startsWith("sha1:")) Some(RawHashAlgorithm.Sha1)
+          else if (canonical.startsWith("sha256:")) Some(RawHashAlgorithm.Sha256)
+          else if (canonical.startsWith("sha512:")) Some(RawHashAlgorithm.Sha512)
+          else None
+        algoOpt match {
+          case Some(algo) =>
+            val colonAt = canonical.indexOf(':')
+            val hexStart = colonAt + 1
+            val expectedHex = algo.byteLength * 2
+            if (canonical.length - hexStart != expectedHex) {
+              // Wrong hex length — preserve as sentinel rather than reject.
+              // This keeps short test fixtures and unusual identifier strings
+              // working without burdening every caller with a try/catch.
+              sentinel(canonical)
+            } else {
+              val hash = new Array[Byte](algo.byteLength)
+              var j = 0
+              var fallToSentinel = false
+              while (j < algo.byteLength && !fallToSentinel) {
+                try {
+                  val hi = HexUtil.nibble(canonical.charAt(hexStart + j * 2))
+                  val lo = HexUtil.nibble(canonical.charAt(hexStart + j * 2 + 1))
+                  hash(j) = ((hi << 4) | lo).toByte
+                  j += 1
+                } catch {
+                  case _: IllegalArgumentException =>
+                    fallToSentinel = true
+                }
+              }
+              if (fallToSentinel) sentinel(canonical) else rawHash(algo, hash)
+            }
+          case None =>
+            sentinel(canonical)
+        }
+      }
+    }
+
+    given Ordering[Identifier] = (a: Identifier, b: Identifier) => {
+      val ab = bytes(a)
+      val bb = bytes(b)
+      val n = math.min(ab.length, bb.length)
+      var i = 0
+      var result = 0
+      while (i < n && result == 0) {
+        result = (ab(i) & 0xff) - (bb(i) & 0xff)
+        i += 1
+      }
+      if (result != 0) result else ab.length - bb.length
+    }
+
+    given Encoder[Identifier] = new Encoder[Identifier] {
+      def write(w: io.bullet.borer.Writer, id: Identifier): w.type =
+        w.writeBytes(bytes(id))
+    }
+    given Decoder[Identifier] = new Decoder[Identifier] {
+      def read(r: io.bullet.borer.Reader): Identifier =
+        new ArraySeq.ofByte(r.readByteArray())
+    }
+
+    /** Materialise the canonical String form. Used by the lazy cache on
+      * `Item` so each Item pays at most once. */
+    private[Opaques] def toCanonicalString(id: Identifier): String = {
+      val ib = bytes(id)
+      if (ib.length == 0)
+        throw new IllegalStateException("Identifier with no bytes")
+      val kind = (ib(0) & 0xff) >>> 4
+      kind match {
+        case KindGitoid     => Gitoid.toUrlString(id.asInstanceOf[Gitoid])
+        case KindRawHash    => rawHashString(ib)
+        case KindPackageUrl => new String(ib, 1, ib.length - 1, "UTF-8")
+        case KindSentinel   => new String(ib, 1, ib.length - 1, "UTF-8")
+        case other =>
+          throw new IllegalStateException(s"Unknown Identifier kind: $other")
+      }
+    }
+
+    private def rawHashString(ib: Array[Byte]): String = {
+      val algo = RawHashAlgorithm.fromOrdinal(ib(0) & 0xf)
+      val n = algo.byteLength
+      val name = algo.name
+      val totalLen = name.length + 1 + n * 2
+      val sb = new java.lang.StringBuilder(totalLen)
+      sb.append(name).append(':')
+      var i = 0
+      while (i < n) {
+        val b = ib(1 + i) & 0xff
+        sb.append(HexUtil.char(b >>> 4))
+        sb.append(HexUtil.char(b & 0xf))
+        i += 1
+      }
+      sb.toString
+    }
+  }
+
+  extension (id: Identifier) {
+    /** Canonical text form. */
+    @targetName("identifierApply")
+    def apply(): String = Identifier.toCanonicalString(id)
+
+    @targetName("identifierKind")
+    def kind: Identifier.Kind = {
+      val k = (Identifier.bytes(id)(0) & 0xff) >>> 4
+      Identifier.Kind.fromOrdinal(k)
+    }
+
+    @targetName("identifierIsGitoid")
+    def isGitoid: Boolean = ((Identifier.bytes(id)(0) & 0xff) >>> 4) == KindGitoid
+
+    /** Zero-copy conversion to `Gitoid` when this identifier IS a gitoid. */
+    @targetName("identifierAsGitoid")
+    def asGitoid: Option[Gitoid] =
+      if (id.isGitoid) Some(id.asInstanceOf[Gitoid]) else None
+
+    /** MD5 of the raw identifier bytes — no UTF-8 round-trip through a
+      * canonical String. */
+    @targetName("identifierMd5")
+    def md5: Array[Byte] = {
+      val md = MessageDigest.getInstance("MD5")
+      md.digest(Identifier.bytes(id))
+    }
+
+    @targetName("identifierMd5Hex")
+    def md5Hex: String = bytesToHex(id.md5)
+
+    @targetName("identifierStartsWith")
+    def startsWith(prefix: String): Boolean =
+      Identifier.toCanonicalString(id).startsWith(prefix)
+  }
+
+  // ============================================================================
+  // PackageUrl
+  // ============================================================================
+
   opaque type PackageUrl = String
 
   object PackageUrl {
 
-    /** Wrap a canonical `pkg:...` String. Validates by round-tripping the
-      * input through `com.github.packageurl.PackageURL` and re-canonicalising;
-      * throws `IllegalArgumentException` if the input is malformed or not
-      * already in canonical form. */
     def apply(canonical: String): PackageUrl = {
       val parsed = new com.github.packageurl.PackageURL(canonical)
       val again = parsed.canonicalize()
@@ -356,13 +552,10 @@ object Opaques {
       canonical
     }
 
-    /** Wrap a `PackageURL` directly — the common case in production where
-      * we build pURLs via `PackageURLBuilder`. */
     def apply(purl: com.github.packageurl.PackageURL): PackageUrl =
       purl.canonicalize()
 
     given Ordering[PackageUrl] = Ordering.String
-
     given Encoder[PackageUrl] =
       Encoder.forString.asInstanceOf[Encoder[PackageUrl]]
     given Decoder[PackageUrl] =
@@ -370,17 +563,75 @@ object Opaques {
   }
 
   extension (p: PackageUrl) {
-    /** The canonical `pkg:...` String form. */
     def apply(): String = p
 
-    /** Parse the canonical form back into a mutable `PackageURL` object for
-      * field access (`getType`, `getNamespace`, `getQualifiers`, etc.). */
     def parsed: com.github.packageurl.PackageURL =
       new com.github.packageurl.PackageURL(p)
 
     def startsWith(prefix: String): Boolean = (p: String).startsWith(prefix)
   }
+
+  // ============================================================================
+  // Shared hex utilities (also used by Helpers but kept private to Opaques
+  // so the encoders/decoders here have no external dependencies). The public
+  // hex helpers in Helpers.scala are unchanged.
+  // ============================================================================
+
+  private object HexUtil {
+    inline def nibble(c: Char): Int = c match {
+      case '0'       => 0
+      case '1'       => 1
+      case '2'       => 2
+      case '3'       => 3
+      case '4'       => 4
+      case '5'       => 5
+      case '6'       => 6
+      case '7'       => 7
+      case '8'       => 8
+      case '9'       => 9
+      case 'a' | 'A' => 10
+      case 'b' | 'B' => 11
+      case 'c' | 'C' => 12
+      case 'd' | 'D' => 13
+      case 'e' | 'E' => 14
+      case 'f' | 'F' => 15
+      case _ =>
+        throw new IllegalArgumentException(s"Invalid hex character: '$c'")
+    }
+
+    inline def char(b: Int): Char = (b & 0xf) match {
+      case 0  => '0'
+      case 1  => '1'
+      case 2  => '2'
+      case 3  => '3'
+      case 4  => '4'
+      case 5  => '5'
+      case 6  => '6'
+      case 7  => '7'
+      case 8  => '8'
+      case 9  => '9'
+      case 10 => 'a'
+      case 11 => 'b'
+      case 12 => 'c'
+      case 13 => 'd'
+      case 14 => 'e'
+      case 15 => 'f'
+    }
+  }
+
+  private def bytesToHex(arr: Array[Byte]): String = {
+    val sb = new java.lang.StringBuilder(arr.length * 2)
+    var i = 0
+    while (i < arr.length) {
+      val b = arr(i) & 0xff
+      sb.append(HexUtil.char(b >>> 4))
+      sb.append(HexUtil.char(b & 0xf))
+      i += 1
+    }
+    sb.toString
+  }
 }
 
 export Opaques.Gitoid
+export Opaques.Identifier
 export Opaques.PackageUrl

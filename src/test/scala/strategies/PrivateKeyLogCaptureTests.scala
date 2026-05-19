@@ -63,7 +63,7 @@ class PrivateKeyLogCaptureTests extends FunSuite {
   }
 
   private def stubItem(): Item = Item(
-    identifier = "gitoid:blob:sha256:dc88a2967453fc0e5270985c475b412dbf7f47a24432bb8cf5177441758bb0f5",
+    identifier = io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:dc88a2967453fc0e5270985c475b412dbf7f47a24432bb8cf5177441758bb0f5"),
     connections = TreeSet.empty,
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(

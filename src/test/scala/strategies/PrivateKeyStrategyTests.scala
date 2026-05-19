@@ -643,7 +643,7 @@ class PrivateKeyStrategyTests extends FunSuite {
     import io.spicelabs.goatrodeo.util.Gitoid
     import scala.collection.immutable.{TreeMap, TreeSet}
     Item(
-      identifier = "gitoid:blob:sha256:1d8d5fa9ef663970b0e15351ea4a8c5f11a3011c1999dbb0c98c38ab0348acda",
+      identifier = io.spicelabs.goatrodeo.util.Identifier("gitoid:blob:sha256:1d8d5fa9ef663970b0e15351ea4a8c5f11a3011c1999dbb0c98c38ab0348acda"),
       connections = TreeSet.empty,
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(

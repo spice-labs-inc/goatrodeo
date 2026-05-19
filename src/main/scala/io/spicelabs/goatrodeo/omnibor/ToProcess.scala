@@ -9,6 +9,7 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Gitoid
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Identifier
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
 
@@ -152,7 +153,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       parent: Option[ParentScope],
       augmentationByHash: Map[String, Vector[Augmentation]]
   ): ParentScope =
-    ParentScope.forAndWith(item.identifier, parent, augmentationByHash)
+    ParentScope.forAndWith(item.identifierString, parent, augmentationByHash)
 }
 
 abstract class ParentScope(
@@ -330,7 +331,7 @@ trait ToProcess {
             val itemRaw = Item.itemFrom(artifact, parentId)
 
             // in blocklist do nothing
-            if (blockListAsStrings.contains(itemRaw.identifier)) {
+            if (blockListAsStrings.contains(itemRaw.identifierString)) {
               orgState -> alreadyDone
             } else {
               val aliases = itemRaw.connections.toVector
@@ -428,7 +429,7 @@ trait ToProcess {
                       item =>
                         Some(
                           Item(
-                            tagGitoid(),
+                            Identifier.fromGitoid(tagGitoid),
                             TreeSet(EdgeType.tagFrom -> "tags"),
                             Some(ItemTagData.mimeType),
                             Some(ItemTagData(tagJson))
@@ -483,7 +484,7 @@ trait ToProcess {
                 parentScope.finalAugmentation(store, artifact, item4)
 
               // if we've seen the gitoid before we write it
-              val hasBeenSeen = store.contains(itemScope4.identifier)
+              val hasBeenSeen = store.contains(itemScope4.identifierString)
 
               // update back-references for this item
               // this is *only* for the the pre-merged `Item`
@@ -500,15 +501,15 @@ trait ToProcess {
                       case Some(item) =>
                         Some(
                           item.copy(connections =
-                            item.connections + (aliasType -> itemScope4.identifier)
+                            item.connections + (aliasType -> itemScope4.identifierString)
                           )
                         )
                       case None =>
                         Some(
                           Item(
-                            itemNeedingAlias,
+                            Identifier(itemNeedingAlias),
                             // noopLocationReference,
-                            TreeSet(aliasType -> itemScope4.identifier),
+                            TreeSet(aliasType -> itemScope4.identifierString),
                             None,
                             None
                           )
@@ -518,7 +519,7 @@ trait ToProcess {
                       f"Updating alias reference ${itemNeedingAlias} ${item.bodyAsItemMetaData match {
                           case None       => ""
                           case Some(body) => f"files ${body.fileNames}"
-                        }} alias name ${aliasType} for item ${itemScope4.identifier}${itemScope4.bodyAsItemMetaData match {
+                        }} alias name ${aliasType} for item ${itemScope4.identifierString}${itemScope4.bodyAsItemMetaData match {
                           case None       => ""
                           case Some(body) => f" files ${body.fileNames}"
                         }}, parent scope ${parentScope.parentScopeInformation()}"
@@ -529,13 +530,13 @@ trait ToProcess {
               // write
               val answerItem = store
                 .write(
-                  itemScope4.identifier,
+                  itemScope4.identifierString,
                   {
                     case None            => Some(itemScope4)
                     case Some(otherItem) => Some(otherItem.merge(itemScope4))
                   },
                   item =>
-                    f"Writing ${itemScope4.identifier}, ${item.body match {
+                    f"Writing ${itemScope4.identifierString}, ${item.body match {
                         case None => ""
                         case Some(body) =>
                           f"gitoid:sha1 ${item.connections.map(_._2).filter(_.startsWith("gitoid:blob:sha1"))}"
@@ -575,7 +576,7 @@ trait ToProcess {
                       )
                       processSet.flatMap(tp =>
                         tp.process(
-                          Some(Gitoid(answerItem.identifier)),
+                          Some(Gitoid(answerItem.identifierString)),
                           store,
                           thisParentScope,
                           None,
@@ -591,7 +592,7 @@ trait ToProcess {
               val state5 =
                 state4.postChildProcessing(childGitoids, store, marker)
 
-              state5 -> (alreadyDone :+ Gitoid(answerItem.identifier))
+              state5 -> (alreadyDone :+ Gitoid(answerItem.identifierString))
             }
         }
 
