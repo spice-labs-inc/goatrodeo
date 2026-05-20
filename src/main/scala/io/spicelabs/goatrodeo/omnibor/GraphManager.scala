@@ -189,7 +189,25 @@ object GraphManager {
     indexWriter.write(ByteBuffer.wrap(indexEnvBytes))
     val indexBB = ByteBuffer.allocate(pairs.length * 32)
 
-    for { v <- pairs } {
+    // Sort by MD5 byte array (unsigned, lex order). The collection is in
+    // *write* order (topological from `Storage.prepareForWrite`), but the
+    // .gri reader (both goatrodeo's own GRDWalker and BigTent's binary
+    // search) requires entries sorted by raw MD5 bytes for lookups to
+    // succeed.
+    val sortedPairs = pairs.sortWith { (a, b) =>
+      val ab = a._2
+      val bb = b._2
+      val n = math.min(ab.length, bb.length)
+      var i = 0
+      var result = 0
+      while (i < n && result == 0) {
+        result = (ab(i) & 0xff) - (bb(i) & 0xff)
+        i += 1
+      }
+      if (result != 0) result < 0 else ab.length < bb.length
+    }
+
+    for { v <- sortedPairs } {
       indexBB.put(v._2)
       indexBB.putLong(sha256Long)
       indexBB.putLong(v._3)
