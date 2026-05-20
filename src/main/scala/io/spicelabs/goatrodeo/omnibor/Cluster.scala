@@ -96,18 +96,27 @@ case class GoatRodeoCluster(
     envelope: ClusterFileEnvelope,
     path: File,
     dataFiles: Map[Long, DataFile],
-    indexFiles: Map[Long, IndexFile]
+    indexFiles: Map[Long, IndexFile],
+    /** Cluster-wide alias map, loaded from the `<hash>.gra` sidecar
+      * file referenced by `envelope.aliasMapFile`. Empty when the
+      * cluster has no aliases (e.g. v1 clusters, or v4 clusters with
+      * `aliasMapFile = None`). */
+    aliasMap: scala.collection.immutable.TreeMap[String, scala.collection.immutable.TreeSet[String]] =
+      scala.collection.immutable.TreeMap.empty
 ) {
 
-  /** Combined alias map across every DataFile in the cluster, inverted to
-    * `alternateIdentifier → canonicalIdentifier`. Built lazily on first
-    * access. Today each DataFile holds an identical copy of the
-    * cluster-wide map, so the merge is idempotent. */
+  /** Look up the alternates registered for a canonical identifier, if
+    * any. Useful for v4 readers that want to surface the `alias:from`
+    * edges that were stripped at write time. */
+  def aliasesFor(canonical: String): scala.collection.immutable.TreeSet[String] =
+    aliasMap.getOrElse(canonical, scala.collection.immutable.TreeSet.empty)
+
+  /** Inverse of [[aliasMap]] — `alternateIdentifier → canonicalIdentifier`.
+    * Built lazily on first access. */
   lazy val aliasInverseMap: Map[String, String] = {
     val b = scala.collection.mutable.Map.empty[String, String]
     for {
-      df <- dataFiles.values
-      (canon, aliases) <- df.envelope.aliasMap
+      (canon, aliases) <- aliasMap
       alias <- aliases
     } b.update(alias, canon)
     b.toMap
@@ -195,6 +204,53 @@ object GoatRodeoCluster {
   def findFile(dir: File, hash: Long, suffix: String): File = {
     File(dir, f"${String.format("%016x", hash)}.${suffix}")
   }
+
+  /** Read and decode a `<hash>.gra` alias-map sidecar file.
+    *
+    * The file's layout matches [[GraphManager.writeAliasMapFile]]:
+    *
+    *   - 4 bytes — [[GraphManager.Consts.AliasMapFileMagicNumber]].
+    *   - Rest of the file — a single CBOR-encoded
+    *     `TreeMap[String, TreeSet[String]]` (no length prefix; the map
+    *     is self-delimiting and consumes the remainder of the file).
+    *
+    * This is the read companion to the sidecar emission that replaces
+    * the v3 embedded-alias-map design (which silently truncated for
+    * any cluster whose alias map exceeded ~64 KiB).
+    */
+  private def loadAliasMapFile(
+      dir: File,
+      hash: Long
+  ): scala.collection.immutable.TreeMap[String, scala.collection.immutable.TreeSet[String]] = {
+    val file = findFile(dir, hash, "gra")
+    Using.resource(FileInputStream(file)) { fis =>
+      val fc = fis.getChannel()
+      val magic = Helpers.readInt(fc)
+      if (magic != GraphManager.Consts.AliasMapFileMagicNumber) {
+        throw Exception(
+          f"Unexpected magic number ${magic} expecting ${GraphManager.Consts.AliasMapFileMagicNumber} for alias-map file ${file.getName()}"
+        )
+      }
+      // Read the remainder of the file as a single CBOR-encoded map.
+      val remaining = (fc.size() - fc.position()).toInt
+      val buf = java.nio.ByteBuffer.allocate(remaining)
+      while (buf.hasRemaining()) {
+        if (fc.read(buf) < 0) {
+          throw Exception(
+            f"Unexpected EOF while reading alias-map file ${file.getName()}"
+          )
+        }
+      }
+      buf.position(0)
+      import io.bullet.borer.Cbor
+      Cbor
+        .decode(buf)
+        .to[
+          scala.collection.immutable.TreeMap[String, scala.collection.immutable.TreeSet[String]]
+        ]
+        .value
+    }
+  }
   def open(path: File): GoatRodeoCluster = {
 
     val fileName = path.getName()
@@ -244,11 +300,19 @@ object GoatRodeoCluster {
         dataFileHash <- dataFileHashes.toSeq
       } yield (dataFileHash -> DataFile.open(theDir, dataFileHash)))*)
 
+      val aliasMap = env.aliasMapFile match {
+        case Some(hash) => loadAliasMapFile(theDir, hash)
+        case None       =>
+          scala.collection.immutable.TreeMap
+            .empty[String, scala.collection.immutable.TreeSet[String]]
+      }
+
       GoatRodeoCluster(
         envelope = env,
         path = theDir,
         dataFiles = dataFiles,
-        indexFiles = indexFiles
+        indexFiles = indexFiles,
+        aliasMap = aliasMap
       )
     }
 

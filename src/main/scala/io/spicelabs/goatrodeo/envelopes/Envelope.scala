@@ -110,8 +110,7 @@ case class DataFileEnvelope(
     previous: Long,
     @key("depends_on") dependsOn: TreeSet[Long],
     @key("built_from_merge") builtFromMerge: Boolean,
-    info: TreeMap[String, String],
-    @key("alias_map") aliasMap: TreeMap[String, TreeSet[String]] = TreeMap.empty
+    info: TreeMap[String, String]
 ) derives Codec {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 }
@@ -125,28 +124,31 @@ object DataFileEnvelope {
     * each connection is encoded as a compact tagged array — `SameFile`,
     * `CrossFile`, `External`, or `UnknownType` per `WireEdge`.
     *
-    * v3: adds `aliasMap` (canonical id → set of alternate identifiers).
-    * Alternate-form Items (one per non-canonical identifier) are collapsed
-    * into their canonical at write time; the alias relationships move into
-    * the table. On read, the alias edges (`alias:from` / `alias:to`) are
-    * synthesised back into `Item.connections` from this table. */
-  val DataFileEnvelopeVersion = 3
+    * v3: alias collapse — alternate-form Items are merged into their
+    * canonical at write time and the alias relationships move into a
+    * cluster-wide alias map. v3 embedded that table into each DataFile
+    * envelope, which silently corrupted the file once the encoded map
+    * exceeded 64 KiB (the envelope length prefix is a `u16`). v3 should
+    * be considered broken and is no longer produced.
+    *
+    * v4: identical streamed item format as v2/v3, but the alias map now
+    * lives in a separate alias-map sidecar file referenced by hash from
+    * `ClusterFileEnvelope.aliasMapFile`. DataFile envelopes stay small. */
+  val DataFileEnvelopeVersion = 4
   def build(
       version: Int = DataFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.DataFileMagicNumber,
       previous: Long,
       dependsOn: TreeSet[Long] = TreeSet(),
       builtFromMerge: Boolean,
-      info: TreeMap[String, String] = TreeMap(),
-      aliasMap: TreeMap[String, TreeSet[String]] = TreeMap.empty
+      info: TreeMap[String, String] = TreeMap()
   ): DataFileEnvelope = DataFileEnvelope(
     version,
     magic,
     previous,
     dependsOn,
     builtFromMerge,
-    info,
-    aliasMap
+    info
   )
 
   def decode(bytes: Array[Byte]): Try[DataFileEnvelope] = {
@@ -193,27 +195,41 @@ case class ClusterFileEnvelope(
     magic: Int,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
-    info: TreeMap[String, String]
+    info: TreeMap[String, String],
+    /** Hash of the cluster-wide alias-map sidecar file
+      * (`<hash>.gra`), if one was written. Encoded as a CBOR null when
+      * absent so older readers that don't know about the field default
+      * cleanly. v3 readers see this as an unknown field and silently
+      * ignore it. */
+    @key("alias_map_file") aliasMapFile: Option[Long] = None
 ) {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 
 }
 
 object ClusterFileEnvelope {
-  val ClusterFileEnvelopeVersion = 3
+  /** v3: cluster envelope shipped alongside per-DataFile `aliasMap`
+    *     embedding. Obsolete — see [[DataFileEnvelope]] notes.
+    *
+    * v4: cluster envelope carries an optional `aliasMapFile` hash
+    *     referencing the cluster-wide alias map written as a separate
+    *     `<hash>.gra` sidecar file. */
+  val ClusterFileEnvelopeVersion = 4
 
   def build(
       version: Int = ClusterFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],
-      info: TreeMap[String, String] = TreeMap()
+      info: TreeMap[String, String] = TreeMap(),
+      aliasMapFile: Option[Long] = None
   ): ClusterFileEnvelope = ClusterFileEnvelope(
     version = version,
     magic = magic,
     dataFiles = dataFiles,
     indexFiles = indexFiles,
-    info = info
+    info = info,
+    aliasMapFile = aliasMapFile
   )
 
   given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =

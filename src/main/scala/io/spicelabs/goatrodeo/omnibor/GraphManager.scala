@@ -1,6 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
+import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
@@ -54,6 +55,14 @@ object GraphManager {
       */
     val ClusterFileMagicNumber: Int = 0xba4a4a // Banana
 
+    /** Magic number at the start of GRA (alias-map sidecar) files:
+      * 0x0A11A5ED ("Aliased"). Written by the cluster's writeEntries
+      * pass when the alias collapse produces a non-empty map. The
+      * `.gra` file is referenced by hash from
+      * [[io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope.aliasMapFile]].
+      */
+    val AliasMapFileMagicNumber: Int = 0x0a11a5ed // Aliased
+
     /** Target maximum file size (15 GB) before starting a new data file. */
     val TargetMaxFileSize: Long = 15L * 1024L * 1024L * 1024L // 15G
   }
@@ -71,8 +80,7 @@ object GraphManager {
       items: Iterator[Item],
       previous: Long,
       afterWrite: Item => Unit,
-      writeCtx: WriteContext,
-      aliasMap: TreeMap[String, TreeSet[String]]
+      writeCtx: WriteContext
   ): DataAndIndexFiles = {
     val start = Instant.now()
     // create temporary file
@@ -86,8 +94,7 @@ object GraphManager {
     val dataFileEnvelope =
       DataFileEnvelope.build(
         previous = previous,
-        builtFromMerge = false,
-        aliasMap = aliasMap
+        builtFromMerge = false
       )
     val envelopeBytes = dataFileEnvelope.encode()
     // write the DataFileEnvelope length
@@ -256,8 +263,7 @@ object GraphManager {
         entries,
         previous = previousInChain,
         updateBiggest,
-        writeCtx,
-        aliasMap
+        writeCtx
       )
       previousInChain = dataAndIndex.dataFile
       fileSet = dataAndIndex :: fileSet
@@ -270,6 +276,15 @@ object GraphManager {
         writeCtx.currentFileOrdinal =
           (writeCtx.currentFileOrdinal + 1).toByte
     }
+
+    // If alias collapse produced a non-empty map, write it out to a
+    // sidecar `.gra` file and capture the hash for the cluster envelope.
+    // We do this here (after data/index files and before the cluster
+    // envelope) so the cluster envelope can reference the sidecar by
+    // hash and stay small itself.
+    val aliasMapFileHash: Option[Long] =
+      if (aliasMap.isEmpty) None
+      else Some(writeAliasMapFile(targetDirectory, aliasMap))
 
     val tempFile =
       Files.createTempFile(
@@ -284,7 +299,8 @@ object GraphManager {
     val clusterEnvelope =
       ClusterFileEnvelope.build(
         indexFiles = fileSet.map(_.indexFile).toVector,
-        dataFiles = fileSet.map(_.dataFile).toVector
+        dataFiles = fileSet.map(_.dataFile).toVector,
+        aliasMapFile = aliasMapFileHash
       )
     val envelopeBytes = clusterEnvelope.encode()
     Helpers.writeShort(writer, envelopeBytes.length)
@@ -335,6 +351,50 @@ object GraphManager {
     (fileSet, targetFile)
   }
 
+  /** Write the cluster-wide alias map to a `<sha256_low_63>.gra`
+    * sidecar file in `targetDirectory` and return the hash that names
+    * the file (and is referenced from
+    * [[io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope.aliasMapFile]]).
+    *
+    * File layout:
+    *
+    *   - 4 bytes — [[Consts.AliasMapFileMagicNumber]] (big-endian).
+    *   - Rest of the file — a single CBOR-encoded
+    *     `TreeMap[String, TreeSet[String]]` mapping canonical
+    *     identifiers to their alternates.
+    *
+    * No length prefix on the CBOR payload: the map is self-delimiting,
+    * and the file is consumed by reading to EOF. This avoids the 16-bit
+    * length-prefix overflow that previously corrupted large embedded
+    * alias maps inside `DataFileEnvelope` (v3).
+    */
+  private def writeAliasMapFile(
+      targetDirectory: File,
+      aliasMap: TreeMap[String, TreeSet[String]]
+  ): Long = {
+    val tempFile =
+      Files.createTempFile(
+        targetDirectory.toPath(),
+        "goat_rodeo_alias_",
+        ".gra"
+      )
+    val fileWriter = new FileOutputStream(tempFile.toFile())
+    val writer = fileWriter.getChannel()
+    try {
+      Helpers.writeInt(writer, Consts.AliasMapFileMagicNumber)
+      val cborBytes = Cbor.encode(aliasMap).toByteArray
+      writer.write(ByteBuffer.wrap(cborBytes))
+    } finally {
+      writer.close()
+    }
+    val sha256Long = Helpers.byteArrayToLong63Bits(
+      Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
+    )
+    val finalFile =
+      new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.gra")
+    tempFile.toFile().renameTo(finalFile)
+    sha256Long
+  }
 }
 
 /** A walker for reading Items from a GRD (Goat Rodeo Data) file.
@@ -417,25 +477,14 @@ class GRDWalker(source: FileChannel) {
         // write side, which records `currentPosition` before writing.
         readCtx.record(frameStart, rawItem.identifierString)
 
-        // v3: reconstruct alias edges from the envelope's aliasMap. Items
-        // that were a canonical of a collapsed equivalence class have
-        // their `alias:from` edges synthesised back, so consumers see
-        // `connections` exactly as it would have been before the
-        // collapse.
-        val entry = envelopeOpt match {
-          case Some(env) if env.version >= 3 && env.aliasMap.nonEmpty =>
-            env.aliasMap.get(rawItem.identifierString) match {
-              case Some(aliases) if aliases.nonEmpty =>
-                val added = aliases.iterator
-                  .map(a => (EdgeType.aliasFrom, a))
-                rawItem.copy(
-                  connections = rawItem.connections ++ added
-                )
-              case _ => rawItem
-            }
-          case _ => rawItem
-        }
-        Some(entry)
+        // Alias-edge synthesis for v3+ canonicals is no longer the
+        // walker's responsibility. The cluster-wide alias map lives in
+        // a separate `.gra` sidecar referenced from `ClusterFileEnvelope`
+        // and `GoatRodeoCluster.open` loads it; callers reading items via
+        // the cluster get alias synthesis at that layer. Standalone
+        // GRDWalker callers (e.g. `forwardEdgeIndex`'s internal scan)
+        // operate on the raw item set.
+        Some(rawItem)
       }
     }
   }
