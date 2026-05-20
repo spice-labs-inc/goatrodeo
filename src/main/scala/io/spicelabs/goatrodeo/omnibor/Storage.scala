@@ -26,11 +26,13 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
+import java.util.function.BiFunction
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+import scala.jdk.CollectionConverters._
 
 /** An abstract definition of a GitOID Corpus storage backend
   */
@@ -442,26 +444,25 @@ class MemStorage(val targetDir: Option[File])
 
   private val logger = Logger(getClass())
 
+  // The item store. `ConcurrentHashMap.compute` gives us atomic
+  // read-modify-write per key under a bucket-level lock — replacing the
+  // old `AtomicReference[Map[String, Item]]` + global `dbSync` +
+  // per-path `locks: HashMap[String, AtomicInteger]` setup. Each write
+  // touches a single bucket instead of allocating a fresh immutable
+  // Map on every update, and contention is naturally striped across
+  // the table's internal segments.
+  private val db: ConcurrentHashMap[String, Item] =
+    new ConcurrentHashMap[String, Item]()
+
+  private val thePurls: AtomicReference[TreeSet[PackageUrl]] =
+    AtomicReference(TreeSet())
+
   override def contains(identifier: String): Boolean =
-    db.get().contains(identifier)
+    db.containsKey(identifier)
 
   override def destDirectory(): Option[File] = targetDir
 
-  // synchronize access to the locks map
-  private val sync = new Object()
-
-  // synchronize access to the database
-  private val dbSync = new Object()
-  private var db: AtomicReference[Map[String, Item]] = AtomicReference(Map())
-  private var thePurls: AtomicReference[TreeSet[PackageUrl]] =
-    AtomicReference(TreeSet())
-  private val locks: java.util.HashMap[String, AtomicInteger] =
-    java.util.HashMap()
-  def keys(): Set[String] = {
-
-    db.get().keySet
-
-  }
+  def keys(): Set[String] = db.keySet().asScala.toSet
 
   override def pathsSortedWithMD5(): Vector[(String, String)] = {
     keys().toVector.par
@@ -484,78 +485,47 @@ class MemStorage(val targetDir: Option[File])
 
   def purls(): TreeSet[PackageUrl] = thePurls.get()
 
-  override def size(): Int = db.get().size
+  override def size(): Int = db.size()
 
   override def target(): Option[File] = targetDir
 
-  override def exists(path: String): Boolean =
-    db.get().contains(path)
+  override def exists(path: String): Boolean = db.containsKey(path)
 
-  override def read(path: String): Option[Item] = {
-    val ret = db.get().get(path)
-    ret
-  }
+  override def read(path: String): Option[Item] = Option(db.get(path))
 
   override def write(
       path: String,
       opr: Option[Item] => Option[Item],
       context: Item => String
   ): Option[Item] = {
-    val (lock, waiters) = sync.synchronized {
-      val theLock = Option(locks.get(path)) match {
-        case Some(lock) => lock
-        case None => {
-          val lock = AtomicInteger(0)
-          locks.put(path, lock)
-          lock
-        }
-      }
-
-      // how many threads are waiting on this row?
-      val waiters = theLock.incrementAndGet()
-
-      theLock -> waiters
-    }
-
-    val contentionThreshold = 8
-
-    try {
-      lock.synchronized {
-        val current = read(path)
-        val updated = opr(current)
-        // if it's contentionThreshold or more, log the message and if it's a multiple of contentionThreshold, log again
-        if (
-          waiters >= contentionThreshold && waiters % contentionThreshold == 0
-        ) {
-          for { updatedItem <- updated } {
-            logger.debug(
-              f"Lock contention for ${path} waiting ${waiters} context ${context(updatedItem)}"
-            )
-          }
-        }
-
-        dbSync.synchronized {
-
-          for { updatedItem <- updated } {
-            val newVal = db.get() + (path -> updatedItem)
-            db.set(newVal)
-          }
-          updated
-        }
-      }
-    } finally {
-      sync.synchronized {
-        val cnt = lock.decrementAndGet()
-        if (cnt == 0) {
-          locks.remove(path)
-        }
+    // `compute` holds the bucket lock for `path` for the duration of
+    // the remapping function; calls for the same path serialise here
+    // exactly as the old per-path AtomicInteger lock did, but without
+    // the global sync. Calls for different paths run in parallel
+    // (striped across the table's internal segments).
+    //
+    // The `context` callback is kept in the signature for source
+    // compatibility — the old contention-logging machinery it fed
+    // (waiter counts on `locks: HashMap[String, AtomicInteger]`) no
+    // longer exists.
+    val _ = context
+    val ref = new AtomicReference[Option[Item]](None)
+    // CHM permits a null return from the BiFunction to mean "remove
+    // the entry" (it explicitly forbids null values otherwise). With
+    // `-Yexplicit-nulls` we have to cast the deletion case manually.
+    val remap: BiFunction[String, Item, Item] = (_, current) => {
+      val updated = opr(Option(current))
+      ref.set(updated)
+      updated match {
+        case Some(item) => item
+        case None       => null.asInstanceOf[Item]
       }
     }
+    db.compute(path, remap)
+    ref.get()
   }
 
-  def release(): Unit = sync.synchronized {
-    db.set(Map()); locks.clear()
-  }
+  def release(): Unit = db.clear()
 
   def getPurls(): Set[PackageUrl] = {
     thePurls.synchronized {
@@ -563,13 +533,9 @@ class MemStorage(val targetDir: Option[File])
     }
   }
 
-  def getKeys(): Set[String] = {
-    keys()
-  }
+  def getKeys(): Set[String] = keys()
 
-  def containsID(identifier: String): Boolean = {
-    contains(identifier)
-  }
+  def containsID(identifier: String): Boolean = contains(identifier)
 }
 
 /** Deal with in-memory storage
