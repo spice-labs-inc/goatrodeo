@@ -106,25 +106,60 @@ object GraphManager {
 
     var pairs: Vector[(String, Array[Byte], Position)] = Vector()
 
+    // Batched write buffer: a single reusable 4 MiB heap ByteBuffer that
+    // accumulates length-prefixed item frames and is flushed to the
+    // channel only when full (or when an oversized item arrives, or at
+    // end-of-stream). Replaces the previous per-item
+    // `ByteBuffer.allocate(256 + entryBytes.length)` + `writer.write` —
+    // ~300k Items on the ADGTests corpus → ~300k allocations and
+    // ~300k syscalls otherwise.
+    //
+    // `logicalPosition` is what the channel position *will be* once the
+    // buffer is flushed, i.e. `writer.position() + buffer.position()`.
+    // It is the offset recorded into `pairs` and into
+    // `writeCtx.record(...)` for back-references, and it is also what
+    // the `TargetMaxFileSize` check uses (writer.position() lags the
+    // true byte stream by up to BUFFER_CAPACITY here).
+    val BufferCapacity = 4 * 1024 * 1024
+    val batch = ByteBuffer.allocate(BufferCapacity)
+    var logicalPosition: Long = writer.position()
+
+    def flushBatch(): Unit = {
+      if (batch.position() > 0) {
+        batch.flip()
+        while (batch.hasRemaining()) writer.write(batch)
+        batch.clear()
+      }
+    }
+
     // loop writing entries until empty or the file is >= 16GB in size
-    while (items.hasNext && writer.position() < Consts.TargetMaxFileSize) {
+    while (items.hasNext && logicalPosition < Consts.TargetMaxFileSize) {
       val orgEntry = items.next()
-      val currentPosition = writer.position()
+      val currentPosition = logicalPosition
       val entry = orgEntry
       val md5 = entry.identifierMD5()
       val entryBytes = Item.encodeStreamed(entry, writeCtx)
 
       pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
 
-      val toAlloc = 256 + (entryBytes.length)
-      val bb = ByteBuffer.allocate(toAlloc)
-
-      bb.putInt(entryBytes.length)
-      bb.put(entryBytes)
-
-      bb.flip()
-
-      writer.write(bb)
+      val frameLen = 4 + entryBytes.length
+      if (frameLen <= BufferCapacity) {
+        if (frameLen > batch.remaining()) flushBatch()
+        batch.putInt(entryBytes.length)
+        batch.put(entryBytes)
+      } else {
+        // Item larger than BufferCapacity: flush whatever is queued,
+        // then write the frame directly to the channel. Rare in
+        // practice (per-item CBOR is typically < a few KB).
+        flushBatch()
+        val header = ByteBuffer.allocate(4)
+        header.putInt(entryBytes.length)
+        header.flip()
+        while (header.hasRemaining()) writer.write(header)
+        val body = ByteBuffer.wrap(entryBytes)
+        while (body.hasRemaining()) writer.write(body)
+      }
+      logicalPosition += frameLen
 
       // Record this item's location for backref encoding of items later in
       // the stream. The recorded offset is the start of the length-prefixed
@@ -143,6 +178,9 @@ object GraphManager {
         )
       }
     }
+
+    // Final flush before writing the EOF trailer.
+    flushBatch()
 
     // 4-byte -1 sentinel — matches the 4-byte length prefix `readNext`
     // expects for each item frame, so the reader can detect end-of-file
