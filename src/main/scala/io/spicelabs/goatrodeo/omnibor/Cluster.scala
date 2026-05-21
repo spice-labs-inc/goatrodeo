@@ -205,51 +205,87 @@ object GoatRodeoCluster {
     File(dir, f"${String.format("%016x", hash)}.${suffix}")
   }
 
-  /** Read and decode a `<hash>.gra` alias-map sidecar file.
+  /** Read a `<hash>.gra` alias-map sidecar file (v2 sorted layout).
     *
-    * The file's layout matches [[GraphManager.writeAliasMapFile]]:
+    * The format is intentionally mmap-friendly — bigtent reads it in
+    * place without deserialising. For goatrodeo's own test suite and
+    * cluster-level helpers we still materialise the
+    * `TreeMap[String, TreeSet[String]]` (callers expect it), but the
+    * cost is paid only when the cluster is opened, never on individual
+    * lookups.
     *
-    *   - 4 bytes — [[GraphManager.Consts.AliasMapFileMagicNumber]].
-    *   - Rest of the file — a single CBOR-encoded
-    *     `TreeMap[String, TreeSet[String]]` (no length prefix; the map
-    *     is self-delimiting and consumes the remainder of the file).
-    *
-    * This is the read companion to the sidecar emission that replaces
-    * the v3 embedded-alias-map design (which silently truncated for
-    * any cluster whose alias map exceeded ~64 KiB).
+    * Layout: see [[GraphManager.writeAliasMapFile]].
     */
   private def loadAliasMapFile(
       dir: File,
       hash: Long
   ): scala.collection.immutable.TreeMap[String, scala.collection.immutable.TreeSet[String]] = {
     val file = findFile(dir, hash, "gra")
+    val total = file.length().toInt
+    if (total < 32)
+      throw Exception(f"alias-map file ${file.getName()} truncated header")
+    val bytes = new Array[Byte](total)
     Using.resource(FileInputStream(file)) { fis =>
-      val fc = fis.getChannel()
-      val magic = Helpers.readInt(fc)
-      if (magic != GraphManager.Consts.AliasMapFileMagicNumber) {
-        throw Exception(
-          f"Unexpected magic number ${magic} expecting ${GraphManager.Consts.AliasMapFileMagicNumber} for alias-map file ${file.getName()}"
-        )
+      var read = 0
+      while (read < total) {
+        val n = fis.read(bytes, read, total - read)
+        if (n < 0)
+          throw Exception(f"Unexpected EOF reading ${file.getName()}")
+        read += n
       }
-      // Read the remainder of the file as a single CBOR-encoded map.
-      val remaining = (fc.size() - fc.position()).toInt
-      val buf = java.nio.ByteBuffer.allocate(remaining)
-      while (buf.hasRemaining()) {
-        if (fc.read(buf) < 0) {
-          throw Exception(
-            f"Unexpected EOF while reading alias-map file ${file.getName()}"
-          )
-        }
-      }
-      buf.position(0)
-      import io.bullet.borer.Cbor
-      Cbor
-        .decode(buf)
-        .to[
-          scala.collection.immutable.TreeMap[String, scala.collection.immutable.TreeSet[String]]
-        ]
-        .value
     }
+    val buf = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.BIG_ENDIAN)
+    val magic = buf.getInt(0)
+    if (magic != GraphManager.Consts.AliasMapFileMagicNumber)
+      throw Exception(
+        f"Unexpected magic number ${magic} expecting ${GraphManager.Consts.AliasMapFileMagicNumber} for ${file.getName()}"
+      )
+    val version = buf.get(4) & 0xff
+    if (version != 2)
+      throw Exception(
+        f"Unsupported .gra version ${version} (expected 2) for ${file.getName()}"
+      )
+    val nAlt = buf.getInt(8)
+    val nCanon = buf.getInt(12)
+    val altIndexOff = buf.getInt(16)
+    val canonIndexOff = buf.getInt(20)
+    val altListOff = buf.getInt(24)
+    val stringsOff = buf.getInt(28)
+
+    def readString(off: Int, len: Int): String =
+      new String(bytes, stringsOff + off, len, "UTF-8")
+
+    // Walk canon_index in order: each entry tells us the canonical and
+    // its slice of alt_list. alt_list entries point at strings.
+    val builder = scala.collection.immutable.TreeMap.newBuilder[
+      String,
+      scala.collection.immutable.TreeSet[String]
+    ]
+    var i = 0
+    while (i < nCanon) {
+      val entryOff = canonIndexOff + i * 30
+      val canonStrOff = buf.getInt(entryOff + 16)
+      val canonStrLen = buf.getShort(entryOff + 20) & 0xffff
+      val altListStart = buf.getInt(entryOff + 22)
+      val altListCount = buf.getInt(entryOff + 26)
+      val canon = readString(canonStrOff, canonStrLen)
+      val altsBuilder = scala.collection.immutable.TreeSet.newBuilder[String]
+      var j = 0
+      while (j < altListCount) {
+        val listEntryOff = altListOff + (altListStart + j) * 6
+        val altStrOff = buf.getInt(listEntryOff)
+        val altStrLen = buf.getShort(listEntryOff + 4) & 0xffff
+        altsBuilder += readString(altStrOff, altStrLen)
+        j += 1
+      }
+      builder += (canon -> altsBuilder.result())
+      i += 1
+    }
+    // Suppress unused warnings — `nAlt` and `altIndexOff` are part of
+    // the on-disk format but not consulted by this loader. bigtent's
+    // reader uses them.
+    val _ = (nAlt, altIndexOff)
+    builder.result()
   }
   def open(path: File): GoatRodeoCluster = {
 

@@ -1,12 +1,12 @@
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
-import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.Position
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.Opaques.Identifier
 import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
 
@@ -412,34 +412,182 @@ object GraphManager {
     * the file (and is referenced from
     * [[io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope.aliasMapFile]]).
     *
-    * File layout:
+    * Version-2 layout: a fixed-record, sorted, mmap-friendly format.
+    * Readers don't deserialise — they binary-search the on-disk indices
+    * directly. On the ADGTest corpus this drops the bigtent cluster-open
+    * cost from ~100 ms down to ~µs at the cost of ~40 MB of extra index
+    * overhead per cluster.
     *
-    *   - 4 bytes — [[Consts.AliasMapFileMagicNumber]] (big-endian).
-    *   - Rest of the file — a single CBOR-encoded
-    *     `TreeMap[String, TreeSet[String]]` mapping canonical
-    *     identifiers to their alternates.
+    * File layout (all integers big-endian):
     *
-    * No length prefix on the CBOR payload: the map is self-delimiting,
-    * and the file is consumed by reading to EOF. This avoids the 16-bit
-    * length-prefix overflow that previously corrupted large embedded
-    * alias maps inside `DataFileEnvelope` (v3).
+    *   Header (32 bytes):
+    *     +0   magic            u32 = AliasMapFileMagicNumber
+    *     +4   version          u8  = 2
+    *     +5   padding          3 × u8
+    *     +8   n_alt            u32  (count of alternate→canonical pairs)
+    *     +12  n_canon          u32  (count of distinct canonicals)
+    *     +16  alt_index_off    u32  (offset within file)
+    *     +20  canon_index_off  u32  (offset within file)
+    *     +24  alt_list_off     u32  (offset within file)
+    *     +28  strings_off      u32  (offset within file)
+    *
+    *   alt_index (n_alt × 20 bytes, sorted by md5_alt):
+    *     +0   md5_alt          16 B  (MD5 of the binary `Identifier` form
+    *                                  of the alternate, same MD5 the .gri
+    *                                  uses everywhere else)
+    *     +16  canon_index_idx  u32   (index into canon_index)
+    *
+    *   canon_index (n_canon × 30 bytes, sorted by md5_canon):
+    *     +0   md5_canon        16 B
+    *     +16  canon_str_off    u32  (offset within strings)
+    *     +20  canon_str_len    u16
+    *     +22  alt_list_off     u32  (offset within alt_list, in 6-byte units)
+    *     +26  alt_list_count   u32
+    *
+    *   alt_list (n_alt × 6 bytes):
+    *     +0   alt_str_off      u32  (offset within strings)
+    *     +4   alt_str_len      u16
+    *
+    *   strings: packed UTF-8 bytes referenced by (off, len) above.
+    *
+    * Strings are deduplicated: each unique canonical or alternate string
+    * appears exactly once in the strings pool.
     */
   private def writeAliasMapFile(
       targetDirectory: File,
       aliasMap: TreeMap[String, TreeSet[String]]
   ): Long = {
-    val tempFile =
-      Files.createTempFile(
-        targetDirectory.toPath(),
-        "goat_rodeo_alias_",
-        ".gra"
-      )
+    // --- 1. Deduplicate strings into a pool with assigned (off, len). ---
+    val stringOffsets =
+      scala.collection.mutable.LinkedHashMap.empty[String, (Int, Int)]
+    val stringsBuf = new java.io.ByteArrayOutputStream(1024 * 1024)
+    def internString(s: String): (Int, Int) = stringOffsets.getOrElseUpdate(
+      s, {
+        val bs = s.getBytes("UTF-8")
+        if (bs.length > 0xffff)
+          throw new IllegalArgumentException(
+            f"alias string longer than 65535 bytes: ${s.take(80)}…"
+          )
+        val off = stringsBuf.size()
+        stringsBuf.write(bs)
+        (off, bs.length)
+      }
+    )
+
+    // --- 2. Walk the alias map in canonical order, intern strings, and
+    //        build the (md5_canon, alt_list_start, alt_list_count) tuples
+    //        for canon_index, plus the (md5_alt, canon_index_idx) tuples
+    //        for alt_index. canon_index_idx is set after sorting in step 4. ---
+    val canonByCanon =
+      scala.collection.mutable.ArrayBuffer
+        .empty[(Array[Byte], String, Int, Int)] // (md5, canon, alt_list_start, count)
+    val altListEntries =
+      scala.collection.mutable.ArrayBuffer.empty[(Int, Int)] // (off, len)
+    val altPairs =
+      scala.collection.mutable.ArrayBuffer
+        .empty[(Array[Byte], String)] // (md5_alt, canonical-this-alt-points-at)
+    for ((canon, alts) <- aliasMap) {
+      internString(canon)
+      val listStart = altListEntries.size
+      for (alt <- alts) {
+        val (aoff, alen) = internString(alt)
+        altListEntries.append((aoff, alen))
+        altPairs.append(
+          (
+            Identifier(alt).md5,
+            canon
+          )
+        )
+      }
+      canonByCanon.append((Identifier(canon).md5, canon, listStart, alts.size))
+    }
+
+    // --- 3. Sort canon_index by md5_canon and build a name → index map. ---
+    val sortedCanon = canonByCanon.sortWith { (a, b) =>
+      java.util.Arrays.compareUnsigned(a._1, b._1) < 0
+    }
+    val canonIdxByName =
+      scala.collection.mutable.HashMap.empty[String, Int]
+    for (i <- sortedCanon.indices) canonIdxByName.update(sortedCanon(i)._2, i)
+
+    // --- 4. Sort alt_index by md5_alt; resolve canonical name → index. ---
+    val sortedAlt = altPairs.sortWith { (a, b) =>
+      java.util.Arrays.compareUnsigned(a._1, b._1) < 0
+    }
+
+    // --- 5. Compute section offsets. ---
+    val nAlt = sortedAlt.size
+    val nCanon = sortedCanon.size
+    val headerSize = 32
+    val altIndexSize = nAlt * 20
+    val canonIndexSize = nCanon * 30
+    val altListSize = altListEntries.size * 6
+    val altIndexOff = headerSize
+    val canonIndexOff = altIndexOff + altIndexSize
+    val altListOff = canonIndexOff + canonIndexSize
+    val stringsOff = altListOff + altListSize
+
+    // --- 6. Write the file. ---
+    val tempFile = Files.createTempFile(
+      targetDirectory.toPath(),
+      "goat_rodeo_alias_",
+      ".gra"
+    )
     val fileWriter = new FileOutputStream(tempFile.toFile())
     val writer = fileWriter.getChannel()
     try {
-      Helpers.writeInt(writer, Consts.AliasMapFileMagicNumber)
-      val cborBytes = Cbor.encode(aliasMap).toByteArray
-      writer.write(ByteBuffer.wrap(cborBytes))
+      // Header
+      val header =
+        ByteBuffer.allocate(headerSize).order(java.nio.ByteOrder.BIG_ENDIAN)
+      header.putInt(Consts.AliasMapFileMagicNumber)
+      header.put(2.toByte)
+      header.put(0.toByte); header.put(0.toByte); header.put(0.toByte)
+      header.putInt(nAlt)
+      header.putInt(nCanon)
+      header.putInt(altIndexOff)
+      header.putInt(canonIndexOff)
+      header.putInt(altListOff)
+      header.putInt(stringsOff)
+      header.flip()
+      writer.write(header)
+
+      // alt_index
+      val altIdxBuf =
+        ByteBuffer.allocate(altIndexSize).order(java.nio.ByteOrder.BIG_ENDIAN)
+      for ((md5Alt, canon) <- sortedAlt) {
+        altIdxBuf.put(md5Alt)
+        altIdxBuf.putInt(canonIdxByName(canon))
+      }
+      altIdxBuf.flip()
+      writer.write(altIdxBuf)
+
+      // canon_index
+      val canonIdxBuf = ByteBuffer
+        .allocate(canonIndexSize)
+        .order(java.nio.ByteOrder.BIG_ENDIAN)
+      for ((md5Canon, canon, listStart, listCount) <- sortedCanon) {
+        canonIdxBuf.put(md5Canon)
+        val (coff, clen) = stringOffsets(canon)
+        canonIdxBuf.putInt(coff)
+        canonIdxBuf.putShort(clen.toShort)
+        canonIdxBuf.putInt(listStart)
+        canonIdxBuf.putInt(listCount)
+      }
+      canonIdxBuf.flip()
+      writer.write(canonIdxBuf)
+
+      // alt_list
+      val altListBuf =
+        ByteBuffer.allocate(altListSize).order(java.nio.ByteOrder.BIG_ENDIAN)
+      for ((off, len) <- altListEntries) {
+        altListBuf.putInt(off)
+        altListBuf.putShort(len.toShort)
+      }
+      altListBuf.flip()
+      writer.write(altListBuf)
+
+      // strings
+      writer.write(ByteBuffer.wrap(stringsBuf.toByteArray))
     } finally {
       writer.close()
     }
