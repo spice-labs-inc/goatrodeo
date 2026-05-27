@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import munit.FunSuite
 
 import java.io.File
+import java.security.Security
 
 /** Phase 3-4 white-box tests with **independent ground truth** for
   * `SingleCert`, `Bundle`, `Keystore`, and `Crl` claim types.
@@ -50,6 +51,17 @@ import java.io.File
   * | CRL DER SHA-256                    | `sha256sum <fixture>`                                                                                    |
   */
 class X509ClaimWhiteboxTests extends FunSuite {
+
+  // BouncyCastle is required by the parse methods under test. Production code
+  // registers it lazily via CryptoDetector / Certificates; running this suite
+  // in isolation (e.g. `sbt testOnly`) doesn't trigger that path, so all
+  // parse* calls silently return None and every assertion fails. Match the
+  // idempotent registration pattern used by the sibling test suites.
+  if (Security.getProvider("BC") == null) {
+    Security.addProvider(
+      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+    )
+  }
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)
