@@ -14,61 +14,105 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo
 
-import io.spicelabs.goatrodeo.ProgressListener.Phase
-
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters._
 
 class ProgressListenerTest extends munit.FunSuite {
 
-  /** A listener that records every event it receives. */
+  /** A listener that records every event it receives. Thread-safe; events
+    * land in arrival order because the underlying queue is FIFO.
+    */
   private class Recorder extends ProgressListener {
-    private val events = new ConcurrentLinkedQueue[(Phase, Long, Long)]()
-    override def onProgress(phase: Phase, current: Long, total: Long): Unit =
-      events.add((phase, current, total))
-    def recorded: List[(Phase, Long, Long)] = events.iterator().asScala.toList
+    private val events = new ConcurrentLinkedQueue[(Long, Long)]()
+    override def onProgress(current: Long, total: Long): Unit =
+      events.add((current, total))
+    def recorded: List[(Long, Long)] = events.iterator().asScala.toList
   }
 
-  test("safeNotify forwards (phase, current, total) verbatim to the listener") {
-    val rec = Recorder()
-    ProgressListener.safeNotify(Some(rec), Phase.Processing, 47L, 1200L)
-    assertEquals(rec.recorded, List((Phase.Processing, 47L, 1200L)))
+  test("notifier forwards (current, total) to the listener") {
+    val rec = new Recorder
+    val n = ProgressListener.notifier(Some(rec))
+    n.notify(47L, 1200L)
+    assertEquals(rec.recorded, List((47L, 1200L)))
   }
 
-  test("safeNotify defaults current/total to 0 for phase-boundary calls") {
-    val rec = Recorder()
-    ProgressListener.safeNotify(Some(rec), Phase.Scanning)
-    ProgressListener.safeNotify(Some(rec), Phase.Writing)
-    ProgressListener.safeNotify(Some(rec), Phase.Done)
-    assertEquals(
-      rec.recorded,
-      List(
-        (Phase.Scanning, 0L, 0L),
-        (Phase.Writing, 0L, 0L),
-        (Phase.Done, 0L, 0L)
-      )
-    )
+  test("notifier with no listener is a silent no-op") {
+    val n = ProgressListener.notifier(None)
+    n.notify(1L, 10L)
   }
 
-  test("safeNotify with None is a silent no-op") {
-    // Just shouldn't throw — no listener attached.
-    ProgressListener.safeNotify(None, Phase.Processing, 1L, 10L)
-  }
-
-  test("safeNotify swallows exceptions thrown by the listener") {
+  test("notifier swallows exceptions thrown by the listener") {
     val throwing = new ProgressListener {
-      override def onProgress(phase: Phase, current: Long, total: Long): Unit =
+      override def onProgress(current: Long, total: Long): Unit =
         throw new RuntimeException("listener exploded")
     }
-    // Must not propagate the RuntimeException — a misbehaving listener should
-    // never abort a multi-hour goat-rodeo run.
-    ProgressListener.safeNotify(Some(throwing), Phase.Processing, 5L, 10L)
+    val n = ProgressListener.notifier(Some(throwing))
+    // Must not propagate — a misbehaving listener should never abort a build.
+    n.notify(5L, 10L)
   }
 
-  test("Phase enum exposes all four cases in declared order") {
+  test("notifier drops non-monotonic (backwards or equal) current") {
+    val rec = new Recorder
+    val n = ProgressListener.notifier(Some(rec))
+    n.notify(100L, 1000L)
+    n.notify(50L, 1000L) // backwards — dropped
+    n.notify(100L, 1000L) // equal — dropped
+    n.notify(101L, 1000L) // forward — delivered
+    assertEquals(rec.recorded, List((100L, 1000L), (101L, 1000L)))
+  }
+
+  test("notifiers are independent (per-run state, no JVM-global)") {
+    // Two notifiers track their own monotonic counters, so a second run
+    // starts fresh even when the first ran in the same JVM.
+    val recA = new Recorder
+    val recB = new Recorder
+    val nA = ProgressListener.notifier(Some(recA))
+    val nB = ProgressListener.notifier(Some(recB))
+    nA.notify(500L, 1000L)
+    nB.notify(10L, 1000L) // would be dropped if state were shared with nA
+    assertEquals(recA.recorded, List((500L, 1000L)))
+    assertEquals(recB.recorded, List((10L, 1000L)))
+  }
+
+  test("notifier under concurrent fire delivers strictly-monotonic current") {
+    // Each worker thread fires a unique sequence of current values; with N
+    // threads racing, the listener must see a strictly increasing sequence
+    // (some ticks are dropped by design when a later thread CAS-wins).
+    val rec = new Recorder
+    val n = ProgressListener.notifier(Some(rec))
+    val threadCount = 16
+    val itemsPerThread = 200
+    val start = new CountDownLatch(1)
+    val pool = Executors.newFixedThreadPool(threadCount)
+    try {
+      val futures = (0 until threadCount).map { t =>
+        pool.submit(new Runnable {
+          def run(): Unit = {
+            start.await()
+            for (i <- 0 until itemsPerThread) {
+              // Interleave values across threads so races are likely.
+              val current = (i.toLong * threadCount) + t
+              n.notify(current, 100_000L)
+            }
+          }
+        })
+      }
+      start.countDown()
+      futures.foreach(_.get())
+    } finally {
+      pool.shutdown()
+      val _ = pool.awaitTermination(10, TimeUnit.SECONDS)
+    }
+
+    val delivered = rec.recorded.map(_._1)
+    assert(delivered.nonEmpty, "expected some deliveries under concurrent fire")
     assertEquals(
-      Phase.values.toList,
-      List(Phase.Scanning, Phase.Processing, Phase.Writing, Phase.Done)
+      delivered,
+      delivered.sorted.distinct,
+      s"deliveries must be strictly increasing; got: $delivered"
     )
   }
 }

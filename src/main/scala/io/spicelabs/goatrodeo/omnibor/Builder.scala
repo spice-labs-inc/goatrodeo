@@ -86,6 +86,9 @@ object Builder {
       fsFilePaths: Boolean = false
   ): Unit = {
     val totalStart = Instant.now()
+    // Fresh per-run dispatcher; enforces monotonic current and catches
+    // exceptions thrown by the caller-supplied ProgressListener.
+    val progressNotifier = ProgressListener.notifier(args.progressListener)
 
     val runningCnt = AtomicInteger(0)
     val dead_? = AtomicBoolean(false)
@@ -206,6 +209,7 @@ object Builder {
         writeThreadCnt = writeThreadCnt,
         tempDir = tempDir,
         args = args,
+        progressNotifier = progressNotifier,
         preWriteDB = preWriteDB
       )
 
@@ -216,11 +220,6 @@ object Builder {
       )
       updatedDest = destWithCount(dest, loopCnt)
     }
-
-    // Processing loop has exited; only the per-batch write threads remain.
-    // Mark the boundary so a ProgressListener can flip the dashboard from
-    // "Processing N of M" to "Writing bundle".
-    ProgressListener.safeNotify(args.progressListener, ProgressListener.Phase.Writing)
 
     logger.debug("Waiting for write threads")
 
@@ -254,6 +253,7 @@ object Builder {
       writeThreadCnt: AtomicInteger,
       tempDir: Option[File],
       args: Config,
+      progressNotifier: ProgressListener.Notifier,
       preWriteDB: Vector[Storage => Boolean] = Vector()
   ): Option[Thread] = {
 
@@ -398,12 +398,7 @@ object Builder {
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
                       )
-                      ProgressListener.safeNotify(
-                        args.progressListener,
-                        ProgressListener.Phase.Processing,
-                        current = updatedCnt.toLong,
-                        total = totalItems.toLong
-                      )
+                      progressNotifier.notify(updatedCnt.toLong, totalItems.toLong)
                     }
                   }
                 }

@@ -14,28 +14,27 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo
 
-import io.spicelabs.goatrodeo.ProgressListener.Phase
-
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters._
 
-/** End-to-end check that a real `Howdy.run` invocation emits progress events
-  * in the documented order (`Scanning → Processing(>=1) → Writing → Done`).
-  * The payload is synthetic — just over a thousand tiny text files, sized to
-  * clear the production-cadence throttle of 1,000 items between
-  * `Processing` emissions.
+/** End-to-end check that a real `Howdy.run` delivers progress events to a
+  * caller-supplied listener: at least one event, strictly increasing
+  * `current`, and `current <= total` invariant maintained across deliveries.
+  * The payload is synthetic — just over a thousand tiny text files, sized
+  * to clear the production-cadence throttle of 1,000 items between
+  * emissions.
   */
 class ProgressListenerIntegrationTest extends munit.FunSuite {
 
   override val munitTimeout = scala.concurrent.duration.Duration(2, "minutes")
 
   private class Recorder extends ProgressListener {
-    private val events = new ConcurrentLinkedQueue[(Phase, Long, Long)]()
-    override def onProgress(phase: Phase, current: Long, total: Long): Unit =
-      events.add((phase, current, total))
-    def recorded: List[(Phase, Long, Long)] = events.iterator().asScala.toList
+    private val events = new ConcurrentLinkedQueue[(Long, Long)]()
+    override def onProgress(current: Long, total: Long): Unit =
+      events.add((current, total))
+    def recorded: List[(Long, Long)] = events.iterator().asScala.toList
   }
 
   private def writeTinyFiles(dir: File, count: Int): Unit = {
@@ -45,12 +44,11 @@ class ProgressListenerIntegrationTest extends munit.FunSuite {
     }
   }
 
-  test("Howdy.run emits Scanning → Processing(>=1) → Writing → Done") {
+  test("Howdy.run delivers monotonic progress to a ProgressListener") {
     val payloadDir = Files.createTempDirectory("gr-progress-payload").toFile
     val outputDir = Files.createTempDirectory("gr-progress-output").toFile
     try {
-      // Just over the 1,000-item Processing throttle so at least one
-      // Processing event is guaranteed to fire.
+      // Just over the 1,000-item throttle so at least one event is guaranteed.
       writeTinyFiles(payloadDir, 1050)
 
       val recorder = new Recorder
@@ -58,43 +56,23 @@ class ProgressListenerIntegrationTest extends munit.FunSuite {
         .builder()
         .withPayload(payloadDir.getAbsolutePath)
         .withOutput(outputDir.getAbsolutePath)
-        .withThreads(2)
+        .withThreads(4)
         .withProgressListener(recorder)
         .run()
 
       val events = recorder.recorded
-      val phases = events.map(_._1)
+      assert(events.nonEmpty, "expected at least one progress event for a 1050-file payload")
 
-      // Boundary phases land in the documented order.
-      assertEquals(phases.head, Phase.Scanning, s"first event should be Scanning, got: $phases")
-      assertEquals(phases.last, Phase.Done, s"last event should be Done, got: $phases")
-      assert(
-        phases.contains(Phase.Writing),
-        s"Writing event missing from sequence: $phases"
+      val currents = events.map(_._1)
+      assertEquals(
+        currents,
+        currents.sorted.distinct,
+        s"delivered current values must be strictly increasing; got: $currents"
       )
-      assert(
-        phases.indexOf(Phase.Writing) < phases.lastIndexOf(Phase.Done),
-        s"Writing must precede Done, got: $phases"
-      )
-
-      // At least one Processing event with sane counts.
-      val processing = events.collect { case (Phase.Processing, c, t) => (c, t) }
-      assert(
-        processing.nonEmpty,
-        s"expected at least one Processing event for a 1050-file payload, got: $phases"
-      )
-      processing.foreach { case (c, t) =>
-        assert(c >= 1L, s"Processing.current must be >= 1, got $c")
-        assert(t >= c, s"Processing.total ($t) must be >= current ($c)")
+      events.foreach { case (c, t) =>
+        assert(c >= 1L, s"current must be >= 1, got $c")
+        assert(t >= c, s"total ($t) must be >= current ($c)")
       }
-
-      // Every Processing event must precede the Writing transition.
-      val firstWriting = phases.indexOf(Phase.Writing)
-      val lastProcessing = phases.lastIndexOf(Phase.Processing)
-      assert(
-        lastProcessing < firstWriting,
-        s"Processing must not arrive after Writing, got: $phases"
-      )
     } finally {
       deleteRecursively(payloadDir)
       deleteRecursively(outputDir)
