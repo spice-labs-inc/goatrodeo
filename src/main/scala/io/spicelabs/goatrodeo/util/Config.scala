@@ -3,6 +3,7 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Config.ExpandFiles.fixTilde
 import org.apache.commons.io.filefilter.WildcardFileFilter
 import scopt.OParser
@@ -72,6 +73,10 @@ import scala.util.Using
   * @param tagDate
   *   optional date to include in top-level tag JSON (parsed flexibly, stored as
   *   Date)
+  * @param progressListener
+  *   optional callback notified at phase boundaries and during the main
+  *   processing loop. Set via [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]];
+  *   not exposed on the command line.
   */
 case class Config(
     out: Option[File] = None,
@@ -99,7 +104,8 @@ case class Config(
     packageTags: Boolean = false,
     packageTagsShortName: Boolean = false,
     tagVersion: Option[String] = None,
-    tagDate: Option[Date] = None
+    tagDate: Option[Date] = None,
+    progressListener: Option[ProgressListener] = None
 ) {
 
   /** Build a list of file list builders from the configuration.

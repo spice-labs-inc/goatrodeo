@@ -359,6 +359,20 @@ class GoatRodeoBuilder {
     }
   }
 
+  /** Attach a progress listener that is notified at phase boundaries
+    * (Scanning, Writing, Done) and periodically during the Processing
+    * phase. See [[ProgressListener]] for cadence and threading semantics.
+    *
+    * Passing `null` clears any previously attached listener.
+    *
+    * @param listener the listener to attach, or `null` to clear
+    * @return this builder
+    */
+  def withProgressListener(listener: ProgressListener): GoatRodeoBuilder = {
+    config = config.copy(progressListener = Option(listener))
+    this
+  }
+
   /** Execute the Goat Rodeo build with the current configuration.
     */
   def run(): Unit = {

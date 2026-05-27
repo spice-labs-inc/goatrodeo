@@ -17,6 +17,7 @@ package io.spicelabs.goatrodeo.omnibor
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
@@ -85,6 +86,9 @@ object Builder {
       fsFilePaths: Boolean = false
   ): Unit = {
     val totalStart = Instant.now()
+    // Fresh per-run dispatcher; enforces monotonic current and catches
+    // exceptions thrown by the caller-supplied ProgressListener.
+    val progressNotifier = ProgressListener.notifier(args.progressListener)
 
     val runningCnt = AtomicInteger(0)
     val dead_? = AtomicBoolean(false)
@@ -205,6 +209,7 @@ object Builder {
         writeThreadCnt = writeThreadCnt,
         tempDir = tempDir,
         args = args,
+        progressNotifier = progressNotifier,
         preWriteDB = preWriteDB
       )
 
@@ -248,6 +253,7 @@ object Builder {
       writeThreadCnt: AtomicInteger,
       tempDir: Option[File],
       args: Config,
+      progressNotifier: ProgressListener.Notifier,
       preWriteDB: Vector[Storage => Boolean] = Vector()
   ): Option[Thread] = {
 
@@ -392,6 +398,7 @@ object Builder {
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
                       )
+                      progressNotifier.notify(updatedCnt.toLong, totalItems.toLong)
                     }
                   }
                 }
