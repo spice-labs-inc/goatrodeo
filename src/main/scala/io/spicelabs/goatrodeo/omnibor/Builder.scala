@@ -17,6 +17,7 @@ package io.spicelabs.goatrodeo.omnibor
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
@@ -216,6 +217,11 @@ object Builder {
       updatedDest = destWithCount(dest, loopCnt)
     }
 
+    // Processing loop has exited; only the per-batch write threads remain.
+    // Mark the boundary so a ProgressListener can flip the dashboard from
+    // "Processing N of M" to "Writing bundle".
+    ProgressListener.safeNotify(args.progressListener, ProgressListener.Phase.Writing)
+
     logger.debug("Waiting for write threads")
 
     // loop while we wait for the end of processing
@@ -391,6 +397,12 @@ object Builder {
                       logger.info(
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
+                      )
+                      ProgressListener.safeNotify(
+                        args.progressListener,
+                        ProgressListener.Phase.Processing,
+                        current = updatedCnt.toLong,
+                        total = totalItems.toLong
                       )
                     }
                   }

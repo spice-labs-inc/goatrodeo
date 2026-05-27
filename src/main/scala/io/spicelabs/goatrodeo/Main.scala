@@ -88,6 +88,16 @@ object Howdy {
 
     val logger = Logger(getClass())
 
+    // Phase boundaries for any caller-supplied ProgressListener. Scanning fires
+    // before the filesystem walk; Done fires in a finally so it's guaranteed
+    // even on early failure.
+    ProgressListener.safeNotify(params.progressListener, ProgressListener.Phase.Scanning)
+    try runInner(params, logger)
+    finally ProgressListener.safeNotify(params.progressListener, ProgressListener.Phase.Done)
+  }
+
+  private def runInner(params: Config, logger: Logger): Unit = {
+
     val fileListers = params.getFileListBuilders()
 
     if (!params.nonexistantDirectories.isEmpty) {
