@@ -65,7 +65,27 @@ object ProgressListener {
     * straight to `Done` on early failure without entering later phases.
     */
   enum Phase {
-    case Scanning, Processing, Writing, Done
+
+    /** Walking the filesystem and characterizing artifacts (MIME, crypto).
+      * The total file count is not yet known at this point.
+      */
+    case Scanning
+
+    /** Building the GitOID graph from artifacts — the hot loop. Periodic
+      * updates carry real `(processed, total)` counts.
+      */
+    case Processing
+
+    /** Sorting, serializing to CBOR, and writing the output bundle. Fires
+      * once when processing is complete and only write work remains.
+      */
+    case Writing
+
+    /** The run has finished (successfully or otherwise). Fires exactly once
+      * per `Howdy.run` invocation, in a `finally` block, so listeners can
+      * reliably release resources or publish a terminal status.
+      */
+    case Done
   }
 
   private val logger = Logger(getClass())
@@ -82,8 +102,9 @@ object ProgressListener {
       total: Long = 0L
   ): Unit = {
     listener.foreach { l =>
-      try l.onProgress(phase, current, total)
-      catch {
+      try {
+        l.onProgress(phase, current, total)
+      } catch {
         case t: Throwable =>
           logger.warn(s"ProgressListener threw on phase=$phase", t)
       }
