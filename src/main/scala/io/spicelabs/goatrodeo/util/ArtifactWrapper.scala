@@ -207,15 +207,41 @@ object ArtifactWrapper {
       : AtomicReference[Vector[(ArtifactWrapper, Set[String]) => Set[String]]] =
     AtomicReference(Vector())
 
+  /** MIME types that are confidently terminal for the purpose of augmentation:
+    * none of the registered augmenters (.NET PE, VM disk image, crypto
+    * material) can ever apply to them. When Tika has already produced one of
+    * these we skip the whole augmenter chain, which avoids per-artifact stream
+    * reads and — crucially — SaffronDetector spilling in-memory artifacts to a
+    * temp file just to rule them out.
+    *
+    * Deliberately excludes text-prefixed and `application/octet-stream` types:
+    * SaffronDetector intentionally re-checks those (e.g. a `.vhd` that Tika
+    * misdetects as `text/x-vhdl`).
+    */
+  private lazy val terminalBinaryMimeTypes: Set[String] =
+    Helpers.javaClassMimeTypes ++ Set(
+      "application/zip",
+      "application/java-archive",
+      "application/vnd.android.package-archive"
+    )
+
+  private def augmentationCannotApply(mimes: Set[String]): Boolean =
+    mimes.exists(m =>
+      m.startsWith("image/") || m.startsWith("audio/") ||
+        m.startsWith("video/") || terminalBinaryMimeTypes.contains(m)
+    )
+
   /** Augment the mime type with other mime types
     */
   def augmentMimeTypes(
       artifact: ArtifactWrapper,
       mimes: Set[String]
   ): Set[String] = {
-    mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, theFn) =>
-      theFn(artifact, cur)
-    }
+    if (augmentationCannotApply(mimes)) mimes
+    else
+      mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, theFn) =>
+        theFn(artifact, cur)
+      }
   }
 
   def addMimeTypeAugmenter(
