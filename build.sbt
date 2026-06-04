@@ -5,7 +5,38 @@ val projectName = "goatrodeo"
 val scala3Version = "3.8.3"
 
 ThisBuild / organization := "io.spicelabs"
-ThisBuild / version := "0.0.1-SNAPSHOT" // Don't change this, it is overridden by the GitHub Actions workflow
+
+// Derive `version` from git. Format follows what sbt-git-versioning used to
+// produce, since `BuildInfo.version` is consumed at runtime:
+//   - HEAD is on a release tag       → "0.15.5"            (or "0.15.5-dirty-SNAPSHOT")
+//   - HEAD is N commits past a tag   → "0.15.5-3-abc1234-SNAPSHOT" (+"-dirty" if dirty)
+//   - No tags / not in a git repo    → "0.0.0-SNAPSHOT"
+// Release builds in CI override this entirely via `sbt "set ThisBuild / version := ..."`.
+ThisBuild / version := {
+  val SemVer = """^v?(\d+)\.(\d+)\.(\d+)$""".r
+  def run(cmd: String): Vector[String] =
+    scala.util.Try(Process(cmd).lineStream.toVector).getOrElse(Vector.empty)
+
+  val dirty = run("git status --porcelain").nonEmpty
+  val headTags = run("git tag --points-at HEAD").collect {
+    case t @ SemVer(ma, mi, pa) => (t, ma.toInt, mi.toInt, pa.toInt)
+  }
+  if (headTags.nonEmpty) {
+    // HEAD is tagged. When multiple semver tags decorate it, pick the largest.
+    val chosen = headTags.maxBy { case (_, ma, mi, pa) => (ma, mi, pa) }._1.stripPrefix("v")
+    if (dirty) s"$chosen-dirty-SNAPSHOT" else chosen
+  } else {
+    val baseTag = run("git describe --tags --abbrev=0 --match=v[0-9]*").headOption
+      .orElse(run("git describe --tags --abbrev=0").headOption)
+      .getOrElse("v0.0.0")
+    val base = baseTag.stripPrefix("v")
+    val sha = run("git rev-parse --short HEAD").headOption.getOrElse("unknown")
+    val commits = run(s"git rev-list --count $baseTag..HEAD").headOption.getOrElse("0")
+    val dirtyTag = if (dirty) "-dirty" else ""
+    s"$base-$commits-$sha$dirtyTag-SNAPSHOT"
+  }
+}
+
 ThisBuild / licenses := Seq(
   "Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html")
 )
@@ -151,7 +182,6 @@ lazy val root = project
   .enablePlugins(
     BuildInfoPlugin,
     JavaAppPackaging,
-    GitVersioningPlugin,
     AssemblyPlugin
   )
   .settings(
