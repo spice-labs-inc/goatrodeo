@@ -316,47 +316,57 @@ object CryptoDetector {
 
   /** Lightweight ASN.1 probe: does this look like a PKCS#12 PFX? */
   private def looksLikePkcs12(bytes: Array[Byte]): Boolean = {
-    Try {
-      // Outer SEQUENCE
-      if ((bytes(0) & 0xff) != 0x30) false
-      else {
-        val (_, contentStart) = readDerLength(bytes, 1)
-        // First inner element should be INTEGER (tag 0x02), version
-        val verTag = bytes(contentStart) & 0xff
-        if (verTag != 0x02) false
-        else {
-          val (verLen, verContentStart) = readDerLength(bytes, contentStart + 1)
-          // PKCS#12 version is 3 (single-byte integer). Accept any short
-          // length to cover future bumps.
-          if (verLen < 1 || verLen > 4) false
+    if (bytes.isEmpty || (bytes(0) & 0xff) != 0x30) false
+    else {
+      readDerLength(bytes, 1)
+        .map { case (_, contentStart) =>
+          if (contentStart >= bytes.length) false
           else {
-            val nextTagOff = verContentStart + verLen
-            // Second inner element should be SEQUENCE (ContentInfo), tag 0x30
-            val niTag = bytes(nextTagOff) & 0xff
-            niTag == 0x30
+            val verTag = bytes(contentStart) & 0xff
+            if (verTag != 0x02) false
+            else {
+              readDerLength(bytes, contentStart + 1)
+                .map { case (verLen, verContentStart) =>
+                  if (verLen < 1 || verLen > 4) false
+                  else {
+                    val nextTagOff = verContentStart + verLen
+                    if (nextTagOff >= bytes.length) false
+                    else {
+                      val niTag = bytes(nextTagOff) & 0xff
+                      niTag == 0x30
+                    }
+                  }
+                }
+                .getOrElse(false)
+            }
           }
         }
-      }
-    }.getOrElse(false)
+        .getOrElse(false)
+    }
   }
 
-  /** Decode a DER length field starting at `off`. Returns `(length,
-    * content-start-offset)`. Throws on truncation.
+  /** Decode a DER length field starting at `off`. Returns Some((length,
+    * content-start-offset)) or None on truncation.
     */
-  private def readDerLength(bytes: Array[Byte], off: Int): (Int, Int) = {
+  private def readDerLength(
+      bytes: Array[Byte],
+      off: Int
+  ): Option[(Int, Int)] = {
+    if (off >= bytes.length) return None
     val first = bytes(off) & 0xff
-    if (first < 0x80) (first, off + 1)
+    if (first < 0x80) Some((first, off + 1))
     else {
       val n = first & 0x7f
-      if (n == 0 || off + 1 + n > bytes.length)
-        throw new RuntimeException("bad DER length")
-      var len = 0
-      var i = 0
-      while (i < n) {
-        len = (len << 8) | (bytes(off + 1 + i) & 0xff)
-        i += 1
+      if (n == 0 || off + 1 + n > bytes.length) None
+      else {
+        var len = 0
+        var i = 0
+        while (i < n) {
+          len = (len << 8) | (bytes(off + 1 + i) & 0xff)
+          i += 1
+        }
+        Some((len, off + 1 + n))
       }
-      (len, off + 1 + n)
     }
   }
 

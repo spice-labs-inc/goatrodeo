@@ -191,7 +191,9 @@ class MySuite extends munit.FunSuite {
 
         val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
 
-        assert(purls.length == 1, s"should be a purl ${purls} on log4j")
+        // both the pom computed and internal manifest pURLs differ
+        // so we find 2
+        assert(purls.length == 2, s"should be a purl ${purls} on log4j")
 
         assert(
           item.bodyAsItemMetaData.get.extra

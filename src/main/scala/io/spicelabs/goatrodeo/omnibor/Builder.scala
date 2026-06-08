@@ -398,7 +398,10 @@ object Builder {
                         f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
                             .format("%,d", storage.size())}"
                       )
-                      progressNotifier.notify(updatedCnt.toLong, totalItems.toLong)
+                      progressNotifier.notify(
+                        updatedCnt.toLong,
+                        totalItems.toLong
+                      )
                     }
                   }
                 }

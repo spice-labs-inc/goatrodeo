@@ -22,7 +22,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import scala.util.Try
+import scala.util.Failure
 
 /** Manages persistence and retrieval of Artifact Dependency Graph (ADG) data.
   *
@@ -320,6 +320,8 @@ object GraphManager {
   */
 class GRDWalker(source: FileChannel) {
 
+  private val logger: Logger = Logger(getClass())
+
   /** Open the GRD file and read its envelope.
     *
     * Validates the magic number and reads the DataFileEnvelope.
@@ -327,20 +329,20 @@ class GRDWalker(source: FileChannel) {
     * @return
     *   a Try containing the envelope on success, or an error on failure
     */
-  def open(): Try[DataFileEnvelope] = {
+  def open(): DataFileEnvelope = {
     val magic_? = Helpers.readInt(source)
     if (magic_? != GraphManager.Consts.DataFileMagicNumber) {
-      // FIXME log the error
       throw new Exception(f"Found incorrect magic number ${magic_?}")
+    } else {
+      val len = Helpers.readShort(source)
+      val ba = ByteBuffer.allocate(len)
+      val readLen = source.read(ba)
+      if (len != readLen) {
+        throw new Exception(f"Wanted ${len} bytes got ${readLen}")
+      } else {
+        DataFileEnvelope.decode(ba.position(0).array())
+      }
     }
-
-    val len = Helpers.readShort(source)
-    val ba = ByteBuffer.allocate(len)
-    val readLen = source.read(ba)
-    if (len != readLen) {
-      throw new Exception(f"Wanted ${len} bytes got ${readLen}")
-    }
-    DataFileEnvelope.decode(ba.position(0).array())
   }
 
   /** Read the next Item from the file.
@@ -360,8 +362,14 @@ class GRDWalker(source: FileChannel) {
         source.read(entryByteBuffer)
 
         val entryBytes = entryByteBuffer.array()
-        val entry = Item.decode(entryBytes).get
-        Some(entry)
+        Item.decode(entryBytes) match {
+          case scala.util.Success(entry) => Some(entry)
+          case scala.util.Failure(err) =>
+            logger.warn(
+              s"Corrupt CBOR entry at position ${source.position()}: ${err.getMessage}"
+            )
+            None
+        }
       }
     }
   }

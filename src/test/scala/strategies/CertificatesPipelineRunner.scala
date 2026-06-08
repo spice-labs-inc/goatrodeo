@@ -35,7 +35,7 @@ import java.io.File
   * Per `certificates-strategy/appendices.md` Appendix B, the Certificates
   * harness asserts against a single Item (`items.head`) when the sidecar's
   * `itemCount == 1`. This runner returns the full vector so cases with
-  * multi-Item fixtures (if any ever emerge — the plan says no, since keystores
+  * multi-Item fixtures (if any ever emerge — keystores
   * produce one Item) can still be reasoned about.
   *
   * Note: this method is test-only infrastructure. It is not optimized — it
@@ -52,7 +52,7 @@ object CertificatesPipelineRunner {
     * solely so each alternate-hash form (e.g., `gitoid:blob:sha1` for the same
     * bytes that live under `gitoid:blob:sha256`) can appear as a lookup key.
     * Those stubs have `body = None` and do not represent artifacts a strategy
-    * claims. The plan's `itemCount` field counts only the primary Items (those
+    * claims. The `itemCount` field counts only the primary Items (those
     * with an `ItemMetaData` body), which is what this method returns.
     *
     * Ordering is stable (sorted by identifier) so tests that depend on

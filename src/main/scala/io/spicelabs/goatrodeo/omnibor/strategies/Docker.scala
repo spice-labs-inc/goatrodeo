@@ -84,7 +84,7 @@ case class DockerState(
       }
 
       val (namespace, path) = base.split("/").toList match {
-        case Nil                    => ??? /// this should never happen
+        case Nil                    => (None, base)
         case blob :: Nil            => (None, blob)
         case path :: subPath :: Nil => (None, f"${path}/${subPath}")
         case namespace :: pathAndSubpath =>

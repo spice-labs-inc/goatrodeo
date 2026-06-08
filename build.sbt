@@ -151,7 +151,7 @@ lazy val root = project
   .enablePlugins(
     BuildInfoPlugin,
     JavaAppPackaging,
-    GitVersioningPlugin,
+    // GitVersioningPlugin, // disabled for local dev - three tags on same commit (v0.15.3/4/5) cause plugin crash
     AssemblyPlugin
   )
   .settings(

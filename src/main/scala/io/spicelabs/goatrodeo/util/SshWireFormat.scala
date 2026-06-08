@@ -17,8 +17,8 @@ package io.spicelabs.goatrodeo.util
 import java.nio.charset.StandardCharsets
 import scala.util.Try
 
-/** RFC 4251 / SSH wire-format reader. Out-of-bounds reads throw
-  * `IndexOutOfBoundsException`.
+/** RFC 4251 / SSH wire-format reader. Out-of-bounds reads return None instead
+  * of throwing. Positions only advance on successful reads.
   */
 final class SshWireReader(val bytes: Array[Byte]) {
   private var pos: Int = 0
@@ -27,83 +27,90 @@ final class SshWireReader(val bytes: Array[Byte]) {
 
   def position: Int = pos
 
-  def readByte(): Int = {
-    require(
-      remaining >= 1,
-      s"SshWireReader: short read at $pos (need 1, have $remaining)"
-    )
-    val b = bytes(pos) & 0xff
-    pos += 1
-    b
+  def readByte(): Option[Int] = {
+    if (remaining < 1) None
+    else {
+      val b = bytes(pos) & 0xff
+      pos += 1
+      Some(b)
+    }
   }
 
-  def readUInt32(): Long = {
-    require(
-      remaining >= 4,
-      s"SshWireReader: short read at $pos (need 4, have $remaining)"
-    )
-    val v =
-      ((bytes(pos) & 0xffL) << 24) |
-        ((bytes(pos + 1) & 0xffL) << 16) |
-        ((bytes(pos + 2) & 0xffL) << 8) |
-        ((bytes(pos + 3) & 0xffL))
-    pos += 4
-    v
+  def readUInt32(): Option[Long] = {
+    if (remaining < 4) None
+    else {
+      val v =
+        ((bytes(pos) & 0xffL) << 24) |
+          ((bytes(pos + 1) & 0xffL) << 16) |
+          ((bytes(pos + 2) & 0xffL) << 8) |
+          ((bytes(pos + 3) & 0xffL))
+      pos += 4
+      Some(v)
+    }
   }
 
-  def readUInt64(): Long = {
-    require(
-      remaining >= 8,
-      s"SshWireReader: short read at $pos (need 8, have $remaining)"
-    )
-    val hi = readUInt32()
-    val lo = readUInt32()
-    (hi << 32) | (lo & 0xffffffffL)
+  def readUInt64(): Option[Long] = {
+    for {
+      hi <- readUInt32()
+      lo <- readUInt32()
+    } yield (hi << 32) | (lo & 0xffffffffL)
   }
 
   /** Length-prefixed byte string. */
-  def readString(): Array[Byte] = {
-    val len = readUInt32()
-    require(
-      len >= 0 && len <= remaining,
-      s"SshWireReader: string length $len exceeds remaining $remaining at $pos"
-    )
-    val out = new Array[Byte](len.toInt)
-    System.arraycopy(bytes, pos, out, 0, len.toInt)
-    pos += len.toInt
-    out
+  def readString(): Option[Array[Byte]] = {
+    readUInt32().flatMap { len =>
+      if (len < 0 || len > remaining) None
+      else {
+        val out = new Array[Byte](len.toInt)
+        System.arraycopy(bytes, pos, out, 0, len.toInt)
+        pos += len.toInt
+        Some(out)
+      }
+    }
   }
 
-  def readUtf8String(): String =
-    new String(readString(), StandardCharsets.UTF_8)
+  def readUtf8String(): Option[String] =
+    readString().map(s => new String(s, StandardCharsets.UTF_8))
 
   /** SSH `mpint` — big-endian two's-complement integer bytes per RFC 4251. */
-  def readMpint(): Array[Byte] = readString()
+  def readMpint(): Option[Array[Byte]] = readString()
 
   /** Read a sequence of length-prefixed strings packed inside an outer `string`
     * (used for OpenSSH cert principals / critical options / extensions).
     */
-  def readStringList(): Vector[String] = {
-    val inner = readString()
-    val r = new SshWireReader(inner)
-    val acc = scala.collection.mutable.ListBuffer[String]()
-    while (r.remaining > 0) acc += r.readUtf8String()
-    acc.toVector
+  def readStringList(): Option[Vector[String]] = {
+    readString().flatMap { inner =>
+      val r = new SshWireReader(inner)
+      val acc = Vector.newBuilder[String]
+      var ok = true
+      while (r.remaining > 0 && ok) {
+        r.readUtf8String() match {
+          case Some(s) => acc += s
+          case None    => ok = false
+        }
+      }
+      if (ok) Some(acc.result()) else None
+    }
   }
 
   /** Read (name, data) pairs from an outer `string`, per OpenSSH cert
     * critical-options/extensions format.
     */
-  def readNameDataList(): Vector[(String, Array[Byte])] = {
-    val inner = readString()
-    val r = new SshWireReader(inner)
-    val acc = scala.collection.mutable.ListBuffer[(String, Array[Byte])]()
-    while (r.remaining > 0) {
-      val n = r.readUtf8String()
-      val d = r.readString()
-      acc += ((n, d))
+  def readNameDataList(): Option[Vector[(String, Array[Byte])]] = {
+    readString().flatMap { inner =>
+      val r = new SshWireReader(inner)
+      val acc = Vector.newBuilder[(String, Array[Byte])]
+      var ok = true
+      while (r.remaining > 0 && ok) {
+        val n = r.readUtf8String()
+        val d = r.readString()
+        (n, d) match {
+          case (Some(name), Some(data)) => acc += ((name, data))
+          case _                        => ok = false
+        }
+      }
+      if (ok) Some(acc.result()) else None
     }
-    acc.toVector
   }
 }
 
@@ -123,7 +130,6 @@ object SshWireReader {
       else {
         val bytesAfterPad = mpint.length - offset
         val highByte = head
-        // bit length = (bytes - 1) * 8 + bit-length-of-high-byte
         var hb = highByte
         var hbBits = 0
         while (hb != 0) { hbBits += 1; hb >>>= 1 }
@@ -153,8 +159,6 @@ object SshWireReader {
       else
         Try {
           val b64 = parts(1)
-          // OpenSSH uses standard base64 with padding. Some tools strip
-          // padding; tolerate both by re-padding.
           val padded =
             if (b64.length % 4 == 0) b64
             else b64 + "=" * (4 - (b64.length % 4))

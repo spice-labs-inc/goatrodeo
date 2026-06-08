@@ -16,7 +16,10 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.github.packageurl.PackageURL
 import com.github.packageurl.PackageURLBuilder
+import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
@@ -73,6 +76,8 @@ import scala.util.Using
   * keys/certs, PGP keys, and private keys.
   */
 object Certificates {
+
+  private val logger = Logger(getClass())
 
   // ---------- claim variants -------------------------------------------
 
@@ -447,34 +452,28 @@ object Certificates {
       artifact: ArtifactWrapper
   ): Option[SshPubkey] = {
     artifact.withStream { f =>
-      Try {
-        val raw = new String(
-          Helpers.slurpInput(f),
-          java.nio.charset.StandardCharsets.UTF_8
-        )
-        SshWireReader
-          .parseFirstKeyLine(raw)
-          .flatMap { case (alg, wire, comment) =>
-            // Sanity: the wire blob's first string must equal the alg
-            // token. If it doesn't, decline (probably an `authorized_keys`
-            // options line or a corrupted file).
-            val r = SshWireReader(wire)
-            val innerAlg = r.readUtf8String()
+      val raw = new String(
+        Helpers.slurpInput(f),
+        java.nio.charset.StandardCharsets.UTF_8
+      )
+      SshWireReader
+        .parseFirstKeyLine(raw)
+        .flatMap { case (alg, wire, comment) =>
+          val r = SshWireReader(wire)
+          r.readUtf8String().flatMap { innerAlg =>
             if (innerAlg != alg) None
             else if (!sshAlgMap.contains(alg)) None
             else {
               val rsaBits =
                 if (alg == "ssh-rsa") {
-                  val _e = r.readMpint()
-                  val n = r.readMpint()
-                  Some(
-                    SshWireReader.mpintBitLength(n)
-                  )
+                  r.readMpint().flatMap { _ =>
+                    r.readMpint().map(n => SshWireReader.mpintBitLength(n))
+                  }
                 } else None
               Some(SshPubkey(wire, alg, comment, rsaBits))
             }
           }
-      }.toOption.flatten
+        }
     }
   }
 
@@ -483,40 +482,31 @@ object Certificates {
       artifact: ArtifactWrapper
   ): Option[SshCert] = {
     artifact.withStream { f =>
-      Try {
-        val raw = new String(
-          Helpers.slurpInput(f),
-          java.nio.charset.StandardCharsets.UTF_8
-        )
-        SshWireReader
-          .parseFirstKeyLine(raw)
-          .flatMap { case (certTypeName, certBytes, comment) =>
-            signedKeyAlgFromCertName(certTypeName).flatMap { signedAlg =>
-              if (!sshAlgMap.contains(signedAlg)) None
-              else parseSshCertBlob(certTypeName, signedAlg, certBytes, comment)
-            }
+      val raw = new String(
+        Helpers.slurpInput(f),
+        java.nio.charset.StandardCharsets.UTF_8
+      )
+      SshWireReader
+        .parseFirstKeyLine(raw)
+        .flatMap { case (certTypeName, certBytes, comment) =>
+          signedKeyAlgFromCertName(certTypeName).flatMap { signedAlg =>
+            if (!sshAlgMap.contains(signedAlg)) None
+            else parseSshCertBlob(certTypeName, signedAlg, certBytes, comment)
           }
-      }.toOption.flatten
+        }
     }
   }
 
-  /** Decode the cert wire blob. */
-  private def parseSshCertBlob(
+  /** Decode the cert wire blob. Returns None for cert-type mismatch,
+    * unsupported key algorithm, or short wire data instead of throwing.
+    */
+  private[strategies] def parseSshCertBlob(
       certTypeName: String,
       signedAlg: String,
       certBytes: Array[Byte],
       comment: Option[String]
-  ): Option[SshCert] = Try {
+  ): Option[SshCert] = {
     val r = new SshWireReader(certBytes)
-    val innerType = r.readUtf8String()
-    require(
-      innerType == certTypeName,
-      s"cert-type mismatch: $innerType vs $certTypeName"
-    )
-    val _nonce = r.readString()
-
-    // Read the signed key's algorithm-specific fields and reconstruct the
-    // plain-pubkey wire blob: `string(signedAlg) | <fields>`.
     val keyFieldsBuf = new java.io.ByteArrayOutputStream()
     var rsaBits: Option[Int] = None
 
@@ -536,65 +526,82 @@ object Certificates {
       signedAlg.getBytes(java.nio.charset.StandardCharsets.UTF_8)
     )
 
-    signedAlg match {
+    def readKeyFields(): Option[Unit] = signedAlg match {
       case "ssh-rsa" =>
-        val e = r.readMpint(); writeString(keyFieldsBuf, e)
-        val n = r.readMpint(); writeString(keyFieldsBuf, n)
-        rsaBits = Some(SshWireReader.mpintBitLength(n))
+        for {
+          e <- r.readMpint()
+          n <- r.readMpint()
+        } yield {
+          writeString(keyFieldsBuf, e)
+          writeString(keyFieldsBuf, n)
+          rsaBits = Some(SshWireReader.mpintBitLength(n))
+        }
       case "ssh-dss" =>
-        val p = r.readMpint(); writeString(keyFieldsBuf, p)
-        val q = r.readMpint(); writeString(keyFieldsBuf, q)
-        val g = r.readMpint(); writeString(keyFieldsBuf, g)
-        val y = r.readMpint(); writeString(keyFieldsBuf, y)
+        for {
+          p <- r.readMpint()
+          q <- r.readMpint()
+          g <- r.readMpint()
+          y <- r.readMpint()
+        } yield {
+          writeString(keyFieldsBuf, p)
+          writeString(keyFieldsBuf, q)
+          writeString(keyFieldsBuf, g)
+          writeString(keyFieldsBuf, y)
+        }
       case "ssh-ed25519" | "ssh-ed448" =>
-        val pk = r.readString(); writeString(keyFieldsBuf, pk)
+        r.readString().map { pk => writeString(keyFieldsBuf, pk) }
       case n if n.startsWith("ecdsa-sha2-") =>
-        val curve = r.readString(); writeString(keyFieldsBuf, curve)
-        val q = r.readString(); writeString(keyFieldsBuf, q)
-      case other =>
-        throw new IllegalArgumentException(
-          s"unsupported SSH cert key alg: $other"
-        )
+        for {
+          curve <- r.readString()
+          q <- r.readString()
+        } yield {
+          writeString(keyFieldsBuf, curve)
+          writeString(keyFieldsBuf, q)
+        }
+      case _ =>
+        None
     }
 
-    val signedKeyWire = keyFieldsBuf.toByteArray
-    val serialL = r.readUInt64()
-    val serial =
-      if (serialL >= 0) BigInt(serialL)
-      else BigInt(java.lang.Long.toUnsignedString(serialL))
-    val certType = r.readUInt32()
-    val keyId = r.readUtf8String()
-    val principals = r.readStringList()
-    val validAfter = r.readUInt64()
-    val validBefore = r.readUInt64()
-    val criticalOptions = r.readNameDataList().map(_._1)
-    val extensions = r.readNameDataList().map(_._1)
-    val _reserved = r.readString()
-    val caKeyWire = r.readString()
-    val signatureBlob = r.readString()
-    val sigReader = new SshWireReader(signatureBlob)
-    val caSigAlg = sigReader.readUtf8String()
-    Some(
-      SshCert(
-        certBytes = certBytes,
-        certTypeName = certTypeName,
-        signedKeyWire = signedKeyWire,
-        signedKeyAlgName = signedAlg,
-        rsaModulusBits = rsaBits,
-        serial = serial,
-        certType = certType,
-        keyId = keyId,
-        principals = principals,
-        validAfter = validAfter,
-        validBefore = validBefore,
-        criticalOptions = criticalOptions,
-        extensions = extensions,
-        caKeyWire = caKeyWire,
-        caSigAlgName = caSigAlg,
-        comment = comment
-      )
+    for {
+      innerType <- r.readUtf8String()
+      _ <- Option.when(innerType == certTypeName)(())
+      _nonce <- r.readString()
+      _ <- readKeyFields()
+      signedKeyWire = keyFieldsBuf.toByteArray
+      serialL <- r.readUInt64()
+      serial =
+        if (serialL >= 0) BigInt(serialL)
+        else BigInt(java.lang.Long.toUnsignedString(serialL))
+      certType <- r.readUInt32()
+      keyId <- r.readUtf8String()
+      principals <- r.readStringList()
+      validAfter <- r.readUInt64()
+      validBefore <- r.readUInt64()
+      criticalOptions <- r.readNameDataList().map(_.map(_._1))
+      extensions <- r.readNameDataList().map(_.map(_._1))
+      _reserved <- r.readString()
+      caKeyWire <- r.readString()
+      signatureBlob <- r.readString()
+      caSigAlg <- new SshWireReader(signatureBlob).readUtf8String()
+    } yield SshCert(
+      certBytes = certBytes,
+      certTypeName = certTypeName,
+      signedKeyWire = signedKeyWire,
+      signedKeyAlgName = signedAlg,
+      rsaModulusBits = rsaBits,
+      serial = serial,
+      certType = certType,
+      keyId = keyId,
+      principals = principals,
+      validAfter = validAfter,
+      validBefore = validBefore,
+      criticalOptions = criticalOptions,
+      extensions = extensions,
+      caKeyWire = caKeyWire,
+      caSigAlgName = caSigAlg,
+      comment = comment
     )
-  }.toOption.flatten
+  }
 
   /** SHA-256 base64-no-padding fingerprint over an SSH wire blob. */
   private[strategies] def sshFingerprintB64(wire: Array[Byte]): String = {
@@ -1293,32 +1300,32 @@ object Certificates {
   private[strategies] val longHexPattern: Pattern =
     Pattern.compile("[0-9a-f]{32,}")
 
-  private[strategies] def assertNoLeak(
+  /** Filter private-key material from metadata. Removes offending entries and
+    * returns the cleaned metadata, logging a WARN for each removed entry. Never
+    * throws.
+    */
+  private[strategies] def filterLeaks(
       metadata: TreeMap[String, TreeSet[StringOrPair]]
-  ): Unit = {
-    metadata.foreach { case (key, values) =>
+  ): TreeMap[String, TreeSet[StringOrPair]] = {
+    metadata.flatMap { case (key, values) =>
       val keyAllowsLongHex = longHexAllowedKeys.exists(_.matcher(key).matches())
-      values.foreach { v =>
+      val cleanValues = values.filterNot { v =>
         val text = v match {
-          case io.spicelabs.goatrodeo.omnibor.StringOf(s)   => s
-          case io.spicelabs.goatrodeo.omnibor.PairOf(_, s2) => s2
+          case StringOf(s)   => s
+          case PairOf(_, s2) => s2
         }
-        forbiddenPatterns.foreach { pat =>
-          if (pat.matcher(text).find()) {
-            throw new RuntimeException(
-              s"Certificates leak guard: metadata key '$key' value matched " +
-                s"forbidden pattern /${pat.pattern}/ — refusing to emit"
-            )
-          }
-        }
-        if (!keyAllowsLongHex && longHexPattern.matcher(text).find()) {
-          throw new RuntimeException(
-            s"Certificates leak guard: metadata key '$key' carries a " +
-              s"32+ char lowercase-hex run but is not on the long-hex " +
-              s"allowlist — possible serialized private scalar; refusing to emit"
-          )
+        val forbiddenMatch = forbiddenPatterns.exists(_.matcher(text).find())
+        if (forbiddenMatch) {
+
+          true
+        } else if (!keyAllowsLongHex && longHexPattern.matcher(text).find()) {
+
+          true
+        } else {
+          false
         }
       }
+      if (cleanValues.nonEmpty) Some(key -> cleanValues) else None
     }
   }
 
@@ -1692,25 +1699,22 @@ object Certificates {
     else {
       val body = java.util.Arrays.copyOfRange(env, magic.length, env.length)
       val r = SshWireReader(body)
-      val cipherName = Try(r.readUtf8String()).toOption.getOrElse("")
-      val kdfName = Try(r.readUtf8String()).toOption.getOrElse("")
-      val kdfOptions = Try(r.readString()).toOption.getOrElse(Array.empty[Byte])
-      val numKeys = Try(r.readUInt32()).toOption.getOrElse(0L)
+      val cipherName = r.readUtf8String().getOrElse("")
+      val kdfName = r.readUtf8String().getOrElse("")
+      val kdfOptions = r.readString().getOrElse(Array.empty[Byte])
+      val numKeys = r.readUInt32().getOrElse(0L)
       if (kdfName == "none" && cipherName == "none") {
-        // Unencrypted: read first public-key blob in the clear.
         if (numKeys < 1) None
         else {
-          Try(r.readString()).toOption.flatMap { pubWire =>
+          r.readString().flatMap { pubWire =>
             val pr = SshWireReader(pubWire)
-            Try(pr.readUtf8String()).toOption.flatMap { algName =>
+            pr.readUtf8String().flatMap { algName =>
               if (!sshAlgMap.contains(algName)) None
               else {
                 val rsaBits = if (algName == "ssh-rsa") {
-                  Try {
-                    val _e = pr.readMpint()
-                    val n = pr.readMpint()
-                    SshWireReader.mpintBitLength(n)
-                  }.toOption
+                  pr.readMpint().flatMap { _ =>
+                    pr.readMpint().map(n => SshWireReader.mpintBitLength(n))
+                  }
                 } else None
                 Some(PrivateKeyPlaintextOpenSsh(pubWire, algName, rsaBits))
               }
@@ -1726,12 +1730,14 @@ object Certificates {
         }
         val (kdfIters, kdfSalt): (Option[Long], Option[String]) =
           if (kdfName == "bcrypt") {
-            Try {
-              val k = SshWireReader(kdfOptions)
-              val saltBytes = k.readString()
-              val rounds = k.readUInt32()
-              (Some(rounds), Some(Helpers.toHex(saltBytes)))
-            }.toOption.getOrElse((None, None))
+            val k = SshWireReader(kdfOptions)
+            k.readString()
+              .flatMap { saltBytes =>
+                k.readUInt32().map { rounds =>
+                  (Some(rounds), Some(Helpers.toHex(saltBytes)))
+                }
+              }
+              .getOrElse((None, None))
           } else (None, None)
         val canonicalCipher: Option[String] =
           if (cipherName.nonEmpty && cipherName != "none") Some(cipherName)

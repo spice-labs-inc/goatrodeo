@@ -8,7 +8,7 @@
     <logger name="org.apache.tika" level="INFO" />        
     <logger name="io.spicelabs.baharat" level="INFO" />                                                        
    
-    <root level="DEBUG">                                                                                          
+    <root level="INFO">                                                                                          
       <appender-ref ref="STDOUT" />
     </root>
   </configuration>

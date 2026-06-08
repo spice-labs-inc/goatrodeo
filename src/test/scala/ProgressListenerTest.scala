@@ -18,12 +18,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class ProgressListenerTest extends munit.FunSuite {
 
-  /** A listener that records every event it receives. Thread-safe; events
-    * land in arrival order because the underlying queue is FIFO.
+  /** A listener that records every event it receives. Thread-safe; events land
+    * in arrival order because the underlying queue is FIFO.
     */
   private class Recorder extends ProgressListener {
     private val events = new ConcurrentLinkedQueue[(Long, Long)]()

@@ -26,9 +26,8 @@ import java.util.Base64
   *
   * ## What these tests test
   *
-  * Phase-5 plan §125-135: the `sk-ed25519.pub` fixture is called out as
-  * "manually-crafted test vector" because security keys can't be generated
-  * without physical hardware. The plan still requires coverage of the
+  * The `sk-ed25519.pub` fixture is a manually-crafted test vector because
+  * security keys can't be generated without physical hardware. Coverage of the
   * `sk-ssh-ed25519@openssh.com` and `sk-ecdsa-sha2-nistp256@openssh.com` wire
   * names because they drive the `sk=true` qualifier and
   * `Certificates:SshIsSecurityKey` metadata path — both otherwise dead in the

@@ -29,12 +29,12 @@ import scala.collection.immutable.TreeSet
   *      `ClaimedContent` (same envelope variant, same ADT sub-type for
   *      plaintext, same SPKI bytes / wire bytes). 2. *Encrypted → no pURL* —
   *      every fixture that classifies as `PrivateKeyEncrypted` produces zero
-  *      pURLs through `getPurls`. Plan §"Encrypted path": no pURL, no SPKI. 3.
-  *      *Unencrypted → exactly one pURL* — every fixture that classifies as
-  *      `PrivateKeyPlaintextPem` or `PrivateKeyPlaintextOpenSsh` produces
-  *      exactly one pURL. 4. *Leak-sweep cleanliness* — `getMetadata` on every
-  *      fixture runs without raising the leak-guard exception, i.e., no
-  *      forbidden pattern AND no long-hex run on a non-allowlisted key. 5.
+  *      pURLs through `getPurls`. Encrypted keys produce zero pURLs and no
+  *      SPKI. 3. *Unencrypted → exactly one pURL* — every fixture that
+  *      classifies as `PrivateKeyPlaintextPem` or `PrivateKeyPlaintextOpenSsh`
+  *      produces exactly one pURL. 4. *Leak-sweep cleanliness* — `getMetadata`
+  *      on every fixture runs without raising the leak-guard exception, i.e.,
+  *      no forbidden pattern AND no long-hex run on a non-allowlisted key. 5.
   *      *Encrypted metadata never leaks key-derived fields* — for every
   *      encrypted fixture, the emitted metadata MUST NOT contain
   *      `Certificates:KeyAlgorithm`, `Certificates:KeySize`,
@@ -43,7 +43,7 @@ import scala.collection.immutable.TreeSet
   *
   * ## Why this matters (HS-3)
   *
-  * Per Phase 7 plan §"Acceptance" + Appendix C: "No fixture in this phase
+   * No fixture in this phase
   * triggers a password prompt, a decryption attempt, or a log message about
   * encryption status beyond what's in the metadata." These properties pin the
   * uniform parts of that contract.

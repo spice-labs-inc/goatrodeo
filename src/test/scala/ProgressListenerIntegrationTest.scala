@@ -17,14 +17,13 @@ package io.spicelabs.goatrodeo
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentLinkedQueue
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 /** End-to-end check that a real `Howdy.run` delivers progress events to a
-  * caller-supplied listener: at least one event, strictly increasing
-  * `current`, and `current <= total` invariant maintained across deliveries.
-  * The payload is synthetic — just over a thousand tiny text files, sized
-  * to clear the production-cadence throttle of 1,000 items between
-  * emissions.
+  * caller-supplied listener: at least one event, strictly increasing `current`,
+  * and `current <= total` invariant maintained across deliveries. The payload
+  * is synthetic — just over a thousand tiny text files, sized to clear the
+  * production-cadence throttle of 1,000 items between emissions.
   */
 class ProgressListenerIntegrationTest extends munit.FunSuite {
 
@@ -61,7 +60,10 @@ class ProgressListenerIntegrationTest extends munit.FunSuite {
         .run()
 
       val events = recorder.recorded
-      assert(events.nonEmpty, "expected at least one progress event for a 1050-file payload")
+      assert(
+        events.nonEmpty,
+        "expected at least one progress event for a 1050-file payload"
+      )
 
       val currents = events.map(_._1)
       assertEquals(

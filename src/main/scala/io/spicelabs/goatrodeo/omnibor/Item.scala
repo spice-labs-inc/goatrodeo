@@ -15,6 +15,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.*
 import scala.util.Try
 
 /** Represents a node in the Artifact Dependency Graph (ADG).
@@ -70,7 +71,8 @@ case class Item(
   def withConnection(edgeType: String, id: String): Item =
     this.copy(connections = this.connections + (edgeType -> id))
 
-  private lazy val md5 = Helpers.computeMD5(identifier)
+  private lazy val md5 =
+    Helpers.computeMD5(Helpers.stringToInputStream(identifier))
 
   /** Lazily cached CBOR-encoded representation of this Item. */
   lazy val cachedCBOR: Array[Byte] = Cbor.encode(this).toByteArray
@@ -153,30 +155,6 @@ case class Item(
     } yield {
       toUpdate
     }
-  }
-
-  /** Create or update (merge) this `Item` in the store.
-    *
-    * The resulting item will be returned. The resulting `Item` may be `this` or
-    * `this` merged with the item in the store
-    *
-    * @param store
-    *   the `Storage` instance
-    *
-    * @return
-    *   the updated item
-    */
-  def createOrUpdateInStore(store: Storage, context: Item => String): Item = {
-    store
-      .write(
-        identifier,
-        {
-          case None        => Some(this)
-          case Some(other) => Some(this.merge(other))
-        },
-        context
-      )
-      .get // we know we just created an item
   }
 
   def updateBackReferences(store: Storage, parentScope: ParentScope): Item = {
@@ -485,47 +463,54 @@ object Item {
   }
 
   /** CBOR decoder for Item. */
-  given Decoder[Item] = {
-    new Decoder[Item] {
-      import io.bullet.borer.Dom
-      def read(r: Reader): Item = {
-        val unbounded = r.readMapOpen(4)
-        assert(r.readString() == "body")
-        val bodyOpt: Option[Dom.Element] = if (r.hasNull) {
-          r.readNull()
-          None
-        } else {
-          Some(r.read[Dom.Element]())
-        }
-        assert(r.readString() == "body_mime_type")
-        val bodyMimeType: Option[String] = if (r.hasNull) {
-          r.readNull()
-          None
-        } else { Some(r.readString()) }
-        assert(r.readString() == "connections")
-        val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
-        assert(r.readString() == "identifier")
-        val identifier = r.readString()
-
-        val ret = Item(
-          identifier,
-          connections,
-          bodyMimeType,
-          (bodyMimeType, bodyOpt) match {
-            case (None, _) => None
-            case (Some(ItemMetaData.mimeType), Some(body)) =>
-              Some(Cbor.transEncode(body).transDecode.to[ItemMetaData].value)
-            case (Some(ItemTagData.mimeType), Some(body)) =>
-              Some(ItemTagData(body))
-
-            case _ =>
-              throw new IllegalArgumentException(
-                s"Unexpected bodyMimeType/bodyOpt combination: bodyMimeType=$bodyMimeType, bodyOpt=$bodyOpt"
-              )
-          }
+  given Decoder[Item] = new Decoder[Item] {
+    import io.bullet.borer.Dom
+    def read(r: Reader): Item = {
+      val unbounded = r.readMapOpen(4)
+      // Read "body" key
+      val bodyKey = r.readString()
+      if (bodyKey != "body")
+        throw new IllegalArgumentException(
+          s"Expected 'body' key, got '$bodyKey'"
         )
-        r.readMapClose(unbounded = unbounded, ret)
-      }
+      val bodyOpt: Option[Dom.Element] = if (r.hasNull) { r.readNull(); None }
+      else Some(r.read[Dom.Element]())
+      // Read body_mime_type
+      val bmtKey = r.readString()
+      if (bmtKey != "body_mime_type")
+        throw new IllegalArgumentException(
+          s"Expected 'body_mime_type', got '$bmtKey'"
+        )
+      val bodyMimeType: Option[String] = if (r.hasNull) { r.readNull(); None }
+      else Some(r.readString())
+      // Read connections
+      val connKey = r.readString()
+      if (connKey != "connections")
+        throw new IllegalArgumentException(
+          s"Expected 'connections', got '$connKey'"
+        )
+      val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
+      // Read identifier
+      val idKey = r.readString()
+      if (idKey != "identifier")
+        throw new IllegalArgumentException(
+          s"Expected 'identifier', got '$idKey'"
+        )
+      val identifier = r.readString()
+
+      Item(
+        identifier,
+        connections,
+        bodyMimeType,
+        (bodyMimeType, bodyOpt) match {
+          case (None, _) => None
+          case (Some(ItemMetaData.mimeType), Some(body)) =>
+            Some(Cbor.transEncode(body).transDecode.to[ItemMetaData].value)
+          case (Some(ItemTagData.mimeType), Some(body)) =>
+            Some(ItemTagData(body))
+          case _ => None
+        }
+      )
     }
   }
 

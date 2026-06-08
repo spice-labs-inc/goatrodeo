@@ -66,7 +66,10 @@ class MavenTestSuite extends munit.FunSuite {
     val newState = state.beginProcessing(artifact, item, MavenMarkers.POM)
 
     assert(newState.pomFile.nonEmpty)
-    assert(newState.pomXml != NodeSeq.Empty)
+    assert(
+      newState.parsedPom.isDefined,
+      "ParsedPOM should be set (pomXml is deprecated legacy field)"
+    )
   }
 
   test("MavenState.beginProcessing - does not capture for JAR marker") {

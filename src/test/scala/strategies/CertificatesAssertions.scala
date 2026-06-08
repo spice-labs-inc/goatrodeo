@@ -44,7 +44,7 @@ import scala.collection.immutable.TreeSet
   *     `ItemMetaData.fileNames`; we read them off the connection set which is
   *     the authoritative location.
   *   - Ad-hoc metadata lives in `ItemMetaData.extra` — keyed by strings like
-  *     `Certificates:SubjectDN` (colon-separator convention; see parent plan's
+  *     `Certificates:SubjectDN` (colon-separator convention; see the parent
   *     Hard rule #6).
   */
 object CertificatesAssertions {

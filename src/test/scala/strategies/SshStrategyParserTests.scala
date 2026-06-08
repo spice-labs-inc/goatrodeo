@@ -99,7 +99,7 @@ class SshStrategyParserTests extends FunSuite {
     assert(cert.rsaModulusBits.isDefined)
   }
 
-  // G1 — Plan §SshCertValidBefore / §SshCertValidAfter: OpenSSH uses
+  // G1 — SshCertValidBefore / SshCertValidAfter: OpenSSH uses
   // 0xFFFFFFFFFFFFFFFFL to mean "never expires" and 0L to mean "valid
   // always from the past". Both must render as their literal sentinel,
   // not as wrapped epoch dates (1970-01-01 / 1969-12-31).
@@ -124,7 +124,7 @@ class SshStrategyParserTests extends FunSuite {
     assertEquals(s, "2026-05-02T00:00:00Z")
   }
 
-  // G11 — Plan §"Files that fail to parse return None": negative test
+  // G11 — "Files that fail to parse return None": negative test
   // exercising the parser's None-on-bad-input contract. Required because
   // all 34 corpus fixtures parse successfully — an inadvertently-permissive
   // parser would pass every per-fixture test.
@@ -162,7 +162,7 @@ class SshStrategyParserTests extends FunSuite {
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  // G7 — Plan §"single-line OpenSSH wire format". `authorized_keys`
+  // G7 — "single-line OpenSSH wire format". `authorized_keys`
   // lines that have options before the algorithm token are explicitly
   // out-of-scope; they silently return None. This test pins that
   // contract so future refactors don't accidentally start claiming

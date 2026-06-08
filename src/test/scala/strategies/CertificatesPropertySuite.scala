@@ -26,7 +26,7 @@ import scala.collection.immutable.TreeSet
 
 /** Phase 8 — generative X.509 roundtrip property tests.
   *
-  * Per the plan (`certificates-strategy/phases-8-9-tests-docs.md`):
+  * Per `certificates-strategy/phases-8-9-tests-docs.md`:
   *
   * > Generate synthetic certs at test time using Bouncy Castle's >
   * `X509v3CertificateBuilder`. For each generated cert, assert > [13
@@ -52,7 +52,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     )
   }
 
-  // Cap test count: per plan, "Target 50 generated certs per test run".
+  // Cap test count: "Target 50 generated certs per test run".
   override def scalaCheckTestParameters =
     super.scalaCheckTestParameters.withMinSuccessfulTests(50)
 
@@ -109,7 +109,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     val displayName = "ed448"
   }
 
-  /** All 8 algorithm cases per the Phase 8 plan: "Generators should cover at
+  /** All 8 algorithm cases: "Generators should cover at
     * minimum: RSA {2048, 3072, 4096}, EC {p-256, p-384, p-521}, Ed25519,
     * Ed448."
     */
@@ -189,7 +189,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       .map(b => f"${b & 0xff}%02x")
       .mkString
 
-  /** Per the plan, parse the cert through the strategy and check the resulting
+  /** Parse the cert through the strategy and check the resulting
     * pURLs. We use `parseSingleCert` + `purlsForCert` to exercise the actual
     * emission path.
     */
@@ -370,7 +370,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
 
   // ===== Property 11: spki-sha256 has version= ===========================
 
-  property("[PROP] spki-sha256 pURL carries version= qualifier (X.509 plan)") {
+  property("[PROP] spki-sha256 pURL carries version= qualifier (X.509)") {
     forAll(genCase) { c =>
       val (_, cert) = buildSelfSignedCert(c)
       val (_, purls) = driveThroughStrategy(cert)
@@ -443,7 +443,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
 
   // ===== Corpus-driven properties for SSH cert + CRL =====================
   //
-  // The plan lists these as properties but they aren't reasonably
+  // These are listed as properties but they aren't reasonably
   // runtime-generative (CRLs need an issuing key + revocation list;
   // SSH certs need a CA. Building either from scratch in test setup
   // is more work than driving the corpus). The corpus is finite —

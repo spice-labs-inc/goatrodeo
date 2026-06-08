@@ -118,7 +118,7 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
       val out = new java.io.ByteArrayOutputStream()
       writeUInt32(out, v)
       val r = new SshWireReader(out.toByteArray)
-      r.readUInt32() == v
+      r.readUInt32() == Some(v)
     }
   }
 
@@ -129,7 +129,7 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
       val out = new java.io.ByteArrayOutputStream()
       writeUInt64(out, v)
       val r = new SshWireReader(out.toByteArray)
-      r.readUInt64() == v
+      r.readUInt64() == Some(v)
     }
   }
 
@@ -138,18 +138,19 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
       val out = new java.io.ByteArrayOutputStream()
       writeString(out, b)
       val r = new SshWireReader(out.toByteArray)
-      r.readString().toSeq == b.toSeq
+      r.readString().map(_.toSeq) == Some(b.toSeq)
     }
   }
 
-  property("[PROP] readString throws on truncated input (G5 #4)") {
+  property("[PROP] readString returns None on truncated input (G5 #4)") {
     forAll(Gen.choose(1, 1024)) { claimedLen =>
       val out = new java.io.ByteArrayOutputStream()
-      writeUInt32(out, claimedLen.toLong) // claim N bytes of payload
-      // intentionally write fewer than claimedLen bytes
+      writeUInt32(out, claimedLen.toLong)
       val r = new SshWireReader(out.toByteArray)
-      val threw = scala.util.Try(r.readString()).isFailure
-      threw :| s"reading $claimedLen bytes from header-only buffer must throw"
+      assert(
+        r.readString().isEmpty,
+        s"reading $claimedLen bytes from header-only buffer must return None"
+      )
     }
   }
 
@@ -176,7 +177,7 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
       val outer = new java.io.ByteArrayOutputStream()
       writeString(outer, inner.toByteArray)
       val r = new SshWireReader(outer.toByteArray)
-      r.readStringList().toList == ss
+      r.readStringList().getOrElse(Vector.empty).toList == ss
     }
   }
 }

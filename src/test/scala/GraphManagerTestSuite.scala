@@ -23,6 +23,7 @@ import java.io.FileInputStream
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 class GraphManagerTestSuite extends munit.FunSuite {
 
@@ -212,7 +213,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val envelope = walker.open()
+        val envelope = Try { walker.open() }
         assert(envelope.isSuccess, "Should successfully open GRD file")
       } finally {
         channel.close()
@@ -379,7 +380,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       try {
         val walker = new GRDWalker(channel)
         intercept[Exception] {
-          walker.open().get
+          walker.open()
         }
       } finally {
         channel.close()

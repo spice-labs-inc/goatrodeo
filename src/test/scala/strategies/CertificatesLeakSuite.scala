@@ -5,7 +5,9 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.FileWrapper
 import munit.FunSuite
@@ -15,39 +17,25 @@ import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Phase 8 — corpus-wide private-key leak sweep + hostile-reviewer sentinel
-  * check.
+/** Phase 0.1 / Phase 8 — corpus-wide private-key leak sweep + hostile-reviewer
+  * sentinel check.
   *
-  * Per the plan (`certificates-strategy/phases-8-9-tests-docs.md` lines 33-37):
+  * The `filterLeaks` method removes private-key material from metadata (instead
+  * of throwing, as the old `assertNoLeak` did). This suite independently
+  * verifies the output is free of leaks by sweeping emitted metadata against
+  * the Appendix C forbidden-pattern regexes.
   *
-  * > Run all fixture tests and property-based tests, collect every > Item
-  * produced, then sweep every metadata value and every Item > body (if any)
-  * against `appendices.md` Appendix C's forbidden- > pattern regexes. Zero
-  * matches allowed. One match = test failure > with a clear message identifying
-  * which fixture, which Item, > which metadata key, and which pattern matched.
-  *
-  * > This suite runs **last** so it has all Items to check. It's the > single
-  * most important test in the strategy — the no-leak > invariant is a hard
-  * rule.
-  *
-  * The hostile-reviewer sentinel check (per HS-2 step 3 in the plan):
+  * The hostile-reviewer sentinel check (per HS-2 step 3):
   *
   * > Introduce a sentinel leak (add `"-----BEGIN RSA PRIVATE KEY-----test"` >
-  * as a metadata value in a feature branch), confirm the leak suite > catches
-  * it, then remove the sentinel. Without this check, "the > leak suite passes"
-  * is not evidence the leak suite works.
+  * as a metadata value), confirm `filterLeaks` removes it, then remove > the
+  * sentinel.
   *
-  * Implementation: the sentinel test injects the forbidden string into a
-  * synthetic metadata table IN-MEMORY (no fixture / committed code carries the
-  * sentinel) and asserts `assertNoLeak` raises. This provides the "leak suite
-  * plumbing actually fires" evidence without shipping the leak risk.
+  * Without this check, "the leak suite passes" is not evidence the plumbing
+  * actually fires.
   */
 class CertificatesLeakSuite extends FunSuite {
 
-  // Appendix C forbidden patterns — independent copy from
-  // certificates-strategy/appendices.md so the test suite verifies
-  // the strategy's `forbiddenPatterns` against the source-of-truth
-  // list, not against itself.
   private val appendixCPatterns: Seq[Pattern] = Seq(
     "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
     "-----BEGIN ENCRYPTED PRIVATE KEY-----",
@@ -114,12 +102,11 @@ class CertificatesLeakSuite extends FunSuite {
           .Try {
             val (md, _) = state.getMetadata(w, stubItem(), SingleMarker())
             checked += 1
-            // Sweep every metadata value.
             md.foreach { case (key, values) =>
               values.foreach { v =>
                 val text = v match {
-                  case io.spicelabs.goatrodeo.omnibor.StringOf(s)   => s
-                  case io.spicelabs.goatrodeo.omnibor.PairOf(_, s2) => s2
+                  case StringOf(s)   => s
+                  case PairOf(_, s2) => s2
                 }
                 appendixCPatterns.foreach { pat =>
                   if (pat.matcher(text).find()) {
@@ -129,22 +116,8 @@ class CertificatesLeakSuite extends FunSuite {
               }
             }
           }
-          .recover {
-            case ex: RuntimeException
-                if Option(ex.getMessage).exists(
-                  _.contains("Certificates leak guard")
-                ) =>
-              // EXPECTED: the strategy's `assertNoLeak` correctly fired.
-              // This is the strategy doing its job; the outer leak suite
-              // is a second-line defense and shouldn't flag a fixture
-              // where the strategy already raised.
-              ()
-            case ex: RuntimeException =>
-              // UNEXPECTED: a non-leak-guard RuntimeException slipped through.
-              // (NPE in metadata builder, ClassCastException, BC parser
-              // failure, etc.) Record as a violation — A3 in the v2 review:
-              // the recover used to swallow these, hiding bugs.
-              violations += s"FIXTURE=${path} UNEXPECTED-CRASH: ${ex.getClass.getSimpleName}: ${ex.getMessage}"
+          .recover { case ex: RuntimeException =>
+            violations += s"FIXTURE=${path} UNEXPECTED-CRASH: ${ex.getClass.getSimpleName}: ${ex.getMessage}"
           }
       }
     }
@@ -165,13 +138,10 @@ class CertificatesLeakSuite extends FunSuite {
     * sentinel."
     *
     * We inject the sentinel IN-MEMORY only — no fixture or committed code
-    * carries it. The test asserts the strategy's `assertNoLeak` raises on the
-    * planted leak. If this test passes, the leak-sweep plumbing is genuinely
-    * live; if it fails, the sweep is broken and the previous "[LEAK SWEEP]"
-    * passing is meaningless.
+    * carries it. The test asserts `filterLeaks` removes the offending entry.
     */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires when a sentinel leak is planted (RSA private-key banner)"
+    "[HOSTILE REVIEWER] filterLeaks removes a sentinel leak (RSA private-key banner)"
   ) {
     val sentinel = "-----BEGIN RSA PRIVATE KEY-----test"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -179,49 +149,35 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestSentinel" ->
           TreeSet(StringOrPair(sentinel))
       )
-    val ex = intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
-    val msg = ex.getMessage
+    val result = Certificates.filterLeaks(planted)
     assert(
-      msg.contains("Certificates leak guard"),
-      s"expected leak-guard message; got: $msg"
-    )
-    assert(
-      msg.contains("Certificates:LeakTestSentinel"),
-      s"expected violating-key name in message; got: $msg"
+      !result.contains("Certificates:LeakTestSentinel"),
+      "filterLeaks must remove the sentinel entry"
     )
   }
 
-  /** Companion sentinel: PKCS#8 private-key DER prefix encoded as base64 (the
-    * kind of leak that a `.toString()` on a parsed PrivateKey could produce).
-    * Verifies the base64-prefix regexes are live.
-    */
+  /** Companion sentinel: PKCS#8 private-key DER prefix encoded as base64. */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on a PKCS#8 base64-prefix sentinel"
+    "[HOSTILE REVIEWER] filterLeaks removes a PKCS#8 base64-prefix sentinel"
   ) {
     val sentinel =
-      "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcw" // matches MIIEvQIBADAN
+      "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcw"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
       TreeMap[String, TreeSet[StringOrPair]](
         "Certificates:LeakTestPkcs8" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestPkcs8"),
+      "filterLeaks must remove the PKCS#8 prefix entry"
+    )
   }
 
-  /** Companion sentinel: long-hex on a non-allowlisted key. Verifies the
-    * Appendix-C long-hex sweep (Phase 7 extension) is live.
-    */
+  /** Companion sentinel: long-hex on a non-allowlisted key. */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on a 32+ char hex run on a non-allowlisted key"
+    "[HOSTILE REVIEWER] filterLeaks removes a 32+ char hex run on a non-allowlisted key"
   ) {
-    // 64 hex chars — could be an Ed25519 private seed or a SHA-256
-    // fingerprint. The allowlist permits long-hex on
-    // Certificates:SpkiSha256 etc.; on a non-allowlisted key, it must
-    // be rejected.
     val sentinel =
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -229,22 +185,18 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestRawHex" ->
           TreeSet(StringOrPair(sentinel))
       )
-    val ex = intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
-    val msg = ex.getMessage
+    val result = Certificates.filterLeaks(planted)
     assert(
-      msg.contains("32+ char lowercase-hex run") ||
-        msg.contains("long-hex allowlist"),
-      s"expected long-hex-allowlist message; got: $msg"
+      !result.contains("Certificates:LeakTestRawHex"),
+      "filterLeaks must remove the long-hex entry on non-allowlisted key"
     )
   }
 
-  /** Companion sentinel: confirm the allowlist DOESN'T fire on
+  /** Companion sentinel: confirm the allowlist DOESN'T filter on
     * legitimately-long-hex values on allowlisted keys.
     */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak does NOT fire on long-hex on Certificates:SpkiSha256"
+    "[HOSTILE REVIEWER] filterLeaks preserves long-hex on Certificates:SpkiSha256"
   ) {
     val sha256 =
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -252,12 +204,13 @@ class CertificatesLeakSuite extends FunSuite {
       TreeMap[String, TreeSet[StringOrPair]](
         "Certificates:SpkiSha256" -> TreeSet(StringOrPair(sha256))
       )
-    Certificates.assertNoLeak(ok) // must not throw
+    val result = Certificates.filterLeaks(ok)
+    assertEquals(result, ok, "Allowlisted long-hex must be preserved")
   }
 
-  /** Companion sentinel: openssh-key-v1 magic must be caught. */
+  /** Companion sentinel: openssh-key-v1 magic must be filtered. */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on openssh-key-v1 magic in metadata"
+    "[HOSTILE REVIEWER] filterLeaks removes openssh-key-v1 magic in metadata"
   ) {
     val sentinel = "openssh-key-v1\u0000abcdef"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -265,14 +218,16 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestOpensshMagic" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestOpensshMagic"),
+      "filterLeaks must remove openssh-key-v1 magic entry"
+    )
   }
 
   /** Sentinel for PKCS#8-encrypted banner (Appendix C pattern #2). */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on PKCS#8 ENCRYPTED PRIVATE KEY banner"
+    "[HOSTILE REVIEWER] filterLeaks removes PKCS#8 ENCRYPTED PRIVATE KEY banner"
   ) {
     val sentinel = "-----BEGIN ENCRYPTED PRIVATE KEY-----xyz"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -280,14 +235,16 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestPkcs8EncryptedBanner" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestPkcs8EncryptedBanner"),
+      "filterLeaks must remove encrypted private key banner entry"
+    )
   }
 
   /** Sentinel for PGP private-key-block banner (Appendix C pattern #3). */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on PGP PRIVATE KEY BLOCK banner"
+    "[HOSTILE REVIEWER] filterLeaks removes PGP PRIVATE KEY BLOCK banner"
   ) {
     val sentinel = "-----BEGIN PGP PRIVATE KEY BLOCK-----xyz"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -295,17 +252,16 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestPgpPrivateBanner" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestPgpPrivateBanner"),
+      "filterLeaks must remove PGP private key block banner entry"
+    )
   }
 
-  /** Sentinel for full-PEM-body regex (Appendix C pattern #4). The pattern is a
-    * multi-line regex — `[\s\S]+?` matches any char including newlines. The
-    * sentinel is a complete fake PEM body.
-    */
+  /** Sentinel for full-PEM-body regex (Appendix C pattern #4). */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on a complete PEM private-key body (BEGIN/.../END)"
+    "[HOSTILE REVIEWER] filterLeaks removes a complete PEM private-key body (BEGIN/.../END)"
   ) {
     val sentinel =
       "-----BEGIN RSA PRIVATE KEY-----\n" +
@@ -316,16 +272,16 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestFullPemBody" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestFullPemBody"),
+      "filterLeaks must remove full PEM body entry"
+    )
   }
 
-  /** Sentinel for the SECOND PKCS#8 base64 prefix `MIIEpAIBAAKCAQEA` (Appendix
-    * C pattern #6). My original sentinel covered only `MIIEvQIBADAN`.
-    */
+  /** Sentinel for the SECOND PKCS#8 base64 prefix (Appendix C pattern #6). */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on MIIEpAIBAAKCAQEA PKCS#8 prefix"
+    "[HOSTILE REVIEWER] filterLeaks removes MIIEpAIBAAKCAQEA PKCS#8 prefix"
   ) {
     val sentinel = "MIIEpAIBAAKCAQEAxyz"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -333,17 +289,16 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestPkcs8Prefix2" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestPkcs8Prefix2"),
+      "filterLeaks must remove MIIEpAIBAAKCAQEA prefix entry"
+    )
   }
 
-  /** Sentinel for the regex-shaped PKCS#8 prefix
-    * `MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+` (Appendix C pattern #7). Construct
-    * a string matching the pattern.
-    */
+  /** Sentinel for the regex-shaped PKCS#8 prefix (Appendix C pattern #7). */
   test(
-    "[HOSTILE REVIEWER] assertNoLeak fires on regex-shaped MIIB...QIB... PKCS#8 prefix"
+    "[HOSTILE REVIEWER] filterLeaks removes regex-shaped MIIB...QIB... PKCS#8 prefix"
   ) {
     val sentinel = "MIIBabcdefghQIBxyz"
     val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -351,21 +306,13 @@ class CertificatesLeakSuite extends FunSuite {
         "Certificates:LeakTestPkcs8RegexPrefix" ->
           TreeSet(StringOrPair(sentinel))
       )
-    intercept[RuntimeException] {
-      Certificates.assertNoLeak(planted)
-    }
+    val result = Certificates.filterLeaks(planted)
+    assert(
+      !result.contains("Certificates:LeakTestPkcs8RegexPrefix"),
+      "filterLeaks must remove MIIB...QIB... prefix entry"
+    )
   }
 
-  /** Robust meta-coverage: rather than reading our own source file and counting
-    * comment markers (brittle — A2 in the v2 review), we directly verify that
-    * EVERY pattern in `Certificates.forbiddenPatterns` triggers the leak guard
-    * when a sample matching value is planted. If a pattern were silently
-    * dropped, this test fires.
-    *
-    * For each pattern, we construct a minimal sample that's guaranteed to
-    * match. Patterns are regex-shaped so we hand-pick a literal that satisfies
-    * each.
-    */
   private val patternSamples: Map[String, String] = Map(
     "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----" ->
       "-----BEGIN RSA PRIVATE KEY-----xxx",
@@ -385,8 +332,9 @@ class CertificatesLeakSuite extends FunSuite {
       "openssh-key-v1\u0000magic"
   )
 
+  /** META: verify every forbidden pattern is enforced by filterLeaks. */
   test(
-    "[HOSTILE REVIEWER META] every Appendix-C pattern is enforced by the leak guard (programmatic check)"
+    "[HOSTILE REVIEWER META] every Appendix-C pattern is enforced by filterLeaks (programmatic check)"
   ) {
     val patterns = Certificates.forbiddenPatterns.map(_.pattern)
     assertEquals(
@@ -394,15 +342,13 @@ class CertificatesLeakSuite extends FunSuite {
       8,
       "Appendix C lists 8 forbidden patterns; strategy must have 8"
     )
-    // Verify the patternSamples map covers every strategy pattern.
     val missing = patterns.filterNot(patternSamples.contains)
     assert(
       missing.isEmpty,
       s"patternSamples is missing entries for: ${missing.mkString(", ")} " +
         s"— add a sample literal that matches the pattern so this " +
-        s"test can verify the leak guard catches it"
+        s"test can verify filterLeaks catches it"
     )
-    // For each pattern, plant the sample and confirm assertNoLeak fires.
     patterns.foreach { pat =>
       val sample = patternSamples(pat)
       val planted: TreeMap[String, TreeSet[StringOrPair]] =
@@ -410,18 +356,16 @@ class CertificatesLeakSuite extends FunSuite {
           s"Certificates:LeakTestProgrammatic" ->
             TreeSet(StringOrPair(sample))
         )
-      val ex = scala.util.Try(Certificates.assertNoLeak(planted))
+      val result = Certificates.filterLeaks(planted)
       assert(
-        ex.isFailure,
-        s"assertNoLeak did not fire on pattern /$pat/ with sample '$sample'; " +
-          s"this means the leak guard is missing or broken for that pattern"
+        !result.contains("Certificates:LeakTestProgrammatic"),
+        s"filterLeaks did not remove entry matching pattern /$pat/ " +
+          s"with sample '$sample'; this means the leak guard is missing or broken"
       )
     }
   }
 
-  /** Verify the strategy's forbiddenPatterns list matches Appendix C exactly
-    * (count + each pattern). Catches "we silently dropped a forbidden pattern"
-    * regressions.
+  /** Verify the strategy's forbiddenPatterns list matches Appendix C exactly.
     */
   test(
     "[LEAK SWEEP META] strategy's forbiddenPatterns matches Appendix C exactly"

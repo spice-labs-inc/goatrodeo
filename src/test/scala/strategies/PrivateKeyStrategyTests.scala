@@ -24,8 +24,8 @@ import java.io.File
   *
   * ## What these tests test
   *
-  * Phase 7 plan §"Two paths": every Phase-7 fixture must take the correct
-  * branch (unencrypted → derive public key → emit pURL + `Envelope=plaintext` +
+   * Unencrypted vs encrypted: every fixture must take the correct branch
+  * (unencrypted → derive public key → emit pURL + `Envelope=plaintext` +
   * `DerivedFromPrivateKey=true`; encrypted → envelope-only metadata, no pURL,
   * no decryption attempts). The sidecar tests in `CertificatesSuite` are
   * black-box (sidecars materialized from the strategy's own emitters →
