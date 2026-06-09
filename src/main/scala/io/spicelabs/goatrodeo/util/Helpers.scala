@@ -16,6 +16,7 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
+import io.spicelabs.coordinates.Coordinates
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.apache.bcel.classfile.ClassParser
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -359,8 +360,8 @@ object Helpers {
     *   the hex of the MD5 hash.
     */
   def md5hashHex(in: String): String = {
-
-    toHex(computeMD5(stringToInputStream(in)))
+    // Delegate to `coordinates`, the canonical definition of this identifier.
+    Coordinates.md5(in.getBytes("UTF-8")).nn
   }
 
   /** Convert a String to an InputStream using UTF-8 encoding.
@@ -546,7 +547,8 @@ object Helpers {
     md.digest(bytes)
   }
 
-  def sha256Hex(bytes: Array[Byte]): String = toHex(computeSHA256(bytes))
+  // Canonical lowercase-hex SHA-256, computed by `coordinates`.
+  def sha256Hex(bytes: Array[Byte]): String = Coordinates.sha256(bytes).nn
 
   def computeSHA256(in: InputStream): Array[Byte] = {
     val md = MessageDigest.getInstance("SHA256")
@@ -1405,33 +1407,22 @@ object GitOIDUtils {
       theFile: ArtifactWrapper
   ): (String, Vector[String]) = {
 
-    val gitoidSha256 =
-      theFile.withStream(url(_, theFile.size(), HashType.SHA256))
+    // Compute every intrinsic identifier in a single streamed pass through the
+    // canonical `coordinates` implementation — no full-artifact buffering, and
+    // one read instead of the six this used to take. The returned map is keyed
+    // by the spec.yaml names; we keep goatrodeo's `<algo>:<hex>` alias shape and
+    // lead with the gitoid-sha256, so the output is byte-identical to before.
+    val all =
+      theFile.withStream(in => Coordinates.intrinsic(in, theFile.size())).nn
 
     (
-      gitoidSha256,
+      all.get("gitoid-blob-sha256").nn,
       Vector(
-        theFile.withStream(url(_, theFile.size(), HashType.SHA1)),
-        String
-          .format(
-            "sha1:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeSHA1(_)))
-          ),
-        String
-          .format(
-            "sha256:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeSHA256(_)))
-          ),
-        String
-          .format(
-            "sha512:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeSHA512(_)))
-          ),
-        String
-          .format(
-            "md5:%s",
-            Helpers.toHex(theFile.withStream(Helpers.computeMD5(_)))
-          )
+        all.get("gitoid-blob-sha1").nn,
+        s"sha1:${all.get("sha1")}",
+        s"sha256:${all.get("sha256")}",
+        s"sha512:${all.get("sha512")}",
+        s"md5:${all.get("md5")}"
       )
     )
   }
