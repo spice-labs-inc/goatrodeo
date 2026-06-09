@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
+import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
@@ -152,7 +152,7 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
-  ): (Vector[PackageURL], MavenState) = {
+  ): (Vector[Purl], MavenState) = {
     val grp = findTag(pomXml, "groupId")
     val art = findTag(pomXml, "artifactId")
     val ver = tryToFixVersion(

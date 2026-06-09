@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
+import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.Package
 import io.spicelabs.baharat.PackageReader
@@ -123,8 +123,10 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[PackageURL], BaharatState) = {
-    Vector(pkg.packageUrl()) -> this
+  ): (Vector[Purl], BaharatState) = {
+    // baharat returns a com.github.packageurl.PackageURL; convert to the
+    // canonical coordinates.Purl by reparsing its canonical form.
+    Vector(Purl.parse(pkg.packageUrl().canonicalize()).nn) -> this
   }
 
   override def getMetadata(

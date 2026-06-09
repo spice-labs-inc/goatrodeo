@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.util
 
-import com.github.packageurl.PackageURL
+import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.*
 import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
@@ -398,7 +398,7 @@ class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
                   ConnectionAugmentation(
                     digest,
                     (EdgeType.aliasFrom, purl),
-                    PackageURL(purl)
+                    Purl.parse(purl)
                   )
                 )
               } catch {

@@ -51,7 +51,7 @@ object CertificatesAssertions {
 
   /** Extract all pURL strings attached to the Item via `alias:from` edges.
     * These are the canonicalized pURL strings produced by
-    * `PackageURL.canonicalize()`.
+    * `PackageURL.toCanonical()`.
     */
   def purlsOf(item: Item): Set[String] = {
     item.connections

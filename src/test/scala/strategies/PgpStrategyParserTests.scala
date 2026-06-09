@@ -260,7 +260,7 @@ class PgpStrategyParserTests extends FunSuite {
   test("purlForPgpKey: shape and ordering") {
     val w = wrap("test_data/certificates/pgp/synthetic/v4-rsa3072-pub.asc")
     val r = Certificates.parsePgpKeyRing(w).get
-    val purl = Certificates.purlForPgpKey(r.keys.head).canonicalize().nn
+    val purl = Certificates.purlForPgpKey(r.keys.head).toCanonical().nn
     assertEquals(
       purl,
       "pkg:generic/pgp/fingerprint@3800518ce65fa1b28e540b3cd242090793ba9dc6?alg=rsa&size=3072&version=4"

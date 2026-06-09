@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import com.github.packageurl.PackageURL
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -383,7 +383,7 @@ class MySuite extends munit.FunSuite {
       f"Expecting at least 2 files, got ${strategy.length}"
     )
 
-    var packages: Vector[PackageURL] = Vector()
+    var packages: Vector[Purl] = Vector()
     val store = ToProcess.buildGraphForToProcess(
       strategy,
       args = Config(),

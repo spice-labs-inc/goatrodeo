@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.cilantro.AssemblyNameReference
 import io.spicelabs.cilantro.CSVersion
@@ -22,6 +22,7 @@ import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.toHex
+import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.JsonDSL.*
@@ -93,19 +94,17 @@ class DotnetState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[PackageURL], DotnetState) = {
+  ): (Vector[Purl], DotnetState) = {
     assemblyOpt
       .map(assembly =>
-        PackageURL(
-          "nuget",
-          "",
-          assembly.name.name,
+        // nuget purls take no namespace (the spec prohibits it).
+        PURLHelpers.purl(
+          `type` = "nuget",
+          name = assembly.name.name,
           // if the build number is 0, it won't show in the nuget version number,
           // so we get a string without the build number.
           // The full number goes into the the VERSION metadata, however.
-          sanitizeVersion(assembly.name.version),
-          null,
-          ""
+          version = sanitizeVersion(assembly.name.version)
         )
       )
       .toVector -> this

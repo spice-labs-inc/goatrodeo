@@ -204,6 +204,8 @@ lazy val root = project
     libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
+    // Still required at the boundary: the annatto/baharat readers hand back
+    // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     libraryDependencies += "io.spicelabs" %% "cilantro" % "0.1.17",
     // Canonical content identifiers (hashes + git blob ids) — the single source of

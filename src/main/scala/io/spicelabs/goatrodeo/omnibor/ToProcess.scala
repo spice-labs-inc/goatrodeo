@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import com.github.packageurl.PackageURL
+import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
@@ -75,7 +75,7 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: PM
-  ): (Vector[PackageURL], ME)
+  ): (Vector[Purl], ME)
 
   /** Get the `extra` information for the artifact
     *
@@ -167,7 +167,7 @@ abstract class ParentScope(
       store: Storage,
       artifact: ArtifactWrapper,
       item: Item,
-      purls: Vector[PackageURL]
+      purls: Vector[Purl]
   ): Item = item
   def enhanceWithMetadata(
       store: Storage,
@@ -853,7 +853,7 @@ object ToProcess {
       toProcess: Vector[ToProcess],
       store: Storage = MemStorage(None),
       args: Config,
-      purlOut: PackageURL => Unit = _ => (),
+      purlOut: Purl => Unit = _ => (),
       block: Set[GitOID] = Set()
   ): Storage = {
 
@@ -894,7 +894,7 @@ object ToProcess {
       artifact: ArtifactWrapper,
       args: Config,
       store: Storage = MemStorage(None),
-      purlOut: PackageURL => Unit = _ => (),
+      purlOut: Purl => Unit = _ => (),
       block: Set[GitOID] = Set()
   ): Storage = {
 

@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 
@@ -94,21 +95,22 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       version = "2.22.1"
     )
 
-    assertEquals(purl.getType(), "maven")
-    assertEquals(purl.getNamespace(), "org.apache.logging.log4j")
-    assertEquals(purl.getName(), "log4j-core")
-    assertEquals(purl.getVersion(), "2.22.1")
+    assertEquals(purl.`type`, "maven")
+    assertEquals(purl.namespace, "org.apache.logging.log4j")
+    assertEquals(purl.name, "log4j-core")
+    assertEquals(purl.version, "2.22.1")
   }
 
   test("buildPackageURL - Maven pURL requires namespace") {
-    // Maven pURLs require both namespace and name per spec
-    import com.github.packageurl.MalformedPackageURLException
-    intercept[MalformedPackageURLException] {
-      PURLHelpers.buildPackageURL(
-        ecosystem = Ecosystems.Maven,
-        artifactId = "simple-artifact",
-        version = "1.0.0"
-      )
+    // Maven pURLs require a namespace per spec; coordinates enforces this when
+    // the purl is canonicalized.
+    val purl = PURLHelpers.buildPackageURL(
+      ecosystem = Ecosystems.Maven,
+      artifactId = "simple-artifact",
+      version = "1.0.0"
+    )
+    intercept[Purl.PurlException] {
+      purl.toCanonical()
     }
   }
 
@@ -121,7 +123,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifierName = Some("pom")
     )
 
-    assertEquals(purl.getQualifiers().get("type"), "pom")
+    assertEquals(purl.qualifiers.get("type"), "pom")
   }
 
   test("buildPackageURL - Maven pURL with sources qualifier") {
@@ -133,7 +135,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifierName = Some("sources")
     )
 
-    assertEquals(purl.getQualifiers().get("packaging"), "sources")
+    assertEquals(purl.qualifiers.get("packaging"), "sources")
   }
 
   test("buildPackageURL - Maven pURL with javadoc qualifier") {
@@ -145,7 +147,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifierName = Some("javadoc")
     )
 
-    assertEquals(purl.getQualifiers().get("classifier"), "javadoc")
+    assertEquals(purl.qualifiers.get("classifier"), "javadoc")
   }
 
   test("buildPackageURL - Maven pURL with custom qualifiers") {
@@ -157,7 +159,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifiers = Seq(("custom", "value"))
     )
 
-    assertEquals(purl.getQualifiers().get("custom"), "value")
+    assertEquals(purl.qualifiers.get("custom"), "value")
   }
 
   test("buildPackageURL - Maven pURL with multiple qualifiers") {
@@ -170,9 +172,9 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifiers = Seq(("repository_url", "https://repo.example.com"))
     )
 
-    assertEquals(purl.getQualifiers().get("type"), "pom")
+    assertEquals(purl.qualifiers.get("type"), "pom")
     assertEquals(
-      purl.getQualifiers().get("repository_url"),
+      purl.qualifiers.get("repository_url"),
       "https://repo.example.com"
     )
   }
@@ -187,10 +189,10 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       version = "2.31-0ubuntu9"
     )
 
-    assertEquals(purl.getType(), "deb")
-    assertEquals(purl.getNamespace(), "ubuntu")
-    assertEquals(purl.getName(), "libc6")
-    assertEquals(purl.getVersion(), "2.31-0ubuntu9")
+    assertEquals(purl.`type`, "deb")
+    assertEquals(purl.namespace, "ubuntu")
+    assertEquals(purl.name, "libc6")
+    assertEquals(purl.version, "2.31-0ubuntu9")
   }
 
   test("buildPackageURL - Debian pURL without namespace") {
@@ -200,9 +202,9 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       version = "1.1.1"
     )
 
-    assertEquals(purl.getType(), "deb")
-    assertEquals(purl.getNamespace(), null)
-    assertEquals(purl.getName(), "openssl")
+    assertEquals(purl.`type`, "deb")
+    assertEquals(purl.namespace, null)
+    assertEquals(purl.name, "openssl")
   }
 
   test("buildPackageURL - Debian ignores unknown qualifierName") {
@@ -215,8 +217,8 @@ class PURLHelpersTestSuite extends munit.FunSuite {
     )
 
     // Should not throw, qualifierName is ignored for Debian
-    assertEquals(purl.getType(), "deb")
-    assert(purl.getQualifiers() == null || purl.getQualifiers().isEmpty())
+    assertEquals(purl.`type`, "deb")
+    assert(purl.qualifiers == null || purl.qualifiers.isEmpty())
   }
 
   test("buildPackageURL - Debian pURL with arch qualifier") {
@@ -228,7 +230,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifiers = Seq(("arch", "amd64"))
     )
 
-    assertEquals(purl.getQualifiers().get("arch"), "amd64")
+    assertEquals(purl.qualifiers.get("arch"), "amd64")
   }
 
   // ==================== buildPackageURL - Edge Cases ====================
@@ -242,7 +244,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       version = "1.0.0"
     )
 
-    assertEquals(purl.getNamespace(), null)
+    assertEquals(purl.namespace, null)
   }
 
   test("buildPackageURL - handles empty qualifiers") {
@@ -254,7 +256,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifiers = Seq()
     )
 
-    assert(purl.getQualifiers() == null || purl.getQualifiers().isEmpty())
+    assert(purl.qualifiers == null || purl.qualifiers.isEmpty())
   }
 
   test("buildPackageURL - handles None qualifierName") {
@@ -266,7 +268,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       qualifierName = None
     )
 
-    assert(purl.getQualifiers() == null || purl.getQualifiers().isEmpty())
+    assert(purl.qualifiers == null || purl.qualifiers.isEmpty())
   }
 
   test("buildPackageURL - pURL can be converted to string") {
@@ -277,7 +279,7 @@ class PURLHelpersTestSuite extends munit.FunSuite {
       version = "2.22.1"
     )
 
-    val purlString = purl.canonicalize()
+    val purlString = purl.toCanonical()
     assert(purlString.startsWith("pkg:maven/"))
     assert(purlString.contains("org.apache.logging.log4j"))
     assert(purlString.contains("log4j-core"))

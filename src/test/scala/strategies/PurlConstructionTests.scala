@@ -14,8 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.MalformedPackageURLException
-import com.github.packageurl.PackageURL
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import munit.FunSuite
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
@@ -88,31 +87,20 @@ class PurlConstructionTests extends FunSuite {
   private val dummyArtifact: ByteWrapper =
     ByteWrapper(Array.empty[Byte], "dummy", None)
 
-  private def assertRoundTrips(purl: PackageURL, clue: String): Unit = {
-    val canonical = purl.canonicalize().nn
-    val reparsed = new PackageURL(canonical)
+  private def assertRoundTrips(purl: Purl, clue: String): Unit = {
+    val canonical = purl.toCanonical().nn
+    val reparsed = Purl.parse(canonical).nn
     assertEquals(
-      reparsed.canonicalize().nn,
+      reparsed.toCanonical().nn,
       canonical,
-      s"$clue — pURL must round-trip through strict parser: $canonical"
+      s"$clue — pURL must round-trip through the parser: $canonical"
     )
-  }
-
-  // ===== Test 0: Root cause demonstration ===============================
-  //
-  // `new PackageURL(String)` is a strict URI parser. Angle brackets in
-  // qualifier values cause `MalformedPackageURLException`. This is the
-  // exception the behavioral tests expect the production code to NOT
-  // throw.
-
-  test(
-    "new PackageURL(String) rejects angle-bracket qualifier value (root cause)"
-  ) {
-    intercept[MalformedPackageURLException] {
-      new PackageURL(
-        "pkg:generic/x509/spki-sha256@abc?alg=ec&params=<unknown-1.2.3>"
-      )
-    }
+    // Adversarial qualifier values (e.g. the `<unknown-sig-oid-…>` fallback)
+    // must be percent-encoded in the canonical form, never emitted raw.
+    assert(
+      !canonical.contains("<") && !canonical.contains(">"),
+      s"$clue — angle brackets must be percent-encoded: $canonical"
+    )
   }
 
   // ===== Test 1: SSH cert pURLs (already migrated to builder) ==========
@@ -172,11 +160,11 @@ class PurlConstructionTests extends FunSuite {
     val state = new CertificatesState(dummyArtifact)
     val purls = state.purlsForSshCert(cert)
     assertEquals(purls.length, 2)
-    val certPurl = purls.find(_.canonicalize().nn.contains("cert-sha256")).get
+    val certPurl = purls.find(_.toCanonical().nn.contains("cert-sha256")).get
     assertRoundTrips(certPurl, "SSH cert pURL with unknown certType")
     assert(
-      certPurl.canonicalize().nn.contains("cert-type=unknown-99"),
-      s"cert pURL must contain cert-type=unknown-99, got: ${certPurl.canonicalize()}"
+      certPurl.toCanonical().nn.contains("cert-type=unknown-99"),
+      s"cert pURL must contain cert-type=unknown-99, got: ${certPurl.toCanonical()}"
     )
     purls.foreach(p => assertRoundTrips(p, "SSH cert pURL"))
   }
@@ -210,8 +198,8 @@ class PurlConstructionTests extends FunSuite {
     val purl = Certificates.purlForPgpKey(key)
     assertRoundTrips(purl, "PGP key pURL with angle-bracket canonicalAlg")
     assert(
-      purl.canonicalize().nn.contains("alg="),
-      s"PGP pURL must contain alg= qualifier, got: ${purl.canonicalize()}"
+      purl.toCanonical().nn.contains("alg="),
+      s"PGP pURL must contain alg= qualifier, got: ${purl.toCanonical()}"
     )
   }
 
@@ -348,8 +336,8 @@ class PurlConstructionTests extends FunSuite {
     val purl = Certificates.purlForPgpKey(key)
     assertRoundTrips(purl, "PGP key pURL with raw OID curve")
     assert(
-      purl.canonicalize().nn.contains("curve="),
-      s"PGP pURL must contain curve= qualifier, got: ${purl.canonicalize()}"
+      purl.toCanonical().nn.contains("curve="),
+      s"PGP pURL must contain curve= qualifier, got: ${purl.toCanonical()}"
     )
   }
 
@@ -413,9 +401,9 @@ class PurlConstructionTests extends FunSuite {
       userIds = Vector("test@example.com")
     )
     val purl = Certificates.purlForPgpKey(key)
-    assertEquals(purl.getType(), "generic")
-    assertEquals(purl.getNamespace(), "pgp")
-    assertEquals(purl.getName(), "fingerprint")
+    assertEquals(purl.`type`, "generic")
+    assertEquals(purl.namespace, "pgp")
+    assertEquals(purl.name, "fingerprint")
     assertRoundTrips(purl, "PGP pURL structural invariant")
   }
 
@@ -430,17 +418,17 @@ class PurlConstructionTests extends FunSuite {
     assertEquals(purls.length, 2)
     purls.foreach { purl =>
       assertEquals(
-        purl.getType(),
+        purl.`type`,
         "generic",
-        s"cert pURL type must be generic, got ${purl.getType()}"
+        s"cert pURL type must be generic, got ${purl.`type`}"
       )
       assertEquals(
-        purl.getNamespace(),
+        purl.namespace,
         "x509",
-        s"cert pURL namespace must be x509, got ${purl.getNamespace()}"
+        s"cert pURL namespace must be x509, got ${purl.namespace}"
       )
     }
-    val names = purls.map(_.getName()).toSet
+    val names = purls.map(_.name).toSet
     assert(
       names.contains("spki-sha256"),
       s"must contain spki-sha256 name, got: $names"
@@ -463,9 +451,9 @@ class PurlConstructionTests extends FunSuite {
     val crl = buildCrlWithUnknownSigOid(pair)
     val state = new CertificatesState(dummyArtifact)
     val purl = state.purlForCrl(crl)
-    assertEquals(purl.getType(), "generic")
-    assertEquals(purl.getNamespace(), "x509")
-    assertEquals(purl.getName(), "crl-sha256")
+    assertEquals(purl.`type`, "generic")
+    assertEquals(purl.namespace, "x509")
+    assertEquals(purl.name, "crl-sha256")
     assertRoundTrips(purl, "CRL pURL structural invariant")
   }
 
@@ -480,9 +468,9 @@ class PurlConstructionTests extends FunSuite {
     )
     val state = new CertificatesState(dummyArtifact)
     val purl = state.purlForSshPubkey(pubkey)
-    assertEquals(purl.getType(), "generic")
-    assertEquals(purl.getNamespace(), "ssh")
-    assertEquals(purl.getName(), "sha256")
+    assertEquals(purl.`type`, "generic")
+    assertEquals(purl.namespace, "ssh")
+    assertEquals(purl.name, "sha256")
     assertRoundTrips(purl, "SSH pubkey pURL structural invariant")
   }
 
@@ -512,17 +500,17 @@ class PurlConstructionTests extends FunSuite {
     assertEquals(purls.length, 2)
     purls.foreach { purl =>
       assertEquals(
-        purl.getType(),
+        purl.`type`,
         "generic",
-        s"SSH cert pURL type must be generic, got ${purl.getType()}"
+        s"SSH cert pURL type must be generic, got ${purl.`type`}"
       )
       assertEquals(
-        purl.getNamespace(),
+        purl.namespace,
         "ssh",
-        s"SSH cert pURL namespace must be ssh, got ${purl.getNamespace()}"
+        s"SSH cert pURL namespace must be ssh, got ${purl.namespace}"
       )
     }
-    val names = purls.map(_.getName()).toSet
+    val names = purls.map(_.name).toSet
     assert(
       names.contains("cert-sha256"),
       s"must contain cert-sha256 name, got: $names"
@@ -545,9 +533,9 @@ class PurlConstructionTests extends FunSuite {
     )
     val state = new CertificatesState(dummyArtifact)
     val purl = state.purlForPrivateKeyPem(pem)
-    assertEquals(purl.getType(), "generic")
-    assertEquals(purl.getNamespace(), "x509")
-    assertEquals(purl.getName(), "spki-sha256")
+    assertEquals(purl.`type`, "generic")
+    assertEquals(purl.namespace, "x509")
+    assertEquals(purl.name, "spki-sha256")
     assertRoundTrips(purl, "Private key PEM pURL structural invariant")
   }
 
@@ -561,9 +549,9 @@ class PurlConstructionTests extends FunSuite {
     )
     val state = new CertificatesState(dummyArtifact)
     val purl = state.purlForPrivateKeyOpenSsh(key)
-    assertEquals(purl.getType(), "generic")
-    assertEquals(purl.getNamespace(), "ssh")
-    assertEquals(purl.getName(), "sha256")
+    assertEquals(purl.`type`, "generic")
+    assertEquals(purl.namespace, "ssh")
+    assertEquals(purl.name, "sha256")
     assertRoundTrips(purl, "Private key OpenSSH pURL structural invariant")
   }
 
