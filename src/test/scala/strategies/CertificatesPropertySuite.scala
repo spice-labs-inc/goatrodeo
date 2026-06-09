@@ -509,8 +509,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
-          val canonicalized = purls.map(_.toCanonical().nn)
-          val certPurls = canonicalized.filter(_.contains("ssh/cert-sha256"))
+          val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
           certPurls.forall { p =>
             val ct =
               "cert-type=([a-z]+)".r.findFirstMatchIn(p).map(_.group(1).nn)
@@ -532,8 +531,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
-          val canonicalized = purls.map(_.toCanonical().nn)
-          val certPurls = canonicalized.filter(_.contains("ssh/cert-sha256"))
+          val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
           certPurls.forall(_.contains("sig-alg="))
         case _ => true
       }
@@ -551,7 +549,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
-          purls.forall(p => p.toCanonical().nn.contains("sig-alg="))
+          purls.forall(p => p.contains("sig-alg="))
         case _ => true
       }
     }
@@ -572,7 +570,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
-          purls.exists(p => p.toCanonical().nn.contains(expectedHex))
+          purls.exists(p => p.contains(expectedHex))
         case _ => true
       }
     }

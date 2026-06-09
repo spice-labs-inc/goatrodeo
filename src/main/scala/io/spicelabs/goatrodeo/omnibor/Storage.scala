@@ -14,7 +14,6 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.GitOID
@@ -99,11 +98,11 @@ trait Storage {
 
   def destDirectory(): Option[File]
 
-  /** The endpoint for sending package URLs
+  /** The endpoint for sending package URLs (already in canonical form)
     *
     * @param purl
     */
-  def addPurl(purl: Purl): Unit
+  def addPurl(purl: String): Unit
 
   /** Get the purls
     *
@@ -242,9 +241,9 @@ class MemStorage(val targetDir: Option[File])
     *
     * @param purl
     */
-  def addPurl(purl: Purl): Unit = {
+  def addPurl(purl: String): Unit = {
     thePurls.synchronized {
-      val next = thePurls.get() + purl.toCanonical()
+      val next = thePurls.get() + purl
       thePurls.set(next)
     }
   }

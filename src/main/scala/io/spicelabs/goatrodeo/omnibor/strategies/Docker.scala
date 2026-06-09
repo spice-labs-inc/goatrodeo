@@ -1,7 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
@@ -70,7 +69,7 @@ case class DockerState(
     case _ => this
   }
 
-  private def computePurls(info: ManifestInfo): Vector[Purl] = {
+  private def computePurls(info: ManifestInfo): Vector[String] = {
     val purls = for {
       // get "RepoTags" which should be an Array of tags
       case JArray(tags) <- info.manifestConfig \ "RepoTags"
@@ -98,12 +97,15 @@ case class DockerState(
 
       // construct a Docker Package URL based on the pURL examples
       // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
-      PURLHelpers.purl(
-        `type` = "docker",
-        name = path,
-        namespace = namespace.orNull,
-        version = version.orNull
-      )
+      PURLHelpers
+        .purl(
+          `type` = "docker",
+          name = path,
+          namespace = namespace.orNull,
+          version = version.orNull
+        )
+        .toCanonical()
+        .nn
     }
 
     purls.toVector
@@ -113,7 +115,7 @@ case class DockerState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: DockerMarkers
-  ): (Vector[Purl], DockerState) = marker match {
+  ): (Vector[String], DockerState) = marker match {
     case DockerMarkers.Config(info) =>
       val purls = computePurls(info)
 

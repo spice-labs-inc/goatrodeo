@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeMap
@@ -67,7 +66,7 @@ final case class TopLevelExtraAugmentation(
 final case class ConnectionAugmentation(
     hashValue: String,
     connection: (String, String),
-    pURL: Purl
+    pURL: String
 ) extends Augmentation {
   def augment(item: Item, store: Storage): Item = {
     store.addPurl(pURL)

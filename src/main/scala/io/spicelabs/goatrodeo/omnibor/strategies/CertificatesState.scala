@@ -61,7 +61,7 @@ class CertificatesState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[Purl], CertificatesState) = {
+  ): (Vector[String], CertificatesState) = {
     import Certificates.*
     val purls: Vector[Purl] = claim match {
       case None                => Vector.empty
@@ -89,7 +89,7 @@ class CertificatesState(
       case Some(_: PrivateKeyEncrypted) =>
         Vector.empty // envelope-only; no pURL
     }
-    purls -> this
+    purls.map(_.toCanonical().nn) -> this
   }
 
   /** Unencrypted-PEM private key → SPKI pURL. */

@@ -1,7 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.coordinates.Purl
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.cilantro.AssemblyNameReference
 import io.spicelabs.cilantro.CSVersion
@@ -94,18 +93,21 @@ class DotnetState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[Purl], DotnetState) = {
+  ): (Vector[String], DotnetState) = {
     assemblyOpt
       .map(assembly =>
         // nuget purls take no namespace (the spec prohibits it).
-        PURLHelpers.purl(
-          `type` = "nuget",
-          name = assembly.name.name,
-          // if the build number is 0, it won't show in the nuget version number,
-          // so we get a string without the build number.
-          // The full number goes into the the VERSION metadata, however.
-          version = sanitizeVersion(assembly.name.version)
-        )
+        PURLHelpers
+          .purl(
+            `type` = "nuget",
+            name = assembly.name.name,
+            // if the build number is 0, it won't show in the nuget version number,
+            // so we get a string without the build number.
+            // The full number goes into the the VERSION metadata, however.
+            version = sanitizeVersion(assembly.name.version)
+          )
+          .toCanonical()
+          .nn
       )
       .toVector -> this
   }

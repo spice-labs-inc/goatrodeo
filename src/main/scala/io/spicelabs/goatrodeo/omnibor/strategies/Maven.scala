@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
@@ -152,7 +151,7 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
-  ): (Vector[Purl], MavenState) = {
+  ): (Vector[String], MavenState) = {
     val grp = findTag(pomXml, "groupId")
     val art = findTag(pomXml, "artifactId")
     val ver = tryToFixVersion(
@@ -163,18 +162,21 @@ case class MavenState(
     (grp, art, ver) match {
       case (Some(g), Some(a), Some(v)) =>
         val ret = Vector(
-          PURLHelpers.buildPackageURL(
-            Ecosystems.Maven,
-            Some(g),
-            a,
-            v,
-            marker match {
-              case MavenMarkers.JAR      => None
-              case MavenMarkers.Sources  => Some("sources")
-              case MavenMarkers.POM      => Some("pom")
-              case MavenMarkers.JavaDocs => Some("javadoc")
-            }
-          )
+          PURLHelpers
+            .buildPackageURL(
+              Ecosystems.Maven,
+              Some(g),
+              a,
+              v,
+              marker match {
+                case MavenMarkers.JAR      => None
+                case MavenMarkers.Sources  => Some("sources")
+                case MavenMarkers.POM      => Some("pom")
+                case MavenMarkers.JavaDocs => Some("javadoc")
+              }
+            )
+            .toCanonical()
+            .nn
         )
         ret -> this
       case _ => (Vector(), this)

@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.coordinates.Purl
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
@@ -261,21 +260,21 @@ case class Item(
 
   }
 
-  /** Given an `Item`, enhance it with Purls
+  /** Given an `Item`, enhance it with purls
     *
     * @param purls
-    *   the Purls
+    *   the canonical purl strings
     * @param fileNames
     *   the filenames associated with this Item
     *
     * @return
     *   the enhanced `Item`
     */
-  def enhanceItemWithPurls(purls: Seq[Purl]): Item = {
+  def enhanceItemWithPurls(purls: Seq[String]): Item = {
     if (purls.isEmpty) this
     else {
 
-      val textPurls = purls.map(p => p.toCanonical())
+      val textPurls = purls
       val ret = this.copy(
         connections = this.connections ++ TreeSet(
           textPurls.map(purl => EdgeType.aliasFrom -> purl)*
