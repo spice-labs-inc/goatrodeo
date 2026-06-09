@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
@@ -700,6 +701,34 @@ Long-Value: This is a very long value that continues
   test("javaClassMimeTypes - contains expected mime types") {
     assert(Helpers.javaClassMimeTypes.contains("application/java-vm"))
     assert(Helpers.javaClassMimeTypes.contains("application/x-java-class"))
+  }
+
+  test(
+    "computeAssociatedSource - extracts package-qualified source path from a real .class"
+  ) {
+    // Load a real compiled class from the test classpath and confirm the ASM-based
+    // reader reproduces BCEL's getSourceFilePath() (package path + SourceFile attribute).
+    val classResource = "io/spicelabs/goatrodeo/util/Helpers.class"
+    val is = getClass().getClassLoader().getResourceAsStream(classResource)
+    assert(is != null, s"Could not load ${classResource} from test classpath")
+    val classBytes =
+      try Helpers.slurpInput(is)
+      finally is.close()
+
+    val wrapper = ByteWrapper(classBytes, "Helpers.class", None)
+    val srcGitoid =
+      "gitoid:blob:sha256:66b242a56899be4c47f7825315f721c0401ccaeeb6410c16f8175678b3317459"
+    val expectedPath = "io/spicelabs/goatrodeo/util/Helpers.scala"
+
+    val result =
+      Helpers.computeAssociatedSource(wrapper, Map(expectedPath -> srcGitoid))
+    assertEquals(result.size, 1, s"expected one source gitoid, got ${result}")
+    assert(result.contains(srcGitoid))
+
+    // When the extracted source path is not in the map, no gitoid is returned.
+    val empty =
+      Helpers.computeAssociatedSource(wrapper, Map("wrong/Path.scala" -> srcGitoid))
+    assert(empty.isEmpty, s"expected no match, got ${empty}")
   }
 
   // ==================== iteratorFor Tests ====================

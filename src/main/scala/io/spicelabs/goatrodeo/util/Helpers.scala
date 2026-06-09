@@ -17,7 +17,9 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import org.apache.bcel.classfile.ClassParser
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.Opcodes
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 
@@ -205,23 +207,44 @@ object Helpers {
         val sourceName: Option[String] =
           Try {
             file.withStream { is =>
-              try {
-                val cp = new ClassParser(is, file.path())
-
-                val clz = cp.parse()
-                clz.getSourceFilePath()
-              } catch {
-                case e: OutOfMemoryError =>
-                  // if the classfile is corrupt, we may get an OOME, swallow it and just don't
-                  // return a file name
-                  throw new Exception(
-                    f"Failed to parse class ${e.getMessage()}"
-                  )
-              } finally {
-                is.close()
+              // Read only what we need: the SourceFile attribute. SKIP_CODE avoids
+              // walking method bodies (the bulk of the class). Do NOT use SKIP_DEBUG --
+              // it would suppress the SourceFile attribute we depend on.
+              val reader = new ClassReader(is)
+              var className: String | Null = null
+              var sourceFile: String | Null = null
+              reader.accept(
+                new ClassVisitor(Opcodes.ASM9) {
+                  override def visit(
+                      version: Int,
+                      access: Int,
+                      name: String,
+                      signature: String,
+                      superName: String,
+                      interfaces: Array[String]
+                  ): Unit = className = name
+                  override def visitSource(
+                      source: String,
+                      debug: String
+                  ): Unit = sourceFile = source
+                },
+                ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES
+              )
+              // Reproduce BCEL's getSourceFilePath(): the package-qualified path,
+              // e.g. "com/example/Foo.java", derived from the class's internal name.
+              sourceFile match {
+                case null => None
+                case sf: String =>
+                  val pkg = className match {
+                    case null => ""
+                    case cn: String =>
+                      val i = cn.lastIndexOf('/')
+                      if (i >= 0) cn.substring(0, i + 1) else ""
+                  }
+                  Some(pkg + sf)
               }
             }
-          }.toOption
+          }.toOption.flatten
 
         val sourceGitOID = for {
           sn <- sourceName
