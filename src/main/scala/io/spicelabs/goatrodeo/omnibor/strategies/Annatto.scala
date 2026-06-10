@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
 import io.spicelabs.annatto.Ecosystem
 import io.spicelabs.annatto.EcosystemRouter
 import io.spicelabs.annatto.LanguagePackage
@@ -92,8 +91,11 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[PackageURL], AnnattoState) = {
-    pkg.toPurl().toScala.toVector -> this
+  ): (Vector[String], AnnattoState) = {
+    // annatto returns a com.github.packageurl.PackageURL; emit its own canonical
+    // form. We keep the reader's canonicalization rather than re-validating
+    // through coordinates, which is stricter than what some readers produce.
+    pkg.toPurl().toScala.toVector.map(_.canonicalize().nn) -> this
   }
 
   override def getMetadata(

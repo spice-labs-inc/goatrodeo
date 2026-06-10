@@ -1,7 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
-import com.github.packageurl.PackageURLBuilder
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
@@ -16,6 +14,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.PURLHelpers
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -70,7 +69,7 @@ case class DockerState(
     case _ => this
   }
 
-  private def computePurls(info: ManifestInfo): Vector[PackageURL] = {
+  private def computePurls(info: ManifestInfo): Vector[String] = {
     val purls = for {
       // get "RepoTags" which should be an Array of tags
       case JArray(tags) <- info.manifestConfig \ "RepoTags"
@@ -98,22 +97,15 @@ case class DockerState(
 
       // construct a Docker Package URL based on the pURL examples
       // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
-      val withName = PackageURLBuilder
-        .aPackageURL()
-        .withType("docker")
-        .withName(path)
-
-      val withVersion = version match {
-        case Some(v) => withName.withVersion(v)
-        case None    => withName
-      }
-
-      val withNamespace = namespace match {
-        case Some(ns) => withVersion.withNamespace(ns)
-        case None     => withVersion
-      }
-
-      withNamespace.build()
+      PURLHelpers
+        .purl(
+          `type` = "docker",
+          name = path,
+          namespace = namespace.orNull,
+          version = version.orNull
+        )
+        .toCanonical()
+        .nn
     }
 
     purls.toVector
@@ -123,7 +115,7 @@ case class DockerState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: DockerMarkers
-  ): (Vector[PackageURL], DockerState) = marker match {
+  ): (Vector[String], DockerState) = marker match {
     case DockerMarkers.Config(info) =>
       val purls = computePurls(info)
 

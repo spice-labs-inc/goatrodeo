@@ -12,12 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import com.github.packageurl.PackageURLBuilder
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PURLHelpers
 
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
@@ -193,39 +193,36 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - addPurl adds package URL") {
     val storage = MemStorage(None)
-    val purl = PackageURLBuilder
-      .aPackageURL()
-      .withType("maven")
-      .withNamespace("org.example")
-      .withName("artifact")
-      .withVersion("1.0.0")
-      .build()
+    val purl = PURLHelpers.purl(
+      `type` = "maven",
+      name = "artifact",
+      namespace = "org.example",
+      version = "1.0.0"
+    )
 
-    storage.addPurl(purl)
+    storage.addPurl(purl.toCanonical().nn)
 
     val purls = storage.purls()
     assertEquals(purls.size, 1)
-    assert(purls.contains(purl.canonicalize()))
+    assert(purls.contains(purl.toCanonical()))
   }
 
   test("MemStorage - purls returns all added purls") {
     val storage = MemStorage(None)
-    val purl1 = PackageURLBuilder
-      .aPackageURL()
-      .withType("deb")
-      .withNamespace("ubuntu")
-      .withName("artifact1")
-      .withVersion("1.0")
-      .build()
-    val purl2 = PackageURLBuilder
-      .aPackageURL()
-      .withType("npm")
-      .withName("package")
-      .withVersion("2.0")
-      .build()
+    val purl1 = PURLHelpers.purl(
+      `type` = "deb",
+      name = "artifact1",
+      namespace = "ubuntu",
+      version = "1.0"
+    )
+    val purl2 = PURLHelpers.purl(
+      `type` = "npm",
+      name = "package",
+      version = "2.0"
+    )
 
-    storage.addPurl(purl1)
-    storage.addPurl(purl2)
+    storage.addPurl(purl1.toCanonical().nn)
+    storage.addPurl(purl2.toCanonical().nn)
 
     val purls = storage.purls()
     assertEquals(purls.size, 2)
@@ -233,16 +230,15 @@ class StorageTestSuite extends munit.FunSuite {
 
   test("MemStorage - purls deduplicates identical purls") {
     val storage = MemStorage(None)
-    val purl = PackageURLBuilder
-      .aPackageURL()
-      .withType("deb")
-      .withNamespace("debian")
-      .withName("artifact")
-      .withVersion("1.0")
-      .build()
+    val purl = PURLHelpers.purl(
+      `type` = "deb",
+      name = "artifact",
+      namespace = "debian",
+      version = "1.0"
+    )
 
-    storage.addPurl(purl)
-    storage.addPurl(purl)
+    storage.addPurl(purl.toCanonical().nn)
+    storage.addPurl(purl.toCanonical().nn)
 
     val purls = storage.purls()
     assertEquals(purls.size, 1)

@@ -598,7 +598,7 @@ class PrivateKeyStrategyTests extends FunSuite {
       io.spicelabs.goatrodeo.omnibor.SingleMarker()
     )
     assertEquals(purls.length, 1)
-    val canon = purls.head.canonicalize().nn
+    val canon = purls.head
     assertEquals(
       canon,
       "pkg:generic/x509/spki-sha256@23061b4699527614aba79f341cccd03865af660ffe4e90b972733a3e5cfd4104?alg=ed25519"

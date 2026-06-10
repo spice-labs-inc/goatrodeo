@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.Package
 import io.spicelabs.baharat.PackageReader
@@ -123,8 +122,11 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[PackageURL], BaharatState) = {
-    Vector(pkg.packageUrl()) -> this
+  ): (Vector[String], BaharatState) = {
+    // baharat returns a com.github.packageurl.PackageURL; emit its own canonical
+    // form. We keep the reader's canonicalization rather than re-validating
+    // through coordinates, which is stricter than what some readers produce.
+    Vector(pkg.packageUrl().canonicalize().nn) -> this
   }
 
   override def getMetadata(
