@@ -1,78 +1,119 @@
-# Metadata Tags
+# Metadata Tags (LLM Reference)
 
-> **Navigation:** [Documentation Index](README.md) | [Corpus Format](corpus.md) | [Architecture](architecture.md)
+> **Navigation:** [Docs](README.md) | [Corpus](corpus.md) | [Architecture](architecture.md)
 
-Attaching metadata to a processed file can be useful for categorizing and searching for particular patterns across data sets.
-As such, it's useful to have a standard set of names for the tags that are associated with a piece of metadata.
+All metadata keys Goat Rodeo can emit, by source strategy. Keys are sorted by source.
 
-There are challenges in doing this because different metadata providers can disagree on the names of metadata tags as well as the semantics of the metadata and the formatting of the actual data. It should be understood that goat rodeo doesn't have direct control over every metadata provider and that there will be differences in any of names/semantics/formatting. New providers should try to provide as many of these pieces of metadata.
+## Standard Keys (MetadataKeyConstants)
 
-Standard tags are defined in MetadataKeyConstants
+| Key | Meaning | Format |
+|---|---|---|
+| NAME | Full name of artifact | String, arbitrary |
+| SIMPLE_NAME | Short product name | String, 1–2 words |
+| VERSION | Version | Dot-separated, e.g. `1.0.0d4` |
+| LOCALE | Locale | `CC-LL`, e.g. `en-US` |
+| PUBLIC_KEY | Signing public key | Hex string |
+| PUBLISHER | Publisher | String, e.g. `ByteStyle, LLC` |
+| PUBLICATION_DATE | Publish/build date | Date string, ideally ISO 8601 |
+| COPYRIGHT | Copyright declaration | String |
+| DESCRIPTION | Description | String |
+| TRADEMARK | Trademark | String |
+| ARTIFACTID | Artifact identifier | String |
+| LICENSE | License | String or merged from POM + MANIFEST |
+| URL | Homepage / download URL | String URL |
+| DEPENDENCIES | Dependency list | JSON array of `{group, artifact, version, scope, optional, classifier, type}` |
 
-| Constant Name | String Value | Meaning | Format |
-| ----          | ----         |  ----   |  ----  
-| NAME          | Name         | The full name of the artifact | String, arbitrary. e.g., "Splunge JSON checker." |
-| SIMPLE_NAME   | SimpleName   | A simplified name for the product | String, one or two words. e.g. "Splunge" |
-| VERSION       | Version      | A version for the atifact | String, ideally dot-separated fields. e.g. 1.0.0d4 |
-| LOCALE        | Locale       | A descriptor for the locale of the artifact or default locale if it has several | String, ideally 2 char country code dash 2 char language code |
-| PUBLIC_KEY    | PublicKey    | The public key used to sign the artifact, if any. | String of hex bytes. |
-| PUBLISHER     | Publisher    | The publisher of the artifact. | String, e.g. "ByteStyle, LLC" |
-| PUBLICATION_DATE | PublicationDate | The date when the artifact was published. For code, this might be the day that it was compiled. | String, Date, hopefully something easily parsable. |
-| COPYRIGHT     | Copyright    | A copyright decalarion if available | String e.g. "Copyright (c) 2020, all rights reserved" |
-| DESCRIPTION   | Description  | A description of the artifact  | String e.g. "A library to check JSON streams for validity" |
-| TRADEMARK     | Trademark    | A trademark declaration if available | String e.g. "Splunge is a registered trademark of ByteStyle" |
-| ARTIFACTID    | ArtifactID   | An identifier for the artifact | String |
-| LICENSE       | License      | The lisence for the artifact | String e.g. "This work is openly licensed via CC BY 4.0" |
-| MAVEN_SCM_URL | maven:SCM_URL | The SCM URL from the POM `<scm><url>` element | String URL |
-| MAVEN_SCM_URL | maven:SCM_URL | Alias for maven:SCM_URL | String URL |
-| URL           | URL           | The home page or download URL for the artifact | String URL |
-| PUBLISHER     | Publisher     | The publisher of the artifact | String, e.g. "ByteStyle, LLC" |
-| DEPENDENCIES  | Dependencies  | A list of the dependencies | String, formatted as JSON. See below. |
-| RuntimeDependencies | maven:RuntimeDependencies | Subset of dependencies whose scope is `compile` or `runtime`; excludes `test` and `provided` | String, formatted as JSON |
-| LICENSE       | License      | The license for the artifact | String. Merged from POM `<licenses>` and `Bundle-License` manifest header. |
+## Maven Strategy (`maven:*`)
 
-**Verified by:**
-- `MavenPhase2Suite` — `MavenState getMetadata includes POM name as NAME key`, `getMetadata includes POM description as DESCRIPTION key`, `getMetadata includes POM URL as URL key`, `getMetadata includes organization as PUBLISHER key`, `getMetadata includes SCM URL as adHoc key`.
-- `MavenPhase2Suite` — `Bundle-License from JAR manifest appears in metadata`.
-- `MavenPhase3Suite` — `MavenState - dependencies appear in metadata as JSON`, `MavenState - no Dependencies key when no deps`, `RuntimeDependencies excludes test and provided scope`, `All deps include scope in metadata JSON`.
-- `MavenPropertyTests` — `resolveGAV: embeddedProps always wins when complete`, `resolveGAV: falls through each layer deterministically`.
+| Key | Meaning | Format |
+|---|---|---|
+| maven:SCM_URL | POM `<scm><url>` | String URL |
+| maven:Timestamp | Build timestamp | ISO 8601 string |
+| maven:ParentPOM | POM `<parent>` GAV | JSON `{"groupId": ..., "artifactId": ..., "version": ...}` |
+| maven:Latest | `maven-metadata.xml` latest | String |
+| maven:Release | `maven-metadata.xml` release | String |
+| maven:Versions | All versions in metadata | JSON array of strings |
+| maven:JarType | Archive type | `spring-boot-fat-jar`, `shaded-jar`, `war`, `ear`, `multi-release` |
+| maven:NestedJars | Spring Boot `BOOT-INF/lib/` | JSON array of path strings |
+| maven:SpringBootMainClass | `Start-Class` manifest header | FQCN string |
+| maven:LayersIdx | `BOOT-INF/layers.idx` contents | JSON array of strings |
+| maven:ClasspathIdx | `BOOT-INF/classpath.idx` contents | JSON array of strings |
+| maven:WarLibJars | `WEB-INF/lib/` JARs | JSON array of path strings |
+| maven:EarModules | EAR `META-INF/application.xml` modules | JSON array of module objects |
+| maven:MultiReleaseVersions | JDK versions in `META-INF/versions/` | JSON array of integers |
+| maven:JarSigned | Signature presence | `"true"` if `.SF`/`.RSA`/`.DSA` found |
+| maven:SignatureFiles | Signature file names | JSON array of strings |
+| maven:ServiceProviders | `META-INF/services/*` mappings | JSON map `{service: [impl1, impl2]}` |
+| maven:AutomaticModuleName | `Automatic-Module-Name` manifest header | String |
+| maven:GraalNativeImage | `native-image.properties` content | JSON map of properties |
+| maven:JenkinsPlugin | Jenkins plugin detection | `"true"` if `.jpi`/`.hpi` or `io.jenkins.plugins.*` group |
+| maven:RuntimeDependencies | Filtered dependencies (compile + runtime only) | JSON array (same shape as DEPENDENCIES) |
+| maven:ModuleRequires | JPMS `requires` | JSON array of strings |
+| maven:ModuleExports | JPMS `exports` | JSON array of strings |
+| maven:ModuleOpens | JPMS `opens` | JSON array of strings |
+| maven:ModuleProvides | JPMS `provides` | JSON object `{service: [impl1]}` |
+| maven:ModuleUses | JPMS `uses` | JSON array of strings |
 
-# Dependencies
+## OSGi Strategy (`osgi:*`)
 
-If the artifact doesn't have all of its dependencies in hand, it is necessary to provide the information for the relationships between the artifact and its dependencies manually.
+| Key | Meaning | Format |
+|---|---|---|
+| osgi:BundleName | `Bundle-Name` | String |
+| osgi:BundleDescription | `Bundle-Description` | String |
+| osgi:BundleVendor | `Bundle-Vendor` | String |
+| osgi:BundleDocURL | `Bundle-DocURL` | String URL |
+| osgi:ExportPackage | Parsed `Export-Package` | JSON array `[{"package": "...", "version": "..."}]` |
+| osgi:ImportPackage | Parsed `Import-Package` | JSON array `[{"package": "...", "version": "..."}]` |
+| osgi:RequireCapability | `Require-Capability` | String |
+| osgi:ProvideCapability | `Provide-Capability` | String |
+| osgi:FragmentHost | `Fragment-Host` | String |
 
-This information is formatted as JSON and will look like this:
+## JVM Distribution Strategy (`jvm:*`)
+
+| Key | Meaning | Format |
+|---|---|---|
+| jvm:Vendor | Vendor namespace | `eclipse`, `oracle`, `azul`, `amazon`, `openjdk`, ... |
+| jvm:JavaVersion | `JAVA_VERSION` from `release` | e.g. `21.0.4` |
+| jvm:JavaRuntimeVersion | `JAVA_RUNTIME_VERSION` | e.g. `21.0.4+7` |
+| jvm:ImageType | `IMAGE_TYPE` (`JDK` or `JRE`) | String |
+| jvm:OsArch | `OS_ARCH` | e.g. `x86_64` |
+| jvm:OsName | `OS_NAME` | e.g. `linux` |
+| jvm:Libc | `LIBC` | e.g. `glibc` |
+| jvm:JvmVariant | `JVM_VARIANT` | e.g. `Hotspot` |
+| jvm:SemanticVersion | `SEMANTIC_VERSION` | String |
+| jvm:FullVersion | `FULL_VERSION` | String |
+| jvm:SourceRepo | `SOURCE_REPO` | String URL |
+| jvm:BuildSourceRepo | `BUILD_SOURCE_REPO` | String URL |
+| jvm:JavaVersionDate | `JAVA_VERSION_DATE` | `YYYY-MM-DD` |
+| jvm:IsJDK | JDK classification | `"true"` or `"false"` |
+
+## Gradle Lockfile Strategy (`gradle:*`)
+
+| Key | Meaning | Format |
+|---|---|---|
+| gradle:DependencyCount | Number of locked dependencies | String integer |
+
+## Verification Sources
+
+- `MavenPhase2Suite`, `MavenPhase3Suite`, `MavenPhase5Suite`, `MavenPhase5ModuleInfoSuite`, `MavenPhase5CorpusSuite`
+- `JvmDistributionSuite`
+- `GradleLockfileSuite`
+- `MavenPropertyTests`
+
+## Dependency JSON Shape
+
+Maven/Gradle dependencies serialize as:
 ```json
 [
-  {
-    "group": "org.example",
-    "artifact": "mylib",
-    "version": "2.0",
-    "scope": "compile",
-    "optional": false,
-    "classifier": null,
-    "type": null
-  }
+  {"group": "org.example", "artifact": "mylib", "version": "2.0",
+   "scope": "compile", "optional": false, "classifier": null, "type": null}
 ]
 ```
-The Maven strategy produces this JSON from the parsed POM `<dependencies>` and `<dependencyManagement>` sections, with property interpolation applied. The `RuntimeDependencies` subset is a filtered copy containing only entries whose resolved scope is `compile` or `runtime`.
 
-
-If the artifact doesn't have all of its dependencies in hand, it is necessary to provide the information for the relationships between the artifact and its dependencies manually.
-
-This information is formatted as JSON and will look like this:
+Dotnet dependencies serialize as:
 ```json
-{
-    "dependencies": [
-        {
-            "name": "assembly name of the reference, does not include a file extension",
-            "version": "the version of the assembly usually in the form Maj.Min.Rev",
-            "public_key_token": "the public key token of the assembly, a hex string",
-            "public_key": "the public key of the assembly IF ANY, a hex string"
-        },
-    ]
-}
+{"dependencies": [
+  {"name": "assemblyName", "version": "1.2.3",
+   "public_key_token": "...", "public_key": "..."}
+]}
 ```
-The `public_key` entry is optional.
-Entries in the `dependencies` collection are sorted by name.
-

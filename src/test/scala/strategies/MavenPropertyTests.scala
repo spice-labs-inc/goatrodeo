@@ -576,4 +576,98 @@ class MavenPropertyTests extends ScalaCheckSuite {
       modern.isInstanceOf[Vector[?]] && legacy.isInstanceOf[Vector[?]]
     }
   }
+
+  // ------------------------------------------------------------------
+  // Cross-Cutting Property: release file parsing never crashes
+  // (plan §Property-Based)
+  //
+  // Theory: for every generated release-file-like content, parsing
+  // terminates without exception.
+  // ------------------------------------------------------------------
+
+  val genReleaseLine: Gen[String] = Gen.oneOf(
+    Gen.const("JAVA_VERSION=\"1.8.0_411\""),
+    Gen.const("JAVA_RUNTIME_VERSION=\"21.0.4+7\""),
+    Gen.const("IMPLEMENTOR=\"Eclipse Adoptium\""),
+    Gen.const("IMAGE_TYPE=\"JDK\""),
+    Gen.const("OS_ARCH=\"x86_64\""),
+    Gen.const("OS_NAME=\"linux\""),
+    Gen.const("LIBC=\"glibc\""),
+    Gen.const("SOURCE_REPO=\"https://github.com/adoptium/temurin21-binaries\""),
+    Gen.const("BUILD_SOURCE_REPO=\"https://github.com/adoptium/temurin\""),
+    Gen.const("FULL_VERSION=\"21.0.4+7-adoptium\""),
+    Gen.const("SEMANTIC_VERSION=\"21.0.4+7\""),
+    Gen.const("JVM_VARIANT=\"Hotspot\""),
+    Gen.const("JAVA_VERSION_DATE=\"2024-07-16\""),
+    Gen.alphaNumStr, // potentially malformed/missing required fields
+    Gen.const("")    // empty line
+  )
+
+  val genReleaseFile: Gen[String] =
+    Gen.listOf(genReleaseLine).map(_.filter(_.nonEmpty).mkString("\n"))
+
+  property("JvmDistribution.parseReleaseFile never crashes on arbitrary strings") {
+    forAll(genReleaseFile) { content =>
+      // Must not throw; always returns a JvmReleaseData
+      val data = JvmDistribution.parseReleaseFile(content)
+      data.isInstanceOf[JvmReleaseData]
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Cross-Cutting Property: leak filtering is idempotent
+  // (plan §Property-Based)
+  //
+  // Theory: filterLeaks(filterLeaks(m)) == filterLeaks(m) for all
+  // metadata maps m. Once leaks are removed, a second pass removes
+  // nothing new.
+  // ------------------------------------------------------------------
+
+  val genForbiddenValue: Gen[String] = Gen.oneOf(
+    Gen.const("-----BEGIN RSA PRIVATE KEY-----"),
+    Gen.const("-----BEGIN ENCRYPTED PRIVATE KEY-----"),
+    Gen.const("-----BEGIN PGP PRIVATE KEY BLOCK-----"),
+    Gen.const("MIIEvQIBADAN"),
+    Gen.const("MIIEpAIBAAKCAQEA"),
+    Gen.const("openssh-key-v1"),
+    Gen.listOfN(40, Gen.oneOf('0' to '9', 'a' to 'f')).map(_.mkString)
+  )
+
+  val genCleanValue: Gen[String] = Gen.oneOf(
+    Gen.alphaNumStr,
+    Gen.const("com.example"),
+    Gen.const("1.2.3"),
+    Gen.const("sha256:abcdef"),
+    Gen.listOfN(10, Gen.oneOf('0' to '9', 'a' to 'f')).map(_.mkString)
+  )
+
+  val genMetadataValue: Gen[String] = Gen.frequency(
+    (1, genForbiddenValue),
+    (4, genCleanValue)
+  )
+
+  val genMetadataKey: Gen[String] = Gen.oneOf(
+    Gen.const("SomeKey"),
+    Gen.const("Certificates:SpkiSha256"), // allowlisted for long hex
+    Gen.const("Certificates:CertSha256"),
+    Gen.const("Certificates:Serial"),
+    Gen.const("OtherKey")
+  )
+
+  val genMetadataMap: Gen[TreeMap[String, TreeSet[StringOrPair]]] = for {
+    entries <- Gen.listOf(
+      for {
+        key <- genMetadataKey
+        values <- Gen.nonEmptyListOf(genMetadataValue.map(StringOrPair.apply))
+      } yield key -> TreeSet(values*)
+    )
+  } yield TreeMap(entries*)
+
+  property("Certificates.filterLeaks is idempotent") {
+    forAll(genMetadataMap) { metadata =>
+      val once = Certificates.filterLeaks(metadata)
+      val twice = Certificates.filterLeaks(once)
+      once == twice
+    }
+  }
 }
