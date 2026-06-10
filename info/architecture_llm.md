@@ -36,6 +36,7 @@ src/main/scala/io/spicelabs/goatrodeo/
 │       ├── Annatto.scala   # Bun JS bundler outputs
 │       ├── Baharat.scala   # Saffron-flagged outputs
 │       ├── JvmDistribution.scala  # JDK/JRE release-file detection
+│       ├── GradleLockfile.scala  # Gradle lockfile dependency parsing
 │       ├── Certificates.scala       # X.509/CRL/keystore/SSH/PGP/private-key
 │       ├── CertificatesState.scala  # Per-artifact processing state for ^
 │       ├── CertificatesOidMaps.scala # OID lookup tables for ^
@@ -134,8 +135,9 @@ trait ProcessingState[M, S] {
 5. `Annatto` - Bun JavaScript bundler outputs
 6. `BaharatStrategy` - Saffron-flagged outputs
 7. `JvmDistribution` - JDK/JRE installations via `release` file
-8. `Certificates` - X.509 certs / CRLs / keystores / PEM bundles / SSH / PGP / private keys
-9. `GenericFile` - Everything else (fallback)
+8. `GradleLockfile` - Gradle lockfile dependency parsing
+9. `Certificates` - X.509 certs / CRLs / keystores / PEM bundles / SSH / PGP / private keys
+10. `GenericFile` - Everything else (fallback)
 
 ### 3. Item (`omnibor/Item.scala`)
 
@@ -228,6 +230,7 @@ val strategies = Vector(
   Annatto.computeAnnattoFiles,
   BaharatStrategy.computeBaharatFiles,
   JvmDistribution.computeJvmFiles,
+  GradleLockfile.computeGradleLockfiles,
   Certificates.computeCertificateFiles,
   GenericFile.computeGenericFiles  // Must be last
 )

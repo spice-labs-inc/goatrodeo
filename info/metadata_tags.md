@@ -86,6 +86,7 @@ Standard tags are defined in MetadataKeyConstants
 - `MavenPhase5CorpusSuite` — corpus integration tests for all 10 structural JAR types.
 - `MavenPropertyTests` — `resolveGAV: embeddedProps always wins when complete`, `resolveGAV: falls through each layer deterministically`.
 - `JvmDistributionSuite` — `JvmState - parses release file with all fields`, `JvmState - generates pURL for JDK`, `corpus adoptium-jdk21 produces pURL and metadata`.
+- `GradleLockfileSuite` — `GradleLockfile - parses modern lockfile format`, `GradleLockfile - generates pURLs for each dependency`, `GradleLockfile - preserves configuration list in metadata`.
 
 # Dependencies
 

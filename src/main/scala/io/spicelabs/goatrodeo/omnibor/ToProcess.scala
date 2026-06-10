@@ -616,6 +616,7 @@ object ToProcess {
       AnnattoStrategy.computeAnnattoFiles,
       Certificates.computeCertificateFiles,
       JvmDistribution.computeJvmFiles,
+      GradleLockfile.computeGradleLockfiles,
       GenericFile.computeGenericFiles
     )
   )
@@ -659,6 +660,7 @@ object ToProcess {
         AnnattoStrategy.computeAnnattoFiles,
         Certificates.computeCertificateFiles,
         JvmDistribution.computeJvmFiles,
+        GradleLockfile.computeGradleLockfiles,
         GenericFile.computeGenericFiles
       )
     })

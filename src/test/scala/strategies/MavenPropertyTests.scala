@@ -541,4 +541,39 @@ class MavenPropertyTests extends ScalaCheckSuite {
       deps == back
     }
   }
+
+  // ------------------------------------------------------------------
+  // Cross-Cutting Property: Gradle lockfile parsing never crashes
+  // (plan §Property-Based)
+  //
+  // Theory: for every generated Gradle lockfile content, parsing terminates
+  // without exception — it either produces dependencies or returns empty.
+  // ------------------------------------------------------------------
+
+  val genGradleCoord: Gen[String] = for {
+    group <- Gen.listOfN(3, Gen.alphaLowerStr.suchThat(_.nonEmpty)).map(_.mkString("."))
+    artifact <- Gen.alphaNumStr.suchThat(_.nonEmpty)
+    version <- genVersion
+  } yield s"$group:$artifact:$version"
+
+  val genGradleLine: Gen[String] = Gen.oneOf(
+    genGradleCoord.map(_ + "=compileClasspath,runtimeClasspath"),
+    genGradleCoord.map(_ + "=compileClasspath"),
+    genGradleCoord, // legacy line without config
+    Gen.const("# comment line"),
+    Gen.const("empty=annotationProcessor"),
+    Gen.alphaNumStr // potentially malformed
+  )
+
+  val genGradleLockfile: Gen[String] =
+    Gen.listOf(genGradleLine).map(_.mkString("\n"))
+
+  property("GradleLockfile.parseLockfile never crashes on arbitrary strings") {
+    forAll(genGradleLockfile) { content =>
+      val modern = GradleLockfile.parseLockfile(content, None)
+      val legacy = GradleLockfile.parseLockfile(content, Some("compileClasspath"))
+      // Must not throw, and must return a Vector
+      modern.isInstanceOf[Vector[?]] && legacy.isInstanceOf[Vector[?]]
+    }
+  }
 }
