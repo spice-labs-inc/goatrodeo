@@ -105,18 +105,26 @@ object PomParser {
     }
   }
 
+  /** Silent SAX error handler that prevents the default parser from
+    * printing `[Fatal Error]` / `[Error]` / `[Warning]` lines to stderr.
+    */
+  private object SilentSaxHandler extends org.xml.sax.ErrorHandler {
+    def warning(e: org.xml.sax.SAXParseException): Unit = ()
+    def error(e: org.xml.sax.SAXParseException): Unit = ()
+    def fatalError(e: org.xml.sax.SAXParseException): Unit = ()
+  }
+
   private def parse0(pomString: String): Option[ParsedPom] =
     Try {
       val db = secureDbf.newDocumentBuilder()
+      db.setErrorHandler(SilentSaxHandler)
       val doc =
         try {
           db.parse(
             new java.io.ByteArrayInputStream(pomString.getBytes("UTF-8"))
           )
         } catch {
-          case e: Exception =>
-            logger.warn(s"PomParser: parse failed: ${e.getMessage}")
-            throw e
+          case e: Exception => throw e
         }
       val props = parseProperties(doc)
       val base = baseProperties(doc) ++ props

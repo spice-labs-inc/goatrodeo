@@ -803,11 +803,15 @@ case class MavenState(
         "http://apache.org/xml/features/nonvalidating/load-external-dtd",
         false
       )
-      val doc = dbf
-        .newDocumentBuilder()
-        .parse(
-          new java.io.ByteArrayInputStream(xmlString.getBytes("UTF-8"))
-        )
+      val db = dbf.newDocumentBuilder()
+      db.setErrorHandler(new org.xml.sax.ErrorHandler {
+        def warning(e: org.xml.sax.SAXParseException): Unit = ()
+        def error(e: org.xml.sax.SAXParseException): Unit = ()
+        def fatalError(e: org.xml.sax.SAXParseException): Unit = ()
+      })
+      val doc = db.parse(
+        new java.io.ByteArrayInputStream(xmlString.getBytes("UTF-8"))
+      )
 
       def tagText(tag: String): Option[String] = {
         val nl = doc.getElementsByTagName(tag)

@@ -22,6 +22,7 @@ import io.spicelabs.goatrodeo.util.Config
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.regex.Pattern
+import io.spicelabs.goatrodeo.omnibor.strategies.BaharatStrategy
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -173,62 +174,59 @@ class MySuite extends munit.FunSuite {
 
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
 
-    if (StaticMetadata.hasSyft) { // only run the Static Metadata tests if Syft is installed
-      {
-        // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
-        val item = store
-          .read(
-            store
-              .read(
-                "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
-              )
-              .get
-              .connections
-              .head
-              ._2
-          )
-          .get
-
-        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
-
-        // both the pom computed and internal manifest pURLs differ
-        // so we find 2
-        assert(purls.length == 2, s"should be a purl ${purls} on log4j")
-
-        assert(
-          item.bodyAsItemMetaData.get.extra
-            .get("static-metadata-artifact")
+    {
+      // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
+      val item = store
+        .read(
+          store
+            .read(
+              "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
+            )
             .get
-            .size == 1,
-          "Should have one augmentation on log4j"
+            .connections
+            .head
+            ._2
         )
-      }
+        .get
 
-      {
-        // a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17 tk
+      val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
 
-        val item = store
-          .read(
-            store
-              .read(
-                "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
-              )
-              .get
-              .connections
-              .head
-              ._2
-          )
+      assert(purls.length == 1, s"should be a purl ${purls} on log4j")
+
+      assert(
+        item.bodyAsItemMetaData.get.extra
+          .get("static-metadata-artifact")
           .get
-
-        assert(
-          item.bodyAsItemMetaData.get.extra
-            .get("static-metadata-artifact")
-            .get
-            .size == 1,
-          "Should have one augmentation on tk"
-        )
-      }
+          .size == 1,
+        "Should have one augmentation on log4j"
+      )
     }
+
+    {
+      // a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17 tk
+
+      val item = store
+        .read(
+          store
+            .read(
+              "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
+            )
+            .get
+            .connections
+            .head
+            ._2
+        )
+        .get
+
+      assert(
+        item.bodyAsItemMetaData.get.extra
+          .get("static-metadata-artifact")
+          .get
+          .size == 1,
+        "Should have one augmentation on tk"
+      )
+    }
+
   }
 
   test("Finds files in RPM package") {
@@ -244,53 +242,6 @@ class MySuite extends munit.FunSuite {
       s"There should be at least 200 files found in the rpm, found ${gitoids.size}"
     )
   }
-
-  // test("Compute pURL for .deb") {
-  //   val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
-  //   val (maybePurl, attrs) = BaharatStrategy
-  //     .computePurl(
-  //       FileWrapper(File(name), name, None)
-  //     )
-  //     .get
-  //   assert(maybePurl.isDefined, "Should compute a purl")
-  //   val purl = maybePurl.get
-  //   assertEquals(purl.getName(), "tk8.6", None)
-  //   assert(
-  //     attrs.get("maintainer").get.size > 0,
-  //     "Should have a mainter"
-  //   )
-  //   assert(
-  //     attrs.get("description").get.head.value.contains("look-and-feel"),
-  //     "The description must support multi-line"
-  //   )
-  // }
-
-  // test("Compute pURL for another .deb") {
-  //   val name = "test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"
-
-  //   val (maybePurl, attrs) = Debian
-  //     .computePurl(
-  //       FileWrapper(File(name), name, None)
-  //     )
-  //     .get
-  //   assert(maybePurl.isDefined, "Should compute a purl")
-  //   val purl = maybePurl.get
-  //   assertEquals(purl.getName(), "libasound2", None)
-  //   assert(
-  //     attrs.get("maintainer").get.size > 0,
-  //     "Should have a mainter"
-  //   )
-  //   assert(
-  //     attrs
-  //       .get("description")
-  //       .get
-  //       .head
-  //       .value
-  //       .contains("ALSA library and its standard plugins"),
-  //     "The description must support multi-line"
-  //   )
-
-  // }
 
   test("Build graph from deb package with zst compression") {
     val name = "test_data/tk8.6_8.6.14-1build1_amd64.deb"
