@@ -62,6 +62,20 @@ Standard tags are defined in MetadataKeyConstants
 | ModuleOpens | maven:ModuleOpens | JPMS module opens (from `module-info.class`) | JSON array of strings |
 | ModuleProvides | maven:ModuleProvides | JPMS module provides (from `module-info.class`) | JSON object `{service: [impl1]}` |
 | ModuleUses | maven:ModuleUses | JPMS module uses (from `module-info.class`) | JSON array of strings |
+| Vendor | jvm:Vendor | JVM vendor namespace (e.g., `eclipse`, `oracle`, `azul`) | String |
+| JavaVersion | jvm:JavaVersion | `JAVA_VERSION` from `release` file | String, e.g. `21.0.4` |
+| JavaRuntimeVersion | jvm:JavaRuntimeVersion | `JAVA_RUNTIME_VERSION` from `release` file | String, e.g. `21.0.4+7` |
+| ImageType | jvm:ImageType | `IMAGE_TYPE` (`JDK` or `JRE`) | String |
+| OsArch | jvm:OsArch | `OS_ARCH` from `release` file | String, e.g. `x86_64` |
+| OsName | jvm:OsName | `OS_NAME` from `release` file | String, e.g. `linux` |
+| Libc | jvm:Libc | `LIBC` from `release` file | String, e.g. `glibc` |
+| JvmVariant | jvm:JvmVariant | `JVM_VARIANT` from `release` file | String, e.g. `Hotspot` |
+| SemanticVersion | jvm:SemanticVersion | `SEMANTIC_VERSION` from `release` file | String |
+| FullVersion | jvm:FullVersion | `FULL_VERSION` from `release` file | String |
+| SourceRepo | jvm:SourceRepo | `SOURCE_REPO` from `release` file | String URL |
+| BuildSourceRepo | jvm:BuildSourceRepo | `BUILD_SOURCE_REPO` from `release` file | String URL |
+| JavaVersionDate | jvm:JavaVersionDate | `JAVA_VERSION_DATE` from `release` file | String `YYYY-MM-DD` |
+| IsJDK | jvm:IsJDK | `true` if JDK, `false` if JRE | String `"true"` or `"false"` |
 
 **Verified by:**
 - `MavenPhase2Suite` — `MavenState getMetadata includes POM name as NAME key`, `getMetadata includes POM description as DESCRIPTION key`, `getMetadata includes POM URL as URL key`, `getMetadata includes organization as PUBLISHER key`, `getMetadata includes SCM URL as adHoc key`.
@@ -71,6 +85,7 @@ Standard tags are defined in MetadataKeyConstants
 - `MavenPhase5ModuleInfoSuite` — `MavenState - extracts module-info.class metadata via BCEL`.
 - `MavenPhase5CorpusSuite` — corpus integration tests for all 10 structural JAR types.
 - `MavenPropertyTests` — `resolveGAV: embeddedProps always wins when complete`, `resolveGAV: falls through each layer deterministically`.
+- `JvmDistributionSuite` — `JvmState - parses release file with all fields`, `JvmState - generates pURL for JDK`, `corpus adoptium-jdk21 produces pURL and metadata`.
 
 # Dependencies
 

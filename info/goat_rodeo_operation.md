@@ -53,7 +53,7 @@ Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects
 * `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
 * `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
   Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
-* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet). Each package gets a tag Item
+* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet, JDK/JRE). Each package gets a tag Item
   with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
   is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.
 * `--package-tags-short-name` : Use short package names (e.g., `artifactId` for Maven) instead of fully qualified names

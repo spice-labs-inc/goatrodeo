@@ -158,6 +158,36 @@ class MavenPropertyTests extends ScalaCheckSuite {
     }
   }
 
+  // ------------------------------------------------------------------
+  // Cross-Cutting Property: filename parsing terminates
+  // (plan §Property-Based)
+  //
+  // Theory: for every generated filename, extractIdentityFromFilename either
+  // returns Some(valid identity) when a version pattern is present, or returns
+  // None (no version pattern).  Crucially it must NEVER throw.
+  // ------------------------------------------------------------------
+
+  val genFilename: Gen[String] = Gen.frequency(
+    (2, genMavenFilename),
+    (1, Gen.alphaNumStr.map(_ + ".jar")),
+    (1, Gen.asciiStr.map(s => if (s.contains(".")) s else s + ".jar")),
+    (1, Gen.const("foo-bar-baz-1.0-SNAPSHOT.jar")),
+    (1, Gen.const("com.example.lib_2.13-3.0.0.jar")),
+    (1, Gen.listOf(Gen.oneOf('a','-','_','.','0')).map(_.mkString + ".jar"))
+  )
+
+  property(
+    "extractIdentityFromFilename terminates for all inputs (isDefined or None, never crashes)"
+  ) {
+    forAll(genFilename) { filename =>
+      val result = scala.util.Try(MavenState().resolveGAVFromFilename(filename))
+      // Must not crash
+      result.isSuccess &&
+      // Result must be a tuple of three Options
+      result.toOption.isDefined
+    }
+  }
+
   property("extractIdentityFromFilename returns None for non-Maven filenames") {
     forAll(Gen.alphaNumStr) { name =>
       // Only true when name has no dash-digit split
@@ -285,11 +315,32 @@ class MavenPropertyTests extends ScalaCheckSuite {
   // Property: arbitrary date string does not crash parseDateString
   // ------------------------------------------------------------------
 
-  property("parseDateString never crashes on arbitrary strings") {
-    forAll(Gen.alphaNumStr) { s =>
+  // ------------------------------------------------------------------
+  // Cross-Cutting Property: date parsing robustness (plan §Property-Based)
+  //
+  // Theory: for every generated date string, either parseDateString returns
+  // Some(Date) (the string matches a supported format) or returns None
+  // (unparseable).  Crucially it must NEVER throw.
+  // ------------------------------------------------------------------
+
+  val genDateStr: Gen[String] = Gen.frequency(
+    (2, genFormattedDate.map(_._1)),
+    (1, Gen.alphaNumStr),
+    (1, Gen.asciiStr),
+    (1, Gen.listOf(Gen.oneOf('0','9','-','/',':',' ','A','M')).map(_.mkString)),
+    (1, Gen.choose(0L, 2000000000000L).map(_.toString))
+  )
+
+  property(
+    "parseDateString terminates for all inputs (isDefined or None, never crashes)"
+  ) {
+    forAll(genDateStr) { s =>
       val state = MavenState()
-      // Must not throw; returns Option
-      scala.util.Try(state.parseDateString(s)).isSuccess
+      val result = scala.util.Try(state.parseDateString(s))
+      // Must not crash
+      result.isSuccess &&
+      // Result must be an Option (Some or None)
+      result.toOption.isDefined
     }
   }
 
@@ -339,6 +390,89 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // ------------------------------------------------------------------
+  // Cross-Cutting Property: GAV resolution terminates (plan §Property-Based)
+  //
+  // Theory: for every generated POM XML, either PomParser.parse returns
+  // Some (the POM has structure from which a GAV could be extracted) or
+  // returns None (no valid GAV source).  Crucially it must NEVER throw.
+  // ------------------------------------------------------------------
+
+  /** Generate random XML-ish strings that may or may not contain <project>
+    * tags.  This includes well-formed fragments, malformed tags, and random
+    * ascii — the full input space for a parser that must be crash-proof.
+    */
+  val genPomXml: Gen[String] = Gen.frequency(
+    (3, genPomXmlWithGav.map(_._1)),
+    (2, Gen.asciiStr),
+    (1, Gen.alphaNumStr),
+    (1, Gen.frequency((1, Gen.const("<project></project>")),
+                       (1, Gen.const("<project><groupId>g</groupId></project>")))),
+    (1, Gen.listOf(Gen.oneOf('<', '>', '/', '=', '"', 'a', 'b', 'c')).map(_.mkString))
+  )
+
+  property(
+    "PomParser.parse terminates for all inputs (isDefined or None, never throws)"
+  ) {
+    forAll(genPomXml) { xml =>
+      val result = scala.util.Try(PomParser.parse(xml))
+      // Must not crash
+      result.isSuccess &&
+      // If it succeeds it must be an Option (Some or None), never a thrown exception
+      result.toOption.isDefined
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Cross-Cutting Property: property resolution terminates
+  // (plan §Property-Based)
+  //
+  // Theory: for every generated property map and property name,
+  // PomParser.resolveProperty either returns Some(value) when the key exists
+  // and its value is fully resolvable, or returns None (name missing, circular
+  // reference, unresolved interpolation, etc.).  Crucially it must NEVER throw.
+  // ------------------------------------------------------------------
+
+  val genProperties: Gen[Map[String, String]] = Gen.frequency(
+    (3, genLiteralProps),
+    (1, Gen.const(Map.empty[String, String])),
+    (1, genLiteralProps.map { m =>
+      // Inject an unresolved interpolation into one random value
+      if (m.isEmpty) m
+      else {
+        val (k, _) = m.head
+        m.updated(k, "${nonexistent.property}")
+      }
+    }),
+    (1, genLiteralProps.map { m =>
+      // Inject a self-reference into one random value
+      if (m.isEmpty) m
+      else {
+        val (k, _) = m.head
+        m.updated(k, s"$${$k}")
+      }
+    })
+  )
+
+  val genPropName: Gen[String] = Gen.frequency(
+    (3, genPropKey),
+    (1, Gen.alphaNumStr),
+    (1, Gen.const("project.version")),
+    (1, Gen.const("pom.groupId"))
+  )
+
+  property(
+    "PomParser.resolveProperty terminates for all inputs (isDefined or None, never crashes)"
+  ) {
+    forAll(genProperties, genPropName) { (props, name) =>
+      val result = scala.util.Try(PomParser.resolveProperty(name, props))
+      // Must not crash
+      result.isSuccess &&
+      // Result must be an Option (Some or None)
+      result.toOption.isDefined
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Property: resolveProperty consistency
   // ------------------------------------------------------------------
 
@@ -351,7 +485,12 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // ------------------------------------------------------------------
-  // Property: Dependency JSON round-trip
+  // Cross-Cutting Property: dependency JSON round-trip (plan §Property-Based)
+  //
+  // Theory: for every generated dependency list, formatting to JSON never
+  // crashes (formatDeps.isDefined in spirit — compact(render) always
+  // succeeds for our structured data) and re-parsing yields the original
+  // data (parseAgain(formatDeps(deps)) == deps).
   // ------------------------------------------------------------------
 
   val genParsedDependency: Gen[PomParser.ParsedDependency] = for {

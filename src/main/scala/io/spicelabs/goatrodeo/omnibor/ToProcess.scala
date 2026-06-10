@@ -615,6 +615,7 @@ object ToProcess {
       DotnetFile.computeDotnetFiles,
       AnnattoStrategy.computeAnnattoFiles,
       Certificates.computeCertificateFiles,
+      JvmDistribution.computeJvmFiles,
       GenericFile.computeGenericFiles
     )
   )
@@ -657,6 +658,7 @@ object ToProcess {
         DotnetFile.computeDotnetFiles,
         AnnattoStrategy.computeAnnattoFiles,
         Certificates.computeCertificateFiles,
+        JvmDistribution.computeJvmFiles,
         GenericFile.computeGenericFiles
       )
     })

@@ -171,60 +171,125 @@ class MySuite extends munit.FunSuite {
     val cnt = gitoids.size
 
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
-
-    {
-      // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
-      val item = store
-        .read(
-          store
-            .read(
-              "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
-            )
-            .get
-            .connections
-            .head
-            ._2
-        )
-        .get
-
-      val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
-
-      assert(purls.length == 1, s"should be a purl ${purls} on log4j")
-
-      assert(
-        item.bodyAsItemMetaData.get.extra
-          .get("static-metadata-artifact")
+    if (StaticMetadata.hasSyft) { // only run the Static Metadata tests if Syft is installed
+      {
+        // 46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d  log4j-core-2.22.1.jar
+        val item = store
+          .read(
+            store
+              .read(
+                "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
+              )
+              .get
+              .connections
+              .head
+              ._2
+          )
           .get
-          .size == 1,
-        "Should have one augmentation on log4j"
-      )
-    }
 
-    {
-      // a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17 tk
+        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
 
-      val item = store
-        .read(
-          store
-            .read(
-              "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
-            )
+        assert(purls.length == 1, s"should be a purl ${purls} on log4j")
+
+        assert(
+          item.bodyAsItemMetaData.get.extra
+            .get("static-metadata-artifact")
             .get
-            .connections
-            .head
-            ._2
+            .size == 1,
+          "Should have one augmentation on log4j"
         )
-        .get
+      }
 
-      assert(
-        item.bodyAsItemMetaData.get.extra
-          .get("static-metadata-artifact")
+      {
+        // a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17 tk
+
+        val item = store
+          .read(
+            store
+              .read(
+                "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
+              )
+              .get
+              .connections
+              .head
+              ._2
+          )
           .get
-          .size == 1,
-        "Should have one augmentation on tk"
-      )
-    }
 
+        assert(
+          item.bodyAsItemMetaData.get.extra
+            .get("static-metadata-artifact")
+            .get
+            .size == 1,
+          "Should have one augmentation on tk"
+        )
+      }
+
+    }
+  }
+
+  test("Build graph from nested archive without static metadata") {
+    /* What this tests:
+     *  The Maven strategy produces pURLs for artifacts inside nested.tar
+     *  even when Syft/static-metadata is disabled.  This ensures pURL
+     *  generation is a core strategy behavior, not dependent on Syft.
+     *  Requirement: Phase 1-5 Maven strategy pURL generation.
+     *  Theory:  log4j-core-2.22.1.jar inside nested.tar should be claimed by
+     *  MavenToProcess and produce a pkg:maven/... pURL.
+     */
+    val name = "test_data/nested.tar"
+    val nested = FileWrapper(File(name), name, None)
+
+    val store = ToProcess.buildGraphFromArtifactWrapper(
+      nested,
+      args = Config() // useStaticMetadata defaults to false
+    )
+
+    val gitoids = store.gitoidKeys()
+    val cnt = gitoids.size
+
+    assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
+
+    // log4j-core-2.22.1.jar sha256
+    val log4jSha256 =
+      "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
+    val log4jItemOpt = for {
+      firstItem <- store.read(log4jSha256)
+      // Follow the first "contains" edge to the nested JAR child
+      childGitoid <- firstItem.connections
+        .find(_._1 == EdgeType.contains)
+        .map(_._2)
+        .orElse(firstItem.connections.headOption.map(_._2))
+      childItem <- store.read(childGitoid)
+    } yield childItem
+
+    assert(log4jItemOpt.isDefined, s"log4j JAR should be reachable from $log4jSha256")
+
+    val log4jPurls = log4jItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
+    assert(
+      log4jPurls.nonEmpty,
+      s"log4j JAR should have at least one pURL connection, got ${log4jPurls}"
+    )
+
+    // tk sha256
+    val tkSha256 =
+      "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
+    val tkItemOpt = for {
+      firstItem <- store.read(tkSha256)
+      childGitoid <- firstItem.connections
+        .find(_._1 == EdgeType.contains)
+        .map(_._2)
+        .orElse(firstItem.connections.headOption.map(_._2))
+      childItem <- store.read(childGitoid)
+    } yield childItem
+
+    assert(tkItemOpt.isDefined, s"tk package should be reachable from $tkSha256")
+
+    val tkPurls = tkItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
+    assert(
+      tkPurls.nonEmpty,
+      s"tk package should have at least one pURL connection, got ${tkPurls}"
+    )
   }
 
   test("Finds files in RPM package") {
