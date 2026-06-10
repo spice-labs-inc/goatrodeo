@@ -26,12 +26,11 @@ import scala.sys.process.*
 
 /** End-to-end tests for `test_data/certificates/tools/compute-expected.sh`.
   *
-  * Task #3 specifies a
-  * draft-sidecar generator that contributors run when adding a fixture.
-  * Pre-Phase-0b, the script existed but was untested. A regression in the
-  * SubjectDN/IssuerDN sed expressions (an extra space in `sed 's/^subject= //'`
-  * against openssl's `subject=...` output) was shipping broken sidecars. This
-  * suite locks in the tool's contract:
+  * Task #3 specifies a draft-sidecar generator that contributors run when
+  * adding a fixture. Pre-Phase-0b, the script existed but was untested. A
+  * regression in the SubjectDN/IssuerDN sed expressions (an extra space in `sed
+  * 's/^subject= //'` against openssl's `subject=...` output) was shipping
+  * broken sidecars. This suite locks in the tool's contract:
   *
   *   - exit 0 on a valid PEM X.509 fixture
   *   - emits parseable JSON

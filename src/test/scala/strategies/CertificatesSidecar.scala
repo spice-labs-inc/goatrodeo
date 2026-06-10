@@ -24,8 +24,7 @@ import scala.util.Try
 /** Sidecar — the ground-truth JSON file paired with every fixture in
   * `test_data/certificates/`.
   *
-  * The Certificates strategy (see
-  * `certificates-strategy/phase-0-corpus.md` and
+  * The Certificates strategy (see `certificates-strategy/phase-0-corpus.md` and
   * `certificates-strategy/appendices.md` Appendix B) requires every fixture to
   * be paired with a `{artifact-filename}.expected.json` sidecar that declares
   * what the strategy must emit for that fixture.

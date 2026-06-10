@@ -142,6 +142,8 @@ goatrodeo [OPTIONS]
 | `--maxrecords <n>` | Batch size (default: 50,000) |
 | `--tempdir <dir>` | Temp storage (RAM disk recommended) |
 | `--tag <name>` | Tag this run for later identification |
+| `--package-tags` | Create per-package tags for identified packages (Maven, Docker, etc.) |
+| `--package-tags-short-name` | Use short package names when `--package-tags` is enabled |
 | `--block <file>` | Skip known/common GitOIDs |
 
 <details>

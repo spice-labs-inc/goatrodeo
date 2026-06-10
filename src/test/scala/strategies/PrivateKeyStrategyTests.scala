@@ -24,7 +24,7 @@ import java.io.File
   *
   * ## What these tests test
   *
-   * Unencrypted vs encrypted: every fixture must take the correct branch
+  * Unencrypted vs encrypted: every fixture must take the correct branch
   * (unencrypted → derive public key → emit pURL + `Envelope=plaintext` +
   * `DerivedFromPrivateKey=true`; encrypted → envelope-only metadata, no pURL,
   * no decryption attempts). The sidecar tests in `CertificatesSuite` are

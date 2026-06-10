@@ -164,8 +164,7 @@ class CertificatesKeystoreKeyEntrySuite extends FunSuite {
     * certificate chain only, allowing operators to see what certs are in the
     * keystore without exposing secrets.
     *
-     * REQUIREMENT: Keystore with private key entry produces cert
-     * metadata only.
+    * REQUIREMENT: Keystore with private key entry produces cert metadata only.
     */
   test("Certificates - keystore with key entry emits chain cert metadata") {
     val ks = createKeystoreWithKeyEntry()
@@ -229,8 +228,8 @@ class CertificatesKeystoreKeyEntrySuite extends FunSuite {
     * no-op (which is the correct and desired behavior). If it were not a no-op,
     * that would indicate a bug in the metadata generation.
     *
-     * REQUIREMENT: cert metadata only, no private key material.
-    * key patterns should be present in the first place.
+    * REQUIREMENT: cert metadata only, no private key material. key patterns
+    * should be present in the first place.
     */
   test("Certificates - keystore key entry metadata has no forbidden patterns") {
     val ks = createKeystoreWithKeyEntry()
@@ -261,7 +260,7 @@ class CertificatesKeystoreKeyEntrySuite extends FunSuite {
     * emitting chain metadata for key entries and direct cert metadata for cert
     * entries.
     *
-     * REQUIREMENT: KeyEntryCount and CertCount must be accurate.
+    * REQUIREMENT: KeyEntryCount and CertCount must be accurate.
     */
   test("Certificates - keystore with mixed entries produces correct counts") {
     val ks = createKeystoreWithMixedEntries()
@@ -323,7 +322,7 @@ class CertificatesKeystoreKeyEntrySuite extends FunSuite {
     * the definitive check is that filterLeaks returns the metadata unchanged
     * (tested above).
     *
-     * REQUIREMENT: cert metadata only, NO private key.
+    * REQUIREMENT: cert metadata only, NO private key.
     */
   test(
     "Certificates - keystore key entry metadata has no raw private key bytes"

@@ -3,6 +3,7 @@
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
@@ -109,9 +110,8 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     val displayName = "ed448"
   }
 
-  /** All 8 algorithm cases: "Generators should cover at
-    * minimum: RSA {2048, 3072, 4096}, EC {p-256, p-384, p-521}, Ed25519,
-    * Ed448."
+  /** All 8 algorithm cases: "Generators should cover at minimum: RSA {2048,
+    * 3072, 4096}, EC {p-256, p-384, p-521}, Ed25519, Ed448."
     */
   private val allCases: Vector[CertGenCase] = Vector(
     RsaCase(2048),
@@ -189,9 +189,8 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       .map(b => f"${b & 0xff}%02x")
       .mkString
 
-  /** Parse the cert through the strategy and check the resulting
-    * pURLs. We use `parseSingleCert` + `purlsForCert` to exercise the actual
-    * emission path.
+  /** Parse the cert through the strategy and check the resulting pURLs. We use
+    * `parseSingleCert` + `purlsForCert` to exercise the actual emission path.
     */
   private def driveThroughStrategy(
       cert: X509Certificate
@@ -641,6 +640,29 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           !spkiPurl.contains("curve="),
           s"${c.displayName}: should not have curve="
         )
+    }
+  }
+
+  // ===== Property: filterLeaks idempotence ==============================
+
+  property(
+    "filterLeaks is idempotent: filterLeaks(m) == filterLeaks(filterLeaks(m))"
+  ) {
+    forAll(genMetadata) { meta =>
+      val once = Certificates.filterLeaks(meta)
+      val twice = Certificates.filterLeaks(once)
+      once == twice
+    }
+  }
+
+  private lazy val genMetadata: Gen[TreeMap[String, TreeSet[StringOrPair]]] = {
+    val genKey = Gen.alphaNumStr.suchThat(_.nonEmpty)
+    val genValue = Gen.alphaNumStr
+    Gen.listOf(Gen.zip(genKey, Gen.listOf(genValue).suchThat(_.nonEmpty))).map {
+      pairs =>
+        TreeMap.from(pairs.map { case (k, vs) =>
+          k -> TreeSet.from(vs.map(StringOrPair.apply))
+        })
     }
   }
 

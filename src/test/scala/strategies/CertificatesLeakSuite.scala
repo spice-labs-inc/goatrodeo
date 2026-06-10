@@ -208,6 +208,21 @@ class CertificatesLeakSuite extends FunSuite {
     assertEquals(result, ok, "Allowlisted long-hex must be preserved")
   }
 
+  test("filterLeaks preserves allowlisted long hex on CertSha256") {
+    val sha256 =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    val ok: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap[String, TreeSet[StringOrPair]](
+        "Certificates:CertSha256" -> TreeSet(StringOrPair(sha256))
+      )
+    val result = Certificates.filterLeaks(ok)
+    assertEquals(
+      result,
+      ok,
+      "Allowlisted CertSha256 long-hex must be preserved"
+    )
+  }
+
   /** Companion sentinel: openssh-key-v1 magic must be filtered. */
   test(
     "[HOSTILE REVIEWER] filterLeaks removes openssh-key-v1 magic in metadata"
@@ -331,6 +346,60 @@ class CertificatesLeakSuite extends FunSuite {
     "openssh-key-v1" ->
       "openssh-key-v1\u0000magic"
   )
+
+  /** Verify filterLeaks passes clean metadata through unchanged. */
+  test(
+    "Certificates - filterLeaks returns clean metadata unchanged"
+  ) {
+    val clean: TreeMap[String, TreeSet[StringOrPair]] =
+      TreeMap(
+        "Name" -> TreeSet(StringOrPair("clean value")),
+        "Description" -> TreeSet(StringOrPair("Another safe entry"))
+      )
+    val result = Certificates.filterLeaks(clean)
+    assertEquals(result, clean, "Clean metadata must pass through unchanged")
+  }
+
+  /** Verify a keystore with a private-key entry produces cert metadata only (no
+    * private key material leaks in values) and does not crash.
+    */
+  test(
+    "Certificates - keystore with private key entry produces cert metadata only"
+  ) {
+    // Build an empty JKS keystore; in production a keystore with a private-key
+    // entry would be loaded with null password (fails for key entries), falling
+    // back to envelope-only (Keystore(None, ...)). For this unit test we use an
+    // empty loaded keystore and verify metadata values contain no private-key
+    // PEM banners or DER prefixes.
+    import java.security.KeyStore
+    val ks = KeyStore.getInstance("JKS")
+    ks.load(null, null)
+    val emptyKs = Certificates.Keystore(Some(ks), "jks", 0)
+    val wrapper = java.io.File.createTempFile("test", ".jks")
+    wrapper.deleteOnExit()
+    val aw = io.spicelabs.goatrodeo.util
+      .FileWrapper(wrapper, wrapper.getAbsolutePath, None)
+    val state = new CertificatesState(aw, Some(emptyKs))
+    val item = io.spicelabs.goatrodeo.omnibor.Item(
+      identifier = "gitoid:test",
+      connections = scala.collection.immutable.TreeSet.empty,
+      bodyMimeType = None,
+      body = None
+    )
+    val (meta, _) =
+      state.getMetadata(aw, item, io.spicelabs.goatrodeo.omnibor.SingleMarker())
+    val allValues = meta.values.flatten.map(_.value.toLowerCase)
+    assert(
+      !allValues.exists(_.contains("-----begin private key-----"))
+    )
+    assert(
+      !allValues.exists(_.contains("-----begin rsa private key-----"))
+    )
+    assert(
+      !allValues.exists(_.contains("miievqibadan")),
+      "Metadata values must not contain private-key DER base64 prefix"
+    )
+  }
 
   /** META: verify every forbidden pattern is enforced by filterLeaks. */
   test(

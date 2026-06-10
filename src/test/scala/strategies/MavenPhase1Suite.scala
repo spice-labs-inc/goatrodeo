@@ -290,7 +290,8 @@ class MavenPhase1Suite extends FunSuite {
         |  <artifactId>safe-art</artifactId>
         |  <version>2.0.0</version>
         |</project>""".stripMargin
-    val artifact = ByteWrapper(pomWithDoctype.getBytes("UTF-8"), "safe.pom", None)
+    val artifact =
+      ByteWrapper(pomWithDoctype.getBytes("UTF-8"), "safe.pom", None)
     val item = createTestItem(" harmless-doctype")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(state.groupId, Some("com.example"))
@@ -308,7 +309,8 @@ class MavenPhase1Suite extends FunSuite {
         |  <artifactId>quoted-gt</artifactId>
         |  <version>3.0.0</version>
         |</project>""".stripMargin
-    val artifact = ByteWrapper(pomWithQuotedGt.getBytes("UTF-8"), "quoted.pom", None)
+    val artifact =
+      ByteWrapper(pomWithQuotedGt.getBytes("UTF-8"), "quoted.pom", None)
     val item = createTestItem("quoted-gt-test")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(state.groupId, Some("com.example"))
@@ -326,7 +328,8 @@ class MavenPhase1Suite extends FunSuite {
         |  <artifactId>test</artifactId>
         |  <version>1.0</version>
         |</project>""".stripMargin
-    val artifact = ByteWrapper(pomWithEntity.getBytes("UTF-8"), "entity.pom", None)
+    val artifact =
+      ByteWrapper(pomWithEntity.getBytes("UTF-8"), "entity.pom", None)
     val item = createTestItem("entity-test")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(state.groupId, None)
@@ -685,6 +688,94 @@ class MavenPhase1Suite extends FunSuite {
       result.isDefined,
       "dd-MMM-yyyy in manifest build-date should parse via fallback chain"
     )
+  }
+
+  // ==================== Gap fill: filename groupId extraction ====================
+
+  test("1.5 extracts groupId and artifactId from dotted filename") {
+    val state = MavenState()
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "com.example.mylib-1.2.3.jar", None),
+      None,
+      TreeMap.empty[String, TreeSet[StringOrPair]]
+    )
+    assertEquals(g, Some("com.example"))
+    assertEquals(a, Some("mylib"))
+    assertEquals(v, Some("1.2.3"))
+  }
+
+  test("1.5 no groupId from filename when no dots") {
+    val state = MavenState()
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "mylib-1.0.jar", None),
+      None,
+      TreeMap.empty[String, TreeSet[StringOrPair]]
+    )
+    assertEquals(g, None)
+    assertEquals(a, Some("mylib"))
+    assertEquals(v, Some("1.0"))
+  }
+
+  // ==================== Gap fill: parent POM groupId fallback ====================
+
+  test("1.6 parent POM groupId fallback") {
+    val pom = """<project>
+      <parent><groupId>com.parent</groupId><artifactId>parent</artifactId><version>1.0</version></parent>
+      <artifactId>child</artifactId>
+    </project>"""
+    val parsed = PomParser.parse(pom)
+    assertEquals(parsed.flatMap(_.groupId), Some("com.parent"))
+  }
+
+  // ==================== Gap fill: maven.timestamp date property ====================
+
+  test("1.7 extracts build date from maven.timestamp property") {
+    val pom = """<project>
+      <properties><maven.timestamp>2024-06-15T10:30:00Z</maven.timestamp></properties>
+      <groupId>com.test</groupId><artifactId>t</artifactId><version>1</version>
+    </project>"""
+    val artifact = ByteWrapper(pom.getBytes("UTF-8"), "test.pom", None)
+    val item = createTestItem("maven-ts-test")
+    val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
+    assert(
+      state.buildDate.isDefined,
+      "maven.timestamp should be parsed as build date"
+    )
+  }
+
+  // ==================== Gap fill: bundle-name and specification-version ====================
+
+  test("1.4 resolves artifactId from Bundle-Name when no Bundle-SymbolicName") {
+    val state = MavenState()
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "bundle-name" -> TreeSet(StringOrPair("my-bundle")),
+      "bundle-version" -> TreeSet(StringOrPair("2.0.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "test.jar", None),
+      None,
+      manifest,
+      Map.empty,
+      None
+    )
+    assertEquals(a, Some("my-bundle"))
+    assertEquals(v, Some("2.0.0"))
+  }
+
+  test("1.6 resolves version from Specification-Version fallback") {
+    val state = MavenState()
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-title" -> TreeSet(StringOrPair("mylib")),
+      "specification-version" -> TreeSet(StringOrPair("3.0.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "test.jar", None),
+      None,
+      manifest,
+      Map.empty,
+      None
+    )
+    assertEquals(v, Some("3.0.0"))
   }
 }
 

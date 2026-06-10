@@ -172,6 +172,22 @@ On a system that has fast disk IO (e.g., NVMe or SSD), choosing a thread count t
 of logical CPUs will maximize processing. The only shared resource among the threads (other than the `ToProcess`
 queue) is the `MemStorage` instance.
 
+#### Maven Identity Resolution
+
+The Maven strategy extracts identity metadata (groupId, artifactId, version) using a strict five-layer priority chain. The first layer that produces a complete tuple wins:
+
+1. **Embedded `pom.properties`** — parsed from `META-INF/maven/<groupId>/<artifactId>/pom.properties` inside the JAR. If multiple properties files exist (fat JAR), the one whose embedded `artifactId` matches the JAR filename is chosen.
+2. **External sibling `.pom`** — a `pom.xml` file sitting next to the JAR on disk.
+3. **Embedded `pom.xml`** — the `pom.xml` bundled inside the JAR itself.
+4. **MANIFEST.MF** — OSGi headers (`Bundle-SymbolicName` / `Implementation-Title`) and version headers (`Bundle-Version` / `Implementation-Version`), with further fallbacks to `bundle-name` and `specification-version`.
+5. **Filename** — heuristic parsing of `groupId.artifactId-version.jar` or `artifactId-version.jar`. Dots before the final artifactId are treated as groupId segments, except when the trailing segment is purely numeric (a Scala binary suffix like `_2.13`), in which case it stays in the artifactId.
+
+The extracted identity is used to generate a pURL (`pkg:maven/<groupId>/<artifactId>@<version>`) and to populate metadata keys such as:
+- `("tag","package")` — the pURL
+- `("tag","package tag group id")` — the groupId (or `artifactId` when short names are requested)
+- `("tag","repo URL")` — SHA-256 of the Maven Central URL
+- `("maven","Timestamp")` — the parsed build timestamp
+
 #### `MemStorage` 
 
 The "graph" of artifacts is kept in `MemStorage`, and in-memory data structure that stores all the nodes in the graph.

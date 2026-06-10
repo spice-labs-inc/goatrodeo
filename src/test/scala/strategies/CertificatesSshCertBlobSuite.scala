@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets
   * algorithms triggered `throw new IllegalArgumentException`. Both are now
   * `None` returns.
   *
-   * ==LLM-Readable Section==
+  * ==LLM-Readable Section==
   *
   * This suite tests that parseSshCertBlob handles expected failures gracefully
   * by returning None instead of throwing:
@@ -56,7 +56,7 @@ class CertificatesSshCertBlobSuite extends FunSuite {
     * expected failure case (encountering an algorithm the strategy doesn't
     * handle). The correct response is None.
     *
-     * REQUIREMENT: Unknown algorithm returns None.
+    * REQUIREMENT: Unknown algorithm returns None.
     */
   test(
     "Certificates - unsupported SSH cert key alg returns None"
@@ -87,7 +87,7 @@ class CertificatesSshCertBlobSuite extends FunSuite {
     * for an expected failure case (corrupt or mismatched cert data). The
     * correct response is None.
     *
-     * REQUIREMENT: Type mismatch returns None.
+    * REQUIREMENT: Type mismatch returns None.
     */
   test(
     "Certificates - SSH cert type mismatch returns None"
@@ -116,8 +116,40 @@ class CertificatesSshCertBlobSuite extends FunSuite {
     * This is a meta-test that ensures the method is provably non-throwing for
     * the cases we control (cert-type mismatch, unsupported alg).
     *
-     * REQUIREMENT: No exceptions for flow control.
+    * REQUIREMENT: No exceptions for flow control.
     */
+  /** Test: short wire data returns None without throwing.
+    *
+    * WHAT: parseSshCertBlob with truncated wire data (fewer bytes than needed)
+    * returns None. WHAT NOT: Does not throw on short reads.
+    *
+    * WHY: SSH wire data from untrusted sources may be truncated; the reader
+    * methods return None on short reads, and parseSshCertBlob must propagate
+    * that as None.
+    *
+    * REQUIREMENT: Short wire data returns None.
+    */
+  test(
+    "Certificates - SSH cert parsing handles short wire data gracefully"
+  ) {
+    val certTypeName = "ssh-rsa-cert-v01@openssh.com"
+    val signedAlg = "ssh-rsa"
+    // Wire is too short to contain a valid SSH cert structure.
+    val shortWire =
+      Array(0x00.toByte, 0x00.toByte, 0x00.toByte, 0x05.toByte) ++ "ssh-r"
+        .getBytes(StandardCharsets.UTF_8)
+    val result = Certificates.parseSshCertBlob(
+      certTypeName,
+      signedAlg,
+      shortWire,
+      None
+    )
+    assert(
+      result.isEmpty,
+      "Short wire data must return None, not throw"
+    )
+  }
+
   test(
     "Certificates - parseSshCertBlob never throws for controlled failures"
   ) {

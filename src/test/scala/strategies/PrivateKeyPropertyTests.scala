@@ -43,10 +43,9 @@ import scala.collection.immutable.TreeSet
   *
   * ## Why this matters (HS-3)
   *
-   * No fixture in this phase
-  * triggers a password prompt, a decryption attempt, or a log message about
-  * encryption status beyond what's in the metadata." These properties pin the
-  * uniform parts of that contract.
+  * No fixture in this phase triggers a password prompt, a decryption attempt,
+  * or a log message about encryption status beyond what's in the metadata."
+  * These properties pin the uniform parts of that contract.
   */
 class PrivateKeyPropertyTests extends ScalaCheckSuite {
 

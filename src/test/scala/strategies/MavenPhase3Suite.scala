@@ -9,8 +9,12 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenMarkers
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PomParser
 
+import java.io.File
+import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -446,5 +450,286 @@ class MavenPhase3Suite extends munit.FunSuite {
       !json.contains("provided-dep"),
       "provided-scope deps should be excluded"
     )
+  }
+
+  // ==================== Gap fill: explicit version overrides managed ====================
+
+  test(
+    "MavenState - explicit version overrides managed version in dependency metadata"
+  ) {
+    val pom = """<project>
+      <groupId>g</groupId><artifactId>t</artifactId><version>1</version>
+      <dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>lib</artifactId>
+            <version>5.0</version>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
+      <dependencies>
+        <dependency>
+          <groupId>com.example</groupId>
+          <artifactId>lib</artifactId>
+          <version>3.0</version>
+        </dependency>
+      </dependencies>
+    </project>"""
+    val artifact = ByteWrapper(pom.getBytes("UTF-8"), "t.pom", None)
+    val state = MavenState().beginProcessing(
+      artifact,
+      createTestItem("explicit-over-managed"),
+      MavenMarkers.POM
+    )
+    val (meta, _) =
+      state.getMetadata(artifact, createTestItem("x"), MavenMarkers.POM)
+    val key = MetadataKeyConstants.adHoc("maven")("DEPENDENCIES")
+    val json = meta.get(key).get.head.value
+    assert(
+      json.contains("3.0"),
+      "Explicit version 3.0 must override managed 5.0"
+    )
+    assert(
+      !json.contains("5.0"),
+      "Managed version 5.0 must not appear when overridden"
+    )
+  }
+
+  // ==================== Gap fill: scoped dependencyManagement ====================
+
+  test("PomParser - scoped dependencyManagement entries preserved") {
+    val pom = """<project>
+      <dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>managed</artifactId>
+            <version>2.0</version>
+            <scope>test</scope>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
+    </project>"""
+    val result = PomParser.parse(pom)
+    assert(result.isDefined)
+    val dm = result.get.dependencyManagement.head
+    assertEquals(
+      dm.scope,
+      Some("test"),
+      "Managed dependency scope should be captured"
+    )
+  }
+
+  // ==================== Gap fill: pURL-constructible dependency data ====================
+
+  test("MavenState - dependency entries include pURL-constructible data") {
+    val pom = """<project>
+      <groupId>com.test</groupId><artifactId>t</artifactId><version>1</version>
+      <dependencies>
+        <dependency>
+          <groupId>org.example</groupId>
+          <artifactId>lib</artifactId>
+          <version>2.0</version>
+          <scope>compile</scope>
+          <classifier>sources</classifier>
+          <type>jar</type>
+        </dependency>
+      </dependencies>
+    </project>"""
+    val artifact = ByteWrapper(pom.getBytes("UTF-8"), "t.pom", None)
+    val state = MavenState().beginProcessing(
+      artifact,
+      createTestItem("purl-dep"),
+      MavenMarkers.POM
+    )
+    val (meta, _) =
+      state.getMetadata(artifact, createTestItem("x"), MavenMarkers.POM)
+    val key = MetadataKeyConstants.adHoc("maven")("DEPENDENCIES")
+    val json = meta.get(key).get.head.value
+    assert(json.contains("org.example"), "JSON must contain groupId")
+    assert(json.contains("lib"), "JSON must contain artifactId")
+    assert(json.contains("2.0"), "JSON must contain version")
+    assert(json.contains("compile"), "JSON must contain scope")
+    assert(json.contains("sources"), "JSON must contain classifier")
+    assert(json.contains("type"), "JSON must contain type")
+  }
+
+  // ==================== Gap fill: MANIFEST and POM licenses merged ====================
+
+  test("MavenState - MANIFEST and POM licenses merged in metadata") {
+    val pom = """<project>
+      <groupId>g</groupId><artifactId>a</artifactId><version>1</version>
+      <licenses>
+        <license><name>Apache 2</name></license>
+      </licenses>
+    </project>"""
+    val artifact = ByteWrapper(pom.getBytes("UTF-8"), "test.pom", None)
+    val state = MavenState().beginProcessing(
+      artifact,
+      createTestItem("merged-lic"),
+      MavenMarkers.POM
+    )
+    val manifestMap = TreeMap[String, TreeSet[StringOrPair]](
+      "bundle-license" -> TreeSet(StringOrPair("https://example.com/license"))
+    )
+    val (meta, _) = state.getMetadata(
+      artifact,
+      createTestItem("x"),
+      MavenMarkers.POM
+    )
+    // getMetadata does not take manifestMap directly; metadata is built from parsedPom only for POM marker.
+    // Instead construct a state with manifest to test the merge path used for JAR marker.
+    val jarState = state.copy(manifest = manifestMap)
+    val (jarMeta, _) = jarState.getMetadata(
+      artifact,
+      createTestItem("y"),
+      MavenMarkers.JAR
+    )
+    val licenseValues = jarMeta.get(MetadataKeyConstants.LICENSE)
+    assert(licenseValues.isDefined, "LICENSE key must be present")
+    val values = licenseValues.get.map(_.value)
+    assert(values.contains("Apache 2"), "POM license must appear")
+    assert(
+      values.exists(_.contains("example.com/license")),
+      "MANIFEST Bundle-License must appear"
+    )
+  }
+
+  test("MavenState - extracts Plugin-License-Name from MANIFEST") {
+    val pom = """<project>
+      <groupId>g</groupId><artifactId>a</artifactId><version>1</version>
+    </project>"""
+    val artifact = ByteWrapper(pom.getBytes("UTF-8"), "test.pom", None)
+    val state = MavenState().beginProcessing(
+      artifact,
+      createTestItem("plugin-lic"),
+      MavenMarkers.POM
+    )
+    val manifestMap = TreeMap[String, TreeSet[StringOrPair]](
+      "plugin-license-name" -> TreeSet(StringOrPair("EPL 2.0"))
+    )
+    val jarState = state.copy(manifest = manifestMap)
+    val (jarMeta, _) = jarState.getMetadata(
+      artifact,
+      createTestItem("y"),
+      MavenMarkers.JAR
+    )
+    val licenseValues = jarMeta.get(MetadataKeyConstants.LICENSE)
+    assert(licenseValues.isDefined, "LICENSE key must be present")
+    val values = licenseValues.get.map(_.value)
+    assert(
+      values.contains("EPL 2.0"),
+      "Plugin-License-Name must appear in LICENSE metadata"
+    )
+  }
+
+  // ==================== Gap fill: embedded pom.xml path traversal ====================
+
+  test("1.3 path traversal: extractAllEmbeddedGavs skips pom.xml with ..") {
+    val tempDir = Files.createTempDirectory("maven-phase1-jar-pomxml")
+    try {
+      val jarFile = new File(tempDir.toFile, "test.jar")
+      writeJarEntries(
+        jarFile,
+        Seq(
+          "META-INF/maven/../../etc/passwd/pom.xml" ->
+            "<project><groupId>com.evil</groupId><artifactId>evil</artifactId><version>1.0</version></project>",
+          "META-INF/maven/com.good/good-art/pom.xml" ->
+            "<project><groupId>com.good</groupId><artifactId>good-art</artifactId><version>2.0</version></project>",
+          "META-INF/maven/com.good/good-art/pom.properties" ->
+            "groupId=com.good\nartifactId=good-art\nversion=2.0"
+        )
+      )
+      val wrapper = FileWrapper(jarFile, "test.jar", None)
+      val item = createTestItem("path-traversal-pomxml-test")
+      val state = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+      assert(
+        !state.embeddedGavs.exists(_._2 == "evil"),
+        "Traversal pom.xml with .. should be skipped"
+      )
+      assert(
+        state.embeddedGavs.exists(_._2 == "good-art"),
+        "Legitimate pom.xml / pom.properties should be included"
+      )
+    } finally {
+      Helpers.deleteDirectory(tempDir)
+    }
+  }
+
+  // ==================== Gap fill: computeMavenFiles excludes Weave-Classes end-to-end ====================
+
+  test("computeMavenFiles - excludes JARs with Weave-Classes from output") {
+    val tempDir = Files.createTempDirectory("weave-exclude")
+    try {
+      val jarFile = new File(tempDir.toFile, "weaved.jar")
+      val fos = new java.io.FileOutputStream(jarFile)
+      val zos = new java.util.zip.ZipOutputStream(fos)
+      zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
+      zos.write(
+        "Manifest-Version: 1.0\nWeave-Classes: com.newrelic.Weave\n".getBytes(
+          "UTF-8"
+        )
+      )
+      zos.closeEntry()
+      zos.close()
+
+      val wrapper = FileWrapper(jarFile, "weaved.jar", None)
+      val byUUID = Map(wrapper.uuid -> wrapper)
+      val byName = Map("weaved.jar" -> Vector(wrapper))
+      val (toProcess, _, _, _) =
+        MavenToProcess.computeMavenFiles(byUUID, byName)
+      assertEquals(
+        toProcess.size,
+        0,
+        "Weave-Classes JAR must not be claimed by Maven strategy"
+      )
+    } finally {
+      Helpers.deleteDirectory(tempDir)
+    }
+  }
+
+  test("computeMavenFiles - normal JARs unaffected by Weave-Classes check") {
+    val tempDir = Files.createTempDirectory("weave-normal")
+    try {
+      val jarFile = new File(tempDir.toFile, "normal.jar")
+      val fos = new java.io.FileOutputStream(jarFile)
+      val zos = new java.util.zip.ZipOutputStream(fos)
+      zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
+      zos.write("Manifest-Version: 1.0\n".getBytes("UTF-8"))
+      zos.closeEntry()
+      zos.close()
+
+      val wrapper = FileWrapper(jarFile, "normal.jar", None)
+      val byUUID = Map(wrapper.uuid -> wrapper)
+      val byName = Map("normal.jar" -> Vector(wrapper))
+      val (toProcess, _, _, _) =
+        MavenToProcess.computeMavenFiles(byUUID, byName)
+      assertEquals(
+        toProcess.size,
+        1,
+        "Normal JAR must be claimed by Maven strategy"
+      )
+    } finally {
+      Helpers.deleteDirectory(tempDir)
+    }
+  }
+
+  // Helper to write JAR entries
+  private def writeJarEntries(
+      jarFile: File,
+      entries: Seq[(String, String)]
+  ): Unit = {
+    val zos =
+      new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(jarFile))
+    try {
+      for ((path, content) <- entries) {
+        zos.putNextEntry(new java.util.zip.ZipEntry(path))
+        zos.write(content.getBytes("UTF-8"))
+        zos.closeEntry()
+      }
+    } finally {
+      zos.close()
+    }
   }
 }

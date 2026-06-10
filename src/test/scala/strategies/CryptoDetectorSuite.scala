@@ -32,8 +32,8 @@ import java.nio.file.Files
   * package-private internal entry that lets us assert MIME-set output without
   * going through the full `mimeTypeAugmenter` pass-through wrapper).
   *
-  * Negative tests cover the explicit "must NOT match" cases plus the
-  * 4-KB read-budget invariant.
+  * Negative tests cover the explicit "must NOT match" cases plus the 4-KB
+  * read-budget invariant.
   *
   * ## LLM-friendly summary
   *

@@ -250,6 +250,28 @@ class PomParserSuite extends FunSuite {
     assertEquals(result.get.dependencyManagement(0).version, Some("2.0"))
   }
 
+  test("PomParser - scoped dependencyManagement entries") {
+    val pom = """<project>
+      <dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>managed-dep</artifactId>
+            <version>2.0</version>
+            <scope>provided</scope>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
+      <groupId>com.test</groupId>
+      <artifactId>t</artifactId>
+      <version>1.0</version>
+    </project>"""
+    val result = PomParser.parse(pom)
+    assert(result.isDefined)
+    assertEquals(result.get.dependencyManagement.length, 1)
+    assertEquals(result.get.dependencyManagement(0).scope, Some("provided"))
+  }
+
   test("PomParser - empty dependencies and licenses when absent") {
     val pom =
       "<project><groupId>g</groupId><artifactId>a</artifactId><version>1</version></project>"

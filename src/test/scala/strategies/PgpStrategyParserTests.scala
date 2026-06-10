@@ -24,11 +24,10 @@ import java.io.File
   *
   * ## What these tests test
   *
-  * For each PGPPublicKey: fingerprint, version, alg,
-  * size/curve, subkey enumeration. The tests pin a representative fixture for
-  * each major algorithm + version combination and assert the strategy's parsed
-  * values against the canonical `gpg(1)` output captured at fixture-creation
-  * time.
+  * For each PGPPublicKey: fingerprint, version, alg, size/curve, subkey
+  * enumeration. The tests pin a representative fixture for each major algorithm
+  * + version combination and assert the strategy's parsed values against the
+  * canonical `gpg(1)` output captured at fixture-creation time.
   *
   * ## Why this matters
   *

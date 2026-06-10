@@ -1301,8 +1301,7 @@ object Certificates {
     Pattern.compile("[0-9a-f]{32,}")
 
   /** Filter private-key material from metadata. Removes offending entries and
-    * returns the cleaned metadata, logging a WARN for each removed entry. Never
-    * throws.
+    * returns the cleaned metadata. Never throws.
     */
   private[strategies] def filterLeaks(
       metadata: TreeMap[String, TreeSet[StringOrPair]]

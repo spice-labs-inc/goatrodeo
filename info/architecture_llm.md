@@ -313,7 +313,7 @@ is a comprehensive worked example covering 8 distinct claim types
 PGP keys, private keys both unencrypted and encrypted), a sealed
 `ClaimedContent` ADT for dispatch, MIME-driven routing in
 `classifyAndParse`, per-variant emitters, and a defensive leak sweep
-(`assertMetadataStructureNoLeak`) before metadata emission. See
+(`assertNoLeak`) before metadata emission. See
 [`info/certificates_strategy.md`](certificates_strategy.md) for the
 user-facing strategy documentation and
 [`info/certificates/phase-{0..9}-claims.md`](certificates/) for the
@@ -455,31 +455,13 @@ Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
 - `maven:DEPENDENCIES` — JSON array of all `<dependency>` elements with interpolated versions and merged `dependencyManagement` entries.
 - `maven:RuntimeDependencies` — filtered subset excluding `test` and `provided` scopes.
 - `maven:SCM_URL` — from `<scm><url>`.
-- `LICENSE` — merged from POM `<licenses>`, `Bundle-License`, and `Plugin-License-Name` manifest headers.
+- `LICENSE` — merged from POM `<licenses>` and the `Bundle-License` manifest header.
 - `PUBLISHER` — from `<organization><name>`.
-- `maven:Timestamp` — build timestamp from POM or manifest.
-- `maven:ParentPOM` — parent GAV as JSON object.
-- `maven:Latest`, `maven:Release`, `maven:Versions` — from `maven-metadata.xml`.
-- `maven:JarType`, `maven:NestedJars`, `maven:SpringBootMainClass`, `maven:LayersIdx`, `maven:ClasspathIdx` — for Spring Boot / shaded JARs.
-- `maven:WarLibJars` — for WAR archives.
-- `maven:EarModules` — for EAR archives.
-- `maven:MultiReleaseVersions` — for Multi-Release JARs.
-- `maven:JarSigned`, `maven:SignatureFiles` — for signed JARs.
-- `maven:ServiceProviders` — for `META-INF/services/*` files.
-- `maven:AutomaticModuleName` — from manifest or `module-info.class` (BCEL).
-- `maven:ModuleRequires`, `maven:ModuleExports`, `maven:ModuleOpens`, `maven:ModuleProvides`, `maven:ModuleUses` — from JPMS `module-info.class` (BCEL).
-- `maven:GraalNativeImage` — from `native-image.properties`.
-- `maven:JenkinsPlugin` — for `.jpi`/`.hpi` or Jenkins groupId.
-- `osgi:BundleName`, `osgi:BundleSymbolicName`, `osgi:BundleDescription`, `osgi:BundleVendor`, `osgi:BundleDocURL`, `osgi:ExportPackage`, `osgi:ImportPackage`, `osgi:RequireCapability`, `osgi:ProvideCapability`, `osgi:FragmentHost` — from OSGi manifest headers (Export-Package and Import-Package parsed for directives).
 
 **Verified by:**
 - `MavenPhase1Suite` — GAV chain, filename parsing, OSGi manifest, XXE protection, DOCTYPE edge cases.
 - `MavenPhase2Suite` — PomParser interpolation, extended metadata, build dates.
-- `MavenPhase3Suite` — dependency JSON, license extraction, scope filtering, Plugin-License-Name.
-- `MavenPhase4Suite` — parent POM metadata, maven-metadata.xml, pqc_jars end-to-end identity and tags.
-- `MavenPhase5Suite` — JAR structure metadata, Spring Boot, shaded, WAR, EAR, multi-release, signatures, ServiceLoader, module name, GraalVM, Jenkins, OSGi full headers.
-- `MavenPhase5ModuleInfoSuite` — BCEL-based parsing of JPMS `module-info.class`.
-- `MavenPhase5CorpusSuite` — corpus integration tests against all 10 structural `test_data/` artifacts.
+- `MavenPhase3Suite` — dependency JSON, license extraction, scope filtering.
 - `MavenPropertyTests` — ScalaCheck property tests for interpolation, filename extraction, date parsing, and priority-chain determinism.
 - `PackageTagIntegrationSuite` — end-to-end processing of real Maven JARs from `test_data/pqc_jars`.
 

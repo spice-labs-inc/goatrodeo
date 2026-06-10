@@ -36,7 +36,10 @@ object PomParser {
       properties: Map[String, String],
       licenses: Vector[ParsedLicense],
       dependencies: Vector[ParsedDependency],
-      dependencyManagement: Vector[ParsedDependency]
+      dependencyManagement: Vector[ParsedDependency],
+      parentGroupId: Option[String],
+      parentArtifactId: Option[String],
+      parentVersion: Option[String]
   )
 
   private val MaxDepth = 10
@@ -61,12 +64,12 @@ object PomParser {
   private def containsDoctype(xml: String): Boolean =
     xml.toUpperCase.contains(DoctypeStart)
 
-  /** Strip DOCTYPE declaration from XML string.
-    * Finds "<!DOCTYPE" (case-insensitive) and removes through the matching
-    * closing ">". Correctly handles:
+  /** Strip DOCTYPE declaration from XML string. Finds "<!DOCTYPE"
+    * (case-insensitive) and removes through the matching closing ">". Correctly
+    * handles:
     *   - internal subsets ([...])
-    *   - quoted strings (both single and double) inside the declaration
-    *     so that a ">" inside a SYSTEM identifier does not truncate early.
+    *   - quoted strings (both single and double) inside the declaration so that
+    *     a ">" inside a SYSTEM identifier does not truncate early.
     */
   private def stripDoctype(xml: String): String = {
     val start = xml.toUpperCase.indexOf(DoctypeStart)
@@ -107,7 +110,9 @@ object PomParser {
       val db = secureDbf.newDocumentBuilder()
       val doc =
         try {
-          db.parse(new java.io.ByteArrayInputStream(pomString.getBytes("UTF-8")))
+          db.parse(
+            new java.io.ByteArrayInputStream(pomString.getBytes("UTF-8"))
+          )
         } catch {
           case e: Exception =>
             logger.warn(s"PomParser: parse failed: ${e.getMessage}")
@@ -116,8 +121,12 @@ object PomParser {
       val props = parseProperties(doc)
       val base = baseProperties(doc) ++ props
       ParsedPom(
-        groupId = interpolate(tagText(doc, "groupId").getOrElse(""), base)
-          .filter(_.nonEmpty),
+        groupId = interpolate(
+          tagText(doc, "groupId")
+            .orElse(parentTagText(doc, "groupId"))
+            .getOrElse(""),
+          base
+        ).filter(_.nonEmpty),
         artifactId = tagText(doc, "artifactId"),
         version = interpolate(
           tagText(doc, "version")
@@ -133,7 +142,10 @@ object PomParser {
         properties = props,
         licenses = parseLicenses(doc),
         dependencies = parseDependencies(doc, base ++ props),
-        dependencyManagement = parseDependencyManagement(doc)
+        dependencyManagement = parseDependencyManagement(doc),
+        parentGroupId = parentTagText(doc, "groupId"),
+        parentArtifactId = parentTagText(doc, "artifactId"),
+        parentVersion = parentTagText(doc, "version")
       )
     }.toOption
 
@@ -274,21 +286,31 @@ object PomParser {
     var i = 0
     while (i < depNodes.getLength) {
       val e = depNodes.item(i).asInstanceOf[Element]
-      val g = interpolate(elementText(e, "groupId").getOrElse(""), props)
-        .filter(_.nonEmpty)
-      val a = interpolate(elementText(e, "artifactId").getOrElse(""), props)
-        .filter(_.nonEmpty)
-      val v = interpolate(elementText(e, "version").getOrElse(""), props)
-        .filter(_.nonEmpty)
-      result += ParsedDependency(
-        groupId = g,
-        artifactId = a,
-        version = v,
-        scope = elementText(e, "scope"),
-        classifier = elementText(e, "classifier"),
-        optional = elementText(e, "optional").contains("true"),
-        `type` = elementText(e, "type")
-      )
+      // Skip <dependency> elements nested under <dependencyManagement>;
+      // only parse direct <dependencies> blocks.
+      var parent = e.getParentNode
+      var inDepMgmt = false
+      while (parent != null && !inDepMgmt) {
+        if (parent.getNodeName == "dependencyManagement") inDepMgmt = true
+        parent = parent.getParentNode
+      }
+      if (!inDepMgmt) {
+        val g = interpolate(elementText(e, "groupId").getOrElse(""), props)
+          .filter(_.nonEmpty)
+        val a = interpolate(elementText(e, "artifactId").getOrElse(""), props)
+          .filter(_.nonEmpty)
+        val v = interpolate(elementText(e, "version").getOrElse(""), props)
+          .filter(_.nonEmpty)
+        result += ParsedDependency(
+          groupId = g,
+          artifactId = a,
+          version = v,
+          scope = elementText(e, "scope"),
+          classifier = elementText(e, "classifier"),
+          optional = elementText(e, "optional").contains("true"),
+          `type` = elementText(e, "type")
+        )
+      }
       i += 1
     }
     result.result()

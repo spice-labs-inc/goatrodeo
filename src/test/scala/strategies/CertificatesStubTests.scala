@@ -44,8 +44,8 @@ import scala.collection.immutable.TreeSet
   *
   * ## Traceability
   *
-  * `certificates-strategy/phases-1-2-foundation-detector.md` Phase 1 task
-  * #3 (CryptoDetector stub) and task #5 (Certificates skeleton with five
+  * `certificates-strategy/phases-1-2-foundation-detector.md` Phase 1 task #3
+  * (CryptoDetector stub) and task #5 (Certificates skeleton with five
   * ProcessingState methods).
   *
   * ## LLM-friendly summary
@@ -289,8 +289,7 @@ class CertificatesStubTests extends FunSuite {
 
   // === SECTION A continued — Phase-INVARIANT (registration) =============
 
-  /** Phase-1 task #6 + claim #8 in `docs/certificates/phase-1-claims.md`
-    * say
+  /** Phase-1 task #6 + claim #8 in `docs/certificates/phase-1-claims.md` say
     * `Class.forName("io.spicelabs.goatrodeo.omnibor.strategies.Certificates")`
     * must resolve at runtime — that's the gate `CertificatesSuite` reads to
     * decide whether to skip per-fixture tests. Prior to this test, claim #8 was

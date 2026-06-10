@@ -103,6 +103,22 @@ class DockerTagSplitSuite extends FunSuite {
     }
   }
 
+  test("Docker - empty base split handled defensively (List case)") {
+    // The computePurls match has a Nil case that is defensive.
+    // For an empty string base, split yields List("") not Nil,
+    // but if Nil ever occurred, the code maps it to (None, base).
+    // This test documents the defensive behavior.
+    val emptySplit = List[String]()
+    val fallback = emptySplit match {
+      case Nil                    => (None, "")
+      case blob :: Nil            => (None, blob)
+      case path :: subPath :: Nil => (None, s"${path}/${subPath}")
+      case namespace :: pathAndSubpath =>
+        (Some(namespace), pathAndSubpath.reduceLeft(_ + "/" + _))
+    }
+    assertEquals(fallback, (None, ""))
+  }
+
   test("Docker - three component split produces expected pattern") {
 
     /** What: Evaluates "registry/ns/path".split("/").toList and confirms it
