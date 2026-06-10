@@ -20,7 +20,9 @@ class FatJarContentsTest extends munit.FunSuite {
 
   test("fat JAR must not contain signature files") {
     val fatJarFile =
-      new File(s"target/scala-3.8.3/goatrodeo-0.0.1-SNAPSHOT-fat.jar")
+      new File(
+        s"target/scala-3.8.3/${hellogoat.BuildInfo.name}-${hellogoat.BuildInfo.version}-fat.jar"
+      )
     assert(
       fatJarFile.exists(),
       s"Fat JAR not found at ${fatJarFile.getAbsolutePath}"

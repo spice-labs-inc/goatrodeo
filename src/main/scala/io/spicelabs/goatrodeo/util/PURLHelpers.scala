@@ -1,9 +1,13 @@
 package io.spicelabs.goatrodeo.util
 
-import com.github.packageurl.PackageURL
-import com.github.packageurl.PackageURLBuilder
+import io.spicelabs.coordinates.Purl
 
-/** Helpers related to Package URLs
+/** Helpers related to Package URLs.
+  *
+  * Package URLs are produced via `io.spicelabs.coordinates.Purl`, the canonical
+  * Spice Labs purl implementation (parse / build / normalize per the
+  * purl-spec). `coordinates` exposes a plain constructor rather than a builder,
+  * so [[purl]] is a small Scala-friendly factory over it.
   */
 object PURLHelpers {
 
@@ -33,6 +37,41 @@ object PURLHelpers {
     Ecosystems.Debian -> ("deb", None)
   );
 
+  /** Build a [[Purl]] from its parts.
+    *
+    * Replaces the old `PackageURLBuilder`: `type` and `name` are required, the
+    * rest optional. A blank namespace/version/subpath is treated as absent (the
+    * canonical purl form distinguishes "missing" from "empty", and some types —
+    * e.g. `nuget` — forbid a namespace entirely). Normalization and validation
+    * happen canonically in [[Purl.toCanonical]].
+    *
+    * @param qualifiers
+    *   key/value qualifiers, in insertion order (canonicalization sorts them)
+    */
+  def purl(
+      `type`: String,
+      name: String,
+      namespace: String | Null = null,
+      version: String | Null = null,
+      qualifiers: Seq[(String, String)] = Seq(),
+      subpath: String | Null = null
+  ): Purl = {
+    def blankToNull(s: String | Null): String | Null =
+      if (s == null || s.isEmpty) null else s
+
+    val q = new java.util.LinkedHashMap[String, String]()
+    for ((k, v) <- qualifiers) q.put(k, v)
+
+    new Purl(
+      `type`,
+      blankToNull(namespace),
+      name,
+      blankToNull(version),
+      q,
+      blankToNull(subpath)
+    )
+  }
+
   /** Take a bunch of "information" and turn it into a package URL
     *
     * @param ecosystem
@@ -57,7 +96,7 @@ object PURLHelpers {
       version: String,
       qualifierName: Option[String] = None,
       qualifiers: Seq[(String, String)] = Seq()
-  ): PackageURL = {
+  ): Purl = {
     val (ecosystemText, ecosystemQualifiers) =
       ecosystems.get(ecosystem) match {
         case None => ("unknown", Map())
@@ -65,24 +104,16 @@ object PURLHelpers {
           (name, ecosystemQualifiers.getOrElse(Map()))
       }
 
-    var purlBuilder = PackageURLBuilder.aPackageURL().withType(ecosystemText)
+    val namedQualifier =
+      qualifierName.flatMap(name => ecosystemQualifiers.get(name)).toSeq
 
-    purlBuilder = namespace.foldLeft(purlBuilder) { case (pb, namespace) =>
-      pb.withNamespace(namespace)
-    }
-    purlBuilder = purlBuilder.withName(artifactId).withVersion(version)
-
-    purlBuilder = qualifierName
-      .flatMap(name => ecosystemQualifiers.get(name))
-      .foldLeft(purlBuilder) { case (pb, (k, v)) => pb.withQualifier(k, v) }
-
-    purlBuilder = qualifiers.foldLeft(purlBuilder) { case (pb, (k, v)) =>
-      pb.withQualifier(k, v)
-    }
-
-    val ret: PackageURL = purlBuilder.build()
-
-    return ret
+    purl(
+      `type` = ecosystemText,
+      name = artifactId,
+      namespace = namespace.orNull,
+      version = version,
+      qualifiers = namedQualifier ++ qualifiers
+    )
   }
 
 }

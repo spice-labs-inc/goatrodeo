@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
@@ -543,7 +542,7 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
-  ): (Vector[PackageURL], MavenState) = {
+  ): (Vector[String], MavenState) = {
     (groupId, artifactId, version) match {
       case (Some(g), Some(a), Some(v)) =>
         val classifier = marker match {
@@ -553,13 +552,16 @@ case class MavenState(
           case MavenMarkers.JavaDocs => Some("javadoc")
           case MavenMarkers.Metadata => None
         }
-        val purl = PURLHelpers.buildPackageURL(
-          Ecosystems.Maven,
-          Some(g),
-          a,
-          v,
-          classifier
-        )
+        val purl = PURLHelpers
+          .buildPackageURL(
+            Ecosystems.Maven,
+            Some(g),
+            a,
+            v,
+            classifier
+          )
+          .toCanonical()
+          .nn
         Vector(purl) -> this
       case _ => (Vector.empty, this)
     }

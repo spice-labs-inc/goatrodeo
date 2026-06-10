@@ -6,6 +6,16 @@ import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
 
 object SaffronDetector {
+
+  /** VM disk images are large files, and probing one requires a path. For an
+    * in-memory artifact, `withFile` spills the entire artifact to a temp file
+    * just to read a header — wasteful when run on every artifact (e.g. each
+    * class file extracted from a JAR). Below this size an in-memory artifact is
+    * never a disk image, so we skip the probe (and the spill). Real files on
+    * disk are cheap to probe and are always checked.
+    */
+  val minInMemoryProbeSize: Long = 1L * 1024 * 1024
+
   // detect if an artifact wrapper is a mime type known to saffron
   private def readFormat(artifact: ArtifactWrapper): Set[String] = {
     artifact.withFile(file => {
@@ -19,6 +29,11 @@ object SaffronDetector {
       artifact: ArtifactWrapper,
       currentMimes: Set[String]
   ): Set[String] = {
+    // Avoid spilling small in-memory artifacts to a temp file just to rule out
+    // a disk image they cannot be.
+    if (!artifact.isRealFile() && artifact.size() < minInMemoryProbeSize)
+      return currentMimes
+
     val myMimes = readFormat(artifact)
     // why the conditional?
     // an empty set indicates that this augmentinator should absolutely do nothing to the

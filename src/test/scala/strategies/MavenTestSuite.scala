@@ -14,6 +14,7 @@ limitations under the License. */
 
 package strategies
 
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
@@ -118,11 +119,11 @@ class MavenTestSuite extends munit.FunSuite {
     val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
 
     assert(purls.nonEmpty)
-    val purl = purls.head
-    assertEquals(purl.getType(), "maven")
-    assertEquals(purl.getNamespace(), "org.example")
-    assertEquals(purl.getName(), "test-artifact")
-    assertEquals(purl.getVersion(), "1.0.0")
+    val purl = Purl.parse(purls.head).nn
+    assertEquals(purl.`type`, "maven")
+    assertEquals(purl.namespace, "org.example")
+    assertEquals(purl.name, "test-artifact")
+    assertEquals(purl.version, "1.0.0")
   }
 
   test("MavenState.getPurls - returns empty for missing group") {
@@ -149,8 +150,8 @@ class MavenTestSuite extends munit.FunSuite {
     val (purls, _) = state.getPurls(artifact, item, MavenMarkers.POM)
 
     assert(purls.nonEmpty)
-    val purl = purls.head
-    assertEquals(purl.getQualifiers().get("type"), "pom")
+    val purl = Purl.parse(purls.head).nn
+    assertEquals(purl.qualifiers.get("type"), "pom")
   }
 
   test("MavenState.getPurls - includes sources qualifier for Sources marker") {
@@ -162,8 +163,8 @@ class MavenTestSuite extends munit.FunSuite {
     val (purls, _) = state.getPurls(artifact, item, MavenMarkers.Sources)
 
     assert(purls.nonEmpty)
-    val purl = purls.head
-    assertEquals(purl.getQualifiers().get("packaging"), "sources")
+    val purl = Purl.parse(purls.head).nn
+    assertEquals(purl.qualifiers.get("packaging"), "sources")
   }
 
   test("MavenState.getPurls - includes javadoc qualifier for JavaDocs marker") {
@@ -175,8 +176,8 @@ class MavenTestSuite extends munit.FunSuite {
     val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JavaDocs)
 
     assert(purls.nonEmpty)
-    val purl = purls.head
-    assertEquals(purl.getQualifiers().get("classifier"), "javadoc")
+    val purl = Purl.parse(purls.head).nn
+    assertEquals(purl.qualifiers.get("classifier"), "javadoc")
   }
 
   test("MavenState.getPurls - extracts version from parent if missing") {
@@ -196,7 +197,7 @@ class MavenTestSuite extends munit.FunSuite {
     val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
 
     assert(purls.nonEmpty)
-    assertEquals(purls.head.getVersion(), "2.0.0")
+    assertEquals(Purl.parse(purls.head).nn.version, "2.0.0")
   }
 
   // ==================== MavenState.getMetadata Tests ====================

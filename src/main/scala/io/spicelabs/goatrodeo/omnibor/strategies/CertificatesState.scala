@@ -14,8 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
-import com.github.packageurl.PackageURLBuilder
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
@@ -27,6 +26,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.Certificates.KVPair
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
 import java.security.KeyStore
@@ -61,15 +61,15 @@ class CertificatesState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[PackageURL], CertificatesState) = {
+  ): (Vector[String], CertificatesState) = {
     import Certificates.*
-    val purls: Vector[PackageURL] = claim match {
+    val purls: Vector[Purl] = claim match {
       case None                => Vector.empty
       case Some(SingleCert(c)) => purlsForCert(c)
       case Some(Bundle(certs)) =>
-        certs.flatMap(purlsForCert).distinctBy(_.canonicalize())
+        certs.flatMap(purlsForCert).distinctBy(_.toCanonical())
       case Some(ks @ Keystore(Some(keystore), _, _)) =>
-        ksAllCerts(keystore).flatMap(purlsForCert).distinctBy(_.canonicalize())
+        ksAllCerts(keystore).flatMap(purlsForCert).distinctBy(_.toCanonical())
       case Some(Keystore(None, _, _)) =>
         Vector.empty // encrypted → envelope-only; no pURLs
       case Some(Crl(crl)) =>
@@ -79,23 +79,23 @@ class CertificatesState(
       case Some(c: SshCert) =>
         purlsForSshCert(c)
       case Some(r: PgpKeyRing) =>
-        r.keys.map(purlForPgpKey).distinctBy(_.canonicalize())
+        r.keys.map(purlForPgpKey).distinctBy(_.toCanonical())
       case Some(p: PrivateKeyPlaintextPem) =>
         Vector(purlForPrivateKeyPem(p))
       case Some(p: PrivateKeyPlaintextOpenSsh) =>
         Vector(purlForPrivateKeyOpenSsh(p))
       case Some(p: PrivateKeyPlaintextPgp) =>
-        p.ring.keys.map(purlForPgpKey).distinctBy(_.canonicalize())
+        p.ring.keys.map(purlForPgpKey).distinctBy(_.toCanonical())
       case Some(_: PrivateKeyEncrypted) =>
         Vector.empty // envelope-only; no pURL
     }
-    purls -> this
+    purls.map(_.toCanonical().nn) -> this
   }
 
   /** Unencrypted-PEM private key → SPKI pURL. */
   private[strategies] def purlForPrivateKeyPem(
       p: Certificates.PrivateKeyPlaintextPem
-  ): PackageURL = {
+  ): Purl = {
     val spkiSha = sha256Hex(p.spkiBytes)
     val parts =
       Vector(KVPair("alg", p.canonicalAlg)) ++ p.keySize.toVector.map(s =>
@@ -104,67 +104,62 @@ class CertificatesState(
         p.curve.toVector.map(c => KVPair("curve", c)) ++ p.params.toVector.map(
           p => KVPair("params", p)
         )
-    val builder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("x509")
-      .withName("spki-sha256")
-      .withVersion(spkiSha)
-
-    parts.foreach(p => builder.withQualifier(p.key, p.value))
-
-    builder.build()
+    PURLHelpers.purl(
+      `type` = "generic",
+      name = "spki-sha256",
+      namespace = "x509",
+      version = spkiSha,
+      qualifiers = parts.map(p => p.key -> p.value)
+    )
   }
 
   /** Unencrypted-OpenSSH private key → SSH pURL. */
   private[strategies] def purlForPrivateKeyOpenSsh(
       p: Certificates.PrivateKeyPlaintextOpenSsh
-  ): PackageURL = {
+  ): Purl = {
     import Certificates.*
     val fp = sshFingerprintB64(p.wireBytes)
     val quals = sshKeyQualifiers(p.algName, p.rsaModulusBits)
-    val builder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("ssh")
-      .withName("sha256")
-      .withVersion(fp)
-    quals.foreach(q => builder.withQualifier(q.key, q.value))
-    builder.build()
+    PURLHelpers.purl(
+      `type` = "generic",
+      name = "sha256",
+      namespace = "ssh",
+      version = fp,
+      qualifiers = quals.map(q => q.key -> q.value)
+    )
   }
 
   /** `pkg:generic/ssh/sha256@{b64}?alg=...&{companion}` */
   private[strategies] def purlForSshPubkey(
       p: Certificates.SshPubkey
-  ): PackageURL = {
+  ): Purl = {
     import Certificates.*
     val fp = sshFingerprintB64(p.wireBytes)
     val quals = sshKeyQualifiers(p.algName, p.rsaModulusBits)
-    val builder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("ssh")
-      .withName("sha256")
-      .withVersion(fp)
-    quals.foreach(q => builder.withQualifier(q.key, q.value))
-    builder.build()
+    PURLHelpers.purl(
+      `type` = "generic",
+      name = "sha256",
+      namespace = "ssh",
+      version = fp,
+      qualifiers = quals.map(q => q.key -> q.value)
+    )
   }
 
   /** SSH cert pURLs: cert-sha256 + sha256 (signed-key fingerprint). */
   private[strategies] def purlsForSshCert(
       c: Certificates.SshCert
-  ): Vector[PackageURL] = {
+  ): Vector[Purl] = {
     import Certificates.*
     val certHex = sha256Hex(c.certBytes)
     val signedKeyFp = sshFingerprintB64(c.signedKeyWire)
     val keyQuals = sshKeyQualifiers(c.signedKeyAlgName, c.rsaModulusBits)
-    val keyBuilder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("ssh")
-      .withName("sha256")
-      .withVersion(signedKeyFp)
-    keyQuals.foreach(q => keyBuilder.withQualifier(q.key, q.value))
+    val keyPurl = PURLHelpers.purl(
+      `type` = "generic",
+      name = "sha256",
+      namespace = "ssh",
+      version = signedKeyFp,
+      qualifiers = keyQuals.map(q => q.key -> q.value)
+    )
 
     val certTypeLabel = c.certType match {
       case 1L    => "user"
@@ -176,16 +171,15 @@ class CertificatesState(
       KVPair("sig-alg", c.caSigAlgName)
     ))
 
-    val certBuilder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("ssh")
-      .withName("cert-sha256")
-      .withVersion(certHex)
+    val certPurl = PURLHelpers.purl(
+      `type` = "generic",
+      name = "cert-sha256",
+      namespace = "ssh",
+      version = certHex,
+      qualifiers = certQuals.map(cq => cq.key -> cq.value)
+    )
 
-    certQuals.foreach(cq => certBuilder.withQualifier(cq.key, cq.value))
-
-    Vector(certBuilder.build(), keyBuilder.build())
+    Vector(certPurl, keyPurl)
   }
 
   /** Extract every X.509 cert from a loaded keystore, including key-entry chain
@@ -216,20 +210,19 @@ class CertificatesState(
   }
 
   /** Build the single CRL pURL. */
-  private[strategies] def purlForCrl(crl: X509CRL): PackageURL = {
+  private[strategies] def purlForCrl(crl: X509CRL): Purl = {
     import Certificates.*
     val derBytes = crl.getEncoded
     val crlSha = sha256Hex(derBytes)
     val sigAlg = canonicalSigAlgCrl(crl)
 
-    PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("x509")
-      .withName("crl-sha256")
-      .withVersion(crlSha)
-      .withQualifier("sig-alg", sigAlg)
-      .build()
+    PURLHelpers.purl(
+      `type` = "generic",
+      name = "crl-sha256",
+      namespace = "x509",
+      version = crlSha,
+      qualifiers = Seq("sig-alg" -> sigAlg)
+    )
 
   }
 

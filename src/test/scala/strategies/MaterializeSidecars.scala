@@ -51,7 +51,7 @@ object MaterializeSidecars {
   private def materializeBundle(fixture: File): Option[Vector[String]] = {
     val bundle = Certificates.parseBundle(wrap(fixture))
     bundle.map { b =>
-      b.certs.flatMap(Certificates.purlsForCert).map(_.canonicalize().nn)
+      b.certs.flatMap(Certificates.purlsForCert).map(_.toCanonical().nn)
     }
   }
 
@@ -59,7 +59,7 @@ object MaterializeSidecars {
     val w = wrap(fixture)
     Certificates.parseCrl(w).map { c =>
       val state = new CertificatesState(w)
-      Vector(state.purlForCrl(c.crl).canonicalize().nn)
+      Vector(state.purlForCrl(c.crl).toCanonical().nn)
     }
   }
 
@@ -68,9 +68,9 @@ object MaterializeSidecars {
     sshClaim(fixture).map { case (state, content) =>
       content match {
         case p: Certificates.SshPubkey =>
-          Vector(state.purlForSshPubkey(p).canonicalize().nn)
+          Vector(state.purlForSshPubkey(p).toCanonical().nn)
         case c: Certificates.SshCert =>
-          state.purlsForSshCert(c).map(_.canonicalize().nn)
+          state.purlsForSshCert(c).map(_.toCanonical().nn)
         case _ => Vector.empty
       }
     }
@@ -155,10 +155,10 @@ object MaterializeSidecars {
     Certificates.classifyAndParse(w).map {
       case p: Certificates.PrivateKeyPlaintextPem =>
         val state = new CertificatesState(w, Some(p))
-        Vector(state.purlForPrivateKeyPem(p).canonicalize().nn)
+        Vector(state.purlForPrivateKeyPem(p).toCanonical().nn)
       case p: Certificates.PrivateKeyPlaintextOpenSsh =>
         val state = new CertificatesState(w, Some(p))
-        Vector(state.purlForPrivateKeyOpenSsh(p).canonicalize().nn)
+        Vector(state.purlForPrivateKeyOpenSsh(p).toCanonical().nn)
       case _: Certificates.PrivateKeyEncrypted =>
         Vector.empty // envelope-only, no pURL
       case _ => Vector.empty
@@ -199,7 +199,7 @@ object MaterializeSidecars {
   private def materializePgp(fixture: File): Option[Vector[String]] = {
     val w = wrap(fixture)
     Certificates.parsePgpKeyRing(w).map { ring =>
-      ring.keys.map(k => Certificates.purlForPgpKey(k).canonicalize().nn)
+      ring.keys.map(k => Certificates.purlForPgpKey(k).toCanonical().nn)
     }
   }
 

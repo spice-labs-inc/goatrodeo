@@ -12,12 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import com.github.packageurl.PackageURLBuilder
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.PURLHelpers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -322,30 +322,28 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceItemWithPurls - adds purl connections") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val purl = PackageURLBuilder
-      .aPackageURL()
-      .withType("deb")
-      .withNamespace("debian")
-      .withName("artifact")
-      .withVersion("1.0")
-      .build()
+    val purl = PURLHelpers.purl(
+      `type` = "deb",
+      name = "artifact",
+      namespace = "debian",
+      version = "1.0"
+    )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl))
+    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
     val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
     assert(purlConnections.nonEmpty)
   }
 
   test("enhanceItemWithPurls - adds purl to filenames") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val purl = PackageURLBuilder
-      .aPackageURL()
-      .withType("deb")
-      .withNamespace("debian")
-      .withName("artifact")
-      .withVersion("1.0")
-      .build()
+    val purl = PURLHelpers.purl(
+      `type` = "deb",
+      name = "artifact",
+      namespace = "debian",
+      version = "1.0"
+    )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl))
+    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
     val body = enhanced.bodyAsItemMetaData.get
     assert(body.fileNames.exists(_.startsWith("pkg:")))
   }
@@ -358,36 +356,36 @@ class ItemTestSuite extends munit.FunSuite {
 
   test("enhanceItemWithPurls - handles multiple purls") {
     val item = createBasicItem("gitoid:blob:sha256:abc123")
-    val purl1 = PackageURLBuilder
-      .aPackageURL()
-      .withType("deb")
-      .withNamespace("ubuntu")
-      .withName("artifact1")
-      .withVersion("1.0")
-      .build()
-    val purl2 = PackageURLBuilder
-      .aPackageURL()
-      .withType("npm")
-      .withName("package")
-      .withVersion("2.0")
-      .build()
+    val purl1 = PURLHelpers.purl(
+      `type` = "deb",
+      name = "artifact1",
+      namespace = "ubuntu",
+      version = "1.0"
+    )
+    val purl2 = PURLHelpers.purl(
+      `type` = "npm",
+      name = "package",
+      version = "2.0"
+    )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl1, purl2))
+    val enhanced =
+      item.enhanceItemWithPurls(
+        Seq(purl1.toCanonical().nn, purl2.toCanonical().nn)
+      )
     val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
     assertEquals(purlConnections.size, 2)
   }
 
   test("enhanceItemWithPurls - creates body if none exists") {
     val item = Item("id", TreeSet(), None, None)
-    val purl = PackageURLBuilder
-      .aPackageURL()
-      .withType("deb")
-      .withNamespace("debian")
-      .withName("artifact")
-      .withVersion("1.0")
-      .build()
+    val purl = PURLHelpers.purl(
+      `type` = "deb",
+      name = "artifact",
+      namespace = "debian",
+      version = "1.0"
+    )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl))
+    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
     assert(enhanced.bodyAsItemMetaData.isDefined)
   }
 

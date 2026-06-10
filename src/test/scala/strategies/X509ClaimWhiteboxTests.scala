@@ -111,14 +111,14 @@ class X509ClaimWhiteboxTests extends FunSuite {
       "emit both pkg:generic/x509/spki-sha256 and pkg:generic/x509/cert-sha256"
     )
     val spkiPurl =
-      purls.find(_.toString.contains("spki-sha256")).get.canonicalize().nn
+      purls.find(_.name == "spki-sha256").get.toCanonical().nn
     assert(
       spkiPurl.contains(
         "0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a39dad301c5afc3"
       )
     )
     val certPurl =
-      purls.find(_.toString.contains("cert-sha256")).get.canonicalize().nn
+      purls.find(_.name == "cert-sha256").get.toCanonical().nn
     assert(
       certPurl.contains(
         "96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6"

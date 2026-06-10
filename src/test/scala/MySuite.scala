@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-import com.github.packageurl.PackageURL
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -22,7 +21,6 @@ import io.spicelabs.goatrodeo.util.Config
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.regex.Pattern
-import io.spicelabs.goatrodeo.omnibor.strategies.BaharatStrategy
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -336,7 +334,7 @@ class MySuite extends munit.FunSuite {
       f"Expecting at least 2 files, got ${strategy.length}"
     )
 
-    var packages: Vector[PackageURL] = Vector()
+    var packages: Vector[String] = Vector()
     val store = ToProcess.buildGraphForToProcess(
       strategy,
       args = Config(),

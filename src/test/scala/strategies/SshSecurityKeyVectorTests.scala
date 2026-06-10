@@ -111,7 +111,7 @@ class SshSecurityKeyVectorTests extends FunSuite {
     val pk = Certificates.parseSshPubkey(w).get
 
     val state = new CertificatesState(w)
-    val purl = state.purlForSshPubkey(pk).canonicalize().nn
+    val purl = state.purlForSshPubkey(pk).toCanonical().nn
     assert(
       purl.contains("sk=true"),
       s"expected sk=true in qualifier set, got $purl"
@@ -161,7 +161,7 @@ class SshSecurityKeyVectorTests extends FunSuite {
     assertEquals(pk.get.algName, "sk-ecdsa-sha2-nistp256@openssh.com")
 
     val state = new CertificatesState(w)
-    val purl = state.purlForSshPubkey(pk.get).canonicalize().nn
+    val purl = state.purlForSshPubkey(pk.get).toCanonical().nn
     assert(purl.contains("sk=true"), s"sk=true missing from $purl")
     assert(purl.contains("alg=ec"), s"alg=ec missing from $purl")
     assert(purl.contains("curve=p-256"), s"curve=p-256 missing from $purl")

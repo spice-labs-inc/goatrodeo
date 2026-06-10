@@ -105,8 +105,8 @@ object PomParser {
     }
   }
 
-  /** Silent SAX error handler that prevents the default parser from
-    * printing `[Fatal Error]` / `[Error]` / `[Warning]` lines to stderr.
+  /** Silent SAX error handler that prevents the default parser from printing
+    * `[Fatal Error]` / `[Error]` / `[Warning]` lines to stderr.
     */
   private object SilentSaxHandler extends org.xml.sax.ErrorHandler {
     def warning(e: org.xml.sax.SAXParseException): Unit = ()

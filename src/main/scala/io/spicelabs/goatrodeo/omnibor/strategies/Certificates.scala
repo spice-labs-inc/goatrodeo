@@ -14,9 +14,8 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.github.packageurl.PackageURL
-import com.github.packageurl.PackageURLBuilder
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
@@ -28,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesOidMaps.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.SshWireReader
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
@@ -984,20 +984,19 @@ object Certificates {
   /** Build the pkg:generic/pgp/fingerprint@{hex}?... pURL for a PGP key. */
   private[strategies] def purlForPgpKey(
       key: PgpKey
-  ): PackageURL = {
+  ): Purl = {
     val parts = Vector(
       KVPair("alg", key.canonicalAlg),
       KVPair("version", key.version.toString())
     ) ++ key.keySize.toVector.map(s => KVPair("size", s.toString())) ++
       key.curve.toVector.map(c => KVPair("curve", c))
-    val builder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("pgp")
-      .withName("fingerprint")
-      .withVersion(key.fingerprintHex)
-    parts.foreach(q => builder.withQualifier(q.key, q.value))
-    builder.build()
+    PURLHelpers.purl(
+      `type` = "generic",
+      name = "fingerprint",
+      namespace = "pgp",
+      version = key.fingerprintHex,
+      qualifiers = parts.map(q => q.key -> q.value)
+    )
   }
 
   /** First 8 hex chars of the key fingerprint. */
@@ -1759,7 +1758,7 @@ object Certificates {
   /** Emit the (spki, cert) pURL pair for a single X.509 cert. */
   private[strategies] def purlsForCert(
       c: X509Certificate
-  ): Vector[PackageURL] = {
+  ): Vector[Purl] = {
     val derBytes = c.getEncoded
     val spkiBytes = spkiBytesFromCert(c)
     val certSha = sha256Hex(derBytes)
@@ -1785,24 +1784,21 @@ object Certificates {
       KVPair(s"self-signed", selfSigned.toString()),
       KVPair(s"version", version.toString())
     ) ++ companion
-    val spkiBuilder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("x509")
-      .withName("spki-sha256")
-      .withVersion(spkiSha)
-    spkiQuals.foreach(q => spkiBuilder.withQualifier(q.key, q.value))
-
-    val certBuilder = PackageURLBuilder
-      .aPackageURL()
-      .withType("generic")
-      .withNamespace("x509")
-      .withName("cert-sha256")
-      .withVersion(certSha)
-    certQuals.foreach(q => certBuilder.withQualifier(q.key, q.value))
     Vector(
-      spkiBuilder.build(),
-      certBuilder.build()
+      PURLHelpers.purl(
+        `type` = "generic",
+        name = "spki-sha256",
+        namespace = "x509",
+        version = spkiSha,
+        qualifiers = spkiQuals.map(q => q.key -> q.value)
+      ),
+      PURLHelpers.purl(
+        `type` = "generic",
+        name = "cert-sha256",
+        namespace = "x509",
+        version = certSha,
+        qualifiers = certQuals.map(q => q.key -> q.value)
+      )
     )
   }
 
