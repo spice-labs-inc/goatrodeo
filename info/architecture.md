@@ -35,6 +35,8 @@ src/main/scala/io/spicelabs/goatrodeo/
 │       ├── Dotnet.scala    # .NET assemblies
 │       ├── Annatto.scala   # Bun JS bundler outputs
 │       ├── Baharat.scala   # Saffron-flagged outputs
+│       ├── JvmDistribution.scala  # JDK/JRE release-file detection
+│       ├── GradleLockfile.scala  # Gradle lockfile dependency parsing
 │       ├── Certificates.scala       # X.509/CRL/keystore/SSH/PGP/private-key
 │       ├── CertificatesState.scala  # Per-artifact processing state for ^
 │       ├── CertificatesOidMaps.scala # OID lookup tables for ^
@@ -132,8 +134,10 @@ trait ProcessingState[M, S] {
 4. `DotnetFile` - .NET assemblies
 5. `Annatto` - Bun JavaScript bundler outputs
 6. `BaharatStrategy` - Saffron-flagged outputs
-7. `Certificates` - X.509 certs / CRLs / keystores / PEM bundles / SSH / PGP / private keys
-8. `GenericFile` - Everything else (fallback)
+7. `JvmDistribution` - JDK/JRE installations via `release` file
+8. `GradleLockfile` - Gradle lockfile dependency parsing
+9. `Certificates` - X.509 certs / CRLs / keystores / PEM bundles / SSH / PGP / private keys
+10. `GenericFile` - Everything else (fallback)
 
 ### 3. Item (`omnibor/Item.scala`)
 
@@ -225,6 +229,8 @@ val strategies = Vector(
   DotnetFile.computeDotnetFiles,
   Annatto.computeAnnattoFiles,
   BaharatStrategy.computeBaharatFiles,
+  JvmDistribution.computeJvmFiles,
+  GradleLockfile.computeGradleLockfiles,
   Certificates.computeCertificateFiles,
   GenericFile.computeGenericFiles  // Must be last
 )
@@ -313,7 +319,7 @@ is a comprehensive worked example covering 8 distinct claim types
 PGP keys, private keys both unencrypted and encrypted), a sealed
 `ClaimedContent` ADT for dispatch, MIME-driven routing in
 `classifyAndParse`, per-variant emitters, and a defensive leak sweep
-(`assertNoLeak`) before metadata emission. See
+(`assertMetadataStructureNoLeak`) before metadata emission. See
 [`info/certificates_strategy.md`](certificates_strategy.md) for the
 user-facing strategy documentation and
 [`info/certificates/phase-{0..9}-claims.md`](certificates/) for the
@@ -425,9 +431,68 @@ val item = Item.decode(bytes)
 
 ---
 
+## Maven GAV Resolution
+
+The Maven strategy uses a 5-level priority chain for GroupId:ArtifactId:Version (GAV) resolution, implemented in `MavenState.resolveGAV()`:
+
+1. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata.
+2. **External POM** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`.
+3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by matching its `<artifactId>` to the filename when multiple are present.
+4. **MANIFEST.MF** — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin.
+5. **Filename heuristics** — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
+
+Each layer short-circuits on the first complete `(groupId, artifactId, version)` tuple; if all layers fail, the fields remain `None`.
+
+### PomParser Integration
+
+`PomParser.scala` replaces the previous `scala.xml.XML` parser. It uses `javax.xml.parsers.DocumentBuilderFactory` hardened against XXE:
+- `disallow-doctype-decl=true`
+- `external-general-entities=false`
+- `load-external-dtd=false`
+- `xIncludeAware=false`
+
+If a POM contains a benign DOCTYPE, a stripping fallback removes the declaration and retries parsing. Entity references in the body remain undeclared after stripping, causing the parse to fail safely rather than expanding them.
+
+`PomParser` extracts and interpolates properties (`${key}` → value), walks `<parent>` references for missing GAV fields, reads `<dependencyManagement>`, and extracts `<licenses>`, `<scm>`, `<organization>`, and `<dependencies>`. The results are stored in `MavenState` as `Option[ParsedPom]` rather than the legacy `scala.xml.NodeSeq`.
+
+### Metadata Emission
+
+Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
+- `maven:DEPENDENCIES` — JSON array of all `<dependency>` elements with interpolated versions and merged `dependencyManagement` entries.
+- `maven:RuntimeDependencies` — filtered subset excluding `test` and `provided` scopes.
+- `maven:SCM_URL` — from `<scm><url>`.
+- `LICENSE` — merged from POM `<licenses>`, `Bundle-License`, and `Plugin-License-Name` manifest headers.
+- `PUBLISHER` — from `<organization><name>`.
+- `maven:Timestamp` — build timestamp from POM or manifest.
+- `maven:ParentPOM` — parent GAV as JSON object.
+- `maven:Latest`, `maven:Release`, `maven:Versions` — from `maven-metadata.xml`.
+- `maven:JarType`, `maven:NestedJars`, `maven:SpringBootMainClass`, `maven:LayersIdx`, `maven:ClasspathIdx` — for Spring Boot / shaded JARs.
+- `maven:WarLibJars` — for WAR archives.
+- `maven:EarModules` — for EAR archives.
+- `maven:MultiReleaseVersions` — for Multi-Release JARs.
+- `maven:JarSigned`, `maven:SignatureFiles` — for signed JARs.
+- `maven:ServiceProviders` — for `META-INF/services/*` files.
+- `maven:AutomaticModuleName` — from manifest or `module-info.class` (BCEL).
+- `maven:ModuleRequires`, `maven:ModuleExports`, `maven:ModuleOpens`, `maven:ModuleProvides`, `maven:ModuleUses` — from JPMS `module-info.class` (BCEL).
+- `maven:GraalNativeImage` — from `native-image.properties`.
+- `maven:JenkinsPlugin` — for `.jpi`/`.hpi` or Jenkins groupId.
+- `osgi:BundleName`, `osgi:BundleSymbolicName`, `osgi:BundleDescription`, `osgi:BundleVendor`, `osgi:BundleDocURL`, `osgi:ExportPackage`, `osgi:ImportPackage`, `osgi:RequireCapability`, `osgi:ProvideCapability`, `osgi:FragmentHost` — from OSGi manifest headers (Export-Package and Import-Package parsed for directives).
+
+**Verified by:**
+- `MavenPhase1Suite` — GAV chain, filename parsing, OSGi manifest, XXE protection, DOCTYPE edge cases.
+- `MavenPhase2Suite` — PomParser interpolation, extended metadata, build dates.
+- `MavenPhase3Suite` — dependency JSON, license extraction, scope filtering, Plugin-License-Name.
+- `MavenPhase4Suite` — parent POM metadata, maven-metadata.xml, pqc_jars end-to-end identity and tags.
+- `MavenPhase5Suite` — JAR structure metadata, Spring Boot, shaded, WAR, EAR, multi-release, signatures, ServiceLoader, module name, GraalVM, Jenkins, OSGi full headers.
+- `MavenPhase5ModuleInfoSuite` — BCEL-based parsing of JPMS `module-info.class`.
+- `MavenPhase5CorpusSuite` — corpus integration tests against all 10 structural `test_data/` artifacts.
+- `MavenPropertyTests` — ScalaCheck property tests for interpolation, filename extraction, date parsing, and priority-chain determinism.
+- `PackageTagIntegrationSuite` — end-to-end processing of real Maven JARs from `test_data/pqc_jars`.
+
+---
+
 ## See Also
 
 - [How It Works](goat_rodeo_operation.md) - Operational guide
 - [API Reference](goat_rodeo_api.md) - Library API
-- [Data Formats](corpus.md) - Output file formats
-- [Documentation Index](README.md) - All documentation
+- [Data Formats](corpus.md) - Output file formats - All documentation

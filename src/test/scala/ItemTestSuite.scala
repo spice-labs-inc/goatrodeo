@@ -369,7 +369,9 @@ class ItemTestSuite extends munit.FunSuite {
     )
 
     val enhanced =
-      item.enhanceItemWithPurls(Seq(purl1.toCanonical().nn, purl2.toCanonical().nn))
+      item.enhanceItemWithPurls(
+        Seq(purl1.toCanonical().nn, purl2.toCanonical().nn)
+      )
     val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
     assertEquals(purlConnections.size, 2)
   }

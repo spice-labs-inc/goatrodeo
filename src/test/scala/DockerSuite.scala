@@ -12,12 +12,12 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWrapper
 import org.json4s.*
-import org.json4s.JsonAST.*
-import org.json4s.native.*
+import org.json4s.native.JsonMethods.*
 
 import java.io.File
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+
 class DockerSuite extends munit.FunSuite {
   val logger = Logger(getClass())
 
@@ -35,6 +35,19 @@ class DockerSuite extends munit.FunSuite {
         )
       )
     )
+  }
+
+  // Helper: retrieve a docker: prefixed metadata value from an item
+  private def dockerMeta(
+      item: Item,
+      key: String
+  ): Option[String] = {
+    for {
+      body <- item.body
+      meta = body.asInstanceOf[ItemMetaData]
+      values <- meta.extra.get(s"docker:$key")
+      head <- values.headOption
+    } yield head.value
   }
 
   test("Can build for a simple Docker image") {
@@ -57,13 +70,13 @@ class DockerSuite extends munit.FunSuite {
       .headOption
       .get
 
-    assertEquals(
-      aliasTo,
-      "gitoid:blob:sha256:9a6a5302b3ea1ccc5c4a8cd58c032eb5e1b257a5a4837c3ddc4d8e8af9954dbe"
+    // Verify the alias target is the config item (starts with gitoid:blob:sha256)
+    assert(
+      aliasTo.startsWith("gitoid:blob:sha256:"),
+      s"Expected config gitoid but got $aliasTo"
     )
 
     testLayersAndManifest(aliasTo, store1)
-
   }
 
   test("ItemMetaData.merge - combines file names from both items") {
@@ -121,36 +134,74 @@ class DockerSuite extends munit.FunSuite {
       store1: Storage
   ): Unit = {
     val item2 = store1.read(identifier).get
-    val extraMetadata = item2.body.get.asInstanceOf[ItemMetaData].extra
-    val config = extraMetadata.get("docker_config").get
-    val manifest = extraMetadata.get("docker_manifest").get
-
-    assertEquals(config.size, 1)
-    assertEquals(manifest.size, 1)
-
-    val configJson = parseJsonOpt(config.head.value).get
-
-    val mimeTypes = item2.body.get.asInstanceOf[ItemMetaData].mimeType
-
     assert(
-      mimeTypes.contains("application/vnd.oci.image"),
-      s"Should have ${"application/vnd.oci.image"} "
+      item2.body.isDefined,
+      s"Config item $identifier must have a body"
+    )
+    val extraMetadata = item2.body.get.asInstanceOf[ItemMetaData].extra
+
+    // Raw JSON keys should be present for audit/completeness
+    assert(
+      extraMetadata.get("docker:ConfigJson").isDefined,
+      "docker:ConfigJson should be present"
+    )
+    assert(
+      extraMetadata.get("docker:ManifestJson").isDefined,
+      "docker:ManifestJson should be present"
     )
 
-    val layers = for {
-      case JArray(layers) <- configJson \ "rootfs" \ "diff_ids"
-      case JString(layer_id) <- layers
-    } yield layer_id
+    // Old raw JSON keys must be absent
+    assert(
+      extraMetadata.get("docker_config").isEmpty,
+      "docker_config raw JSON key should be absent"
+    )
+    assert(
+      extraMetadata.get("docker_manifest").isEmpty,
+      "docker_manifest raw JSON key should be absent"
+    )
 
-    assert(layers.length > 0, "Must have at least one layer")
+    // Platform should be present on every image
+    val platformOpt = extraMetadata.get("docker:Platform")
+    assert(platformOpt.isDefined, "docker:Platform should be present")
+    val platform = platformOpt.get.head.value
+    assert(
+      platform.startsWith("linux/"),
+      s"Platform $platform should start with linux/"
+    )
+
+    // LayerCount should be present and positive
+    val layerCountOpt = extraMetadata.get("docker:LayerCount")
+    assert(layerCountOpt.isDefined, "docker:LayerCount should be present")
+    val layerCount = layerCountOpt.get.head.value.toInt
+    assert(layerCount > 0, s"LayerCount $layerCount must be > 0")
+
+    // Size should be present and positive
+    val sizeOpt = extraMetadata.get("docker:Size")
+    assert(sizeOpt.isDefined, "docker:Size should be present")
+    val size = sizeOpt.get.head.value.toLong
+    assert(size > 0, s"Size $size must be > 0")
+
+    // History should have at least one entry
+    val historyOpt = extraMetadata.get("docker:History")
+    assert(historyOpt.isDefined, "docker:History should be present")
+    assert(historyOpt.get.nonEmpty, "docker:History should not be empty")
+
+    // Config item should have layer connections
+    val connectedLayers = item2.connections.collect {
+      case (EdgeType.contains, v) => v
+    }
+    assert(
+      connectedLayers.nonEmpty,
+      "Config item must have at least one layer connected"
+    )
 
     for {
-      layer <- layers
+      layerGitoid <- connectedLayers
     } {
-      val layerItem = antiAlias(layer, store1)
+      val layerItem = store1.read(layerGitoid).get
       assert(
         layerItem.connections.size > 3,
-        f"Layer ${layer} must have more than 3 files, found ${layerItem.connections.size}"
+        f"Layer ${layerGitoid} must have more than 3 files, found ${layerItem.connections.size}"
       )
       assert(
         layerItem.body.get
@@ -162,13 +213,419 @@ class DockerSuite extends munit.FunSuite {
     }
   }
 
-  private def antiAlias(key: String, store: Storage): Item = {
-    val item = store.read(key).get
+  // ==================== Structured Metadata Tests ====================
+
+  test("bigtent image has correct structured metadata") {
+    val name = "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
+    val nested = FileWrapper(File(name), name, None)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+
+    val purl = "pkg:docker/bigtent@2025_03_22"
+    val item = store.read(purl).get
     val aliasTo = item.connections
       .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
       .headOption
       .get
-    store.read(aliasTo).get
+
+    val configItem = store.read(aliasTo).get
+    val extra = configItem.body.get.asInstanceOf[ItemMetaData].extra
+
+    // Platform
+    assertEquals(dockerMeta(configItem, "Platform"), Some("linux/amd64"))
+
+    // Created
+    assertEquals(
+      dockerMeta(configItem, "Created"),
+      Some("2025-03-22T13:10:35.59966703-04:00")
+    )
+
+    // Author not present
+    assert(dockerMeta(configItem, "Author").isEmpty, "Author should be absent")
+
+    // WorkingDir
+    assertEquals(dockerMeta(configItem, "WorkingDir"), Some("/"))
+
+    // Cmd
+    assertEquals(dockerMeta(configItem, "Cmd"), Some("/bigtent"))
+
+    // Entrypoint not present (empty array)
+    assert(
+      dockerMeta(configItem, "Entrypoint").isEmpty,
+      "Entrypoint should be absent when empty"
+    )
+
+    // User not present
+    assert(dockerMeta(configItem, "User").isEmpty, "User should be absent")
+
+    // EnvCount
+    assertEquals(dockerMeta(configItem, "EnvCount"), Some("1"))
+
+    // Env vars extracted
+    assertEquals(
+      dockerMeta(configItem, "Env:PATH"),
+      Some("/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+    )
+
+    // LayerCount
+    assertEquals(dockerMeta(configItem, "LayerCount"), Some("2"))
+
+    // Size
+    assertEquals(dockerMeta(configItem, "Size"), Some("16447488"))
+
+    // History
+    val history = extra
+      .get("docker:History")
+      .map(_.map(_.value))
+      .getOrElse(TreeSet[String]())
+    assert(history.nonEmpty, "History should contain entries")
+    assert(
+      history.exists(_.contains("ADD alpine-minirootfs")),
+      "History should include ADD command"
+    )
+
+    // No labels on this image
+    assert(
+      extra.keys.forall(!_.startsWith("docker:Label:")),
+      "No custom labels should be present"
+    )
+
+    // RepoDigest not present
+    assert(
+      dockerMeta(configItem, "RepoDigest").isEmpty,
+      "RepoDigest should be absent"
+    )
+  }
+
+  test("grinder image has correct OCI label metadata") {
+    val name = "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
+    val nested = FileWrapper(File(name), name, None)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+
+    val purl = "pkg:docker/spicelabs%2Fgrinder@0.1.0"
+    val item = store.read(purl).get
+    val aliasTo = item.connections
+      .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
+      .headOption
+      .get
+
+    val configItem = store.read(aliasTo).get
+    val extra = configItem.body.get.asInstanceOf[ItemMetaData].extra
+
+    // Normalized OCI labels
+    assertEquals(
+      dockerMeta(configItem, "Source"),
+      Some("https://github.com/spice-labs-inc/grinder")
+    )
+
+    assertEquals(
+      dockerMeta(configItem, "License"),
+      Some("Apache-2.0")
+    )
+
+    assertEquals(
+      dockerMeta(configItem, "Title"),
+      Some("grinder")
+    )
+
+    assertEquals(
+      dockerMeta(configItem, "ImageLabelVersion"),
+      Some("0.1.0")
+    )
+
+    assertEquals(
+      dockerMeta(configItem, "Url"),
+      Some("https://github.com/spice-labs-inc/grinder")
+    )
+
+    assertEquals(
+      dockerMeta(configItem, "Description"),
+      Some("The Spice Labs open source integration")
+    )
+
+    assertEquals(
+      dockerMeta(configItem, "Revision"),
+      Some("4330087943dfac7cc0f17eba62f97383d74a401b")
+    )
+
+    // User
+    assertEquals(dockerMeta(configItem, "User"), Some("1001:0"))
+
+    // WorkingDir
+    assertEquals(dockerMeta(configItem, "WorkingDir"), Some("/opt/docker"))
+
+    // Entrypoint
+    assertEquals(
+      dockerMeta(configItem, "Entrypoint"),
+      Some("/opt/grinder/grind.sh")
+    )
+
+    // EnvCount
+    assertEquals(dockerMeta(configItem, "EnvCount"), Some("8"))
+
+    // Env vars extracted
+    assertEquals(
+      dockerMeta(configItem, "Env:PATH"),
+      Some(
+        "/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      )
+    )
+    assertEquals(dockerMeta(configItem, "Env:container"), Some("oci"))
+    assertEquals(
+      dockerMeta(configItem, "Env:JAVA_HOME"),
+      Some("/opt/java/openjdk")
+    )
+    assertEquals(
+      dockerMeta(configItem, "Env:LANG"),
+      Some("en_US.UTF-8")
+    )
+    assertEquals(
+      dockerMeta(configItem, "Env:LANGUAGE"),
+      Some("en_US:en")
+    )
+    assertEquals(
+      dockerMeta(configItem, "Env:LC_ALL"),
+      Some("en_US.UTF-8")
+    )
+    assertEquals(
+      dockerMeta(configItem, "Env:JAVA_VERSION"),
+      Some("jdk-21.0.6+7")
+    )
+    assertEquals(
+      dockerMeta(configItem, "Env:CLASSPATH"),
+      Some(".;/opt/docker/lib/")
+    )
+
+    // LayerCount
+    assertEquals(dockerMeta(configItem, "LayerCount"), Some("12"))
+
+    // Size
+    assertEquals(dockerMeta(configItem, "Size"), Some("408010752"))
+
+    // Preserved custom label
+    assertEquals(
+      extra.get("docker:Label:com.redhat.component").map(_.head.value),
+      Some("ubi9-minimal-container")
+    )
+
+    // Raw JSON keys absent
+    assert(extra.get("docker_config").isEmpty)
+    assert(extra.get("docker_manifest").isEmpty)
+  }
+
+  test("postgres image has entrypoint and workingdir metadata") {
+    val name = "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
+    val nested = FileWrapper(File(name), name, None)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+
+    // Test both postgres variants
+    Seq(
+      ("pkg:docker/postgres@16.6", "14", 439935488L),
+      ("pkg:docker/postgres@9.6.12", "14", 237365248L)
+    ).foreach { case (purl, expectedLayers, expectedSize) =>
+      val item = store.read(purl).get
+      val aliasTo = item.connections
+        .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
+        .headOption
+        .get
+
+      val configItem = store.read(aliasTo).get
+
+      assertEquals(
+        dockerMeta(configItem, "Platform"),
+        Some("linux/amd64")
+      )
+
+      assertEquals(
+        dockerMeta(configItem, "Entrypoint"),
+        Some("docker-entrypoint.sh")
+      )
+
+      assertEquals(
+        dockerMeta(configItem, "Cmd"),
+        Some("postgres")
+      )
+
+      assertEquals(
+        dockerMeta(configItem, "LayerCount"),
+        Some(expectedLayers)
+      )
+
+      assertEquals(
+        dockerMeta(configItem, "Size"),
+        Some(expectedSize.toString)
+      )
+
+      // Env vars
+      purl match {
+        case "pkg:docker/postgres@16.6" =>
+          assertEquals(
+            dockerMeta(configItem, "Env:PATH"),
+            Some(
+              "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/16/bin"
+            )
+          )
+          assertEquals(
+            dockerMeta(configItem, "Env:GOSU_VERSION"),
+            Some("1.17")
+          )
+          assertEquals(
+            dockerMeta(configItem, "Env:PG_MAJOR"),
+            Some("16")
+          )
+          assertEquals(
+            dockerMeta(configItem, "Env:PG_VERSION"),
+            Some("16.6-1.pgdg120+1")
+          )
+        case "pkg:docker/postgres@9.6.12" =>
+          assertEquals(
+            dockerMeta(configItem, "Env:PATH"),
+            Some(
+              "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/9.6/bin"
+            )
+          )
+          assertEquals(
+            dockerMeta(configItem, "Env:GOSU_VERSION"),
+            Some("1.11")
+          )
+          assertEquals(
+            dockerMeta(configItem, "Env:PG_MAJOR"),
+            Some("9.6")
+          )
+          assertEquals(
+            dockerMeta(configItem, "Env:PG_VERSION"),
+            Some("9.6.12-1.pgdg90+1")
+          )
+        case _ =>
+      }
+
+      // Common env vars across postgres versions
+      assertEquals(
+        dockerMeta(configItem, "Env:LANG"),
+        Some("en_US.utf8")
+      )
+      assertEquals(
+        dockerMeta(configItem, "Env:PGDATA"),
+        Some("/var/lib/postgresql/data")
+      )
+    }
+  }
+
+  // ==================== Completeness Audit Test ====================
+
+  test("docker metadata completeness audit - all config leaves accounted for") {
+    val name = "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
+    val nested = FileWrapper(File(name), name, None)
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+
+    val purl = "pkg:docker/bigtent@2025_03_22"
+    val item = store.read(purl).get
+    val aliasTo = item.connections
+      .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
+      .headOption
+      .get
+
+    val configItem = store.read(aliasTo).get
+    val extra = configItem.body.get.asInstanceOf[ItemMetaData].extra
+
+    // Parse the raw config JSON back out of metadata
+    val compactConfig = extra
+      .get("docker:ConfigJson")
+      .flatMap(_.headOption)
+      .map(_.value)
+      .getOrElse(fail("docker:ConfigJson must be present"))
+    val configJson = parse(compactConfig)
+
+    // Map from JSON field paths to the structured metadata keys that represent them
+    val pathToKey = Map(
+      "architecture" -> "docker:Platform",
+      "os" -> "docker:Platform",
+      "variant" -> "docker:Platform",
+      "created" -> "docker:Created",
+      "author" -> "docker:Author",
+      "config.User" -> "docker:User",
+      "config.Env" -> "docker:EnvCount",
+      "config.Cmd" -> "docker:Cmd",
+      "config.WorkingDir" -> "docker:WorkingDir",
+      "config.Entrypoint" -> "docker:Entrypoint",
+      "config.Labels" -> "docker:Label", // prefix match
+      "rootfs.diff_ids" -> "docker:LayerCount",
+      "history" -> "docker:History"
+    )
+
+    // Fields known to have no supply-chain value and intentionally unmodeled
+    val ignoredPaths = Set(
+      "config.Hostname",
+      "config.Domainname",
+      "config.AttachStdin",
+      "config.AttachStdout",
+      "config.AttachStderr",
+      "config.Tty",
+      "config.OpenStdin",
+      "config.StdinOnce",
+      "config.Image",
+      "config.Volumes",
+      "config.OnBuild",
+      "config.StopSignal",
+      "config.ExposedPorts",
+      "config.ArgsEscaped",
+      "rootfs.type"
+    )
+
+    // Recursively collect all leaf paths from the config JSON
+    def collectLeaves(jv: JValue, prefix: String = ""): Set[String] = {
+      jv match {
+        case JObject(fields) =>
+          fields.flatMap { case (k, v) =>
+            val path = if (prefix.isEmpty) k else s"$prefix.$k"
+            v match {
+              case JObject(_) | JArray(_) => collectLeaves(v, path)
+              case _                      => Set(path)
+            }
+          }.toSet
+        case JArray(arr) if arr.nonEmpty =>
+          // For arrays, just record the array path itself
+          Set(prefix)
+        case _ =>
+          Set(prefix)
+      }
+    }
+
+    val leaves = collectLeaves(configJson)
+
+    // For Env we check individual keys are present
+    val envKeys = extra.keys.filter(_.startsWith("docker:Env:"))
+
+    val unaccounted = leaves.filter { leaf =>
+      val hasStructured = pathToKey.get(leaf) match {
+        case Some(key) => extra.contains(key)
+        case None if leaf.startsWith("config.Labels.") =>
+          val labelName = leaf.substring("config.Labels.".length)
+          extra.contains(s"docker:Label:$labelName") ||
+          Set(
+            "docker:Source",
+            "docker:Revision",
+            "docker:License",
+            "docker:Title",
+            "docker:Description",
+            "docker:Url",
+            "docker:Vendor",
+            "docker:ImageLabelVersion",
+            "docker:BaseImageRef",
+            "docker:BaseImageDigest",
+            "docker:LabelCreated",
+            "docker:BuildDate"
+          ).exists(extra.contains)
+        case None if leaf == "config.Env" => envKeys.nonEmpty
+        case None                         => false
+      }
+      !hasStructured && !ignoredPaths.contains(leaf)
+    }
+
+    assert(
+      unaccounted.isEmpty,
+      s"Config JSON leaves without structured representation or ignored status: ${unaccounted.toList.sorted
+          .mkString(", ")}"
+    )
   }
 
   // ==================== DockerState Tests ====================

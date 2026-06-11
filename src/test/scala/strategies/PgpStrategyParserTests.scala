@@ -24,11 +24,10 @@ import java.io.File
   *
   * ## What these tests test
   *
-  * Phase 6 plan §"For each PGPPublicKey": fingerprint, version, alg,
-  * size/curve, subkey enumeration. The tests pin a representative fixture for
-  * each major algorithm + version combination and assert the strategy's parsed
-  * values against the canonical `gpg(1)` output captured at fixture-creation
-  * time.
+  * For each PGPPublicKey: fingerprint, version, alg, size/curve, subkey
+  * enumeration. The tests pin a representative fixture for each major algorithm
+  * + version combination and assert the strategy's parsed values against the
+  * canonical `gpg(1)` output captured at fixture-creation time.
   *
   * ## Why this matters
   *
@@ -69,8 +68,8 @@ class PgpStrategyParserTests extends FunSuite {
   test(
     "parsePgpKeyRing: v4 ed25519 primary + ECDH cv25519 encryption subkey (G3)"
   ) {
-    // Plan §125-135 fixture table: "ed25519, v4, subkey encryption".
-    // Regenerated 2026-05-01 to add the encryption subkey the plan
+    // Fixture table: "ed25519, v4, subkey encryption".
+    // Regenerated 2026-05-01 to add the encryption subkey the requirements
     // requires; gpg --list-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   ed25519 2026-05-01 [SC] [expires: 2028-04-30]
     //         6046 C53C 8DF8 C522 076F  8CD7 6D7F AAE7 96AB C62E
@@ -94,7 +93,7 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(sub.curve, Some("curve25519"))
   }
 
-  // G7 — Phase 6 plan §Metadata: "ExpirationTime — ISO-8601 UTC or
+  // G7 — Metadata: "ExpirationTime — ISO-8601 UTC or
   // omitted if never expires". For PGP subkeys, expiration is encoded
   // in the binding-signature subpacket (type 9), not in the key
   // packet itself. This test pins that BC's `getValidSeconds()` reads
@@ -450,13 +449,13 @@ class PgpStrategyParserTests extends FunSuite {
 
   // N3 — `pgpAlgIdMap` size claim. The doc previously said size==10
   // (wrong); the literal map has 13 entries (RSA has 3 ids: 1, 2, 3;
-  // ElGamal has 2: 16, 20). The plan TABLE shows 10 rows (one per
+  // ElGamal has 2: 16, 20). The TABLE shows 10 rows (one per
   // canonical (alg-id-group, canonical-alg) tuple); the distinct
   // canonical-alg name set has 8 elements because `ec` covers both
   // ECDH(18) and ECDSA(19), and `ed25519` covers both EdDSA-Legacy(22)
   // and Ed25519(27). Pin all three numbers.
   test(
-    "pgpAlgIdMap: 13 alg-id entries / 10 plan-table rows / 8 distinct canonical alg names (N3)"
+    "pgpAlgIdMap: 13 alg-id entries / 10 table rows / 8 distinct canonical alg names (N3)"
   ) {
     assertEquals(
       Certificates.pgpAlgIdMap.size,
@@ -468,7 +467,7 @@ class PgpStrategyParserTests extends FunSuite {
     assertEquals(
       Certificates.pgpAlgIdMap.values.toSet,
       Set("rsa", "elgamal", "dsa", "ec", "ed25519", "x25519", "x448", "ed448"),
-      "8 distinct canonical-alg values; plan-table 10 rows collapse " +
+      "8 distinct canonical-alg values; table 10 rows collapse " +
         "to 8 because (ECDH, ECDSA) both → 'ec' and (EdDSA-Legacy, " +
         "Ed25519) both → 'ed25519'"
     )

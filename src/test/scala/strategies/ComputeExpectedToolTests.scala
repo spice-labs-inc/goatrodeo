@@ -26,12 +26,11 @@ import scala.sys.process.*
 
 /** End-to-end tests for `test_data/certificates/tools/compute-expected.sh`.
   *
-  * Plan task #3 (`certificates-strategy/phase-0-corpus.md`) specifies a
-  * draft-sidecar generator that contributors run when adding a fixture.
-  * Pre-Phase-0b, the script existed but was untested. A regression in the
-  * SubjectDN/IssuerDN sed expressions (an extra space in `sed 's/^subject= //'`
-  * against openssl's `subject=...` output) was shipping broken sidecars. This
-  * suite locks in the tool's contract:
+  * Task #3 specifies a draft-sidecar generator that contributors run when
+  * adding a fixture. Pre-Phase-0b, the script existed but was untested. A
+  * regression in the SubjectDN/IssuerDN sed expressions (an extra space in `sed
+  * 's/^subject= //'` against openssl's `subject=...` output) was shipping
+  * broken sidecars. This suite locks in the tool's contract:
   *
   *   - exit 0 on a valid PEM X.509 fixture
   *   - emits parseable JSON
@@ -43,9 +42,9 @@ import scala.sys.process.*
   * If the script is missing or `bash` cannot be invoked the test is marked
   * `assume(... && !ignored)` so non-Linux dev machines do not fail-spuriously.
   *
-  * ## Trace to plan
+  * ## Traceability
   *
-  * Plan task: phase-0-corpus.md task #3 (the tool itself). Acceptance criterion
+  * Task: phase-0-corpus.md task #3 (the tool itself). Acceptance criterion
   * verified: tool produces JSON with correctly- stripped DN values that any
   * reviewer can hand-verify against `openssl x509 -subject -nameopt RFC2253`
   * output.

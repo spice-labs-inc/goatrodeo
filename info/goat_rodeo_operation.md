@@ -53,7 +53,7 @@ Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects
 * `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
 * `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
   Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
-* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet). Each package gets a tag Item
+* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet, JDK/JRE). Each package gets a tag Item
   with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
   is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.
 * `--package-tags-short-name` : Use short package names (e.g., `artifactId` for Maven) instead of fully qualified names
@@ -171,6 +171,22 @@ is particularly helpful if the pom and sources file is in the `.deb` file in add
 On a system that has fast disk IO (e.g., NVMe or SSD), choosing a thread count that's roughly equal to the number
 of logical CPUs will maximize processing. The only shared resource among the threads (other than the `ToProcess`
 queue) is the `MemStorage` instance.
+
+#### Maven Identity Resolution
+
+The Maven strategy extracts identity metadata (groupId, artifactId, version) using a strict five-layer priority chain. The first layer that produces a complete tuple wins:
+
+1. **Embedded `pom.properties`** — parsed from `META-INF/maven/<groupId>/<artifactId>/pom.properties` inside the JAR. If multiple properties files exist (fat JAR), the one whose embedded `artifactId` matches the JAR filename is chosen.
+2. **External sibling `.pom`** — a `pom.xml` file sitting next to the JAR on disk.
+3. **Embedded `pom.xml`** — the `pom.xml` bundled inside the JAR itself.
+4. **MANIFEST.MF** — OSGi headers (`Bundle-SymbolicName` / `Implementation-Title`) and version headers (`Bundle-Version` / `Implementation-Version`), with further fallbacks to `bundle-name` and `specification-version`.
+5. **Filename** — heuristic parsing of `groupId.artifactId-version.jar` or `artifactId-version.jar`. Dots before the final artifactId are treated as groupId segments, except when the trailing segment is purely numeric (a Scala binary suffix like `_2.13`), in which case it stays in the artifactId.
+
+The extracted identity is used to generate a pURL (`pkg:maven/<groupId>/<artifactId>@<version>`) and to populate metadata keys such as:
+- `("tag","package")` — the pURL
+- `("tag","package tag group id")` — the groupId (or `artifactId` when short names are requested)
+- `("tag","repo URL")` — SHA-256 of the Maven Central URL
+- `("maven","Timestamp")` — the parsed build timestamp
 
 #### `MemStorage` 
 

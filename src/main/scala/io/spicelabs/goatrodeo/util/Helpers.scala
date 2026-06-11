@@ -18,11 +18,11 @@ import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.spicelabs.coordinates.Coordinates
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import org.apache.commons.compress.archivers.ArchiveEntry
+import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.Opcodes
-import org.apache.commons.compress.archivers.ArchiveEntry
-import org.apache.commons.compress.archivers.ArchiveInputStream
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -51,7 +51,6 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
-import scala.util.Try
 
 /** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
   * content-addressable identifier based on Git's object hashing scheme.
@@ -206,7 +205,7 @@ object Helpers {
     file.mimeType match {
       case maybeClass if javaClassMimeTypes.intersect(maybeClass).nonEmpty =>
         val sourceName: Option[String] =
-          Try {
+          try {
             file.withStream { is =>
               // Read only what we need: the SourceFile attribute. SKIP_CODE avoids
               // walking method bodies (the bulk of the class). Do NOT use SKIP_DEBUG --
@@ -245,23 +244,22 @@ object Helpers {
                   Some(pkg + sf)
               }
             }
-          }.toOption.flatten
+          } catch {
+            case _: OutOfMemoryError => None
+          }
 
         val sourceGitOID = for {
           sn <- sourceName
-          pf <- associatedFiles.get(sn)
-        } yield {
-          pf
-        }
+          gitoid <- associatedFiles.get(sn)
+        } yield gitoid
 
         sourceGitOID match {
-          case None    => TreeSet()
           case Some(s) => TreeSet(s)
+          case None    => TreeSet.empty[GitOID]
         }
 
-      case _ => TreeSet()
+      case _ => TreeSet.empty[GitOID]
     }
-
   }
 
   /** Get the current date in ISO 8601 format
@@ -407,6 +405,16 @@ object Helpers {
     * @return
     *   the 16 bytes of the MD5 hash
     */
+  def computeMD5(str: String): Array[Byte] =
+    computeMD5(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+
+  /** Compute MD5 of a File. */
+  def computeMD5(file: File): Array[Byte] = {
+    val fis = new java.io.FileInputStream(file)
+    try { computeMD5(fis) }
+    finally { fis.close() }
+  }
+
   def computeMD5(in: InputStream): Array[Byte] = {
     val md = MessageDigest.getInstance("MD5")
     val ba = new Array[Byte](4096)
@@ -419,110 +427,19 @@ object Helpers {
 
       md.update(ba, 0, len)
     }
-    ???
+    md.digest() // unreachable, satisfies compiler
   }
 
-  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
-    * efficient than secure hashes. It's used to compute the hash of file
-    * paths/names for indexing.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the 16 bytes of the MD5 hash
-    */
-  def computeMD5(in: String): Array[Byte] = {
-    computeMD5(stringToInputStream(in))
-  }
+  /** Compute hex-encoded SHA-256 hash of a byte array */
 
-  /** Compute the MD5 hash of an input stream. Note MD5 is faster and more space
-    * efficient than secure hashes. It's used to compute the hash of file
-    * paths/names for indexing.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the 16 bytes of the MD5 hash
-    */
-  def computeMD5(in: File): Array[Byte] = {
-    computeMD5(FileInputStream(in))
-  }
+  /** Compute SHA-1 hash of a String. */
+  def computeSHA1(str: String): Array[Byte] =
+    computeSHA1(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
 
-  /** Compute the SHA1 hash of an input stream.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the sha1 hash
-    */
-  def computeSHA1(in: String): Array[Byte] = {
-    computeSHA1(stringToInputStream(in))
-  }
-
-  /** Compute the SHA1 hash of an input stream.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the sha1 hash
-    */
-  def computeSHA1(in: File): Array[Byte] = {
-    computeSHA1(FileInputStream(in))
-  }
-
-  /** Compute the SHA256 hash of a String
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the SHA256 hash
-    */
-  def computeSHA256(in: String): Array[Byte] = {
-    computeSHA256(stringToInputStream(in))
-  }
-
-  /** Compute the SHA512 hash of a file.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the sha512 hash
-    */
-  def computeSHA512(in: File): Array[Byte] = {
-    computeSHA512(FileInputStream(in))
-  }
-
-  /** Compute the SHA512 hash of a String
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the SHA512 hash
-    */
-  def computeSHA512(in: String): Array[Byte] = {
-    computeSHA512(stringToInputStream(in))
-  }
-
-  /** Compute the SHA256 hash of a file.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the sha256 hash
-    */
-  def computeSHA256(in: File): Array[Byte] = {
-    computeSHA256(FileInputStream(in))
-  }
-
-  /** Compute the SHA1 hash of an input stream.
-    *
-    * @param in
-    *   the String to get the hash for
-    * @return
-    *   the SHA1 hash
+  /** Compute SHA-1 hash of an InputStream.
     */
   def computeSHA1(in: InputStream): Array[Byte] = {
-    val md = MessageDigest.getInstance("SHA1")
+    val md = MessageDigest.getInstance("SHA-1")
     val ba = new Array[Byte](4096)
     while (true) {
       val len = in.read(ba)
@@ -530,44 +447,47 @@ object Helpers {
         in.close()
         return md.digest()
       }
-
       md.update(ba, 0, len)
     }
-    ???
+    md.digest() // unreachable, for compiler
   }
 
-  /** Compute the sha512 of an input stream
+  /** Compute SHA-1 hash of a File. */
+  def computeSHA1(file: File): Array[Byte] = {
+    val fis = new java.io.FileInputStream(file)
+    try { computeSHA1(fis) }
+    finally { fis.close() }
+  }
+
+  /** Compute the SHA-256 hash of an InputStream. */
+
+  /** Compute the SHA-256 hash of an InputStream.
     *
     * @param in
     *   the input stream
     * @return
     *   the bytes of the sha256 hash
     */
-  def computeSHA512(in: InputStream): Array[Byte] = {
-    val md = MessageDigest.getInstance("SHA512")
-    val ba = new Array[Byte](4096)
-    while (true) {
-      val len = in.read(ba)
-      if (len <= 0) {
-        in.close()
-        return md.digest()
-      }
+  /** Compute SHA-256 of a String. */
+  def computeSHA256(str: String): Array[Byte] =
+    computeSHA256(str.getBytes("UTF-8"))
 
-      md.update(ba, 0, len)
-    }
-    ???
-  }
-
-  /** Compute the sha256 of an input stream
+  /** Compute SHA-256 hash of a byte array.
     *
-    * @param in
-    *   the input stream
+    * @param bytes
+    *   the byte array to hash
     * @return
-    *   the bytes of the sha256 hash
+    *   the bytes of the SHA-256 hash
     */
   def computeSHA256(bytes: Array[Byte]): Array[Byte] = {
     val md = MessageDigest.getInstance("SHA256")
     md.digest(bytes)
+  }
+
+  def computeSHA256(file: File): Array[Byte] = {
+    val fis = new java.io.FileInputStream(file)
+    try { computeSHA256(fis) }
+    finally { fis.close() }
   }
 
   // Canonical lowercase-hex SHA-256, computed by `coordinates`.
@@ -585,7 +505,35 @@ object Helpers {
 
       md.update(ba, 0, len)
     }
-    ???
+    md.digest() // unreachable, for compiler
+  }
+
+  /** Compute the SHA-512 hash of a String. */
+  def computeSHA512(str: String): Array[Byte] = {
+    computeSHA512(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+  }
+
+  /** Compute SHA-512 hash of a File. */
+  def computeSHA512(file: File): Array[Byte] = {
+    val fis = new java.io.FileInputStream(file)
+    try { computeSHA512(fis) }
+    finally { fis.close() }
+  }
+
+  /** Compute the SHA-512 hash of an InputStream.
+    */
+  def computeSHA512(in: InputStream): Array[Byte] = {
+    val md = MessageDigest.getInstance("SHA-512")
+    val ba = new Array[Byte](4096)
+    while (true) {
+      val len = in.read(ba)
+      if (len <= 0) {
+        in.close()
+        return md.digest()
+      }
+      md.update(ba, 0, len)
+    }
+    md.digest()
   }
 
   /** Create a Scala `Iterator` for the `ArchiveInputStream`

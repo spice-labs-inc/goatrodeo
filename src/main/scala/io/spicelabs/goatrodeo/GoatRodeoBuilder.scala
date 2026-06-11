@@ -258,17 +258,16 @@ class GoatRodeoBuilder {
     * @param d
     *   the date string (parsed flexibly, e.g., "2024-01-15", "today", "now")
     * @return
-    *   this builder
-    * @throws IllegalArgumentException
-    *   if the date cannot be parsed
+    *   Right(this builder) if the date was parsed successfully,
+    *   Left(errorMessage) otherwise
     */
-  def withTagDate(d: String): GoatRodeoBuilder = {
+  def withTagDate(d: String): Either[String, GoatRodeoBuilder] = {
     io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
       case Right(date) =>
         config = config.copy(tagDate = Some(date))
-        this
+        Right(this)
       case Left(error) =>
-        throw new IllegalArgumentException(error)
+        Left(error)
     }
   }
 
@@ -359,14 +358,16 @@ class GoatRodeoBuilder {
     }
   }
 
-  /** Attach a progress listener that is notified at phase boundaries
-    * (Scanning, Writing, Done) and periodically during the Processing
-    * phase. See [[ProgressListener]] for cadence and threading semantics.
+  /** Attach a progress listener that is notified at phase boundaries (Scanning,
+    * Writing, Done) and periodically during the Processing phase. See
+    * [[ProgressListener]] for cadence and threading semantics.
     *
     * Passing `null` clears any previously attached listener.
     *
-    * @param listener the listener to attach, or `null` to clear
-    * @return this builder
+    * @param listener
+    *   the listener to attach, or `null` to clear
+    * @return
+    *   this builder
     */
   def withProgressListener(listener: ProgressListener): GoatRodeoBuilder = {
     config = config.copy(progressListener = Option(listener))

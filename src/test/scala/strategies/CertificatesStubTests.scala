@@ -42,10 +42,10 @@ import scala.collection.immutable.TreeSet
   * will replace `CryptoDetector.mimeTypeAugmenter` with content sniffing, so
   * that test will need to update (per invariant #4 — discuss before changing).
   *
-  * ## Trace to plan
+  * ## Traceability
   *
-  * Plan: `certificates-strategy/phases-1-2-foundation-detector.md` Phase 1 task
-  * #3 (CryptoDetector stub) and task #5 (Certificates skeleton with five
+  * `certificates-strategy/phases-1-2-foundation-detector.md` Phase 1 task #3
+  * (CryptoDetector stub) and task #5 (Certificates skeleton with five
   * ProcessingState methods).
   *
   * ## LLM-friendly summary
@@ -96,7 +96,7 @@ class CertificatesStubTests extends FunSuite {
   test(
     "[INVARIANT] CryptoDetector.mimeTypeAugmenter never strips MIME types beginning with `text/`"
   ) {
-    // Plan task #2 detection-signature table footnote: contrasting
+    // Detection-signature table footnote: contrasting
     // SaffronDetector, the Crypto augmenter is purely additive.
     val input = Set("text/plain", "text/html")
     val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input)
@@ -289,8 +289,7 @@ class CertificatesStubTests extends FunSuite {
 
   // === SECTION A continued — Phase-INVARIANT (registration) =============
 
-  /** Phase-1 plan task #6 + claim #8 in `docs/certificates/phase-1-claims.md`
-    * say
+  /** Phase-1 task #6 + claim #8 in `docs/certificates/phase-1-claims.md` say
     * `Class.forName("io.spicelabs.goatrodeo.omnibor.strategies.Certificates")`
     * must resolve at runtime — that's the gate `CertificatesSuite` reads to
     * decide whether to skip per-fixture tests. Prior to this test, claim #8 was

@@ -75,8 +75,9 @@ import scala.util.Using
   *   Date)
   * @param progressListener
   *   optional callback notified at phase boundaries and during the main
-  *   processing loop. Set via [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]];
-  *   not exposed on the command line.
+  *   processing loop. Set via
+  *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]]; not
+  *   exposed on the command line.
   */
 case class Config(
     out: Option[File] = None,

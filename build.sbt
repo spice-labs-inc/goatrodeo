@@ -23,15 +23,20 @@ ThisBuild / version := {
   }
   if (headTags.nonEmpty) {
     // HEAD is tagged. When multiple semver tags decorate it, pick the largest.
-    val chosen = headTags.maxBy { case (_, ma, mi, pa) => (ma, mi, pa) }._1.stripPrefix("v")
+    val chosen = headTags
+      .maxBy { case (_, ma, mi, pa) => (ma, mi, pa) }
+      ._1
+      .stripPrefix("v")
     if (dirty) s"$chosen-dirty-SNAPSHOT" else chosen
   } else {
-    val baseTag = run("git describe --tags --abbrev=0 --match=v[0-9]*").headOption
-      .orElse(run("git describe --tags --abbrev=0").headOption)
-      .getOrElse("v0.0.0")
+    val baseTag =
+      run("git describe --tags --abbrev=0 --match=v[0-9]*").headOption
+        .orElse(run("git describe --tags --abbrev=0").headOption)
+        .getOrElse("v0.0.0")
     val base = baseTag.stripPrefix("v")
     val sha = run("git rev-parse --short HEAD").headOption.getOrElse("unknown")
-    val commits = run(s"git rev-list --count $baseTag..HEAD").headOption.getOrElse("0")
+    val commits =
+      run(s"git rev-list --count $baseTag..HEAD").headOption.getOrElse("0")
     val dirtyTag = if (dirty) "-dirty" else ""
     s"$base-$commits-$sha$dirtyTag-SNAPSHOT"
   }
@@ -191,6 +196,7 @@ lazy val root = project
     semanticdbVersion := scalafixSemanticdb.revision,
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
     libraryDependencies += "org.ow2.asm" % "asm" % "9.8",
+    libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,

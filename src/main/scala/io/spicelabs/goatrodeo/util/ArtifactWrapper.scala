@@ -220,7 +220,6 @@ object ArtifactWrapper {
     */
   private lazy val terminalBinaryMimeTypes: Set[String] =
     Helpers.javaClassMimeTypes ++ Set(
-      "application/zip",
       "application/java-archive",
       "application/vnd.android.package-archive"
     )
@@ -254,6 +253,7 @@ object ArtifactWrapper {
   addMimeTypeAugmenter(DotnetDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(SaffronDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(CryptoDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(JavaArchiveDetector.mimeTypeAugmenter)
 
   private def massageMimeType(
       fileName: String,

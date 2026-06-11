@@ -13,7 +13,7 @@ import java.io.File
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Phase 7 plan §"Acceptance":
+/** Acceptance:
   *
   * > No fixture in this phase triggers a password prompt, a decryption >
   * attempt, or a log message about encryption status beyond what's > in the

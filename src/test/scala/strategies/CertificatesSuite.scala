@@ -31,7 +31,7 @@ import munit.FunSuite
   *
   * ## Phase-0 state
   *
-  * Phase 0 of the Certificates plan specifies the harness-is-present state.
+  * Phase 0 of the Certificates strategy specifies the harness-is-present state.
   * Phase 0 has split into (a) infrastructure — this file and its siblings — and
   * (b) corpus population (the 200+ fixture download). Until (b) lands,
   * [[CertificatesFixtureInventory.pairs]] is empty and this suite emits zero
@@ -40,8 +40,8 @@ import munit.FunSuite
   * Corpus-integrity assertions (the 200-floor, orphan detection, sidecar schema
   * validation) live in [[CertificatesCorpusIntegritySuite]] — that suite runs
   * every time even when no fixtures exist, so the build fails until the corpus
-  * is populated. Per the plan's acceptance criteria ("mark all pending OR fail
-  * loudly — pick one"), we fail loudly via the integrity suite and emit passing
+  * is populated. Per the acceptance criteria ("mark all pending OR fail loudly
+  * — pick one"), we fail loudly via the integrity suite and emit passing
   * pending placeholders here when fixtures exist but the strategy is not yet
   * producing the expected Items.
   */
@@ -52,9 +52,9 @@ class CertificatesSuite extends FunSuite {
     * `io.spicelabs.goatrodeo.omnibor.strategies.Certificates`; until then this
     * suite's per-fixture assertions cannot be meaningfully evaluated (the
     * pipeline uses GenericFile as the fallback and emits no crypto pURLs /
-    * metadata). To keep the state uniform per the Phase 0 plan's "all pending
-    * OR all fail loudly — no partial mix" rule, every per-fixture test is
-    * marked `.ignore` until the class exists.
+    * metadata). To keep the state uniform per Phase 0's "all pending OR all
+    * fail loudly — no partial mix" rule, every per-fixture test is marked
+    * `.ignore` until the class exists.
     */
   private val strategyPresent: Boolean = {
     try {

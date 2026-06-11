@@ -12,7 +12,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Phase 8 — coverage matrix completeness suite.
   *
-  * Per the plan (`certificates-strategy/phases-8-9-tests-docs.md` lines 39-66):
+  * Per `certificates-strategy/phases-8-9-tests-docs.md` lines 39-66:
   *
   * > Enumerate all `*.expected.json` sidecars. Build a matrix of > which
   * (algorithm, key-size-or-curve-or-params, artifact-type) > combinations are
@@ -141,7 +141,7 @@ class CertificatesCoverageSuite extends FunSuite {
     )
   }
 
-  // ===== Required matrix per Phase 8 plan ===============================
+  // ===== Required matrix per Phase 8 ===============================
 
   private def x509SpkiOrCertPurls: Vector[Map[String, String]] =
     purlsByScheme
@@ -431,7 +431,7 @@ class CertificatesCoverageSuite extends FunSuite {
   }
 
   // A4 in v2 review: Phase-7 second-pass remediation introduced two
-  // additional envelope values that the original Phase-8 plan didn't
+  // additional envelope values that the original Phase-8 spec didn't
   // know about: `pem-legacy-encrypted` (RFC 1421 legacy PEM with
   // Proc-Type:4,ENCRYPTED) and `pgp-encrypted-secret-key`. Coverage
   // matrix must require these so a future contributor who removes

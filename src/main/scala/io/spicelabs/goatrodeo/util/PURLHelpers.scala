@@ -5,9 +5,9 @@ import io.spicelabs.coordinates.Purl
 /** Helpers related to Package URLs.
   *
   * Package URLs are produced via `io.spicelabs.coordinates.Purl`, the canonical
-  * Spice Labs purl implementation (parse / build / normalize per the purl-spec).
-  * `coordinates` exposes a plain constructor rather than a builder, so [[purl]]
-  * is a small Scala-friendly factory over it.
+  * Spice Labs purl implementation (parse / build / normalize per the
+  * purl-spec). `coordinates` exposes a plain constructor rather than a builder,
+  * so [[purl]] is a small Scala-friendly factory over it.
   */
 object PURLHelpers {
 

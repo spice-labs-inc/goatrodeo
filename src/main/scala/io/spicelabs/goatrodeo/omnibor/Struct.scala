@@ -307,10 +307,16 @@ case class ItemMetaData(
         case (_, tsize, osize) =>
           val thisWithMapping =
             if (tsize > 1) this.fileNames
-            else fix(this.fileNames.head, thisContains())
+            else
+              this.fileNames.headOption
+                .map(fn => fix(fn, thisContains()))
+                .getOrElse(this.fileNames)
           val otherWithMapping =
             if (osize > 1) other.fileNames
-            else fix(other.fileNames.head, otherContains())
+            else
+              other.fileNames.headOption
+                .map(fn => fix(fn, otherContains()))
+                .getOrElse(other.fileNames)
           thisWithMapping ++ otherWithMapping
       }
 

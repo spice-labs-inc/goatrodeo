@@ -32,8 +32,8 @@ import java.nio.file.Files
   * package-private internal entry that lets us assert MIME-set output without
   * going through the full `mimeTypeAugmenter` pass-through wrapper).
   *
-  * Negative tests cover the plan's explicit "must NOT match" cases plus the
-  * 4-KB read-budget invariant.
+  * Negative tests cover the explicit "must NOT match" cases plus the 4-KB
+  * read-budget invariant.
   *
   * ## LLM-friendly summary
   *
@@ -236,7 +236,7 @@ class CryptoDetectorSuite extends FunSuite {
     assert(out.contains("application/x-openssh-certificate"))
   }
 
-  // G2 — Plan §sshCertTokens: the original sshCertTokens set had 4 of 6
+  // G2 — sshCertTokens: the original sshCertTokens set had 4 of 6
   // entries replaced by `[email protected]` placeholder strings. Phase 5
   // restored the real OpenSSH cert-type tokens and these tests guard
   // against regression for each of the 6.
@@ -375,7 +375,7 @@ class CryptoDetectorSuite extends FunSuite {
 
   test("[PKCS#12]: 0x30 0x82 + .p12 extension adds application/pkcs12") {
     // Synthetic DER-prefixed bytes; the .p12 extension is the
-    // disambiguation hint per plan task #2 footnote.
+    // disambiguation hint per task #2 footnote.
     val out = detect(
       Array[Byte](0x30, 0x82.toByte, 0x01, 0x00, 0x00, 0x00),
       name = "x.p12"
@@ -435,7 +435,7 @@ class CryptoDetectorSuite extends FunSuite {
   }
 
   // ===================================================================
-  // SECTION C — Negative tests (plan-explicit "must NOT match")
+  // SECTION C — Negative tests (explicit "must NOT match")
   // ===================================================================
 
   test("[NEG]: plain text returns empty MIME set (currentMimes unchanged)") {
@@ -493,14 +493,14 @@ class CryptoDetectorSuite extends FunSuite {
   }
 
   test(
-    "[NEG]: file that is not a PGP packet but happens to start with 0xC6 — DOES match (acceptable false positive per plan: detection-only, parser fails at strategy)"
+    "[NEG]: file that is not a PGP packet but happens to start with 0xC6 — DOES match (acceptable false positive: detection-only, parser fails at strategy)"
   ) {
-    // The plan accepts this. We document it explicitly so a reviewer
+    // This is an accepted false positive. We document it explicitly so a reviewer
     // doesn't expect a stricter discriminator.
     val out = detect(Array[Byte](0xc6.toByte, 0x42, 0x42, 0x42))
     assert(
       out.contains("application/pgp-keys"),
-      "Per plan, 0xC6 high-bit packet-tag byte → application/pgp-keys " +
+      "0xC6 high-bit packet-tag byte → application/pgp-keys " +
         "even on garbage; the strategy-time PGP parser will fail and " +
         "the file falls through to Generic."
     )
@@ -515,9 +515,9 @@ class CryptoDetectorSuite extends FunSuite {
   // stream directly. We prove the 4 KB read-budget invariant
   // behaviorally instead — see the three tests below.
 
-  test("[BUDGET] MAX_READ_BYTES constant is 4096 (plan acceptance)") {
+  test("[BUDGET] MAX_READ_BYTES constant is 4096 (acceptance criterion)") {
     // Direct constant check; if a future change widens this it must
-    // be discussed (the plan acceptance criterion is exact 4 KB).
+    // be discussed (the acceptance criterion is exact 4 KB).
     assertEquals(CryptoDetector.MAX_READ_BYTES, 4096)
   }
 
@@ -789,7 +789,7 @@ class CryptoDetectorSuite extends FunSuite {
     "[P2] non-PKCS#12 .p12-named file (X.509 cert renamed) is detected as PKCS#12 via extension hint AND also as cert via dual emission"
   ) {
     // A real X.509 DER cert renamed to .p12 — extension says PKCS#12,
-    // structure says X.509. Plan dual-emission policy: emit pkcs12
+    // structure says X.509. Dual-emission policy: emit pkcs12
     // (extension hint) AND also try X.509 fallback so the strategy
     // can pick at parse time.
     val src = new File(

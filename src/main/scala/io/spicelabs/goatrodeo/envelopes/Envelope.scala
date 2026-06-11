@@ -9,11 +9,9 @@ import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 
+import java.io.IOException
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
 
 trait EncodeCBOR {
   def encodeCBORElement(): Element
@@ -21,12 +19,10 @@ trait EncodeCBOR {
 }
 
 trait DecodeCBOR[T] {
-  def decodeCBORElement(in: Element): Try[T]
-  def decodeCBOR(in: Array[Byte]): Try[T] = {
-    for {
-      elem <- Cbor.decode(in).to[Element].valueTry
-      ret <- decodeCBORElement(elem)
-    } yield ret
+  def decodeCBORElement(in: Element): T
+  def decodeCBOR(in: Array[Byte]): T = {
+    decodeCBORElement(Cbor.decode(in).to[Element].value)
+
   }
 }
 
@@ -67,7 +63,7 @@ final case class MD5(hash: Array[Byte]) extends EncodeCBOR {
 
 object MD5 extends DecodeCBOR[MD5] {
 
-  override def decodeCBORElement(in: Element): Try[MD5] =
+  override def decodeCBORElement(in: Element): MD5 =
     in match {
       case m: MapElem =>
         val ret = for {
@@ -91,10 +87,10 @@ object MD5 extends DecodeCBOR[MD5] {
           )
         }
         ret match {
-          case Some(ret) => Success(ret)
-          case _ => Failure(new Exception(f"Failed to decode ${in} as MD5"))
+          case Some(ret) => ret
+          case _ => throw new IOException(f"Failed to decode ${in} as MD5")
         }
-      case _ => Failure(new Exception(f"Failed to decode ${in} as MD5"))
+      case _ => throw new IOException(f"Failed to decode ${in} as MD5")
     }
 
 }
@@ -133,9 +129,9 @@ object DataFileEnvelope {
     info
   )
 
-  def decode(bytes: Array[Byte]): Try[DataFileEnvelope] = {
+  def decode(bytes: Array[Byte]): DataFileEnvelope = {
 
-    Cbor.decode(bytes).to[DataFileEnvelope].valueTry
+    Cbor.decode(bytes).to[DataFileEnvelope].value
   }
 }
 
@@ -168,8 +164,8 @@ object IndexFileEnvelope {
     info = info
   )
 
-  def decode(bytes: Array[Byte]): Try[IndexFileEnvelope] =
-    Cbor.decode(bytes).to[IndexFileEnvelope].valueTry
+  def decode(bytes: Array[Byte]): IndexFileEnvelope =
+    Cbor.decode(bytes).to[IndexFileEnvelope].value
 }
 
 case class ClusterFileEnvelope(

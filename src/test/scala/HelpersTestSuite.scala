@@ -727,7 +727,10 @@ Long-Value: This is a very long value that continues
 
     // When the extracted source path is not in the map, no gitoid is returned.
     val empty =
-      Helpers.computeAssociatedSource(wrapper, Map("wrong/Path.scala" -> srcGitoid))
+      Helpers.computeAssociatedSource(
+        wrapper,
+        Map("wrong/Path.scala" -> srcGitoid)
+      )
     assert(empty.isEmpty, s"expected no match, got ${empty}")
   }
 

@@ -250,8 +250,7 @@ class CertificatesState(
       case Some(p: PrivateKeyEncrypted) =>
         privateKeyEncryptedMetadata(artifact, p)
     }
-    Certificates.assertNoLeak(tm)
-    tm -> this
+    Certificates.filterLeaks(tm) -> this
   }
 
   /** Metadata for an unencrypted PEM private key. */

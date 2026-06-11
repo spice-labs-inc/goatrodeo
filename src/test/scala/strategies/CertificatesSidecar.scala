@@ -24,8 +24,7 @@ import scala.util.Try
 /** Sidecar — the ground-truth JSON file paired with every fixture in
   * `test_data/certificates/`.
   *
-  * Phase 0 of the Certificates strategy plan (see
-  * `certificates-strategy/phase-0-corpus.md` and
+  * The Certificates strategy (see `certificates-strategy/phase-0-corpus.md` and
   * `certificates-strategy/appendices.md` Appendix B) requires every fixture to
   * be paired with a `{artifact-filename}.expected.json` sidecar that declares
   * what the strategy must emit for that fixture.
@@ -42,7 +41,7 @@ import scala.util.Try
   *     emitted pURLs (canonicalized strings)
   *   - `metadata.mustContain` — subset assertion on the Item's extra metadata
   *     (keys use `:` separators per project-wide convention — see the parent
-  *     plan's "Hard rules" and `MKC.adHoc`'s `prefix:key` output)
+  *     "Hard rules" and `MKC.adHoc`'s `prefix:key` output)
   *   - `metadata.mustContainRanges` — integer-range assertions for metadata
   *     values whose exact content is too noisy to pin (e.g., entry counts in
   *     large keystores)

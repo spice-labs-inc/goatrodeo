@@ -6,6 +6,7 @@ import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
 
 object SaffronDetector {
+
   /** VM disk images are large files, and probing one requires a path. For an
     * in-memory artifact, `withFile` spills the entire artifact to a temp file
     * just to read a header — wasteful when run on every artifact (e.g. each

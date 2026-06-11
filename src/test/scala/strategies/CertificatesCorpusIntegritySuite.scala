@@ -54,7 +54,7 @@ import munit.FunSuite
   *
   * ## Phase traceability
   *
-  *   - Test `corpus contains at least 200 fixtures` → plan sub-goal #2
+  *   - Test `corpus contains at least 200 fixtures` → sub-goal #2
   *     (phase-0-corpus.md).
   *   - Test `no orphan sidecars` → phase-0-corpus.md task #4 sourcing protocol.
   *   - Test `no orphan fixtures` → phase-0-corpus.md task #4 sourcing protocol.
@@ -81,7 +81,7 @@ class CertificatesCorpusIntegritySuite extends FunSuite {
     assert(
       count >= 200,
       s"Certificates fixture corpus has $count paired (fixture, sidecar) " +
-        s"pairs; the plan requires at least 200. See " +
+        s"pairs; the requirement is at least 200. See " +
         s"certificates-strategy/phase-0-corpus.md sub-goal #2. Per-category " +
         s"counts: ${CertificatesFixtureInventory.countByCategory}"
     )
