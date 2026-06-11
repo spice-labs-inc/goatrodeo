@@ -69,7 +69,7 @@ object DockerMetadataExtractor {
     }
     result match {
       case Some(JString(s)) if s.nonEmpty => Some(s)
-      case _ => None
+      case _                              => None
     }
   }
 
@@ -84,7 +84,7 @@ object DockerMetadataExtractor {
     }
     nested match {
       case Some(JArray(arr)) => arr.collect { case JString(s) => s }.toVector
-      case _ => Vector.empty
+      case _                 => Vector.empty
     }
   }
 
@@ -99,7 +99,7 @@ object DockerMetadataExtractor {
     }
     result match {
       case Some(JArray(arr)) => Some(arr.length)
-      case _ => None
+      case _                 => None
     }
   }
 
@@ -108,7 +108,7 @@ object DockerMetadataExtractor {
   private[strategies] def isOciManifestBlob(json: JValue): Boolean = {
     val hasSchema = (json \ "schemaVersion") match {
       case JInt(_) | JLong(_) => true
-      case _ => false
+      case _                  => false
     }
     val hasMediaType = (json \ "mediaType") match {
       case JString(s) =>
@@ -119,7 +119,7 @@ object DockerMetadataExtractor {
     }
     val hasConfigDigest = (json \ "config" \ "digest") match {
       case JString(d) => d.startsWith("sha256:")
-      case _ => false
+      case _          => false
     }
     hasSchema && hasMediaType && hasConfigDigest
   }
@@ -133,8 +133,8 @@ object DockerMetadataExtractor {
           case JString(s) if s.nonEmpty =>
             s.split("=", 2).toList match {
               case key :: value :: Nil => key -> value
-              case key :: Nil => key -> ""
-              case _ => s -> ""
+              case key :: Nil          => key -> ""
+              case _                   => s -> ""
             }
         }.toMap
       case _ => Map.empty
@@ -156,14 +156,17 @@ object DockerMetadataExtractor {
   private def computeSize(manifestConfig: JValue): Option[Long] = {
     (manifestConfig \ "LayerSources") match {
       case JObject(sources) =>
-        val total = sources.map(_._2).flatMap {
-          case JObject(fields) =>
-            fields.collectFirst {
-              case ("size", JInt(n))  => n.toLong
-              case ("size", JLong(n)) => n.toLong
-            }
-          case _ => None
-        }.sum
+        val total = sources
+          .map(_._2)
+          .flatMap {
+            case JObject(fields) =>
+              fields.collectFirst {
+                case ("size", JInt(n))  => n.toLong
+                case ("size", JLong(n)) => n.toLong
+              }
+            case _ => None
+          }
+          .sum
         if (total > 0) Some(total) else None
       case _ => None
     }
@@ -178,7 +181,7 @@ object DockerMetadataExtractor {
           case JObject(fields) =>
             val hasEmpty = fields.exists {
               case ("empty_layer", JBool(true)) => true
-              case _ => false
+              case _                            => false
             }
             val createdBy =
               fields.collectFirst { case ("created_by", JString(s)) => s }
@@ -199,10 +202,11 @@ object DockerMetadataExtractor {
     value.map(v => key -> TreeSet(StringOrPair(v)))
   }
 
-  /** Normalize known OCI / label-schema label keys into Goat Rodeo metadata keys.
+  /** Normalize known OCI / label-schema label keys into Goat Rodeo metadata
+    * keys.
     *
-    * OCI keys take precedence over label-schema keys. If both are present,
-    * the OCI value wins.
+    * OCI keys take precedence over label-schema keys. If both are present, the
+    * OCI value wins.
     */
   private def normalizeLabels(
       labels: Map[String, String]
@@ -323,8 +327,10 @@ object DockerMetadataExtractor {
     }
 
     // Core config fields
-    metadata = metadata +? maybePair(adHoc("Created"), stringAt(configJson, "created"))
-    metadata = metadata +? maybePair(adHoc("Author"), stringAt(configJson, "author"))
+    metadata =
+      metadata +? maybePair(adHoc("Created"), stringAt(configJson, "created"))
+    metadata =
+      metadata +? maybePair(adHoc("Author"), stringAt(configJson, "author"))
     metadata = metadata +? maybePair(
       adHoc("WorkingDir"),
       stringAt(configJson, "config", "WorkingDir")
@@ -346,8 +352,9 @@ object DockerMetadataExtractor {
 
     val cmdParts = stringArrayAt(configJson, "config", "Cmd")
     if (cmdParts.nonEmpty) {
-      metadata =
-        metadata + (adHoc("Cmd") -> TreeSet(StringOrPair(cmdParts.mkString(" "))))
+      metadata = metadata + (adHoc("Cmd") -> TreeSet(
+        StringOrPair(cmdParts.mkString(" "))
+      ))
     }
 
     // Env count (avoids leaking secrets while preserving cardinality)
@@ -382,10 +389,11 @@ object DockerMetadataExtractor {
     // RepoDigest (immutable reference)
     (manifestConfig \ "RepoDigests") match {
       case JArray(arr) =>
-        arr.collectFirst { case JString(s) if s.nonEmpty => s }.foreach { digest =>
-          metadata = metadata + (
-            adHoc("RepoDigest") -> TreeSet(StringOrPair(digest))
-          )
+        arr.collectFirst { case JString(s) if s.nonEmpty => s }.foreach {
+          digest =>
+            metadata = metadata + (
+              adHoc("RepoDigest") -> TreeSet(StringOrPair(digest))
+            )
         }
       case _ =>
     }

@@ -263,9 +263,13 @@ class MySuite extends munit.FunSuite {
       childItem <- store.read(childGitoid)
     } yield childItem
 
-    assert(log4jItemOpt.isDefined, s"log4j JAR should be reachable from $log4jSha256")
+    assert(
+      log4jItemOpt.isDefined,
+      s"log4j JAR should be reachable from $log4jSha256"
+    )
 
-    val log4jPurls = log4jItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
+    val log4jPurls =
+      log4jItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
     assert(
       log4jPurls.nonEmpty,
       s"log4j JAR should have at least one pURL connection, got ${log4jPurls}"
@@ -283,9 +287,13 @@ class MySuite extends munit.FunSuite {
       childItem <- store.read(childGitoid)
     } yield childItem
 
-    assert(tkItemOpt.isDefined, s"tk package should be reachable from $tkSha256")
+    assert(
+      tkItemOpt.isDefined,
+      s"tk package should be reachable from $tkSha256"
+    )
 
-    val tkPurls = tkItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
+    val tkPurls =
+      tkItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
     assert(
       tkPurls.nonEmpty,
       s"tk package should have at least one pURL connection, got ${tkPurls}"

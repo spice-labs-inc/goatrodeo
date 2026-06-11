@@ -5,20 +5,18 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
-import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 /** Phase 7 — Gradle Lockfile Parsing Strategy test suite.
   *
-  * Tests GradleLockfile parsing for modern and legacy lockfile formats,
-  * pURL generation, metadata emission, and robustness.
+  * Tests GradleLockfile parsing for modern and legacy lockfile formats, pURL
+  * generation, metadata emission, and robustness.
   */
 class GradleLockfileSuite extends FunSuite {
 
@@ -43,17 +41,27 @@ class GradleLockfileSuite extends FunSuite {
     val content = wrapper.withStream(Helpers.slurpInputToString(_))
     val deps = GradleLockfile.parseLockfile(content, None)
 
-    assertEquals(deps.size, 3, "Should parse 3 dependencies (ignoring empty= line)")
-    
+    assertEquals(
+      deps.size,
+      3,
+      "Should parse 3 dependencies (ignoring empty= line)"
+    )
+
     val dep1 = deps.find(d => d.artifactId == "commons-text").get
     assertEquals(dep1.groupId, "org.apache.commons")
     assertEquals(dep1.version, "1.8")
-    assertEquals(dep1.configurations, Vector("compileClasspath", "runtimeClasspath"))
+    assertEquals(
+      dep1.configurations,
+      Vector("compileClasspath", "runtimeClasspath")
+    )
 
     val dep2 = deps.find(d => d.artifactId == "slf4j-api").get
     assertEquals(dep2.groupId, "org.slf4j")
     assertEquals(dep2.version, "2.0.7")
-    assertEquals(dep2.configurations, Vector("compileClasspath", "runtimeClasspath"))
+    assertEquals(
+      dep2.configurations,
+      Vector("compileClasspath", "runtimeClasspath")
+    )
 
     val dep3 = deps.find(d => d.artifactId == "guava").get
     assertEquals(dep3.groupId, "com.google.guava")
@@ -72,16 +80,23 @@ class GradleLockfileSuite extends FunSuite {
       None
     )
 
-    val (purls, _) = state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val (purls, _) =
+      state.getPurls(wrapper, createTestItem("t"), SingleMarker())
     assertEquals(purls.size, 3, "Should generate 3 pURLs")
-    
-    assert(purls.exists(_.contains("org.apache.commons")), "Should contain commons pURL")
+
+    assert(
+      purls.exists(_.contains("org.apache.commons")),
+      "Should contain commons pURL"
+    )
     assert(purls.exists(_.contains("slf4j-api")), "Should contain slf4j pURL")
     assert(purls.exists(_.contains("guava")), "Should contain guava pURL")
-    
+
     // Verify one is a proper maven pURL
     val commons = purls.find(_.contains("commons-text")).get
-    assert(commons.startsWith("pkg:maven/"), s"pURL should start with pkg:maven/: $commons")
+    assert(
+      commons.startsWith("pkg:maven/"),
+      s"pURL should start with pkg:maven/: $commons"
+    )
     assert(commons.contains("1.8"), s"pURL should contain version: $commons")
   }
 
@@ -115,11 +130,21 @@ class GradleLockfileSuite extends FunSuite {
       None
     )
 
-    val (meta, _) = state.getMetadata(wrapper, createTestItem("t"), SingleMarker())
-    assert(meta.contains(MetadataKeyConstants.DEPENDENCIES), "Metadata should contain Dependencies key")
+    val (meta, _) =
+      state.getMetadata(wrapper, createTestItem("t"), SingleMarker())
+    assert(
+      meta.contains(MetadataKeyConstants.DEPENDENCIES),
+      "Metadata should contain Dependencies key"
+    )
     val depJson = meta(MetadataKeyConstants.DEPENDENCIES).head.value
-    assert(depJson.contains("compileClasspath"), s"JSON should contain configuration: $depJson")
-    assert(depJson.contains("runtimeClasspath"), s"JSON should contain runtimeClasspath: $depJson")
+    assert(
+      depJson.contains("compileClasspath"),
+      s"JSON should contain configuration: $depJson"
+    )
+    assert(
+      depJson.contains("runtimeClasspath"),
+      s"JSON should contain runtimeClasspath: $depJson"
+    )
   }
 
   test("GradleLockfile - handles malformed lines gracefully") {
@@ -149,7 +174,11 @@ class GradleLockfileSuite extends FunSuite {
     assertEquals(deps.size, 2, "Should parse legacy format")
     val commons = deps.find(_.artifactId == "commons-text").get
     assertEquals(commons.version, "1.8")
-    assertEquals(commons.configurations, Vector.empty, "Legacy without explicit config has empty configs when no filename config")
+    assertEquals(
+      commons.configurations,
+      Vector.empty,
+      "Legacy without explicit config has empty configs when no filename config"
+    )
   }
 
   test("GradleLockfile - associates config name from filename") {
@@ -163,8 +192,10 @@ class GradleLockfileSuite extends FunSuite {
     val configFromFilename = Some("compileClasspath")
     val deps = GradleLockfile.parseLockfile(content, configFromFilename)
 
-    assert(deps.forall(_.configurations == Vector("compileClasspath")),
-      "Legacy lockfile should inherit config from filename")
+    assert(
+      deps.forall(_.configurations == Vector("compileClasspath")),
+      "Legacy lockfile should inherit config from filename"
+    )
   }
 
   // ==================== 7.4 Corpus Integration ====================
@@ -179,9 +210,13 @@ class GradleLockfileSuite extends FunSuite {
     val deps = GradleLockfile.parseLockfile(content, None)
     val state = new GradleLockfileState(deps)
 
-    val (purls, _) = state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val (purls, _) =
+      state.getPurls(wrapper, createTestItem("t"), SingleMarker())
     assert(purls.nonEmpty, "Buildscript lockfile should produce pURLs")
-    assert(purls.forall(_.startsWith("pkg:maven/")), "All pURLs should be Maven type")
+    assert(
+      purls.forall(_.startsWith("pkg:maven/")),
+      "All pURLs should be Maven type"
+    )
   }
 
   test("corpus runtimeClasspath legacy lockfile produces pURLs") {
@@ -195,8 +230,12 @@ class GradleLockfileSuite extends FunSuite {
     val deps = GradleLockfile.parseLockfile(content, configFromFilename)
     val state = new GradleLockfileState(deps)
 
-    val (purls, _) = state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val (purls, _) =
+      state.getPurls(wrapper, createTestItem("t"), SingleMarker())
     assert(purls.nonEmpty, "Runtime lockfile should produce pURLs")
-    assert(purls.exists(_.contains("postgresql")), "Should contain postgresql dependency")
+    assert(
+      purls.exists(_.contains("postgresql")),
+      "Should contain postgresql dependency"
+    )
   }
 }

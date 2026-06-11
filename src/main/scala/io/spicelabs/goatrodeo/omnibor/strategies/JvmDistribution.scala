@@ -47,8 +47,8 @@ object JvmDistribution {
 
   private val logger = Logger(this.getClass())
 
-  /** Parse a `release` file KEY="VALUE" format into structured data.
-    * Values are unquoted. Unknown keys are ignored silently.
+  /** Parse a `release` file KEY="VALUE" format into structured data. Values are
+    * unquoted. Unknown keys are ignored silently.
     */
   def parseReleaseFile(content: String): JvmReleaseData = {
     val lines = content.linesIterator
@@ -89,8 +89,8 @@ object JvmDistribution {
     )
   }
 
-  /** Map IMPLEMENTOR and path to a known vendor name.
-    * Falls back to "OpenJDK" for unknown vendors.
+  /** Map IMPLEMENTOR and path to a known vendor name. Falls back to "OpenJDK"
+    * for unknown vendors.
     */
   def detectVendor(
       implementor: Option[String],
@@ -102,13 +102,12 @@ object JvmDistribution {
     if (implLower.contains("azul") || pathLower.contains("zulu")) {
       ("azul", "zulu")
     } else if (
-      implLower.contains("eclipse") || implLower.contains("adoptium") || implLower
+      implLower
+        .contains("eclipse") || implLower.contains("adoptium") || implLower
         .contains("temurin")
     ) {
       ("eclipse", "temurin")
-    } else if (
-      implLower.contains("amazon") || implLower.contains("corretto")
-    ) {
+    } else if (implLower.contains("amazon") || implLower.contains("corretto")) {
       ("amazon", "corretto")
     } else if (implLower.contains("oracle")) {
       ("oracle", "jdk")
@@ -121,9 +120,8 @@ object JvmDistribution {
     }
   }
 
-  /** Determine the effective version string.
-    * Prefers JAVA_RUNTIME_VERSION, falls back to JAVA_VERSION,
-    * then semanticVersion, then fullVersion.
+  /** Determine the effective version string. Prefers JAVA_RUNTIME_VERSION,
+    * falls back to JAVA_VERSION, then semanticVersion, then fullVersion.
     */
   def effectiveVersion(data: JvmReleaseData): Option[String] = {
     data.javaRuntimeVersion
@@ -132,8 +130,8 @@ object JvmDistribution {
       .orElse(data.fullVersion)
   }
 
-  /** Determine whether this is a JDK (true) or JRE (false).
-    * Uses IMAGE_TYPE if present; otherwise checks for `bin/javac` sibling.
+  /** Determine whether this is a JDK (true) or JRE (false). Uses IMAGE_TYPE if
+    * present; otherwise checks for `bin/javac` sibling.
     */
   def isJDK(
       data: JvmReleaseData,
@@ -156,9 +154,8 @@ object JvmDistribution {
     else new java.io.File(parent, "bin/javac").exists()
   }
 
-  /** Compute files to process for JVM distributions.
-    * Claims files named `release` that contain JAVA_VERSION or
-    * JAVA_RUNTIME_VERSION.
+  /** Compute files to process for JVM distributions. Claims files named
+    * `release` that contain JAVA_VERSION or JAVA_RUNTIME_VERSION.
     */
   def computeJvmFiles(
       byUUID: ToProcess.ByUUID,
@@ -362,8 +359,8 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
   }
 }
 
-/** Lightweight ISO-8601-ish date parser for JAVA_VERSION_DATE strings.
-  * Returns None on unparseable input.
+/** Lightweight ISO-8601-ish date parser for JAVA_VERSION_DATE strings. Returns
+  * None on unparseable input.
   */
 private object JavaDateParser {
   def parse(str: String): Option[java.util.Date] = {

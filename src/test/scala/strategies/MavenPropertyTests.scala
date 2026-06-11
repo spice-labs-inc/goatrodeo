@@ -173,7 +173,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
     (1, Gen.asciiStr.map(s => if (s.contains(".")) s else s + ".jar")),
     (1, Gen.const("foo-bar-baz-1.0-SNAPSHOT.jar")),
     (1, Gen.const("com.example.lib_2.13-3.0.0.jar")),
-    (1, Gen.listOf(Gen.oneOf('a','-','_','.','0')).map(_.mkString + ".jar"))
+    (1, Gen.listOf(Gen.oneOf('a', '-', '_', '.', '0')).map(_.mkString + ".jar"))
   )
 
   property(
@@ -327,7 +327,12 @@ class MavenPropertyTests extends ScalaCheckSuite {
     (2, genFormattedDate.map(_._1)),
     (1, Gen.alphaNumStr),
     (1, Gen.asciiStr),
-    (1, Gen.listOf(Gen.oneOf('0','9','-','/',':',' ','A','M')).map(_.mkString)),
+    (
+      1,
+      Gen
+        .listOf(Gen.oneOf('0', '9', '-', '/', ':', ' ', 'A', 'M'))
+        .map(_.mkString)
+    ),
     (1, Gen.choose(0L, 2000000000000L).map(_.toString))
   )
 
@@ -398,16 +403,26 @@ class MavenPropertyTests extends ScalaCheckSuite {
   // ------------------------------------------------------------------
 
   /** Generate random XML-ish strings that may or may not contain <project>
-    * tags.  This includes well-formed fragments, malformed tags, and random
+    * tags. This includes well-formed fragments, malformed tags, and random
     * ascii — the full input space for a parser that must be crash-proof.
     */
   val genPomXml: Gen[String] = Gen.frequency(
     (3, genPomXmlWithGav.map(_._1)),
     (2, Gen.asciiStr),
     (1, Gen.alphaNumStr),
-    (1, Gen.frequency((1, Gen.const("<project></project>")),
-                       (1, Gen.const("<project><groupId>g</groupId></project>")))),
-    (1, Gen.listOf(Gen.oneOf('<', '>', '/', '=', '"', 'a', 'b', 'c')).map(_.mkString))
+    (
+      1,
+      Gen.frequency(
+        (1, Gen.const("<project></project>")),
+        (1, Gen.const("<project><groupId>g</groupId></project>"))
+      )
+    ),
+    (
+      1,
+      Gen
+        .listOf(Gen.oneOf('<', '>', '/', '=', '"', 'a', 'b', 'c'))
+        .map(_.mkString)
+    )
   )
 
   property(
@@ -435,22 +450,28 @@ class MavenPropertyTests extends ScalaCheckSuite {
   val genProperties: Gen[Map[String, String]] = Gen.frequency(
     (3, genLiteralProps),
     (1, Gen.const(Map.empty[String, String])),
-    (1, genLiteralProps.map { m =>
-      // Inject an unresolved interpolation into one random value
-      if (m.isEmpty) m
-      else {
-        val (k, _) = m.head
-        m.updated(k, "${nonexistent.property}")
+    (
+      1,
+      genLiteralProps.map { m =>
+        // Inject an unresolved interpolation into one random value
+        if (m.isEmpty) m
+        else {
+          val (k, _) = m.head
+          m.updated(k, "${nonexistent.property}")
+        }
       }
-    }),
-    (1, genLiteralProps.map { m =>
-      // Inject a self-reference into one random value
-      if (m.isEmpty) m
-      else {
-        val (k, _) = m.head
-        m.updated(k, s"$${$k}")
+    ),
+    (
+      1,
+      genLiteralProps.map { m =>
+        // Inject a self-reference into one random value
+        if (m.isEmpty) m
+        else {
+          val (k, _) = m.head
+          m.updated(k, s"$${$k}")
+        }
       }
-    })
+    )
   )
 
   val genPropName: Gen[String] = Gen.frequency(
@@ -551,7 +572,9 @@ class MavenPropertyTests extends ScalaCheckSuite {
   // ------------------------------------------------------------------
 
   val genGradleCoord: Gen[String] = for {
-    group <- Gen.listOfN(3, Gen.alphaLowerStr.suchThat(_.nonEmpty)).map(_.mkString("."))
+    group <- Gen
+      .listOfN(3, Gen.alphaLowerStr.suchThat(_.nonEmpty))
+      .map(_.mkString("."))
     artifact <- Gen.alphaNumStr.suchThat(_.nonEmpty)
     version <- genVersion
   } yield s"$group:$artifact:$version"
@@ -571,7 +594,8 @@ class MavenPropertyTests extends ScalaCheckSuite {
   property("GradleLockfile.parseLockfile never crashes on arbitrary strings") {
     forAll(genGradleLockfile) { content =>
       val modern = GradleLockfile.parseLockfile(content, None)
-      val legacy = GradleLockfile.parseLockfile(content, Some("compileClasspath"))
+      val legacy =
+        GradleLockfile.parseLockfile(content, Some("compileClasspath"))
       // Must not throw, and must return a Vector
       modern.isInstanceOf[Vector[?]] && legacy.isInstanceOf[Vector[?]]
     }
@@ -600,13 +624,15 @@ class MavenPropertyTests extends ScalaCheckSuite {
     Gen.const("JVM_VARIANT=\"Hotspot\""),
     Gen.const("JAVA_VERSION_DATE=\"2024-07-16\""),
     Gen.alphaNumStr, // potentially malformed/missing required fields
-    Gen.const("")    // empty line
+    Gen.const("") // empty line
   )
 
   val genReleaseFile: Gen[String] =
     Gen.listOf(genReleaseLine).map(_.filter(_.nonEmpty).mkString("\n"))
 
-  property("JvmDistribution.parseReleaseFile never crashes on arbitrary strings") {
+  property(
+    "JvmDistribution.parseReleaseFile never crashes on arbitrary strings"
+  ) {
     forAll(genReleaseFile) { content =>
       // Must not throw; always returns a JvmReleaseData
       val data = JvmDistribution.parseReleaseFile(content)

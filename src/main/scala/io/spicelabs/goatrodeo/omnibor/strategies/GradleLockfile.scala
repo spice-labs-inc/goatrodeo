@@ -50,11 +50,10 @@ object GradleLockfile {
 
   /** Parse a Gradle lockfile (modern or legacy format) into dependency records.
     *
-    * Modern format (Gradle 7.0+):
-    *   `group:artifact:version=config1,config2,...`
+    * Modern format (Gradle 7.0+): `group:artifact:version=config1,config2,...`
     *
-    * Legacy format (Gradle 5.x-6.x):
-    *   `group:artifact:version` (one file per configuration)
+    * Legacy format (Gradle 5.x-6.x): `group:artifact:version` (one file per
+    * configuration)
     *
     * @param content
     *   raw lockfile text
@@ -115,9 +114,9 @@ object GradleLockfile {
     }
   }
 
-  /** Compute files to process for Gradle lockfile strategy.
-    * Claims files named `gradle.lockfile`, `buildscript-gradle.lockfile`, and
-    * legacy files in `dependency-locks` ending with `.lockfile`.
+  /** Compute files to process for Gradle lockfile strategy. Claims files named
+    * `gradle.lockfile`, `buildscript-gradle.lockfile`, and legacy files in
+    * `dependency-locks` ending with `.lockfile`.
     */
   def computeGradleLockfiles(
       byUUID: ToProcess.ByUUID,
@@ -131,13 +130,15 @@ object GradleLockfile {
       if name == "gradle.lockfile" ||
         name == "buildscript-gradle.lockfile" ||
         (name.endsWith(".lockfile") && path.contains("dependency-locks"))
-      content <- scala.util.Try(
-        wrapper.withStream(Helpers.slurpInputToString(_))
-      ).toOption
-      cfg = if (
-        name == "gradle.lockfile" || name == "buildscript-gradle.lockfile"
-      ) None
-      else configFromFilename(name)
+      content <- scala.util
+        .Try(
+          wrapper.withStream(Helpers.slurpInputToString(_))
+        )
+        .toOption
+      cfg =
+        if (name == "gradle.lockfile" || name == "buildscript-gradle.lockfile")
+          None
+        else configFromFilename(name)
       deps = parseLockfile(content, cfg)
     } yield (wrapper, deps)
 
@@ -284,8 +285,8 @@ class GradleLockfileState(deps: Vector[GradleDependency])
       marker: SingleMarker
   ): GradleLockfileState = this
 
-  /** Gradle lockfiles do not represent a single package, so no per-package
-    * tag is generated.
+  /** Gradle lockfiles do not represent a single package, so no per-package tag
+    * is generated.
     */
   override def maybePackageTag(
       marker: SingleMarker

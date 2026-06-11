@@ -579,7 +579,7 @@ class DockerSuite extends munit.FunSuite {
             val path = if (prefix.isEmpty) k else s"$prefix.$k"
             v match {
               case JObject(_) | JArray(_) => collectLeaves(v, path)
-              case _ => Set(path)
+              case _                      => Set(path)
             }
           }.toSet
         case JArray(arr) if arr.nonEmpty =>
@@ -616,14 +616,15 @@ class DockerSuite extends munit.FunSuite {
             "docker:BuildDate"
           ).exists(extra.contains)
         case None if leaf == "config.Env" => envKeys.nonEmpty
-        case None => false
+        case None                         => false
       }
       !hasStructured && !ignoredPaths.contains(leaf)
     }
 
     assert(
       unaccounted.isEmpty,
-      s"Config JSON leaves without structured representation or ignored status: ${unaccounted.toList.sorted.mkString(", ")}"
+      s"Config JSON leaves without structured representation or ignored status: ${unaccounted.toList.sorted
+          .mkString(", ")}"
     )
   }
 

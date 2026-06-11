@@ -12,7 +12,6 @@ import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
-import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 /** Phase 6 — JVM Distribution Strategy test suite.
@@ -298,12 +297,20 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) = state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val (purls, _) =
+      state.getPurls(wrapper, createTestItem("t"), SingleMarker())
     assert(purls.nonEmpty, "Adoptium corpus should produce pURL")
 
-    val (meta, _) = state.getMetadata(wrapper, createTestItem("t"), SingleMarker())
-    assert(meta.contains(MetadataKeyConstants.NAME), "Metadata should have Name")
-    assert(meta.contains(MetadataKeyConstants.VERSION), "Metadata should have Version")
+    val (meta, _) =
+      state.getMetadata(wrapper, createTestItem("t"), SingleMarker())
+    assert(
+      meta.contains(MetadataKeyConstants.NAME),
+      "Metadata should have Name"
+    )
+    assert(
+      meta.contains(MetadataKeyConstants.VERSION),
+      "Metadata should have Version"
+    )
   }
 
   test("corpus oracle-jdk8 produces pURL") {
@@ -317,7 +324,8 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) = state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val (purls, _) =
+      state.getPurls(wrapper, createTestItem("t"), SingleMarker())
     assert(purls.nonEmpty, "Oracle JDK 8 corpus should produce pURL")
     assert(purls.head.contains("oracle"), "pURL should reference oracle")
   }
@@ -333,7 +341,8 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) = state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val (purls, _) =
+      state.getPurls(wrapper, createTestItem("t"), SingleMarker())
     assert(purls.head.contains("amazon"), "Corretto should map to amazon")
   }
 
@@ -348,7 +357,8 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (meta, _) = state.getMetadata(wrapper, createTestItem("t"), SingleMarker())
+    val (meta, _) =
+      state.getMetadata(wrapper, createTestItem("t"), SingleMarker())
     val isJDK = meta.get(MetadataKeyConstants.adHoc("jvm")("IsJDK"))
     assert(isJDK.isDefined, "IsJDK key should be present")
     assertEquals(isJDK.get.head.value, "false", "Zulu corpus is a JRE")
