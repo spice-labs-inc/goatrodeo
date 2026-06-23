@@ -4,6 +4,7 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
@@ -15,7 +16,6 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PURLHelpers
@@ -69,11 +69,121 @@ case class ParsedMavenMetadata(
     versions: Vector[String]
 )
 
+/** Mutable accumulator for JAR-structure metadata collected during child
+  * processing via `accumulateInfo`. This replaces the 3 separate archive walks
+  * (manifest reading, extractAllEmbeddedGavs, buildJarStructureMetadata) that
+  * previously occurred in `beginProcessing(JAR)`.
+  *
+  * Why a separate case class instead of vars on MavenState?
+  *   - Separation of concerns: these fields are only relevant for the JAR
+  *     marker. POM/Metadata/Sources markers never touch them.
+  *   - MavenState stays focused on POM, metadata, and source concerns. Adding
+  *     20+ jar-specific vars would bloat it.
+  *   - `Option[JarAccumulatedState]` = None for non-JAR markers makes the
+  *     lifecycle explicit — you know accumulation hasn't started vs. has
+  *     started but found nothing.
+  *   - Testability: can unit-test the accumulation logic independently.
+  *   - Clear reset: `applyAccumulatedAugmentation` sets the field back to
+  *     `None` rather than resetting 20+ individual vars.
+  *
+  * Thread safety: this class is NOT thread-safe. It relies on the single-
+  * threaded processing pipeline in `ToProcess.process`. If the pipeline becomes
+  * multi-threaded in the future, this will need synchronization.
+  *
+  * @param manifest
+  *   TreeMap from MANIFEST.MF entries (lower-cased keys), populated when the
+  *   `META-INF/MANIFEST.MF` child entry is encountered
+  * @param buildDate
+  *   build date extracted from manifest headers, if present
+  * @param embeddedGavs
+  *   all embedded GAV tuples found in pom.properties files inside the JAR; each
+  *   tuple is (groupId, artifactId, version)
+  * @param embeddedProps
+  *   extracted pom.properties key-value pairs (lower-cased keys)
+  * @param embeddedPoms
+  *   all embedded pom.xml files found inside the JAR, stored with their archive
+  *   path so we can later select the "primary" one matching the JAR filename.
+  *   Replaces the single `embeddedPom` field that only stored one POM.
+  * @param jarType
+  *   detected JAR type (e.g., "spring-boot-fat-jar", "shaded-jar", "war",
+  *   "ear", "multi-release")
+  * @param nestedJars
+  *   paths to nested JARs found in BOOT-INF/lib/
+  * @param springBootMainClass
+  *   the Start-Class from Spring Boot manifest header
+  * @param layersIdx
+  *   lines from BOOT-INF/layers.idx (Spring Boot layered format)
+  * @param classpathIdx
+  *   lines from BOOT-INF/classpath.idx (Spring Boot classpath ordering)
+  * @param warLibJars
+  *   paths to JARs found in WEB-INF/lib/ (WAR structure)
+  * @param earModules
+  *   module names extracted from META-INF/application.xml (EAR structure)
+  * @param multiReleaseVersions
+  *   Java version numbers found under META-INF/versions/ (multi-release JAR)
+  * @param signatureFiles
+  *   paths to signature files (.sf, .rsa, .dsa) under META-INF/
+  * @param serviceProviders
+  *   map of service interface name to implementation class names, from
+  *   META-INF/services/ entries (ServiceLoader metadata)
+  * @param automaticModuleName
+  *   Automatic-Module-Name from manifest or module-info.class
+  * @param moduleRequires
+  *   / moduleExports / moduleOpens / moduleProvides / moduleUses JPMS module
+  *   descriptor data extracted from module-info.class via BCEL
+  * @param graalNativeImageProps
+  *   key-value pairs from
+  *   META-INF/native-image/[subdir]/native-image.properties
+  * @param jenkinsPlugin
+  *   true if this JAR is a Jenkins plugin (detected by Group-Id manifest header
+  *   or .jpi/.hpi file extension)
+  * @param osgiHeaders
+  *   OSGi bundle headers extracted from manifest (Bundle-Name, Export-Package,
+  *   Import-Package, etc.)
+  */
+case class JarAccumulatedState(
+    var manifest: TreeMap[String, TreeSet[StringOrPair]] = TreeMap.empty,
+    var buildDate: Option[Date] = None,
+    var embeddedGavs: Vector[(String, String, String)] = Vector.empty,
+    var embeddedProps: Map[String, String] = Map.empty,
+    var embeddedPoms: Vector[(String, PomParser.ParsedPom)] = Vector.empty,
+    var jarType: Option[String] = None,
+    var nestedJars: Vector[String] = Vector.empty,
+    var springBootMainClass: Option[String] = None,
+    var layersIdx: Vector[String] = Vector.empty,
+    var classpathIdx: Vector[String] = Vector.empty,
+    var warLibJars: Vector[String] = Vector.empty,
+    var earModules: Vector[String] = Vector.empty,
+    var multiReleaseVersions: Vector[String] = Vector.empty,
+    var signatureFiles: Vector[String] = Vector.empty,
+    var serviceProviders: Map[String, Vector[String]] = Map.empty,
+    var automaticModuleName: Option[String] = None,
+    var moduleRequires: Vector[String] = Vector.empty,
+    var moduleExports: Vector[String] = Vector.empty,
+    var moduleOpens: Vector[String] = Vector.empty,
+    var moduleProvides: Map[String, Vector[String]] = Map.empty,
+    var moduleUses: Vector[String] = Vector.empty,
+    var graalNativeImageProps: Map[String, String] = Map.empty,
+    var jenkinsPlugin: Boolean = false,
+    var osgiHeaders: Map[String, String] = Map.empty
+)
+
 /** State maintained during Maven artifact processing.
   *
   * Tracks POM file content and source file mappings to enable:
   *   - Package URL generation from POM metadata
   *   - Source-to-class file mapping for "built from" relationships
+  *
+  * For JAR markers, metadata is accumulated during child processing via
+  * `JarAccumulatedState` (the `jarAccumulated` field). GAV resolution and pURL
+  * generation are deferred to `applyAccumulatedAugmentation`, which runs after
+  * all children have been processed.
+  *
+  * IMPORTANT: Several fields are `var` rather than `val` because they are
+  * mutated in `applyAccumulatedAugmentation` after child processing completes.
+  * The `jarAccumulated` field is set in `beginProcessing(JAR)`, populated via
+  * `accumulateInfo` during child processing, consumed in
+  * `applyAccumulatedAugmentation`, and then reset to `None`.
   *
   * @param pomFile
   *   the raw POM file content as a string
@@ -85,14 +195,25 @@ case class ParsedMavenMetadata(
   *   map of source filenames to their Items
   * @param sourceGitoids
   *   map of source filenames to their GitOIDs
-  * @param manifest
-  *   TreeMap from MANIFEST.MF entries (lower-cased keys)
-  * @param embeddedGavs
-  *   all embedded GAV tuples found inside JARs (groupId, artifactId, version)
-  * @param embeddedProps
-  *   extracted pom.properties key-value pairs
-  * @param embeddedPom
-  *   parsed embedded pom.xml inside the JAR
+  * @param groupId
+  *   resolved group ID (mutable: set in beginProcessing for POM, set in
+  *   applyAccumulatedAugmentation for JAR)
+  * @param artifactId
+  *   resolved artifact ID (mutable: same lifecycle as groupId)
+  * @param version
+  *   resolved version (mutable: same lifecycle as groupId)
+  * @param buildDate
+  *   build date from manifest or POM (mutable: may be updated from accumulated
+  *   manifest data)
+  * @param metadataXmlContent
+  *   raw maven-metadata.xml content (for Metadata marker)
+  * @param parsedMetadata
+  *   parsed maven-metadata.xml (for Metadata marker)
+  * @param jarAccumulated
+  *   mutable accumulator for JAR-structure metadata;
+  *   `Some(JarAccumulatedState())` during JAR processing (set in
+  *   beginProcessing), `None` otherwise; reset to `None` after
+  *   `applyAccumulatedAugmentation` consumes it
   */
 case class MavenState(
     pomFile: String = "",
@@ -100,16 +221,13 @@ case class MavenState(
     parsedPom: Option[PomParser.ParsedPom] = None,
     sources: Map[String, Item] = Map(),
     sourceGitoids: Map[String, GitOID] = Map(),
-    groupId: Option[String] = None,
-    artifactId: Option[String] = None,
-    version: Option[String] = None,
-    buildDate: Option[Date] = None,
-    manifest: TreeMap[String, TreeSet[StringOrPair]] = TreeMap.empty,
-    embeddedGavs: Vector[(String, String, String)] = Vector.empty,
-    embeddedProps: Map[String, String] = Map.empty,
-    embeddedPom: Option[PomParser.ParsedPom] = None,
-    metadataXmlContent: Option[String] = None,
-    parsedMetadata: Option[ParsedMavenMetadata] = None
+    var groupId: Option[String] = None,
+    var artifactId: Option[String] = None,
+    var version: Option[String] = None,
+    var buildDate: Option[Date] = None,
+    var metadataXmlContent: Option[String] = None,
+    var parsedMetadata: Option[ParsedMavenMetadata] = None,
+    var jarAccumulated: Option[JarAccumulatedState] = None
 ) extends ProcessingState[MavenMarkers, MavenState] {
   private lazy val logger = Logger(getClass())
 
@@ -343,50 +461,8 @@ case class MavenState(
       .headOption
   }
 
-  /** Open a JAR artifact and enumerate embedded pom.properties + pom.xml
-    * entries. Returns all embedded GAVs, all parsed properties, and all parsed
-    * embedded POMs.
+  /** Parse a Java properties-style string (key=value lines).
     */
-  private def extractAllEmbeddedGavs(
-      artifact: ArtifactWrapper
-  ): (
-      Vector[(String, String, String)],
-      Map[String, String],
-      Vector[(String, PomParser.ParsedPom)]
-  ) = {
-    var gavs = Vector.empty[(String, String, String)]
-    var props = Map.empty[String, String]
-    var poms = Vector.empty[(String, PomParser.ParsedPom)]
-
-    FileWalker.withinArchiveStream(artifact) { entries =>
-      entries.foreach { entry =>
-        val path = entry.path().toLowerCase
-        if (path.startsWith("meta-inf/maven/") && !path.contains("..")) {
-          if (path.endsWith("/pom.properties")) {
-            val content = entry.withStream(Helpers.slurpInputToString(_))
-            val parsed = parsePropertiesString(content)
-            for {
-              g <- parsed.get("groupid")
-              a <- parsed.get("artifactid")
-              v <- parsed.get("version")
-            } {
-              gavs = gavs :+ (g, a, v)
-            }
-            props = props ++ parsed
-          } else if (path.endsWith("/pom.xml")) {
-            val content = entry.withStream(Helpers.slurpInputToString(_))
-            PomParser.parse(content).foreach { p =>
-              poms = poms :+ (entry.path(), p)
-            }
-          }
-        }
-      }
-    }
-
-    (gavs, props, poms)
-  }
-
-  /** Parse a Java properties-style string (key=value lines). */
   private def parsePropertiesString(text: String): Map[String, String] = {
     text.linesIterator
       .map(_.trim)
@@ -459,70 +535,24 @@ case class MavenState(
       )
 
     case MavenMarkers.JAR =>
-      // Read manifest
-      val (manifestMap, manifestBuildDate) = FileWalker
-        .withinArchiveStream(artifact) { files =>
-          files
-            .filter(_.path().toUpperCase() == "META-INF/MANIFEST.MF")
-            .headOption match {
-            case Some(manifestFile) =>
-              val manifestStr =
-                manifestFile.withStream(Helpers.slurpInputToString(_))
-              val map = Helpers.treeInfoFromManifest(manifestStr)
-              (map, buildDateFromManifest(map))
-            case None =>
-              (TreeMap.empty[String, TreeSet[StringOrPair]], None)
-          }
-        }
-        .getOrElse((TreeMap.empty[String, TreeSet[StringOrPair]], None))
-
-      // Extract embedded pom.properties + pom.xml
-      val (embedGavs, embedProps, embedPoms) = extractAllEmbeddedGavs(artifact)
-
-      // Determine primary embedded GAV (matching filename)
-      val filenameArt = artifact.filenameWithNoPath.takeWhile(_ != '.')
-      val primaryOpt = determinePrimaryGav(embedGavs, filenameArt)
-
-      // Determine primary embedded POM — match by artifactId or path
-      val primaryPomOpt = embedPoms.collectFirst {
-        case (_, p)
-            if p.artifactId.exists(a =>
-              filenameArt.contains(a) || a.contains(filenameArt)
-            ) =>
-          p
-      }
-
-      // Build effective embedded props map (prefer primary if ambiguous).
-      // If no primary match, do NOT fall back to a random dependency's
-      // properties from a fat jar; let the priority chain fall through
-      // to external POM / manifest / filename.
-      val effectiveProps = primaryOpt
-        .map { case (g, a, v) =>
-          Map("groupId" -> g, "artifactId" -> a, "version" -> v)
-        }
-        .getOrElse(Map.empty)
-
-      // Resolve final GAV via priority chain
-      val (g, a, v) = resolveGAV(
-        artifact = artifact,
-        externalPom = this.parsedPom,
-        manifest = manifestMap,
-        embeddedProps = effectiveProps,
-        embeddedPom = primaryPomOpt
-      )
-
-      val finalBuildDate = manifestBuildDate.orElse(this.buildDate)
-
-      this.copy(
-        manifest = manifestMap,
-        embeddedGavs = embedGavs,
-        embeddedProps = embedProps,
-        embeddedPom = primaryPomOpt,
-        groupId = g,
-        artifactId = a,
-        version = v,
-        buildDate = finalBuildDate
-      )
+      // Initialize the JAR accumulation container. No archive walks here —
+      // all metadata is collected via `accumulateInfo` as children are
+      // processed, then applied in `applyAccumulatedAugmentation` after all
+      // children are done.
+      //
+      // Previously, beginProcessing(JAR) opened the archive 3 times:
+      //   1. To read META-INF/MANIFEST.MF (manifest map + build date)
+      //   2. To extract pom.properties/pom.xml (extractAllEmbeddedGavs)
+      //   3. To scan for jar structure metadata (buildJarStructureMetadata)
+      // Now the same entries are encountered during child processing and
+      // accumulated via the `accumulateInfo` override in the ParentScope
+      // created by `generateParentScope(JAR)`.
+      //
+      // GAV resolution is deferred to `applyAccumulatedAugmentation` because
+      // it requires data from children (manifest, embedded pom.properties,
+      // etc.) that isn't available until after child processing completes.
+      this.jarAccumulated = Some(JarAccumulatedState())
+      this
 
     case MavenMarkers.Metadata =>
       val xmlContent = artifact.withStream(Helpers.slurpInputToString(_))
@@ -543,8 +573,20 @@ case class MavenState(
       item: Item,
       marker: MavenMarkers
   ): (Vector[String], MavenState) = {
-    (groupId, artifactId, version) match {
-      case (Some(g), Some(a), Some(v)) =>
+    // For JAR markers, GAV is not yet resolved at this point in the pipeline.
+    // getPurls is called BEFORE children are processed, but GAV depends on
+    // data accumulated from children (manifest, pom.properties, etc.).
+    // The pURL is instead generated in applyAccumulatedAugmentation after
+    // all children have been processed and GAV has been resolved.
+    //
+    // For non-JAR markers (POM, Sources, JavaDocs, Metadata), GAV is already
+    // available from beginProcessing, so we generate the pURL here as before.
+    (groupId, artifactId, version, jarAccumulated) match {
+      case (_, _, _, Some(_)) =>
+        // JAR accumulation in progress — GAV not yet resolved.
+        // pURL will be created in applyAccumulatedAugmentation.
+        (Vector.empty, this)
+      case (Some(g), Some(a), Some(v), None) =>
         val classifier = marker match {
           case MavenMarkers.JAR      => None
           case MavenMarkers.Sources  => Some("sources")
@@ -576,6 +618,12 @@ case class MavenState(
       marker: MavenMarkers
   ): (TreeMap[String, TreeSet[StringOrPair]], MavenState) = {
 
+    // For JAR markers, manifest data lives in jarAccumulated.
+    // For other markers, there is no manifest.
+    val currentManifest = jarAccumulated
+      .map(_.manifest)
+      .getOrElse(TreeMap.empty[String, TreeSet[StringOrPair]])
+
     val baseTree = if (pomFile.length() > 4) {
       TreeMap("pom" -> TreeSet(StringOrPair("text/xml", pomFile)))
     } else TreeMap.empty[String, TreeSet[StringOrPair]]
@@ -590,7 +638,7 @@ case class MavenState(
 
     val licenseMeta = buildLicenseMetadata(
       parsedPom.map(_.licenses).getOrElse(Vector.empty),
-      manifest
+      currentManifest
     )
 
     val parentMeta = parsedPom
@@ -598,20 +646,585 @@ case class MavenState(
       .getOrElse(TreeMap.empty[String, TreeSet[StringOrPair]])
     val metaMeta = buildMavenMetadata()
 
+    // For JAR markers, build jar-structure metadata from the accumulated
+    // state (no archive walk). This may be called before children are
+    // fully processed, in which case jarAccumulated may be partially
+    // populated. The full metadata is also applied in
+    // applyAccumulatedAugmentation after all children are done.
     val jarStructureMeta = marker match {
-      case MavenMarkers.JAR => buildJarStructureMetadata(artifact, manifest)
-      case _                => TreeMap.empty[String, TreeSet[StringOrPair]]
+      case MavenMarkers.JAR =>
+        buildJarStructureMetadataFromAccumulated(jarAccumulated)
+      case _ => TreeMap.empty[String, TreeSet[StringOrPair]]
     }
 
     val merged1 = Helpers.mergeTreeMaps(baseTree, extendedPomMeta)
     val merged2 = Helpers.mergeTreeMaps(merged1, depMeta)
     val merged3 = Helpers.mergeTreeMaps(merged2, licenseMeta)
-    val merged4 = Helpers.mergeTreeMaps(merged3, manifest)
+    val merged4 = Helpers.mergeTreeMaps(merged3, currentManifest)
     val merged5 = Helpers.mergeTreeMaps(merged4, parentMeta)
     val merged6 = Helpers.mergeTreeMaps(merged5, metaMeta)
     val merged7 = Helpers.mergeTreeMaps(merged6, jarStructureMeta)
 
     merged7 -> this
+  }
+
+  /** Accumulate metadata from a child artifact into the JAR accumulation state.
+    * This is called from `passToParent` in the processing pipeline for each
+    * child entry found inside a JAR archive.
+    *
+    * The method inspects the child's path to determine what kind of metadata it
+    * contains (manifest, pom.properties, pom.xml, Spring Boot entries, etc.)
+    * and mutates the `JarAccumulatedState` fields directly.
+    *
+    * This replaces the 3 separate archive walks that previously occurred in
+    * `beginProcessing(JAR)`:
+    *   - manifest reading → handled by META-INF/MANIFEST.MF path check
+    *   - extractAllEmbeddedGavs → handled by pom.properties/pom.xml checks
+    *   - buildJarStructureMetadata → handled by all other path checks
+    *
+    * Path traversal protection: any path containing ".." is silently skipped to
+    * prevent malicious JAR entries from escaping the archive structure.
+    *
+    * @param parentId
+    *   the GitOID of the parent JAR item
+    * @param item
+    *   the child Item (unused here; metadata comes from the artifact)
+    * @param artifact
+    *   the child ArtifactWrapper — its path() identifies the entry type
+    * @param store
+    *   the Storage (unused here; all writes happen in
+    *   applyAccumulatedAugmentation)
+    */
+  def accumulateInfo(
+      parentId: String,
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): Unit = {
+    // Only accumulate if we're in JAR processing mode
+    val acc = jarAccumulated match {
+      case Some(a) => a
+      case None    => return
+    }
+    val path = artifact.path()
+    val lowerPath = path.toLowerCase
+
+    // Path traversal protection — skip entries that could escape the archive
+    if (path.contains("..")) return
+
+    // ---- META-INF/MANIFEST.MF ----
+    // The manifest is the single richest source of JAR metadata.
+    // It provides: OSGi headers, Spring Boot main class, automatic module
+    // name, multi-release flag, shade plugin detection, Jenkins detection,
+    // and build date.
+    if (lowerPath == "meta-inf/manifest.mf") {
+      val manifestStr = artifact.withStream(Helpers.slurpInputToString(_))
+      val map = Helpers.treeInfoFromManifest(manifestStr)
+      acc.manifest = map
+      acc.buildDate = buildDateFromManifest(map)
+
+      // Spring Boot Start-Class
+      acc.springBootMainClass =
+        map.get("start-class").flatMap(_.headOption).map(_.value)
+
+      // Automatic-Module-Name
+      acc.automaticModuleName =
+        map.get("automatic-module-name").flatMap(_.headOption).map(_.value)
+
+      // Multi-Release JAR detection
+      if (
+        map
+          .get("multi-release")
+          .flatMap(_.headOption)
+          .map(_.value)
+          .exists(_.toLowerCase == "true")
+      ) {
+        acc.jarType = Some("multi-release")
+      }
+
+      // Shade plugin detection via Created-By header
+      if (
+        map
+          .get("created-by")
+          .flatMap(_.headOption)
+          .map(_.value)
+          .exists(_.toLowerCase.contains("shade plugin"))
+      ) {
+        acc.jarType = Some("shaded-jar")
+      }
+
+      // Jenkins plugin detection via Group-Id manifest header
+      val isJenkinsByGroupId = map
+        .get("group-id")
+        .flatMap(_.headOption)
+        .map(_.value)
+        .exists(_.toLowerCase.contains("jenkins.plugins"))
+      val isJenkinsByExt = {
+        val lower = artifact.filenameWithNoPath.toLowerCase
+        // We can't check the JAR's own extension from a child entry,
+        // so we check the filename from the parent artifact's name.
+        // This is a limitation — jenkins detection by extension is
+        // handled in applyAccumulatedAugmentation using the parent
+        // artifact's filename.
+        lower.endsWith(".jpi") || lower.endsWith(".hpi")
+      }
+      if (isJenkinsByGroupId || isJenkinsByExt) {
+        acc.jenkinsPlugin = true
+      }
+
+      // OSGi headers from manifest
+      val osgiKeys = Vector(
+        "bundle-name" -> "BundleName",
+        "bundle-description" -> "BundleDescription",
+        "bundle-vendor" -> "BundleVendor",
+        "bundle-docurl" -> "BundleDocURL"
+      )
+      val osgiValues = osgiKeys.flatMap { case (mk, ok) =>
+        map.get(mk).flatMap(_.headOption).map(_.value).map(ok -> _)
+      }
+      val fullOsgiKeys = Vector(
+        "export-package" -> "ExportPackage",
+        "import-package" -> "ImportPackage",
+        "require-capability" -> "RequireCapability",
+        "provide-capability" -> "ProvideCapability",
+        "fragment-host" -> "FragmentHost"
+      )
+      val fullOsgiValues = fullOsgiKeys.flatMap { case (mk, ok) =>
+        map.get(mk).flatMap(_.headOption).map(_.value).map(ok -> _)
+      }
+      acc.osgiHeaders = (osgiValues ++ fullOsgiValues).toMap
+    }
+
+    // ---- META-INF/maven/*/pom.properties ----
+    // Extract GAV coordinates and properties from embedded pom.properties.
+    // All GAVs are accumulated; primary selection happens later in
+    // applyAccumulatedAugmentation using determinePrimaryGav.
+    if (
+      lowerPath
+        .startsWith("meta-inf/maven/") && lowerPath.endsWith("/pom.properties")
+    ) {
+      val content = artifact.withStream(Helpers.slurpInputToString(_))
+      val parsed = parsePropertiesString(content)
+      for {
+        g <- parsed.get("groupid")
+        a <- parsed.get("artifactid")
+        v <- parsed.get("version")
+      } {
+        acc.embeddedGavs = acc.embeddedGavs :+ (g, a, v)
+      }
+      acc.embeddedProps = acc.embeddedProps ++ parsed
+    }
+
+    // ---- META-INF/maven/*/pom.xml ----
+    // Parse embedded POM files. All POMs are stored with their path;
+    // primary selection happens later in applyAccumulatedAugmentation.
+    if (
+      lowerPath.startsWith("meta-inf/maven/") && lowerPath.endsWith("/pom.xml")
+    ) {
+      val content = artifact.withStream(Helpers.slurpInputToString(_))
+      PomParser.parse(content).foreach { p =>
+        acc.embeddedPoms = acc.embeddedPoms :+ (path, p)
+      }
+    }
+
+    // ---- Spring Boot fat JAR detection ----
+    if (lowerPath.startsWith("boot-inf/classes/")) {
+      acc.jarType = acc.jarType.orElse(Some("spring-boot-fat-jar"))
+    }
+    if (lowerPath.startsWith("boot-inf/lib/") && lowerPath.endsWith(".jar")) {
+      acc.nestedJars = acc.nestedJars :+ path
+    }
+    if (lowerPath == "boot-inf/layers.idx") {
+      acc.layersIdx = artifact
+        .withStream(Helpers.slurpInputToString(_))
+        .linesIterator
+        .filter(_.nonEmpty)
+        .toVector
+    }
+    if (lowerPath == "boot-inf/classpath.idx") {
+      acc.classpathIdx = artifact
+        .withStream(Helpers.slurpInputToString(_))
+        .linesIterator
+        .filter(_.nonEmpty)
+        .toVector
+    }
+
+    // ---- Maven Shade Plugin detection ----
+    if (lowerPath.contains("maven-shade-plugin")) {
+      acc.jarType = acc.jarType.orElse(Some("shaded-jar"))
+    }
+
+    // ---- WAR structure ----
+    if (lowerPath.startsWith("web-inf/lib/") && lowerPath.endsWith(".jar")) {
+      acc.warLibJars = acc.warLibJars :+ path
+    }
+    if (lowerPath == "web-inf/web.xml") {
+      acc.jarType = acc.jarType.orElse(Some("war"))
+    }
+
+    // ---- EAR structure ----
+    if (lowerPath == "meta-inf/application.xml") {
+      acc.jarType = acc.jarType.orElse(Some("ear"))
+      val appXmlStr = artifact.withStream(Helpers.slurpInputToString(_))
+      val modulePattern =
+        "<(ejb|web-uri|alt-dd|connector|java|web)>([^<]+)</(ejb|web-uri|alt-dd|connector|java|web)>".r
+      val extracted = modulePattern
+        .findAllMatchIn(appXmlStr)
+        .map(m => Option(m.group(2)).map(_.trim).getOrElse(""))
+        .filter(_.nonEmpty)
+        .toVector
+        .distinct
+      acc.earModules = acc.earModules ++ extracted
+    }
+
+    // ---- Multi-Release JAR versions ----
+    if (lowerPath.startsWith("meta-inf/versions/")) {
+      val parts = lowerPath.split('/')
+      if (parts.length >= 3) {
+        val ver = parts(2)
+        if (!acc.multiReleaseVersions.contains(ver)) {
+          acc.multiReleaseVersions = acc.multiReleaseVersions :+ ver
+        }
+      }
+    }
+
+    // ---- JAR signatures ----
+    if (
+      lowerPath.startsWith("meta-inf/") && (lowerPath.endsWith(
+        ".sf"
+      ) || lowerPath.endsWith(".rsa") || lowerPath.endsWith(".dsa"))
+    ) {
+      acc.signatureFiles = acc.signatureFiles :+ path
+    }
+
+    // ---- ServiceLoader providers ----
+    if (lowerPath.startsWith("meta-inf/services/")) {
+      val serviceName = path.substring("meta-inf/services/".length)
+      val impls = artifact
+        .withStream(Helpers.slurpInputToString(_))
+        .linesIterator
+        .filter(_.nonEmpty)
+        .toVector
+      acc.serviceProviders = acc.serviceProviders + (serviceName -> impls)
+    }
+
+    // ---- JPMS module-info.class ----
+    if (lowerPath == "module-info.class") {
+      val bytes = artifact.withStream(Helpers.slurpInputNoClose)
+      parseModuleInfoClass(bytes).foreach { info =>
+        acc.automaticModuleName = Some(info.name)
+        acc.moduleRequires = info.requires
+        acc.moduleExports = info.exports
+        acc.moduleOpens = info.opens
+        acc.moduleProvides = info.provides
+        acc.moduleUses = info.uses
+      }
+    }
+
+    // ---- GraalVM native-image.properties ----
+    if (
+      lowerPath.endsWith("native-image.properties") && lowerPath.startsWith(
+        "meta-inf/native-image/"
+      )
+    ) {
+      val props = artifact
+        .withStream(Helpers.slurpInputToString(_))
+        .linesIterator
+        .filterNot(_.trim.startsWith("#"))
+        .filter(_.contains("="))
+        .map { line =>
+          val idx = line.indexOf('=')
+          line.substring(0, idx).trim -> line.substring(idx + 1).trim
+        }
+        .toMap
+      acc.graalNativeImageProps = acc.graalNativeImageProps ++ props
+    }
+  }
+
+  /** Apply accumulated JAR metadata to the item in the store.
+    *
+    * This method runs AFTER all children have been processed and
+    * `accumulateInfo` has been called for each child. It:
+    *
+    *   1. Resolves GAV from the accumulated data (manifest, pom.properties,
+    *      embedded POM) using the 5-level priority chain in `resolveGAV`. 2.
+    *      Creates/updates the pURL item in the store with an `aliasTo` edge
+    *      pointing back to the JAR item. A single pURL can have multiple
+    *      `aliasTo` entries (e.g., if the same GAV appears in multiple JARs).
+    *      3. Updates the JAR item with an `aliasFrom` edge pointing to the pURL
+    *      and merges jar-structure metadata into the item's body. 4. Clears the
+    *      `jarAccumulated` state to prevent double-application.
+    *
+    * IMPORTANT: All store operations use the `store.write(path, opr, ctx)`
+    * callback pattern. There are NO standalone `store.read` calls followed by
+    * `store.write` — the read-modify-write cycle is always within a single
+    * `store.write` call to maintain the row-level lock. There are also NO
+    * nested `store.write` calls for the same path (which would deadlock on the
+    * row lock).
+    *
+    * @param item
+    *   the JAR Item that was written to the store during processing
+    * @param artifact
+    *   the JAR ArtifactWrapper (used for filename heuristics in GAV resolution)
+    * @param store
+    *   the Storage to update with pURL items and backlinks
+    * @return
+    *   this MavenState with jarAccumulated cleared to None
+    */
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): MavenState = {
+    jarAccumulated match {
+      case None =>
+        // Non-JAR marker or already applied — nothing to do
+        this
+      case Some(acc) =>
+        // ---- Step 1: Resolve GAV from accumulated data ----
+        // Select the primary embedded GAV that matches the JAR filename.
+        // This prevents a fat JAR's random embedded dependencies from
+        // overriding the JAR's own identity.
+        val filenameArt = artifact.filenameWithNoPath.takeWhile(_ != '.')
+        val primaryOpt = determinePrimaryGav(acc.embeddedGavs, filenameArt)
+
+        // Build effective embedded props map (prefer primary if ambiguous).
+        // If no primary match, do NOT fall back to a random dependency's
+        // properties from a fat jar; let the priority chain fall through
+        // to external POM / manifest / filename.
+        val effectiveProps = primaryOpt
+          .map { case (g, a, v) =>
+            Map("groupId" -> g, "artifactId" -> a, "version" -> v)
+          }
+          .getOrElse(Map.empty)
+
+        // Select the primary embedded POM (matching the JAR filename)
+        val primaryPomOpt = acc.embeddedPoms.collectFirst {
+          case (_, p)
+              if p.artifactId.exists(a =>
+                filenameArt.contains(a) || a.contains(filenameArt)
+              ) =>
+            p
+        }
+
+        // Resolve final GAV via the 5-level priority chain:
+        //   1. embeddedProps (pom.properties)
+        //   2. externalPom (parsedPom from external POM file)
+        //   3. embeddedPom (pom.xml inside JAR)
+        //   4. manifest OSGi / standard headers
+        //   5. filename heuristics
+        val (g, a, v) = resolveGAV(
+          artifact = artifact,
+          externalPom = this.parsedPom,
+          manifest = acc.manifest,
+          embeddedProps = effectiveProps,
+          embeddedPom = primaryPomOpt
+        )
+        this.groupId = g
+        this.artifactId = a
+        this.version = v
+        this.buildDate = acc.buildDate.orElse(this.buildDate)
+
+        // Jenkins plugin detection by file extension — this can only be
+        // done here (not in accumulateInfo) because the child entries
+        // don't carry the JAR's own filename.
+        if (!acc.jenkinsPlugin) {
+          val lower = artifact.filenameWithNoPath.toLowerCase
+          if (lower.endsWith(".jpi") || lower.endsWith(".hpi")) {
+            acc.jenkinsPlugin = true
+          }
+        }
+
+        // Build jar-structure metadata tree from accumulated state
+        val jarStructureMeta =
+          buildJarStructureMetadataFromAccumulated(Some(acc))
+
+        // Build the full metadata tree that getMetadata would produce
+        // NOW (after children are processed), since getMetadata ran before
+        // children and had an empty manifest/pomFile. The manifest and
+        // pom entries must be merged into the store item here.
+        val fullMeta = {
+          val manifestTree = acc.manifest
+          val baseTree =
+            if (pomFile.length() > 4)
+              TreeMap("pom" -> TreeSet(StringOrPair("text/xml", pomFile)))
+            else TreeMap.empty[String, TreeSet[StringOrPair]]
+          val extendedPomMeta = parsedPom
+            .map(buildExtendedPomMetadata)
+            .getOrElse(TreeMap.empty[String, TreeSet[StringOrPair]])
+          val depMeta = parsedPom
+            .map(buildDependencyMetadata)
+            .getOrElse(TreeMap.empty[String, TreeSet[StringOrPair]])
+          val licenseMeta = buildLicenseMetadata(
+            parsedPom.map(_.licenses).getOrElse(Vector.empty),
+            manifestTree
+          )
+          val parentMeta = parsedPom
+            .map(buildParentPomMetadata)
+            .getOrElse(TreeMap.empty[String, TreeSet[StringOrPair]])
+          val metaMeta = buildMavenMetadata()
+          Helpers.mergeTreeMaps(
+            Helpers.mergeTreeMaps(
+              Helpers.mergeTreeMaps(
+                Helpers.mergeTreeMaps(
+                  Helpers.mergeTreeMaps(
+                    Helpers.mergeTreeMaps(
+                      Helpers.mergeTreeMaps(baseTree, extendedPomMeta),
+                      depMeta
+                    ),
+                    licenseMeta
+                  ),
+                  manifestTree
+                ),
+                parentMeta
+              ),
+              metaMeta
+            ),
+            jarStructureMeta
+          )
+        }
+
+        // ---- Step 2: Create/update pURL and fix backlinks ----
+        // For a complete GAV, create a pURL item and establish bidirectional
+        // alias edges:
+        //   - pURL item gets aliasTo -> JAR item
+        //   - JAR item gets aliasFrom -> pURL
+        //
+        // A single pURL can have multiple aliasTo entries (e.g., if the
+        // same GAV appears in multiple JARs, each JAR gets its own aliasTo
+        // entry on the shared pURL item).
+        (g, a, v) match {
+          case (Some(groupId), Some(artId), Some(ver)) =>
+            val purl = PURLHelpers
+              .buildPackageURL(
+                Ecosystems.Maven,
+                Some(groupId),
+                artId,
+                ver,
+                None
+              )
+              .toCanonical()
+              .nn
+
+            // Register the pURL with the store's pURL index
+            store.addPurl(purl)
+
+            // WRITE 1: Update JAR item — add aliasFrom -> pURL and merge
+            // full metadata (manifest, pom, jar-structure, etc.).
+            // Uses store.write callback to ensure atomic read-modify-write
+            // under the row-level lock.
+            // No prior store.read call; no nested store.write for same path.
+            store.write(
+              item.identifier,
+              {
+                case Some(existing) =>
+                  val withAlias = existing.copy(
+                    connections =
+                      existing.connections + (EdgeType.aliasFrom -> purl)
+                  )
+                  val withMeta =
+                    if (fullMeta.nonEmpty)
+                      withAlias.enhanceWithMetadata(
+                        extra = fullMeta,
+                        filenames = Vector.empty,
+                        mimeTypes = Vector.empty
+                      )
+                    else withAlias
+                  Some(withMeta)
+                case None =>
+                  val base = item.copy(
+                    connections =
+                      item.connections + (EdgeType.aliasFrom -> purl)
+                  )
+                  val withMeta =
+                    if (fullMeta.nonEmpty)
+                      base.enhanceWithMetadata(
+                        extra = fullMeta,
+                        filenames = Vector.empty,
+                        mimeTypes = Vector.empty
+                      )
+                    else base
+                  Some(withMeta)
+              },
+              _ => s"accumulated augmentation: aliasFrom $purl + metadata"
+            )
+
+            // WRITE 2: Create/update pURL item with aliasTo -> JAR item.
+            // Different path from WRITE 1, so different row lock — no
+            // deadlock risk. If the pURL item already exists (another JAR
+            // with the same GAV), we add another aliasTo entry.
+            store.write(
+              purl,
+              {
+                case Some(existingPurlItem) =>
+                  // pURL item already exists — add another aliasTo pointing
+                  // to this JAR item
+                  Some(
+                    existingPurlItem.copy(
+                      connections =
+                        existingPurlItem.connections + (EdgeType.aliasTo -> item.identifier)
+                    )
+                  )
+                case None =>
+                  // First time we've seen this pURL — create the item
+                  Some(
+                    Item(
+                      purl,
+                      TreeSet(EdgeType.aliasTo -> item.identifier),
+                      Some(ItemMetaData.mimeType),
+                      Some(
+                        ItemMetaData(
+                          fileNames = TreeSet(purl),
+                          mimeType = TreeSet[String](),
+                          fileSize = 0,
+                          extra = TreeMap[String, TreeSet[StringOrPair]]()
+                        )
+                      )
+                    )
+                  )
+              },
+              _ => s"pURL item for $purl"
+            )
+
+          case _ =>
+            // Incomplete GAV — no pURL generated, but still apply full
+            // metadata (manifest, pom, jar-structure, etc.) from accumulated
+            // state
+            if (fullMeta.nonEmpty) {
+              store.write(
+                item.identifier,
+                {
+                  case Some(existing) =>
+                    Some(
+                      existing.enhanceWithMetadata(
+                        extra = fullMeta,
+                        filenames = Vector.empty,
+                        mimeTypes = Vector.empty
+                      )
+                    )
+                  case None =>
+                    Some(
+                      item.enhanceWithMetadata(
+                        extra = fullMeta,
+                        filenames = Vector.empty,
+                        mimeTypes = Vector.empty
+                      )
+                    )
+                },
+                _ => "accumulated augmentation: metadata only (no pURL)"
+              )
+            }
+        }
+
+        // ---- Step 3: Clear accumulated state ----
+        // All accumulated data has been consumed (GAV resolved, pURL
+        // created, metadata merged). Reset to None to prevent
+        // double-application if applyAccumulatedAugmentation is somehow
+        // called again.
+        this.jarAccumulated = None
+
+        this
+    }
   }
 
   /** Map extended ParsedPom fields to MetadataKeyConstants keys. */
@@ -921,322 +1534,133 @@ case class MavenState(
   }
 
   /** Scan a JAR/WAR/EAR archive for structural metadata (Phase 5). */
-  private def buildJarStructureMetadata(
-      artifact: ArtifactWrapper,
-      manifest: TreeMap[String, TreeSet[StringOrPair]]
-  ): TreeMap[String, TreeSet[StringOrPair]] = {
-    var jarType: Option[String] = None
-    var nestedJars = Vector.empty[String]
-    var springBootMainClass: Option[String] = None
-    var layersIdx = Vector.empty[String]
-    var classpathIdx = Vector.empty[String]
-    var warLibJars = Vector.empty[String]
-    var earModules = Vector.empty[String]
-    var multiReleaseVersions = Vector.empty[String]
-    var signatureFiles = Vector.empty[String]
-    var serviceProviders = Map.empty[String, Vector[String]]
-    var automaticModuleName: Option[String] = None
-    var moduleRequires = Vector.empty[String]
-    var moduleExports = Vector.empty[String]
-    var moduleOpens = Vector.empty[String]
-    var moduleProvides = Map.empty[String, Vector[String]]
-    var moduleUses = Vector.empty[String]
-    var graalNativeImageProps = Map.empty[String, String]
-    var jenkinsPlugin = false
-    var osgiHeaders = Map.empty[String, String]
+  /** Build jar-structure metadata TreeMap from accumulated state.
+    *
+    * This replaces the old `buildJarStructureMetadata(artifact, manifest)`
+    * method that opened the archive to scan for structural metadata. Now the
+    * data is collected via `accumulateInfo` during child processing and stored
+    * in `JarAccumulatedState`. This method simply reads the accumulated fields
+    * and builds the same metadata TreeMap — no archive walk needed.
+    *
+    * @param acc
+    *   the accumulated state from child processing; None if no accumulation
+    *   (non-JAR marker or before children are processed)
+    * @return
+    *   TreeMap of metadata key → values for jar structure entries
+    */
+  private def buildJarStructureMetadataFromAccumulated(
+      acc: Option[JarAccumulatedState]
+  ): TreeMap[String, TreeSet[StringOrPair]] = acc match {
+    case None => TreeMap.empty
+    case Some(a) =>
+      val b = scala.collection.mutable.ArrayBuffer
+        .empty[(String, TreeSet[StringOrPair])]
 
-    // Manifest-based checks
-    springBootMainClass =
-      manifest.get("start-class").flatMap(_.headOption).map(_.value)
-    automaticModuleName =
-      manifest.get("automatic-module-name").flatMap(_.headOption).map(_.value)
-    if (
-      manifest
-        .get("multi-release")
-        .flatMap(_.headOption)
-        .map(_.value)
-        .exists(_.toLowerCase == "true")
-    ) {
-      jarType = Some("multi-release")
-    }
-    if (
-      manifest
-        .get("created-by")
-        .flatMap(_.headOption)
-        .map(_.value)
-        .exists(_.toLowerCase.contains("shade plugin"))
-    ) {
-      jarType = Some("shaded-jar")
-    }
-    val isJenkinsByGroupId = manifest
-      .get("group-id")
-      .flatMap(_.headOption)
-      .map(_.value)
-      .exists(_.toLowerCase.contains("jenkins.plugins"))
-    val isJenkinsByExt = {
-      val lower = artifact.filenameWithNoPath.toLowerCase
-      lower.endsWith(".jpi") || lower.endsWith(".hpi")
-    }
-    jenkinsPlugin = isJenkinsByGroupId || isJenkinsByExt
-
-    // OSGi headers
-    val osgiKeys = Vector(
-      "bundle-name" -> "BundleName",
-      "bundle-description" -> "BundleDescription",
-      "bundle-vendor" -> "BundleVendor",
-      "bundle-docurl" -> "BundleDocURL"
-    )
-    val osgiValues = osgiKeys.flatMap { case (mk, ok) =>
-      manifest.get(mk).flatMap(_.headOption).map(_.value).map(ok -> _)
-    }
-    // Full OSGi headers (Phase 5.11 extended)
-    val fullOsgiKeys = Vector(
-      "export-package" -> "ExportPackage",
-      "import-package" -> "ImportPackage",
-      "require-capability" -> "RequireCapability",
-      "provide-capability" -> "ProvideCapability",
-      "fragment-host" -> "FragmentHost"
-    )
-    val fullOsgiValues = fullOsgiKeys.flatMap { case (mk, ok) =>
-      manifest.get(mk).flatMap(_.headOption).map(_.value).map(ok -> _)
-    }
-    osgiHeaders = (osgiValues ++ fullOsgiValues).toMap
-
-    // Walk archive entries
-    FileWalker.withinArchiveStream(artifact) { entries =>
-      entries.foreach { entry =>
-        val path = entry.path()
-        val lowerPath = path.toLowerCase
-
-        // Spring Boot
-        if (lowerPath.startsWith("boot-inf/classes/")) {
-          jarType = jarType.orElse(Some("spring-boot-fat-jar"))
-        }
-        if (
-          lowerPath.startsWith("boot-inf/lib/") && lowerPath.endsWith(".jar")
-        ) {
-          nestedJars = nestedJars :+ path
-        }
-        if (lowerPath == "boot-inf/layers.idx") {
-          layersIdx = entry
-            .withStream(Helpers.slurpInputToString(_))
-            .linesIterator
-            .filter(_.nonEmpty)
-            .toVector
-        }
-        if (lowerPath == "boot-inf/classpath.idx") {
-          classpathIdx = entry
-            .withStream(Helpers.slurpInputToString(_))
-            .linesIterator
-            .filter(_.nonEmpty)
-            .toVector
-        }
-
-        // Shade Plugin marker
-        if (lowerPath.contains("maven-shade-plugin")) {
-          jarType = jarType.orElse(Some("shaded-jar"))
-        }
-
-        // WAR
-        if (
-          lowerPath.startsWith("web-inf/lib/") && lowerPath.endsWith(".jar")
-        ) {
-          warLibJars = warLibJars :+ path
-        }
-        if (lowerPath == "web-inf/web.xml") {
-          jarType = jarType.orElse(Some("war"))
-        }
-
-        // EAR
-        if (lowerPath == "meta-inf/application.xml") {
-          jarType = jarType.orElse(Some("ear"))
-          val appXmlStr = entry.withStream(Helpers.slurpInputToString(_))
-          // Extract module names: <ejb>name</ejb>, <web-uri>name</web-uri>, <alt-dd>name</alt-dd>, <connector>name</connector>
-          val modulePattern =
-            "<(ejb|web-uri|alt-dd|connector|java|web)>([^<]+)</(ejb|web-uri|alt-dd|connector|java|web)>".r
-          val extracted = modulePattern
-            .findAllMatchIn(appXmlStr)
-            .map(m => Option(m.group(2)).map(_.trim).getOrElse(""))
-            .filter(_.nonEmpty)
-            .toVector
-            .distinct
-          earModules = earModules ++ extracted
-        }
-
-        // Multi-Release versions
-        if (lowerPath.startsWith("meta-inf/versions/")) {
-          val parts = lowerPath.split('/')
-          if (parts.length >= 3) {
-            val ver = parts(2)
-            if (!multiReleaseVersions.contains(ver)) {
-              multiReleaseVersions = multiReleaseVersions :+ ver
-            }
-          }
-        }
-
-        // Signatures
-        if (
-          lowerPath.startsWith("meta-inf/") && (lowerPath.endsWith(
-            ".sf"
-          ) || lowerPath.endsWith(".rsa") || lowerPath.endsWith(".dsa"))
-        ) {
-          signatureFiles = signatureFiles :+ path
-        }
-
-        // ServiceLoader
-        if (lowerPath.startsWith("meta-inf/services/")) {
-          val serviceName = path.substring("meta-inf/services/".length)
-          val impls = entry
-            .withStream(Helpers.slurpInputToString(_))
-            .linesIterator
-            .filter(_.nonEmpty)
-            .toVector
-          serviceProviders = serviceProviders + (serviceName -> impls)
-        }
-
-        // JPMS module-info.class
-        if (lowerPath == "module-info.class") {
-          val bytes = entry.withStream(Helpers.slurpInputNoClose)
-          parseModuleInfoClass(bytes).foreach { info =>
-            automaticModuleName = Some(info.name)
-            moduleRequires = info.requires
-            moduleExports = info.exports
-            moduleOpens = info.opens
-            moduleProvides = info.provides
-            moduleUses = info.uses
-          }
-        }
-
-        // GraalVM native-image.properties
-        if (
-          lowerPath.endsWith("native-image.properties") && lowerPath.startsWith(
-            "meta-inf/native-image/"
-          )
-        ) {
-          val props = entry
-            .withStream(Helpers.slurpInputToString(_))
-            .linesIterator
-            .filterNot(_.trim.startsWith("#"))
-            .filter(_.contains("="))
-            .map { line =>
-              val idx = line.indexOf('=')
-              line.substring(0, idx).trim -> line.substring(idx + 1).trim
-            }
-            .toMap
-          graalNativeImageProps = graalNativeImageProps ++ props
-        }
-      }
-    }
-
-    // Build metadata
-    val b = scala.collection.mutable.ArrayBuffer
-      .empty[(String, TreeSet[StringOrPair])]
-
-    jarType.foreach(t =>
-      b += MetadataKeyConstants.adHoc("maven")("JarType") -> TreeSet(
-        StringOrPair(t)
+      a.jarType.foreach(t =>
+        b += MetadataKeyConstants.adHoc("maven")("JarType") -> TreeSet(
+          StringOrPair(t)
+        )
       )
-    )
-    if (nestedJars.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("NestedJars") -> TreeSet(
-        StringOrPair(compact(render(nestedJars)))
+      if (a.nestedJars.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("NestedJars") -> TreeSet(
+          StringOrPair(compact(render(a.nestedJars)))
+        )
+      a.springBootMainClass.foreach(c =>
+        b += MetadataKeyConstants.adHoc("maven")(
+          "SpringBootMainClass"
+        ) -> TreeSet(StringOrPair(c))
       )
-    springBootMainClass.foreach(c =>
-      b += MetadataKeyConstants.adHoc("maven")(
-        "SpringBootMainClass"
-      ) -> TreeSet(StringOrPair(c))
-    )
-    if (layersIdx.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("LayersIdx") -> TreeSet(
-        StringOrPair(compact(render(layersIdx)))
-      )
-    if (classpathIdx.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("ClasspathIdx") -> TreeSet(
-        StringOrPair(compact(render(classpathIdx)))
-      )
-    if (warLibJars.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("WarLibJars") -> TreeSet(
-        StringOrPair(compact(render(warLibJars)))
-      )
-    if (earModules.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("EarModules") -> TreeSet(
-        StringOrPair(compact(render(earModules)))
-      )
-    if (multiReleaseVersions.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")(
-        "MultiReleaseVersions"
-      ) -> TreeSet(StringOrPair(compact(render(multiReleaseVersions))))
-    if (signatureFiles.nonEmpty) {
-      b += MetadataKeyConstants.adHoc("maven")("JarSigned") -> TreeSet(
-        StringOrPair("true")
-      )
-      b += MetadataKeyConstants.adHoc("maven")("SignatureFiles") -> TreeSet(
-        StringOrPair(compact(render(signatureFiles)))
-      )
-    }
-    if (serviceProviders.nonEmpty) {
-      val json = compact(render(serviceProviders.map { case (k, v) =>
-        k -> v
-      }.toMap))
-      b += MetadataKeyConstants.adHoc("maven")("ServiceProviders") -> TreeSet(
-        StringOrPair(json)
-      )
-    }
-    automaticModuleName.foreach(n =>
-      b += MetadataKeyConstants.adHoc("maven")(
-        "AutomaticModuleName"
-      ) -> TreeSet(StringOrPair(n))
-    )
-    if (moduleRequires.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("ModuleRequires") -> TreeSet(
-        StringOrPair(compact(render(moduleRequires)))
-      )
-    if (moduleExports.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("ModuleExports") -> TreeSet(
-        StringOrPair(compact(render(moduleExports)))
-      )
-    if (moduleOpens.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("ModuleOpens") -> TreeSet(
-        StringOrPair(compact(render(moduleOpens)))
-      )
-    if (moduleProvides.nonEmpty) {
-      val json = compact(render(moduleProvides))
-      b += MetadataKeyConstants.adHoc("maven")("ModuleProvides") -> TreeSet(
-        StringOrPair(json)
-      )
-    }
-    if (moduleUses.nonEmpty)
-      b += MetadataKeyConstants.adHoc("maven")("ModuleUses") -> TreeSet(
-        StringOrPair(compact(render(moduleUses)))
-      )
-    if (graalNativeImageProps.nonEmpty) {
-      val json = compact(render(graalNativeImageProps.toMap))
-      b += MetadataKeyConstants.adHoc("maven")("GraalNativeImage") -> TreeSet(
-        StringOrPair(json)
-      )
-    }
-    if (jenkinsPlugin)
-      b += MetadataKeyConstants.adHoc("maven")("JenkinsPlugin") -> TreeSet(
-        StringOrPair("true")
-      )
-    if (osgiHeaders.nonEmpty) {
-      osgiHeaders.foreach { case (k, v) =>
-        val value = k match {
-          case "ExportPackage" =>
-            val parsed = parseOsgiPackageHeader(v)
-            if (parsed.nonEmpty) compact(render(parsed)) else v
-          case "ImportPackage" =>
-            val parsed = parseOsgiPackageHeader(v)
-            if (parsed.nonEmpty) compact(render(parsed)) else v
-          case _ => v
-        }
-        b += MetadataKeyConstants.adHoc("osgi")(k) -> TreeSet(
-          StringOrPair(value)
+      if (a.layersIdx.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("LayersIdx") -> TreeSet(
+          StringOrPair(compact(render(a.layersIdx)))
+        )
+      if (a.classpathIdx.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("ClasspathIdx") -> TreeSet(
+          StringOrPair(compact(render(a.classpathIdx)))
+        )
+      if (a.warLibJars.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("WarLibJars") -> TreeSet(
+          StringOrPair(compact(render(a.warLibJars)))
+        )
+      if (a.earModules.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("EarModules") -> TreeSet(
+          StringOrPair(compact(render(a.earModules)))
+        )
+      if (a.multiReleaseVersions.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")(
+          "MultiReleaseVersions"
+        ) -> TreeSet(StringOrPair(compact(render(a.multiReleaseVersions))))
+      if (a.signatureFiles.nonEmpty) {
+        b += MetadataKeyConstants.adHoc("maven")("JarSigned") -> TreeSet(
+          StringOrPair("true")
+        )
+        b += MetadataKeyConstants.adHoc("maven")("SignatureFiles") -> TreeSet(
+          StringOrPair(compact(render(a.signatureFiles)))
         )
       }
-    }
+      if (a.serviceProviders.nonEmpty) {
+        val json = compact(render(a.serviceProviders.map { case (k, v) =>
+          k -> v
+        }.toMap))
+        b += MetadataKeyConstants.adHoc("maven")("ServiceProviders") -> TreeSet(
+          StringOrPair(json)
+        )
+      }
+      a.automaticModuleName.foreach(n =>
+        b += MetadataKeyConstants.adHoc("maven")(
+          "AutomaticModuleName"
+        ) -> TreeSet(StringOrPair(n))
+      )
+      if (a.moduleRequires.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("ModuleRequires") -> TreeSet(
+          StringOrPair(compact(render(a.moduleRequires)))
+        )
+      if (a.moduleExports.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("ModuleExports") -> TreeSet(
+          StringOrPair(compact(render(a.moduleExports)))
+        )
+      if (a.moduleOpens.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("ModuleOpens") -> TreeSet(
+          StringOrPair(compact(render(a.moduleOpens)))
+        )
+      if (a.moduleProvides.nonEmpty) {
+        val json = compact(render(a.moduleProvides))
+        b += MetadataKeyConstants.adHoc("maven")("ModuleProvides") -> TreeSet(
+          StringOrPair(json)
+        )
+      }
+      if (a.moduleUses.nonEmpty)
+        b += MetadataKeyConstants.adHoc("maven")("ModuleUses") -> TreeSet(
+          StringOrPair(compact(render(a.moduleUses)))
+        )
+      if (a.graalNativeImageProps.nonEmpty) {
+        val json = compact(render(a.graalNativeImageProps.toMap))
+        b += MetadataKeyConstants.adHoc("maven")("GraalNativeImage") -> TreeSet(
+          StringOrPair(json)
+        )
+      }
+      if (a.jenkinsPlugin)
+        b += MetadataKeyConstants.adHoc("maven")("JenkinsPlugin") -> TreeSet(
+          StringOrPair("true")
+        )
+      if (a.osgiHeaders.nonEmpty) {
+        a.osgiHeaders.foreach { case (k, v) =>
+          val value = k match {
+            case "ExportPackage" =>
+              val parsed = parseOsgiPackageHeader(v)
+              if (parsed.nonEmpty) compact(render(parsed)) else v
+            case "ImportPackage" =>
+              val parsed = parseOsgiPackageHeader(v)
+              if (parsed.nonEmpty) compact(render(parsed)) else v
+            case _ => v
+          }
+          b += MetadataKeyConstants.adHoc("osgi")(k) -> TreeSet(
+            StringOrPair(value)
+          )
+        }
+      }
 
-    TreeMap.from(b.toSeq)
+      TreeMap.from(b.toSeq)
   }
 
   override def finalAugmentation(
@@ -1297,6 +1721,24 @@ case class MavenState(
               case None     => ""
               case Some(ps) => f" Parent: ${ps.parentScopeInformation()}"
             }}"
+
+        /** Override accumulateInfo to collect JAR-structure metadata from child
+          * entries. This is called for each child artifact found inside the JAR
+          * during the processing pipeline. The child's path determines what
+          * kind of metadata to accumulate.
+          *
+          * This override delegates to MavenState.accumulateInfo, which mutates
+          * the JarAccumulatedState fields directly.
+          */
+        override def accumulateInfo(
+            parentId: String,
+            item: Item,
+            artifact: ArtifactWrapper,
+            store: Storage
+        ): Unit = {
+          MavenState.this.accumulateInfo(parentId, item, artifact, store)
+        }
+
         override def finalAugmentation(
             store: Storage,
             artifact: ArtifactWrapper,
@@ -1388,32 +1830,13 @@ object MavenToProcess {
     !lower.endsWith("-javadoc.jar")
   }
 
-  /** Detect JARs with NewRelic Weave-Classes MANIFEST header. These should be
-    * excluded from Maven strategy (fall through to Generic).
-    */
-  private def hasWeaveClasses(artifact: ArtifactWrapper): Boolean = {
-    FileWalker
-      .withinArchiveStream(artifact) { files =>
-        files.find(_.path().equalsIgnoreCase("META-INF/MANIFEST.MF")) match {
-          case Some(entry) =>
-            val text = entry.withStream(Helpers.slurpInputToString(_))
-            text.linesIterator.exists(
-              _.trim.toLowerCase.startsWith("weave-classes")
-            )
-          case None => false
-        }
-      }
-      .getOrElse(false)
-  }
-
   def computeMavenFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val jars = byName.toVector.filter { case (name, artifacts) =>
       isMavenArchive(name) &&
-      artifacts.exists(_.mimeType.contains("application/java-archive")) &&
-      !hasWeaveClasses(artifacts.head)
+      artifacts.exists(_.mimeType.contains("application/java-archive"))
     }
 
     // Build directory-to-metadata mapping for maven-metadata.xml files

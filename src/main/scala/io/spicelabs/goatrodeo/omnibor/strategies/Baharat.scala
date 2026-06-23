@@ -129,6 +129,12 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
     Vector(pkg.packageUrl().canonicalize().nn) -> this
   }
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): BaharatState = this
+
   override def getMetadata(
       artifact: ArtifactWrapper,
       item: Item,

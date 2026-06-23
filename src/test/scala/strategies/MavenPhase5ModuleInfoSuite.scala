@@ -4,7 +4,9 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
@@ -105,13 +107,16 @@ class MavenPhase5ModuleInfoSuite extends FunSuite {
       writeJarEntriesBytes(jarFile, Seq("module-info.class" -> classBytes))
 
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("mod"),
-        MavenMarkers.JAR
-      )
+      val item = createTestItem("mod")
+      val store = MemStorage(None)
+      val s1 = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+      FileWalker.withinArchiveStream(wrapper) { entries =>
+        entries.foreach { entry =>
+          s1.accumulateInfo(item.identifier, item, entry, store)
+        }
+      }
       val (meta, _) =
-        state.getMetadata(wrapper, createTestItem("mod"), MavenMarkers.JAR)
+        s1.getMetadata(wrapper, createTestItem("mod"), MavenMarkers.JAR)
 
       val modNameKey =
         MetadataKeyConstants.adHoc("maven")("AutomaticModuleName")

@@ -470,6 +470,12 @@ case class DockerState(
     case _ => this
   }
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): DockerState = this
+
   private def computePurls(info: ManifestInfo): Vector[String] = {
     val purls = for {
       // get "RepoTags" which should be an Array of tags

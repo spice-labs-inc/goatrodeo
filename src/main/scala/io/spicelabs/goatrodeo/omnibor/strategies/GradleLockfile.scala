@@ -217,6 +217,12 @@ class GradleLockfileState(deps: Vector[GradleDependency])
       marker: SingleMarker
   ): GradleLockfileState = this
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): GradleLockfileState = this
+
   override def getPurls(
       artifact: ArtifactWrapper,
       item: Item,

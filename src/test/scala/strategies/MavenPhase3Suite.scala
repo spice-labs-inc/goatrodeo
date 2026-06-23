@@ -1,14 +1,16 @@
-/* Phase 3 Tests: POM Dependencies, Licenses, Scope Filtering, Weave-Classes
-   Maven Phase 3 tests §3.1–3.6
+/* Phase 3 Tests: POM Dependencies, Licenses, Scope Filtering
+   Maven Phase 3 tests §3.1–3.5
  */
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Edge
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenMarkers
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PomParser
@@ -363,59 +365,6 @@ class MavenPhase3Suite extends munit.FunSuite {
     )
   }
 
-  // ==================== 3.6: Weave-Classes / NewRelic exclusion ====================
-
-  test("Weave-Classes manifest header is detected in a JAR") {
-    // Build a minimal JAR with Weave-Classes in manifest
-    val baos = new java.io.ByteArrayOutputStream
-    val zos = new java.util.zip.ZipOutputStream(baos)
-    zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
-    zos.write(
-      "Manifest-Version: 1.0\nWeave-Classes: com.newrelic.Weave\n".getBytes(
-        "UTF-8"
-      )
-    )
-    zos.closeEntry()
-    zos.close()
-
-    // Open the JAR and check for the Weave-Classes header
-    val jis = new java.util.jar.JarInputStream(
-      new java.io.ByteArrayInputStream(baos.toByteArray)
-    )
-    val manifest = jis.getManifest
-    val hasWeaveClasses = manifest != null &&
-      manifest.getMainAttributes.getValue("Weave-Classes") != null
-    assert(hasWeaveClasses, "Weave-Classes header must be present in test JAR")
-
-    // Verify the Maven.java logic would exclude this:
-    // Maven.scala line 858: manifest.getMainAttributes().getValue("Weave-Classes") != null
-    val shouldExclude = manifest != null &&
-      manifest.getMainAttributes.getValue("Weave-Classes") != null
-    assert(
-      shouldExclude,
-      "JARs with Weave-Classes should be excluded by computeMavenFiles"
-    )
-  }
-
-  test("Normal JARs without Weave-Classes are not excluded") {
-    val baos = new java.io.ByteArrayOutputStream
-    val zos = new java.util.zip.ZipOutputStream(baos)
-    zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
-    zos.write("Manifest-Version: 1.0\n".getBytes("UTF-8"))
-    zos.closeEntry()
-    zos.close()
-    val jis = new java.util.jar.JarInputStream(
-      new java.io.ByteArrayInputStream(baos.toByteArray)
-    )
-    val manifest = jis.getManifest
-    val shouldExclude = manifest != null &&
-      manifest.getMainAttributes.getValue("Weave-Classes") != null
-    assert(
-      !shouldExclude,
-      "Normal JARs without Weave-Classes should NOT be excluded"
-    )
-  }
-
   // ==================== 3.3: Provided scope exclusion ====================
 
   test("RuntimeDependencies excludes provided-scope dependencies") {
@@ -580,7 +529,9 @@ class MavenPhase3Suite extends munit.FunSuite {
     )
     // getMetadata does not take manifestMap directly; metadata is built from parsedPom only for POM marker.
     // Instead construct a state with manifest to test the merge path used for JAR marker.
-    val jarState = state.copy(manifest = manifestMap)
+    val jarState = state.copy(jarAccumulated =
+      Some(JarAccumulatedState(manifest = manifestMap))
+    )
     val (jarMeta, _) = jarState.getMetadata(
       artifact,
       createTestItem("y"),
@@ -609,7 +560,9 @@ class MavenPhase3Suite extends munit.FunSuite {
     val manifestMap = TreeMap[String, TreeSet[StringOrPair]](
       "plugin-license-name" -> TreeSet(StringOrPair("EPL 2.0"))
     )
-    val jarState = state.copy(manifest = manifestMap)
+    val jarState = state.copy(jarAccumulated =
+      Some(JarAccumulatedState(manifest = manifestMap))
+    )
     val (jarMeta, _) = jarState.getMetadata(
       artifact,
       createTestItem("y"),
@@ -643,72 +596,23 @@ class MavenPhase3Suite extends munit.FunSuite {
       )
       val wrapper = FileWrapper(jarFile, "test.jar", None)
       val item = createTestItem("path-traversal-pomxml-test")
+      val store = MemStorage(None)
       val state = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+      // Simulate child processing via accumulateInfo
+      FileWalker.withinArchiveStream(wrapper) { entries =>
+        entries.foreach { entry =>
+          state.accumulateInfo(item.identifier, item, entry, store)
+        }
+      }
+      val gavs =
+        state.jarAccumulated.map(_.embeddedGavs).getOrElse(Vector.empty)
       assert(
-        !state.embeddedGavs.exists(_._2 == "evil"),
+        !gavs.exists(_._2 == "evil"),
         "Traversal pom.xml with .. should be skipped"
       )
       assert(
-        state.embeddedGavs.exists(_._2 == "good-art"),
+        gavs.exists(_._2 == "good-art"),
         "Legitimate pom.xml / pom.properties should be included"
-      )
-    } finally {
-      Helpers.deleteDirectory(tempDir)
-    }
-  }
-
-  // ==================== Gap fill: computeMavenFiles excludes Weave-Classes end-to-end ====================
-
-  test("computeMavenFiles - excludes JARs with Weave-Classes from output") {
-    val tempDir = Files.createTempDirectory("weave-exclude")
-    try {
-      val jarFile = new File(tempDir.toFile, "weaved.jar")
-      val fos = new java.io.FileOutputStream(jarFile)
-      val zos = new java.util.zip.ZipOutputStream(fos)
-      zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
-      zos.write(
-        "Manifest-Version: 1.0\nWeave-Classes: com.newrelic.Weave\n".getBytes(
-          "UTF-8"
-        )
-      )
-      zos.closeEntry()
-      zos.close()
-
-      val wrapper = FileWrapper(jarFile, "weaved.jar", None)
-      val byUUID = Map(wrapper.uuid -> wrapper)
-      val byName = Map("weaved.jar" -> Vector(wrapper))
-      val (toProcess, _, _, _) =
-        MavenToProcess.computeMavenFiles(byUUID, byName)
-      assertEquals(
-        toProcess.size,
-        0,
-        "Weave-Classes JAR must not be claimed by Maven strategy"
-      )
-    } finally {
-      Helpers.deleteDirectory(tempDir)
-    }
-  }
-
-  test("computeMavenFiles - normal JARs unaffected by Weave-Classes check") {
-    val tempDir = Files.createTempDirectory("weave-normal")
-    try {
-      val jarFile = new File(tempDir.toFile, "normal.jar")
-      val fos = new java.io.FileOutputStream(jarFile)
-      val zos = new java.util.zip.ZipOutputStream(fos)
-      zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
-      zos.write("Manifest-Version: 1.0\n".getBytes("UTF-8"))
-      zos.closeEntry()
-      zos.close()
-
-      val wrapper = FileWrapper(jarFile, "normal.jar", None)
-      val byUUID = Map(wrapper.uuid -> wrapper)
-      val byName = Map("normal.jar" -> Vector(wrapper))
-      val (toProcess, _, _, _) =
-        MavenToProcess.computeMavenFiles(byUUID, byName)
-      assertEquals(
-        toProcess.size,
-        1,
-        "Normal JAR must be claimed by Maven strategy"
       )
     } finally {
       Helpers.deleteDirectory(tempDir)

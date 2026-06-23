@@ -234,6 +234,12 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
       marker: SingleMarker
   ): JvmState = this
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): JvmState = this
+
   private def maybeStringOrPair(
       key: String,
       s: String | Option[String] | (String, String)

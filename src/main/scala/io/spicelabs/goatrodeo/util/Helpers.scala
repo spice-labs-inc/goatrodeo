@@ -321,7 +321,7 @@ object Helpers {
         result = result :+ f
         val curCount = count.addAndGet(1)
         if (curCount % 100000 == 0) {
-          logger.debug(s"Find Files count ${curCount}")
+          logger.info(f"Find Files count ${curCount}%,d")
         }
       }
       FileVisitResult.CONTINUE
@@ -1384,12 +1384,12 @@ object GitOIDUtils {
     // by the spec.yaml names; we keep goatrodeo's `<algo>:<hex>` alias shape and
     // lead with the gitoid-sha256, so the output is byte-identical to before.
     val all =
-      theFile.withStream(in => Coordinates.intrinsic(in, theFile.size())).nn
+      theFile.withStream(in => Coordinates.intrinsic(in, theFile.size()))
 
     (
-      all.get("gitoid-blob-sha256").nn,
+      all.get("gitoid-blob-sha256"),
       Vector(
-        all.get("gitoid-blob-sha1").nn,
+        all.get("gitoid-blob-sha1"),
         s"sha1:${all.get("sha1")}",
         s"sha256:${all.get("sha256")}",
         s"sha512:${all.get("sha512")}",

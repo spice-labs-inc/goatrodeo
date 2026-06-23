@@ -70,6 +70,12 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
       marker: SingleMarker
   ): GenericFileState = this
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): GenericFileState = this
+
 }
 
 /** A generic file to process.

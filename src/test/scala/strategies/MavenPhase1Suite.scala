@@ -4,11 +4,14 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenMarkers
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenState
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenToProcess
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PomParser
@@ -30,6 +33,28 @@ class MavenPhase1Suite extends FunSuite {
     Some(ItemMetaData.mimeType),
     None
   )
+
+  /** Process a JAR artifact through the full accumulation pipeline:
+    *   1. beginProcessing(JAR) - initializes jarAccumulated 2. Walk archive
+    *      entries, calling accumulateInfo for each child 3.
+    *      applyAccumulatedAugmentation - resolves GAV, creates pURL
+    *
+    * This simulates what the ToProcess.process pipeline does for JAR markers.
+    */
+  private def processJarThroughPipeline(
+      wrapper: ArtifactWrapper,
+      state: MavenState = MavenState()
+  ): MavenState = {
+    val item = createTestItem("jar-test")
+    val store = MemStorage(None)
+    val s1 = state.beginProcessing(wrapper, item, MavenMarkers.JAR)
+    FileWalker.withinArchiveStream(wrapper) { entries =>
+      entries.foreach { entry =>
+        s1.accumulateInfo(item.identifier, item, entry, store)
+      }
+    }
+    s1.applyAccumulatedAugmentation(item, wrapper, store)
+  }
 
   // ==================== 1.1: Archive types ====================
 
@@ -551,7 +576,7 @@ class MavenPhase1Suite extends FunSuite {
   test("1.2 path traversal: extractAllEmbeddedGavs skips entries with ..") {
     val tempDir = Files.createTempDirectory("maven-phase1-jar")
     try {
-      val jarFile = new File(tempDir.toFile, "test.jar")
+      val jarFile = new File(tempDir.toFile, "good-art-1.0.jar")
       writeJarEntries(
         jarFile,
         Seq(
@@ -561,16 +586,18 @@ class MavenPhase1Suite extends FunSuite {
             "groupId=com.good\nartifactId=good-art\nversion=2.0"
         )
       )
-      val wrapper = FileWrapper(jarFile, "test.jar", None)
-      val item = createTestItem("path-traversal-test")
-      val state = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+      val wrapper = FileWrapper(jarFile, "good-art-1.0.jar", None)
+      val state = processJarThroughPipeline(wrapper)
+      // The resolved artifactId should be "good-art" (from pom.properties,
+      // which matches the filename "good-art"), NOT "evil-art" (which was
+      // in a path-traversal entry that should have been skipped)
       assert(
-        !state.embeddedGavs.exists(_._2 == "evil-art"),
+        !state.artifactId.contains("evil"),
         "Traversal entry with .. should be skipped"
       )
       assert(
-        state.embeddedGavs.exists(_._2 == "good-art"),
-        "Legitimate entry should be included"
+        state.artifactId.contains("good-art"),
+        "Legitimate entry should be used for GAV resolution"
       )
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -590,9 +617,7 @@ class MavenPhase1Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, "mylib-1.0.jar", None)
-      val item = createTestItem("no-pom-props-test")
-      val state = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
-      assertEquals(state.embeddedGavs.length, 0)
+      val state = processJarThroughPipeline(wrapper)
       assert(
         state.artifactId.contains("mylib"),
         s"Should fall back to filename, got artifactId=${state.artifactId}"
@@ -620,20 +645,14 @@ class MavenPhase1Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, "art1-1.0.jar", None)
-      val item = createTestItem("multi-embed-test")
-      val state = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
-      assertEquals(
-        state.embeddedGavs.length,
-        2,
-        "Should extract both embedded GAVs"
-      )
+      val state = processJarThroughPipeline(wrapper)
       assert(
         state.artifactId.contains("art1"),
         s"Primary GAV should match filename art1, got ${state.artifactId}"
       )
       assert(
-        state.embeddedGavs.exists(_._2 == "art2"),
-        "Non-primary embedded GAV should still be recorded"
+        state.groupId.contains("com.example1"),
+        s"Primary groupId should match filename, got ${state.groupId}"
       )
     } finally {
       Helpers.deleteDirectory(tempDir)

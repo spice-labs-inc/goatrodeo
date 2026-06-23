@@ -4,7 +4,9 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import munit.FunSuite
 
@@ -15,6 +17,18 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty, None, None)
+
+  private def processJarAccumulation(wrapper: FileWrapper): MavenState = {
+    val item = createTestItem("jar-test")
+    val store = MemStorage(None)
+    val s1 = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+    FileWalker.withinArchiveStream(wrapper) { entries =>
+      entries.foreach { entry =>
+        s1.accumulateInfo(item.identifier, item, entry, store)
+      }
+    }
+    s1
+  }
 
   private def metadataValue(
       state: MavenState,
@@ -33,11 +47,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus spring-boot-fat-jar produces spring-boot-fat-jar type") {
     val artifact = loadArtifact("spring-boot-fat-jar", "app.jar")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("sb"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val jarType = metadataValue(
       state,
       artifact,
@@ -55,11 +65,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus war-test produces war type") {
     val artifact = loadArtifact("war-test", "app.war")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("war"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val jarType = metadataValue(
       state,
       artifact,
@@ -77,11 +83,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus ear-test produces ear type") {
     val artifact = loadArtifact("ear-test", "app.ear")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("ear"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val jarType = metadataValue(
       state,
       artifact,
@@ -99,11 +101,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus multi-release-jar produces multi-release type") {
     val artifact = loadArtifact("multi-release-jar", "mr.jar")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("mr"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val jarType = metadataValue(
       state,
       artifact,
@@ -121,11 +119,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus shaded-jar produces shaded-jar type") {
     val artifact = loadArtifact("shaded-jar", "shaded.jar")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("shade"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val jarType = metadataValue(
       state,
       artifact,
@@ -136,11 +130,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus signed-jar detects signatures") {
     val artifact = loadArtifact("signed-jar", "signed.jar")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("signed"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val signed = metadataValue(
       state,
       artifact,
@@ -159,11 +149,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus osgi-bundle emits full OSGi headers") {
     val artifact = loadArtifact("osgi-bundle", "bundle.jar")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("osgi"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val bundleName = metadataValue(
       state,
       artifact,
@@ -186,11 +172,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus graalvm-jar extracts native-image.properties") {
     val artifact = loadArtifact("graalvm-jar", "graal.jar")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("graal"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val graal = metadataValue(
       state,
       artifact,
@@ -201,11 +183,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
 
   test("corpus jenkins-plugin detects JenkinsPlugin") {
     val artifact = loadArtifact("jenkins-plugin", "plugin.hpi")
-    val state = MavenState().beginProcessing(
-      artifact,
-      createTestItem("jenkins"),
-      MavenMarkers.JAR
-    )
+    val state = processJarAccumulation(artifact)
     val jenkins = metadataValue(
       state,
       artifact,
@@ -214,16 +192,15 @@ class MavenPhase5CorpusSuite extends FunSuite {
     assertEquals(jenkins, Some("true"))
   }
 
-  test("corpus newrelic-weave JAR is not claimed by Maven") {
+  test("corpus newrelic-weave JAR is claimed by Maven") {
     val artifact = loadArtifact("newrelic-weave", "weave.jar")
     val byUUID = Map(artifact.uuid -> artifact)
     val byName = Map("weave.jar" -> Vector(artifact))
     val (toProcess, _, _, _) = MavenToProcess.computeMavenFiles(byUUID, byName)
-    // Weave-Classes JARs should be excluded from Maven processing
     assertEquals(
       toProcess.size,
-      0,
-      "Weave-Classes JAR must not be claimed by MavenToProcess"
+      1,
+      "Weave-Classes JAR must be claimed by MavenToProcess"
     )
   }
 }

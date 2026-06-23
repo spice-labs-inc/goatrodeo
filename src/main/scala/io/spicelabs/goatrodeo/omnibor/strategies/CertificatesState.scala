@@ -92,6 +92,12 @@ class CertificatesState(
     purls.map(_.toCanonical().nn) -> this
   }
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): CertificatesState = this
+
   /** Unencrypted-PEM private key → SPKI pURL. */
   private[strategies] def purlForPrivateKeyPem(
       p: Certificates.PrivateKeyPlaintextPem

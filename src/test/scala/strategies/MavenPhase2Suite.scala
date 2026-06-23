@@ -12,8 +12,10 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Edge
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.PomParser
 import munit.FunSuite
 
@@ -316,8 +318,14 @@ class MavenPhase2Suite extends FunSuite {
     val jarBytes = baos.toByteArray
     val artifact = ByteWrapper(jarBytes, "test.jar", None)
     val item = createTestItem("bundle-license-test")
-    val state = MavenState().beginProcessing(artifact, item, MavenMarkers.JAR)
-    val (metadata, _) = state.getMetadata(artifact, item, MavenMarkers.JAR)
+    val store = MemStorage(None)
+    val s1 = MavenState().beginProcessing(artifact, item, MavenMarkers.JAR)
+    FileWalker.withinArchiveStream(artifact) { entries =>
+      entries.foreach { entry =>
+        s1.accumulateInfo(item.identifier, item, entry, store)
+      }
+    }
+    val (metadata, _) = s1.getMetadata(artifact, item, MavenMarkers.JAR)
     val licenseKey = MetadataKeyConstants.LICENSE
     assert(
       metadata.get(licenseKey).isDefined,
