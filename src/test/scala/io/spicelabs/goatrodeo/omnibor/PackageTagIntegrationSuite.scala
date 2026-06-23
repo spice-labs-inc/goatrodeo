@@ -282,67 +282,36 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   // ==================== Docker Tests ====================
 
-  test("Docker images - tags created with repository and tag") {
+  test("Docker images - package tags created with repository, tag, and date") {
     assume(
-      checkTestFile(
+      DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
       ),
       "Docker test data exists"
     )
 
-    val config = Config(packageTags = true)
-    val source = FileWrapper(
-      new File("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"),
-      "bigtent_2025_03_22_docker.tar",
-      None
-    )
-    val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-
+    val storage = DockerTestFixtures.bigtentStorage
     val packageTags = findPackageTags(storage)
 
     assert(packageTags.nonEmpty, "Should create package tags for Docker images")
 
-    // Find tag with "bigtent" in name
     val bigtentTag = packageTags.find { tagItem =>
       stringField(extractTagContent(tagItem).get, "tag")
         .exists(_.contains("bigtent"))
     }
-
     assert(bigtentTag.isDefined, "Should have bigtent tag")
 
     val content = extractTagContent(bigtentTag.get)
     val tagValue = stringField(content.get, "tag").get
-
-    // Docker tag format should be repository:tag
     assert(tagValue.contains(":"), s"Should have colon separator: $tagValue")
     assert(
       tagValue.contains("bigtent"),
       s"Should contain repository name: $tagValue"
     )
-  }
-
-  test("Docker images - extracts created date from config") {
-    assume(
-      checkTestFile(
-        "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
-      ),
-      "Docker test data exists"
-    )
-
-    val config = Config(packageTags = true)
-    val source = FileWrapper(
-      new File("test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"),
-      "bigtent_2025_03_22_docker.tar",
-      None
-    )
-    val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-
-    val packageTags = findPackageTags(storage)
 
     packageTags.foreach { tagItem =>
-      val content = extractTagContent(tagItem)
-      val dateOpt = stringField(content.get, "date")
-
+      val tagContent = extractTagContent(tagItem)
+      val dateOpt = stringField(tagContent.get, "date")
       assert(dateOpt.isDefined, "Should have date from Docker config")
       val dateStr = dateOpt.get
       assert(dateStr.contains("T"), "Date should have T separator")
@@ -352,21 +321,15 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   test("Docker complex image - multiple tags created") {
     assume(
-      checkTestFile("test_data/download/docker_tests/grinder_bt_pg_docker.tar"),
+      DockerTestFixtures.checkTestFile(
+        "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
+      ),
       "Complex Docker test data exists"
     )
 
-    val config = Config(packageTags = true)
-    val source = FileWrapper(
-      new File("test_data/download/docker_tests/grinder_bt_pg_docker.tar"),
-      "grinder_bt_pg_docker.tar",
-      None
-    )
-    val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
-
+    val storage = DockerTestFixtures.grinderStorage
     val packageTags = findPackageTags(storage)
 
-    // This image contains postgres, bigtent, and grinder
     val tagNames = packageTags.flatMap { tagItem =>
       stringField(extractTagContent(tagItem).get, "tag")
     }
@@ -395,13 +358,18 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
     val config = Config(packageTags = true)
 
     testCases.foreach { case (path, strategyName, isDirectory) =>
-      val storage = if (isDirectory) {
-        val strategies =
-          ToProcess.strategyForDirectory(new File(path), false, None)
-        ToProcess.buildGraphForToProcess(strategies, args = config)
-      } else {
-        val source = FileWrapper(new File(path), path, None)
-        ToProcess.buildGraphFromArtifactWrapper(source, args = config)
+      val storage = (strategyName, isDirectory) match {
+        case ("Docker", _) if path.contains("bigtent") =>
+          DockerTestFixtures.bigtentStorage
+        case ("Docker", _) if path.contains("grinder") =>
+          DockerTestFixtures.grinderStorage
+        case (mavenDir, true) =>
+          val strategies =
+            ToProcess.strategyForDirectory(new File(path), false, None)
+          ToProcess.buildGraphForToProcess(strategies, args = config)
+        case _ =>
+          val source = FileWrapper(new File(path), path, None)
+          ToProcess.buildGraphFromArtifactWrapper(source, args = config)
       }
 
       val packageTags = findPackageTags(storage)

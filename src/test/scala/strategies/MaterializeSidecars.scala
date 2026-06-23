@@ -14,6 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.util.FileWrapper
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
@@ -42,6 +43,8 @@ import scala.jdk.CollectionConverters.*
   * (private keys).
   */
 object MaterializeSidecars {
+
+  private val logger = Logger(getClass)
 
   private val corpusRoot: Path = Paths.get("test_data/certificates")
 
@@ -233,7 +236,7 @@ object MaterializeSidecars {
     val json = parse(raw)
     compute(fixture) match {
       case None =>
-        println(s"SKIP (parse failed): $sidecarPath")
+        logger.info(s"SKIP (parse failed): $sidecarPath")
         false
       case Some(purls) =>
         val replacement = JArray(purls.map(JString.apply).toList)
@@ -249,7 +252,7 @@ object MaterializeSidecars {
         }
         val pretty = Printer.pretty(render(updated)) + "\n"
         Files.write(sidecarPath, pretty.getBytes(StandardCharsets.UTF_8))
-        println(s"updated: $sidecarPath  (${purls.size} pURLs)")
+        logger.info(s"updated: $sidecarPath  (${purls.size} pURLs)")
         true
     }
   }
@@ -294,10 +297,10 @@ object MaterializeSidecars {
         )
       ) pkHits += 1
     }
-    println(s"\nbundles updated: $bundleHits")
-    println(s"crls updated:    $crlHits")
-    println(s"ssh updated:     $sshHits")
-    println(s"pgp updated:     $pgpHits")
-    println(s"pk updated:      $pkHits")
+    logger.info(s"\nbundles updated: $bundleHits")
+    logger.info(s"crls updated:    $crlHits")
+    logger.info(s"ssh updated:     $sshHits")
+    logger.info(s"pgp updated:     $pgpHits")
+    logger.info(s"pk updated:      $pkHits")
   }
 }

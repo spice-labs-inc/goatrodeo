@@ -89,6 +89,12 @@ class DotnetState(
     }
   }
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): DotnetState = this
+
   override def getPurls(
       artifact: ArtifactWrapper,
       item: Item,

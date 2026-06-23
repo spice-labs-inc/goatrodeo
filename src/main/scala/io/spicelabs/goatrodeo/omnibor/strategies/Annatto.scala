@@ -87,6 +87,11 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
       marker: SingleMarker
   ): AnnattoState = this
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): AnnattoState = this
   override def getPurls(
       artifact: ArtifactWrapper,
       item: Item,

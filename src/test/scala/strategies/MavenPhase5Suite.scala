@@ -4,7 +4,9 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
+import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
@@ -36,6 +38,32 @@ class MavenPhase5Suite extends FunSuite {
     }
   }
 
+  /** Process a JAR through the accumulation pipeline (without applying
+    * augmentation) and return the state with jarAccumulated populated. This
+    * simulates what happens during child processing:
+    *   1. beginProcessing(JAR) - initializes jarAccumulated 2. Walk archive
+    *      entries, calling accumulateInfo for each child
+    *
+    * Note: applyAccumulatedAugmentation is NOT called because it clears
+    * jarAccumulated (which is needed for getMetadata to work). In the real
+    * pipeline, applyAccumulatedAugmentation writes metadata directly to the
+    * store. For unit tests that check metadata via getMetadata, we keep
+    * jarAccumulated populated.
+    */
+  private def processJarAccumulation(
+      wrapper: FileWrapper
+  ): MavenState = {
+    val item = createTestItem("jar-test")
+    val store = MemStorage(None)
+    val s1 = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+    FileWalker.withinArchiveStream(wrapper) { entries =>
+      entries.foreach { entry =>
+        s1.accumulateInfo(item.identifier, item, entry, store)
+      }
+    }
+    s1
+  }
+
   private def metadataValue(
       state: MavenState,
       artifact: FileWrapper,
@@ -60,11 +88,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("sb"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jarType = metadataValue(
         state,
         wrapper,
@@ -89,11 +113,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("sb"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val nested = metadataValue(
         state,
         wrapper,
@@ -120,11 +140,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("sb"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val mainClass = metadataValue(
         state,
         wrapper,
@@ -149,11 +165,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("sb"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val layers = metadataValue(
         state,
         wrapper,
@@ -181,11 +193,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("sb"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val cp = metadataValue(
         state,
         wrapper,
@@ -214,11 +222,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("shade"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jarType = metadataValue(
         state,
         wrapper,
@@ -242,11 +246,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("shade"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jarType = metadataValue(
         state,
         wrapper,
@@ -272,11 +272,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("war"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jarType = metadataValue(
         state,
         wrapper,
@@ -301,11 +297,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("war"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val warLibs = metadataValue(
         state,
         wrapper,
@@ -334,11 +326,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("ear"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jarType = metadataValue(
         state,
         wrapper,
@@ -367,11 +355,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("ear"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val modules = metadataValue(
         state,
         wrapper,
@@ -402,11 +386,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("mr"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jarType = metadataValue(
         state,
         wrapper,
@@ -440,11 +420,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("normal"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val mrKey = metadataValue(
         state,
         wrapper,
@@ -471,11 +447,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("signed"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val signed = metadataValue(
         state,
         wrapper,
@@ -509,11 +481,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("unsigned"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val signed = metadataValue(
         state,
         wrapper,
@@ -540,11 +508,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("svc"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val services = metadataValue(
         state,
         wrapper,
@@ -571,11 +535,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("no-svc"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val services = metadataValue(
         state,
         wrapper,
@@ -601,11 +561,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("mod"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val modName = metadataValue(
         state,
         wrapper,
@@ -631,11 +587,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("graal"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val graal = metadataValue(
         state,
         wrapper,
@@ -660,11 +612,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("no-graal"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val graal = metadataValue(
         state,
         wrapper,
@@ -690,11 +638,7 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("jenkins"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val jenkins = metadataValue(
         state,
         wrapper,
@@ -718,18 +662,29 @@ class MavenPhase5Suite extends FunSuite {
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("jenkins"),
-        MavenMarkers.JAR
-      )
-      val jenkins = metadataValue(
-        state,
-        wrapper,
-        MavenMarkers.JAR,
-        MetadataKeyConstants.adHoc("maven")("JenkinsPlugin")
-      )
-      assertEquals(jenkins, Some("true"))
+      // Jenkins detection by file extension happens in
+      // applyAccumulatedAugmentation, not in accumulateInfo,
+      // because the child entries don't carry the JAR's own filename.
+      // We need to call applyAccumulatedAugmentation to trigger this.
+      val item = createTestItem("jenkins-ext")
+      val store = MemStorage(None)
+      val s1 = MavenState().beginProcessing(wrapper, item, MavenMarkers.JAR)
+      FileWalker.withinArchiveStream(wrapper) { entries =>
+        entries.foreach { entry =>
+          s1.accumulateInfo(item.identifier, item, entry, store)
+        }
+      }
+      val state = s1.applyAccumulatedAugmentation(item, wrapper, store)
+      // After applyAccumulatedAugmentation, jarAccumulated is cleared,
+      // but the metadata was written to the store. Check the store.
+      val storedItem = store.read(item.identifier)
+      val jenkinsInStore = storedItem
+        .flatMap(_.bodyAsItemMetaData)
+        .flatMap(
+          _.extra.get(MetadataKeyConstants.adHoc("maven")("JenkinsPlugin"))
+        )
+        .flatMap(_.headOption.map(_.value))
+      assertEquals(jenkinsInStore, Some("true"))
     } finally {
       Helpers.deleteDirectory(tempDir.toPath)
     }
@@ -753,11 +708,7 @@ Bundle-DocURL: https://example.com
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("osgi"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val bundleName = metadataValue(
         state,
         wrapper,
@@ -788,11 +739,7 @@ Bundle-DocURL: https://example.com
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("plain"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val bundleName = metadataValue(
         state,
         wrapper,
@@ -823,11 +770,7 @@ Fragment-Host: org.example.host
         )
       )
       val wrapper = FileWrapper(jarFile, jarFile.getAbsolutePath, None)
-      val state = MavenState().beginProcessing(
-        wrapper,
-        createTestItem("osgi-full"),
-        MavenMarkers.JAR
-      )
+      val state = processJarAccumulation(wrapper)
       val exportPkg = metadataValue(
         state,
         wrapper,

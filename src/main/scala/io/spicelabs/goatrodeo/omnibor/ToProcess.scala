@@ -131,6 +131,12 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
       marker: PM
   ): ME
 
+  def applyAccumulatedAugmentation(
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): ME
+
   /** Determine if this state should generate a per-package tag.
     *
     * Default implementation returns None - strategies that support per-package
@@ -184,6 +190,43 @@ abstract class ParentScope(
       store: Storage,
       artifact: ArtifactWrapper,
       item: Item
+  ): Unit = ()
+
+  /** Near the end of the processing phase, pass the item and the artifact
+    * wrapper to the optional parent of this scope. This allows the parent scope
+    * to pick up information about its children... for example, extracting
+    * metadata from children (e.g., package urls from MANIFEST.MF files)
+    */
+  def passToParent(
+      parentId: Option[String],
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
+  ): Unit = {
+    parentId.foreach { pid =>
+      accumulateInfo(pid, item, artifact, store)
+    }
+    for {
+      upperScope <- parentOfParentScope()
+      realParentId <- parentId
+    } {
+      upperScope.accumulateInfo(
+        realParentId,
+        item = item,
+        artifact = artifact,
+        store = store
+      )
+    }
+  }
+
+  /** Called from `passToParent` and supports storing metadata extracted from
+    * kids
+    */
+  def accumulateInfo(
+      parentId: String,
+      item: Item,
+      artifact: ArtifactWrapper,
+      store: Storage
   ): Unit = ()
 
   /** Emit information about the scope
@@ -543,6 +586,8 @@ trait ToProcess {
 
               atEnd(parentId, answerItem)
 
+              parentScope.passToParent(parentId, answerItem, artifact, store)
+
               val childGitoids: Option[Vector[GitOID]] =
                 // if the gitoid has already been seen, do not recurse into the potential child
                 if (hasBeenSeen) None
@@ -552,39 +597,47 @@ trait ToProcess {
 
                       val foundItems = rawFoundItems.filter(_.size() > 4)
 
-                      val processSet =
-                        ToProcess.strategiesForArtifacts(
-                          foundItems,
-                          x => (),
-                          false
-                        )
-                      val thisParentScope = state4.generateParentScope(
-                        artifact,
-                        answerItem,
+                    import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+                    for {
+                      item <- foundItems.par
+                    } item.mimeType
+
+                    val processSet =
+                      ToProcess.strategiesForArtifacts(
+                        foundItems,
+                        x => (),
+                        false
+                      )
+                    val thisParentScope = state4.generateParentScope(
+                      artifact,
+                      answerItem,
+                      store,
+                      marker,
+                      Some(parentScope),
+                      Map()
+                    )
+                    processSet.flatMap(tp =>
+                      tp.process(
+                        Some(answerItem.identifier),
                         store,
-                        marker,
-                        Some(parentScope),
-                        Map()
+                        thisParentScope,
+                        None,
+                        args = args,
+                        blockList,
+                        keepRunning,
+                        atEnd
                       )
-                      processSet.flatMap(tp =>
-                        tp.process(
-                          Some(answerItem.identifier),
-                          store,
-                          thisParentScope,
-                          None,
-                          args = args,
-                          blockList,
-                          keepRunning,
-                          atEnd
-                        )
-                      )
+                    )
                   }
                 }
 
               val state5 =
                 state4.postChildProcessing(childGitoids, store, marker)
 
-              state5 -> (alreadyDone :+ answerItem.identifier)
+              val state6 =
+                state5.applyAccumulatedAugmentation(answerItem, artifact, store)
+
+              state6 -> (alreadyDone :+ answerItem.identifier)
             }
         }
 
@@ -705,17 +758,17 @@ object ToProcess {
       case 0 => 1
       case x => x
     }
-    if (infoMsgs_?) logger.debug("Creating strategies for artifacts")
+    if (infoMsgs_?) logger.info("Creating strategies for artifacts")
     // create the list of the files
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
       if (idx % by50 == 0 && infoMsgs_?) {
-        logger.debug(f"Initial file setup ${idx} of ${totalCnt}")
+        logger.info(f"Initial file setup ${idx} of ${totalCnt}")
       }
       f.uuid -> f
     }*)
 
-    if (infoMsgs_?) logger.debug("Built UUID map")
+    if (infoMsgs_?) logger.info("Built UUID map")
     // and by name for lookup
     val byName: ByName =
       artifacts.foldLeft(Map()) { case (map, wrapper) =>
@@ -727,7 +780,7 @@ object ToProcess {
       }
 
     if (infoMsgs_?)
-      logger.debug("Finished setting up files for per-ecosystem specialization")
+      logger.info("Finished setting up files for per-ecosystem specialization")
 
     val (processSet, finalByUUID, finalByName) =
       computeToProcess.zipWithIndex.foldLeft(
@@ -801,12 +854,12 @@ object ToProcess {
         allFiles.par.foreach(file => {
           val cnt = mimeCnt.addAndGet(1)
           if (cnt % 10000 == 0) {
-            logger.debug(f"Mime builder count ${cnt}")
+            logger.info(f"Mime builder count ${cnt}")
           }
           file.mimeType
         })
 
-        logger.debug("Computed mime type for all files")
+        logger.info("Computed mime type for all files")
 
         strategiesForArtifacts(
           allFiles,

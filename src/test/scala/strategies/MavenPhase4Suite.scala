@@ -4,9 +4,11 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.FileWalker
 import munit.FunSuite
 
 import java.io.File
@@ -189,15 +191,27 @@ class MavenPhase4Suite extends FunSuite {
     assertEquals(mavenStrategies.size, 4, "Should find 4 Maven JARs")
 
     val purls = mavenStrategies.flatMap { mtp =>
+      val store = MemStorage(None)
+      val item = createTestItem("jar")
+      // Process the POM first to get GAV data
       val state = MavenState()
       val s1 =
-        state.beginProcessing(mtp.jar, createTestItem("jar"), MavenMarkers.JAR)
-      val s2 = s1.beginProcessing(
-        mtp.pom.get,
-        createTestItem("pom"),
-        MavenMarkers.POM
-      )
-      s2.getPurls(mtp.jar, createTestItem("jar"), MavenMarkers.JAR)._1
+        state.beginProcessing(mtp.jar, item, MavenMarkers.JAR)
+      val s2 = mtp.pom
+        .map { pom =>
+          s1.beginProcessing(pom, createTestItem("pom"), MavenMarkers.POM)
+        }
+        .getOrElse(s1)
+      // Accumulate JAR child entries
+      FileWalker.withinArchiveStream(mtp.jar) { entries =>
+        entries.foreach { entry =>
+          s2.accumulateInfo(item.identifier, item, entry, store)
+        }
+      }
+      // Apply accumulated augmentation which resolves GAV and creates pURLs
+      val s3 = s2.applyAccumulatedAugmentation(item, mtp.jar, store)
+      // After applyAccumulatedAugmentation, pURLs are in the store's purl index
+      store.purls().toVector
     }
 
     // Should have 4 distinct pURLs (one per version)

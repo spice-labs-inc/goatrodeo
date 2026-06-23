@@ -176,7 +176,7 @@ object Builder {
       }
     }
 
-    logger.debug("Kicking off work queue consumer threads")
+    logger.info("Kicking off work queue consumer threads")
     val loopStart = Instant.now()
     var updatedDest = dest
 
