@@ -768,16 +768,10 @@ object ToProcess {
       f.uuid -> f
     }*)
 
-    if (infoMsgs_?) logger.info("Built UUID map")
-    // and by name for lookup
-    val byName: ByName =
-      artifacts.foldLeft(Map()) { case (map, wrapper) =>
-        val v = map.get(wrapper.filenameWithNoPath) match {
-          case None    => Vector()
-          case Some(v) => v
-        }
-        map + (wrapper.filenameWithNoPath -> (v :+ wrapper))
-      }
+    if (infoMsgs_?) logger.debug("Built UUID map")
+    // and by name for lookup. groupBy preserves per-key insertion order and
+    // avoids the O(n) immutable-map/vector rebuilds of a foldLeft + `:+`.
+    val byName: ByName = artifacts.groupBy(_.filenameWithNoPath)
 
     if (infoMsgs_?)
       logger.info("Finished setting up files for per-ecosystem specialization")
@@ -828,9 +822,16 @@ object ToProcess {
         val allFiles: Vector[ArtifactWrapper] =
           (for {
             (root, fl) <- fileListers
-            basePath = root.getCanonicalPath()
+            // Use absolute + lexically-normalized paths rather than
+            // getCanonicalPath(): canonicalization resolves symlinks against the
+            // filesystem (a syscall per file, costly across very large file
+            // sets), whereas toAbsolutePath()/normalize() are pure path ops.
+            // Symlinks are intentionally not resolved.
+            basePath = root.toPath().toAbsolutePath().normalize().toString()
             basePathLen = basePath.length()
-            file <- fl().par if file.exists() && file.isFile() && !file
+            // isFile() already implies exists() (it is true only for an existing
+            // regular file), so a separate exists() stat is redundant.
+            file <- fl().par if file.isFile() && !file
               .getName()
               .startsWith(".") && !ignorePathList.contains(file.getPath()) && {
               val name = file.getName()
@@ -840,9 +841,9 @@ object ToProcess {
           } yield FileWrapper(
             file,
             if (fsFilePaths) {
-              val cp = file.getCanonicalPath()
-              if (cp.startsWith(basePath)) cp.substring(basePathLen + 1)
-              else cp.substring(1)
+              val ap = file.toPath().toAbsolutePath().normalize().toString()
+              if (ap.startsWith(basePath)) ap.substring(basePathLen + 1)
+              else ap.substring(1)
             } else file.getName(),
             tempDir,
             finishedFile
