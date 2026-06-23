@@ -215,7 +215,7 @@ object Builder {
 
       loopCnt += 1
       logger.info(
-        f"Finished multi-thread consumer loop ${loopCnt} at ${Duration
+        f"Finished multi-thread consumer loop ${loopCnt}%,d at ${Duration
             .between(totalStart, Instant.now())}"
       )
       updatedDest = destWithCount(dest, loopCnt)
@@ -395,8 +395,7 @@ object Builder {
                         f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
                       } else ""
                       logger.info(
-                        f"Processed ${updatedCnt} of ${totalItems} at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${String
-                            .format("%,d", storage.size())}"
+                        f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
                       )
                       progressNotifier.notify(
                         updatedCnt.toLong,
@@ -467,7 +466,7 @@ object Builder {
         () => {
           try {
             logger.info(
-              f"Finished processing ${cnt.get()}, vertices ${storage.size()} at ${Duration
+              f"Finished processing ${cnt.get()}%,d, vertices ${storage.size()}%,d at ${Duration
                   .between(start, Instant.now())}"
             )
 
@@ -513,7 +512,7 @@ object Builder {
 
         val purlOut = store.purls()
 
-        logger.info(f"Writing ${purlOut.size} Package URLs")
+        logger.info(f"Writing ${purlOut.size}%,d Package URLs")
         val purlFile = File(target, "purls.txt")
         purlFile.createNewFile()
         val bw = new BufferedWriter(new FileWriter(purlFile))
@@ -555,7 +554,7 @@ object Builder {
         )
 
         logger.info(
-          f"Wrote ${cnt} entries in ${Duration.between(start, Instant.now())}"
+          f"Wrote ${cnt}%,d entries in ${Duration.between(start, Instant.now())}"
         )
 
         Some(ret._2)

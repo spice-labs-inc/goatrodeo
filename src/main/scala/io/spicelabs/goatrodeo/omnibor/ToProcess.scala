@@ -763,7 +763,7 @@ object ToProcess {
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
       if (idx % by50 == 0 && infoMsgs_?) {
-        logger.info(f"Initial file setup ${idx} of ${totalCnt}")
+        logger.info(f"Initial file setup ${idx}%,d of ${totalCnt}%,d")
       }
       f.uuid -> f
     }*)
@@ -791,7 +791,7 @@ object ToProcess {
           theFn(workingByUUID, workingByName)
         if (infoMsgs_?)
           logger.debug(
-            f"Finished processing step ${cnt + 1} for ${name} found ${addlToProcess.length}"
+            f"Finished processing step ${cnt + 1}%,d for ${name} found ${addlToProcess.length}%,d"
           )
 
         // put the new items to process in the queue
@@ -848,13 +848,13 @@ object ToProcess {
             finishedFile
           )).toVector
 
-        logger.info(f"Found all files, count ${allFiles.length}")
+        logger.info(f"Found all files, count ${allFiles.length}%,d")
 
         val mimeCnt = AtomicInteger(0)
         allFiles.par.foreach(file => {
           val cnt = mimeCnt.addAndGet(1)
           if (cnt % 10000 == 0) {
-            logger.info(f"Mime builder count ${cnt}")
+            logger.info(f"Mime builder count ${cnt}%,d")
           }
           file.mimeType
         })
@@ -868,7 +868,7 @@ object ToProcess {
             val total = count.addAndGet(toProcess.itemCnt)
             if (total % 1000 == 0) {
               logger.debug(
-                f"built strategies to handle ${total} of ${allFiles.length}"
+                f"built strategies to handle ${total}%,d of ${allFiles.length}%,d"
               )
             }
           },

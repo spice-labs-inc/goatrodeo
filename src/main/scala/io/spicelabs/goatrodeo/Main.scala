@@ -127,7 +127,7 @@ object Howdy {
             (good: Boolean) => {
               if (good) {
                 logger.info(
-                  f"Completed, exporting ${success.length} ingested items to ${destFile}"
+                  f"Completed, exporting ${success.length}%,d ingested items to ${destFile}"
                 )
 
                 val out = java.io.FileWriter(
