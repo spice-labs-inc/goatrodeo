@@ -36,7 +36,8 @@ enum DockerMarkers extends ProcessingMarker {
   /** A layer tarball containing filesystem changes.
     *
     * @param hash
-    *   the SHA256 hash of the layer
+    *   the full path of the layer within the image tar (e.g.,
+    *   "blobs/sha256/abc123...")
     */
   case Layer(hash: String)
 
@@ -659,7 +660,7 @@ final case class DockerToProcess(
   type StateType = DockerState
   override def main: String =
     f"${manifest.path()}${config.foldLeft(" ") { case (s, m) =>
-        f"${s}${m.configHash} "
+        f"${s}${m.configPath} "
       }}"
 
   override def mimeType: Set[String] = manifest.mimeType
@@ -674,7 +675,7 @@ final case class DockerToProcess(
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) = (layers.values
-    .map(v => v -> DockerMarkers.Layer(v.filenameWithNoPath))
+    .map(v => v -> DockerMarkers.Layer(v.path()))
     .toList ::: List(manifest -> DockerMarkers.Manifest) ::: config.map(m =>
     m.configFile -> DockerMarkers.Config(m)
   )) -> DockerState(
@@ -698,7 +699,7 @@ object DockerToProcess {
     * @param byUUID
     *   artifacts indexed by UUID
     * @param byName
-    *   artifacts indexed by filename
+    *   artifacts indexed by full path
     * @return
     *   tuple of (ToProcess items, remaining UUID map, remaining name map,
     *   strategy name)
@@ -726,7 +727,10 @@ object DockerToProcess {
           case _           => None
         }
       } yield {
-        // Scan for OCI manifest blobs keyed by config digest
+        // Scan for OCI manifest blobs keyed by config path.
+        // With full-path keys, the byName key IS the path (e.g.,
+        // "blobs/sha256/abc123..."), so name.startsWith("blobs/sha256/")
+        // now correctly filters OCI blob entries.
         val ociManifests: Map[String, JValue] = {
           val candidates = for {
             (name, artifacts) <- byName
@@ -741,7 +745,9 @@ object DockerToProcess {
           candidates.flatMap { json =>
             (json \ "config" \ "digest") match {
               case JString(digest) if digest.startsWith("sha256:") =>
-                List(digest.substring(7) -> json)
+                // Key by the full blob path so it can be looked up
+                // by the Config path from the Docker manifest.
+                List(s"blobs/sha256/${digest.substring(7)}" -> json)
               case _ => Nil
             }
           }.toMap
@@ -749,12 +755,15 @@ object DockerToProcess {
 
         for {
           manifestConfig <- manifestElements
-          configHash <- (manifestConfig \ "Config") match {
+          // The Config value in the Docker manifest is a path like
+          // "blobs/sha256/abc123...". With full-path keys, we can look
+          // it up directly in byName.
+          configPath <- (manifestConfig \ "Config") match {
             case JString(s) if s.startsWith("blobs/sha256/") =>
-              List(s.substring(13))
+              List(s)
             case _ => Nil
           }
-          configFile <- byName.get(configHash) match {
+          configFile <- byName.get(configPath) match {
             case Some(a)
                 if a.length == 1 && a(0).mimeType.exists(
                   _.startsWith(jsonMimeType)
@@ -770,21 +779,22 @@ object DockerToProcess {
 
             case JArray(layers) <- manifestConfig \ "Layers"
             case JString(shaLayer) <- layers
-            layer = shaLayer.substring(13)
-            artifactWrapper <- byName.get(layer) match {
+            // shaLayer is the full path within the tar (e.g.,
+            // "blobs/sha256/abc123..."). Look it up directly in byName.
+            artifactWrapper <- byName.get(shaLayer) match {
               case Some(ar) if ar.length == 1 => ar.headOption.toList
               case _                          => Nil
             }
-          } yield layer
+          } yield shaLayer
 
           ManifestInfo(
             manifest,
             manifestConfig,
-            configHash,
+            configPath,
             configFile,
             configJson,
             layers,
-            ociManifests.get(configHash)
+            ociManifests.get(configPath)
           )
         }
       }
@@ -814,7 +824,7 @@ object DockerToProcess {
         val (finalUuid, finalName) =
           all.foldLeft((uuidSansLayer, nameSansLayer)) {
             case ((uuid, name), manifestInfo) =>
-              (uuid - manifestInfo.configFile.uuid) -> (name - manifestInfo.configHash)
+              (uuid - manifestInfo.configFile.uuid) -> (name - manifestInfo.configPath)
           }
 
         (
@@ -837,19 +847,20 @@ object DockerToProcess {
   *   the manifest.json artifact
   * @param manifestConfig
   *   the JSON for this manifest entry
-  * @param configHash
-  *   the SHA256 hash of the config file
+  * @param configPath
+  *   the full path of the config file within the image tar (e.g.,
+  *   "blobs/sha256/abc123...")
   * @param configFile
   *   the config JSON artifact
   * @param configJson
   *   the parsed config JSON
   * @param layers
-  *   list of layer SHA256 hashes
+  *   list of layer full paths within the image tar
   */
 case class ManifestInfo(
     manifest: ArtifactWrapper,
     manifestConfig: JValue,
-    configHash: String,
+    configPath: String,
     configFile: ArtifactWrapper,
     configJson: JValue,
     layers: List[String],

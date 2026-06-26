@@ -1839,8 +1839,13 @@ object MavenToProcess {
       artifacts.exists(_.mimeType.contains("application/java-archive"))
     }
 
-    // Build directory-to-metadata mapping for maven-metadata.xml files
-    val metadataXmlFiles = byName.getOrElse("maven-metadata.xml", Vector.empty)
+    // Build directory-to-metadata mapping for maven-metadata.xml files.
+    // With full-path keys, metadata files may be at any directory level,
+    // so collect all entries whose path ends with "maven-metadata.xml".
+    val metadataXmlFiles = byName.collect {
+      case (path, artifacts) if path.endsWith("maven-metadata.xml") =>
+        artifacts
+    }.flatten
     val metadataXmlByDir = metadataXmlFiles.groupBy { a =>
       Option(new java.io.File(a.path()).getParent()).getOrElse("")
     }
@@ -1887,13 +1892,11 @@ object MavenToProcess {
           )
       }
 
-    // Remove consumed maven-metadata.xml entries from revisedByName
+    // Remove consumed maven-metadata.xml entries from revisedByName.
+    // With full-path keys, each metadata file has its own key, so filter
+    // by the consumed paths rather than a single hardcoded key.
     val finalRevisedByName = if (consumedMetaPaths.nonEmpty) {
-      val allMeta = revisedByName.getOrElse("maven-metadata.xml", Vector.empty)
-      val remaining =
-        allMeta.filterNot(a => consumedMetaPaths.contains(a.path()))
-      if (remaining.isEmpty) revisedByName - "maven-metadata.xml"
-      else revisedByName.updated("maven-metadata.xml", remaining)
+      revisedByName.filterNot { case (k, _) => consumedMetaPaths.contains(k) }
     } else revisedByName
 
     (toProcess, revisedByUUID, finalRevisedByName, "Maven")

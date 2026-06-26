@@ -115,9 +115,9 @@ class MavenPhase4Suite extends FunSuite {
       val metaWrapper = FileWrapper(metaFile, metaFile.getAbsolutePath, None)
 
       val byName: ToProcess.ByName = Map(
-        jarFile.getName -> Vector(jarWrapper),
-        pomFile.getName -> Vector(pomWrapper),
-        metaFile.getName -> Vector(metaWrapper)
+        jarWrapper.path() -> Vector(jarWrapper),
+        pomWrapper.path() -> Vector(pomWrapper),
+        metaWrapper.path() -> Vector(metaWrapper)
       )
       val byUUID = Map(
         jarWrapper.uuid -> jarWrapper,
@@ -131,8 +131,8 @@ class MavenPhase4Suite extends FunSuite {
       val mtp = toProcess.head.asInstanceOf[MavenToProcess]
       assert(mtp.metadataXml.isDefined, "maven-metadata.xml should be matched")
 
-      // Verify revisedByName no longer contains maven-metadata.xml
-      assert(!revisedByName.contains("maven-metadata.xml"))
+      // Verify revisedByName no longer contains the consumed maven-metadata.xml
+      assert(!revisedByName.contains(metaWrapper.path()))
     } finally {
       jarFile.delete()
       pomFile.delete()

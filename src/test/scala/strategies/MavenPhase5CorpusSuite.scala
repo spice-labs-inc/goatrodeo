@@ -195,7 +195,7 @@ class MavenPhase5CorpusSuite extends FunSuite {
   test("corpus newrelic-weave JAR is claimed by Maven") {
     val artifact = loadArtifact("newrelic-weave", "weave.jar")
     val byUUID = Map(artifact.uuid -> artifact)
-    val byName = Map("weave.jar" -> Vector(artifact))
+    val byName = Map(artifact.path() -> Vector(artifact))
     val (toProcess, _, _, _) = MavenToProcess.computeMavenFiles(byUUID, byName)
     assertEquals(
       toProcess.size,

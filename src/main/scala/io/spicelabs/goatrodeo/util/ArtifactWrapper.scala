@@ -80,9 +80,13 @@ sealed trait ArtifactWrapper {
   def size(): Long
 
   private lazy val _mimeType: Set[String] = {
-    val base = Set(Using.resource(getTikaInputStream()) { stream =>
-      ArtifactWrapper.mimeTypeFor(stream, this.path())
-    })
+    val base = ExtensionMimeDetector.detect(this) match {
+      case Some(mime) => Set(mime)
+      case None =>
+        Set(Using.resource(getTikaInputStream()) { stream =>
+          ArtifactWrapper.mimeTypeFor(stream, this.path())
+        })
+    }
     ArtifactWrapper.augmentMimeTypes(this, base)
   }
 

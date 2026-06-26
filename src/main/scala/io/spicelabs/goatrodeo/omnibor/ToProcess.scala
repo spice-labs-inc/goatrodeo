@@ -769,9 +769,11 @@ object ToProcess {
     }*)
 
     if (infoMsgs_?) logger.debug("Built UUID map")
-    // and by name for lookup. groupBy preserves per-key insertion order and
-    // avoids the O(n) immutable-map/vector rebuilds of a foldLeft + `:+`.
-    val byName: ByName = artifacts.groupBy(_.filenameWithNoPath)
+    // Keyed by full path (not bare filename) so that strategies can
+    // disambiguate files with the same name in different directories.
+    // groupBy preserves per-key insertion order and avoids the O(n)
+    // immutable-map/vector rebuilds of a foldLeft + `:+`.
+    val byName: ByName = artifacts.groupBy(_.path())
 
     if (infoMsgs_?)
       logger.info("Finished setting up files for per-ecosystem specialization")
@@ -854,7 +856,7 @@ object ToProcess {
         val mimeCnt = AtomicInteger(0)
         allFiles.par.foreach(file => {
           val cnt = mimeCnt.addAndGet(1)
-          if (cnt % 10000 == 0) {
+          if (cnt % 100000 == 0) {
             logger.info(f"Mime builder count ${cnt}%,d")
           }
           file.mimeType
