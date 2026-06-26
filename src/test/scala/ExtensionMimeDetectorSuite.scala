@@ -30,13 +30,24 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       * Requirement: Extension-based short-circuit for .class files with magic
       * byte verification.
       */
-    val bytes = Array[Byte](0xCA.toByte, 0xFE.toByte, 0xBA.toByte, 0xBE.toByte, 0x00, 0x00, 0x00, 0x34)
+    val bytes = Array[Byte](
+      0xca.toByte,
+      0xfe.toByte,
+      0xba.toByte,
+      0xbe.toByte,
+      0x00,
+      0x00,
+      0x00,
+      0x34
+    )
     val wrapper = ByteWrapper(bytes, "com/example/Foo.class", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, Some("application/java-vm"))
   }
 
-  test("detect - .class with wrong magic returns None (falls through to Tika)") {
+  test(
+    "detect - .class with wrong magic returns None (falls through to Tika)"
+  ) {
 
     /** What: A file named `Foo.class` whose first 4 bytes are NOT 0xCAFEBABE
       * returns `None`, causing the caller to fall through to Tika.
@@ -59,7 +70,7 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       * Why: A valid `.class` file must be at least 4 bytes (the magic header).
       * Files shorter than the magic cannot be valid class files.
       */
-    val bytes = Array[Byte](0xCA.toByte, 0xFE.toByte)
+    val bytes = Array[Byte](0xca.toByte, 0xfe.toByte)
     val wrapper = ByteWrapper(bytes, "Foo.class", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, None)
@@ -70,10 +81,10 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
     /** What: A file named `FOO.CLASS` (uppercase extension) with CAFEBABE magic
       * is detected as `application/java-vm`.
       *
-      * Why: File extensions should be matched case-insensitively, as some
-      * build systems or filesystems produce uppercase extensions.
+      * Why: File extensions should be matched case-insensitively, as some build
+      * systems or filesystems produce uppercase extensions.
       */
-    val bytes = Array[Byte](0xCA.toByte, 0xFE.toByte, 0xBA.toByte, 0xBE.toByte)
+    val bytes = Array[Byte](0xca.toByte, 0xfe.toByte, 0xba.toByte, 0xbe.toByte)
     val wrapper = ByteWrapper(bytes, "FOO.CLASS", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, Some("application/java-vm"))
@@ -90,7 +101,7 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       * standard ZIP local file header signature. Bypassing Tika for verified
       * JARs saves the expensive Tika content-based detection.
       */
-    val bytes = Array[Byte](0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00)
+    val bytes = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00)
     val wrapper = ByteWrapper(bytes, "lib.jar", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, Some("application/java-archive"))
@@ -103,7 +114,7 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       *
       * Why: WAR files are Java Web Application Archives, also ZIP-format.
       */
-    val bytes = Array[Byte](0x50, 0x4B, 0x03, 0x04)
+    val bytes = Array[Byte](0x50, 0x4b, 0x03, 0x04)
     val wrapper = ByteWrapper(bytes, "webapp.war", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, Some("application/java-archive"))
@@ -116,7 +127,7 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       *
       * Why: EAR files are Java Enterprise Application Archives.
       */
-    val bytes = Array[Byte](0x50, 0x4B, 0x03, 0x04)
+    val bytes = Array[Byte](0x50, 0x4b, 0x03, 0x04)
     val wrapper = ByteWrapper(bytes, "app.ear", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, Some("application/java-archive"))
@@ -129,7 +140,7 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       *
       * Why: Jenkins plugins are Java archives with a non-standard extension.
       */
-    val bytes = Array[Byte](0x50, 0x4B, 0x03, 0x04)
+    val bytes = Array[Byte](0x50, 0x4b, 0x03, 0x04)
     val wrapper = ByteWrapper(bytes, "plugin.jpi", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, Some("application/java-archive"))
@@ -140,9 +151,9 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
     /** What: A file named `lib.jar` whose first 4 bytes are NOT PK\x03\x04
       * returns `None`, causing the caller to fall through to Tika.
       *
-      * Why: A `.jar` extension without ZIP magic bytes may indicate a
-      * corrupted file, an empty file, or a non-Java file with a misleading
-      * extension. Tika's content-based detection is still needed.
+      * Why: A `.jar` extension without ZIP magic bytes may indicate a corrupted
+      * file, an empty file, or a non-Java file with a misleading extension.
+      * Tika's content-based detection is still needed.
       */
     val bytes = "not a zip file".getBytes("UTF-8")
     val wrapper = ByteWrapper(bytes, "lib.jar", None)
@@ -154,9 +165,10 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
 
     /** What: A file named `lib.jar` with only 2 bytes returns `None`.
       *
-      * Why: A valid ZIP/JAR file must be at least 4 bytes (the PK magic header).
+      * Why: A valid ZIP/JAR file must be at least 4 bytes (the PK magic
+      * header).
       */
-    val bytes = Array[Byte](0x50, 0x4B)
+    val bytes = Array[Byte](0x50, 0x4b)
     val wrapper = ByteWrapper(bytes, "lib.jar", None)
     val result = ExtensionMimeDetector.detect(wrapper)
     assertEquals(result, None)
@@ -205,7 +217,9 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
 
   // ==================== Integration tests via mimeType ====================
 
-  test("mimeType - .class with CAFEBABE bypasses Tika and returns application/java-vm") {
+  test(
+    "mimeType - .class with CAFEBABE bypasses Tika and returns application/java-vm"
+  ) {
 
     /** What: When `mimeType` is accessed on a ByteWrapper with `.class`
       * extension and CAFEBABE magic, the result is `application/java-vm`.
@@ -213,39 +227,55 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
       * Why: This verifies the wiring of `ExtensionMimeDetector` into the
       * `_mimeType` lazy val. The MIME type should be determined without
       * invoking Tika, and the augmenter chain should still run (but
-      * `augmentationCannotApply` returns true for `application/java-vm`,
-      * so augmenters are skipped — same as the Tika path).
+      * `augmentationCannotApply` returns true for `application/java-vm`, so
+      * augmenters are skipped — same as the Tika path).
       */
-    val bytes = Array[Byte](0xCA.toByte, 0xFE.toByte, 0xBA.toByte, 0xBE.toByte, 0x00, 0x00, 0x00, 0x34)
+    val bytes = Array[Byte](
+      0xca.toByte,
+      0xfe.toByte,
+      0xba.toByte,
+      0xbe.toByte,
+      0x00,
+      0x00,
+      0x00,
+      0x34
+    )
     val wrapper = ByteWrapper(bytes, "com/example/Foo.class", None)
     val mimes = wrapper.mimeType
-    assert(mimes.contains("application/java-vm"), s"Expected application/java-vm in $mimes")
+    assert(
+      mimes.contains("application/java-vm"),
+      s"Expected application/java-vm in $mimes"
+    )
   }
 
-  test("mimeType - .jar with PK magic bypasses Tika and returns application/java-archive") {
+  test(
+    "mimeType - .jar with PK magic bypasses Tika and returns application/java-archive"
+  ) {
 
-    /** What: When `mimeType` is accessed on a ByteWrapper with `.jar`
-      * extension and PK\x03\x04 magic, the result includes
-      * `application/java-archive`.
+    /** What: When `mimeType` is accessed on a ByteWrapper with `.jar` extension
+      * and PK\x03\x04 magic, the result includes `application/java-archive`.
       *
       * Why: This verifies the wiring of `ExtensionMimeDetector` into the
       * `_mimeType` lazy val for Java archives. The MIME type should be
-      * determined without invoking Tika, and the augmenter chain should
-      * still run (but `augmentationCannotApply` returns true for
-      * `application/java-archive`, so augmenters are skipped — same as the
-      * Tika path).
+      * determined without invoking Tika, and the augmenter chain should still
+      * run (but `augmentationCannotApply` returns true for
+      * `application/java-archive`, so augmenters are skipped — same as the Tika
+      * path).
       */
-    val bytes = Array[Byte](0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00)
+    val bytes = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00)
     val wrapper = ByteWrapper(bytes, "lib.jar", None)
     val mimes = wrapper.mimeType
-    assert(mimes.contains("application/java-archive"), s"Expected application/java-archive in $mimes")
+    assert(
+      mimes.contains("application/java-archive"),
+      s"Expected application/java-archive in $mimes"
+    )
   }
 
   test("mimeType - .class with wrong magic falls through to Tika") {
 
     /** What: When `mimeType` is accessed on a ByteWrapper with `.class`
-      * extension but wrong magic bytes, the result is NOT
-      * `application/java-vm` — Tika determines the type instead.
+      * extension but wrong magic bytes, the result is NOT `application/java-vm`
+      * — Tika determines the type instead.
       *
       * Why: This verifies the fallback path. When magic bytes don't match,
       * `ExtensionMimeDetector.detect` returns `None`, and the original
@@ -254,13 +284,16 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
     val bytes = "not a class file".getBytes("UTF-8")
     val wrapper = ByteWrapper(bytes, "Foo.class", None)
     val mimes = wrapper.mimeType
-    assert(!mimes.contains("application/java-vm"), s"Should not contain application/java-vm: $mimes")
+    assert(
+      !mimes.contains("application/java-vm"),
+      s"Should not contain application/java-vm: $mimes"
+    )
   }
 
   test("mimeType - .jar with wrong magic falls through to Tika") {
 
-    /** What: When `mimeType` is accessed on a ByteWrapper with `.jar`
-      * extension but wrong magic bytes, the result does NOT contain
+    /** What: When `mimeType` is accessed on a ByteWrapper with `.jar` extension
+      * but wrong magic bytes, the result does NOT contain
       * `application/java-archive` — Tika determines the type instead.
       *
       * Why: This verifies the fallback path for Java archives.
@@ -268,6 +301,9 @@ class ExtensionMimeDetectorSuite extends munit.FunSuite {
     val bytes = "not a zip file".getBytes("UTF-8")
     val wrapper = ByteWrapper(bytes, "lib.jar", None)
     val mimes = wrapper.mimeType
-    assert(!mimes.contains("application/java-archive"), s"Should not contain application/java-archive: $mimes")
+    assert(
+      !mimes.contains("application/java-archive"),
+      s"Should not contain application/java-archive: $mimes"
+    )
   }
 }
