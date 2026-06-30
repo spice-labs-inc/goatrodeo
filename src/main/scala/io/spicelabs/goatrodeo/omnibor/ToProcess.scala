@@ -597,9 +597,8 @@ trait ToProcess {
 
                       val foundItems = rawFoundItems.filter(_.size() > 4)
 
-                    import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
                     for {
-                      item <- foundItems.par
+                      item <- foundItems
                     } item.mimeType
 
                     val processSet =
