@@ -50,10 +50,13 @@ jobs:
       - name: Derive and validate version
         id: version
         shell: bash
+        env:
+          # tag_name is "vX.Y.Z" (no refs/tags/ prefix) for the release event.
+          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          raw_version="${GITHUB_REF#refs/tags/v}"
+          raw_version="${TAG_NAME#v}"
           if [[ ! "$raw_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag format: $raw_version. Must be v<major>.<minor>.<patch>." >&2
+            echo "Invalid tag format: $TAG_NAME. Must be v<major>.<minor>.<patch>." >&2
             exit 1
           fi
           echo "projectVersion=$raw_version" >> "$GITHUB_ENV"
