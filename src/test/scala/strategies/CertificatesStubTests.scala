@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesState
@@ -239,9 +240,9 @@ class CertificatesStubTests extends FunSuite {
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
-    val (purls, returned) =
+    val (purlSet, returned) =
       state.getPurls(art, syntheticItem(), SingleMarker())
-    assertEquals(purls, Vector.empty)
+    assertEquals(purlSet, PurlSet.empty)
     assert(returned eq state)
   }
 

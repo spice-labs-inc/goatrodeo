@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -505,31 +506,31 @@ case class DockerState(
 
       // construct a Docker Package URL based on the pURL examples
       // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
-      PURLHelpers
-        .purl(
-          `type` = "docker",
-          name = path,
-          namespace = namespace.orNull,
-          version = version.orNull
-        )
-        .toCanonical()
-        .nn
+      scala.util.Try {
+        PURLHelpers
+          .purl(
+            `type` = "docker",
+            name = path,
+            namespace = namespace.orNull,
+            version = version.orNull
+          )
+          .toCanonical()
+      }.toOption
     }
 
-    purls.toVector
+    purls.flatten.toVector
   }
 
   override def getPurls(
       artifact: ArtifactWrapper,
       item: Item,
       marker: DockerMarkers
-  ): (Vector[String], DockerState) = marker match {
+  ): (PurlSet, DockerState) = marker match {
     case DockerMarkers.Config(info) =>
-      val purls = computePurls(info)
-
-      // purls.toVector -> this
-      Vector.empty -> this
-    case _ => Vector.empty -> this
+      // pURLs are emitted in finalAugmentation, not here — Docker needs
+      // config info that is only available at finalization time.
+      PurlSet.empty -> this
+    case _ => PurlSet.empty -> this
   }
 
   override def getMetadata(
@@ -571,7 +572,7 @@ case class DockerState(
       // ToProcess.process backref logic will create pURL items that alias to
       // this config item, giving each Docker image its own distinct metadata
       // namespace rather than sharing a single parent item.
-      val updatedItem = item
+      val itemWithPurls = item
         .enhanceWithMetadata(mimeTypes =
           Vector(
             "application/vnd.oci.image.config.v1+json",
@@ -579,6 +580,22 @@ case class DockerState(
           )
         )
         .enhanceItemWithPurls(thePurls)
+
+      // Store the first pURL as the canonical pURL metadata on the config
+      // item. This designates the Docker image's primary identity.
+      // Docker's getPurls returns PurlSet.empty (pURLs are emitted here in
+      // finalAugmentation, not through getPurls), so ToProcess.process does
+      // not write canonical pURL metadata for Docker — it must be done here.
+      val updatedItem = thePurls.headOption match {
+        case Some(canonicalPurl) =>
+          itemWithPurls.enhanceWithMetadata(
+            extra = TreeMap(
+              MetadataKeyConstants.CANONICAL_PURL ->
+                TreeSet(StringOrPair(canonicalPurl))
+            )
+          )
+        case None => itemWithPurls
+      }
 
       // for config, make sure it contains all the layers
       // and the layers will have a containedBy reference

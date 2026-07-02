@@ -10,6 +10,7 @@ import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingMarker
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -231,10 +232,26 @@ case class MavenState(
 ) extends ProcessingState[MavenMarkers, MavenState] {
   private lazy val logger = Logger(getClass())
 
-  /** Resolve GAV using the priority chain:
-    *   1. embeddedProps (pom.properties) 2. externalPom (parsedPom) 3.
-    *      embeddedPom (pom.xml inside JAR) 4. manifest OSGi / standard headers
-    *      5. filename heuristics
+  /** Resolve groupId/artifactId/version using field-level merge.
+    *
+    * For each field (groupId, artifactId, version), the best value is picked
+    * from the best source FOR THAT FIELD, not from the first source that
+    * provides all three. This produces pURLs more likely to exist in Maven
+    * Central because:
+    *   - Manifest's Implementation-Title is human-readable, NOT the Maven
+    *     artifactId. The filename usually matches the Maven artifactId.
+    *   - So for artifactId, filename has higher priority than manifest.
+    *   - For groupId and version, manifest is still higher priority than
+    *     filename (manifest has vendor info and build version).
+    *
+    * Per-field priority:
+    *   groupId:    pom.properties > external POM > embedded pom.xml > manifest > filename
+    *   artifactId: pom.properties > external POM > embedded pom.xml > filename > manifest
+    *   version:    pom.properties > external POM > embedded pom.xml > manifest > filename
+    *
+    * pom.properties is filename-gated by `determinePrimaryGav` in
+    * `applyAccumulatedAugmentation` — it only contributes fields when its
+    * artifactId matches the JAR filename, preventing cross-artifact mixing.
     */
   def resolveGAV(
       artifact: ArtifactWrapper,
@@ -244,65 +261,111 @@ case class MavenState(
       embeddedPom: Option[PomParser.ParsedPom] = None
   ): (Option[String], Option[String], Option[String]) = {
 
-    // ---- priority 1: embedded pom.properties ----
-    val fromProps = for {
-      g <- embeddedProps.get("groupId")
-      a <- embeddedProps.get("artifactId")
-      v <- embeddedProps.get("version")
-    } yield (Some(g), Some(a), Some(v))
+    // Gather candidates from each source, per field.
+    // .filter(_.nonEmpty) ensures that empty-string values (e.g. from
+    // a pom.properties with "groupId=") are treated as missing.
+    val propsGroupId = embeddedProps.get("groupId").filter(_.nonEmpty)
+    val propsArtifactId = embeddedProps.get("artifactId").filter(_.nonEmpty)
+    val propsVersion = embeddedProps.get("version").filter(_.nonEmpty)
 
-    // ---- priority 2: external POM direct GAV ----
-    val fromExternal = externalPom.flatMap { p =>
-      for {
-        g <- p.groupId
-        a <- p.artifactId
-        v <- p.version
-      } yield (Some(g), Some(a), Some(v))
-    }
+    val extGroupId = externalPom.flatMap(_.groupId).filter(_.nonEmpty)
+    val extArtifactId = externalPom.flatMap(_.artifactId).filter(_.nonEmpty)
+    val extVersion = externalPom.flatMap(_.version).filter(_.nonEmpty)
 
-    // ---- priority 3: embedded pom.xml ----
-    val fromEmbedded = embeddedPom.flatMap { p =>
-      for {
-        g <- p.groupId
-        a <- p.artifactId
-        v <- p.version
-      } yield (Some(g), Some(a), Some(v))
-    }
+    val embGroupId = embeddedPom.flatMap(_.groupId).filter(_.nonEmpty)
+    val embArtifactId = embeddedPom.flatMap(_.artifactId).filter(_.nonEmpty)
+    val embVersion = embeddedPom.flatMap(_.version).filter(_.nonEmpty)
 
-    // ---- priority 4: manifest ----
-    val fromManifest = resolveGAVFromManifest(manifest)
+    // Manifest contributes individual fields without a gate — even when
+    // it has no artifactId headers, its groupId (Implementation-Vendor-Id)
+    // and version (Implementation-Version) are still valid.
+    val (manGroupId, manArtifactId, manVersion) = resolveGAVFromManifest(manifest)
 
-    // ---- priority 5: filename ----
-    val fromFilename = extractIdentityFromFilename(artifact.filenameWithNoPath)
+    val (fileGroupId, fileArtifactId, fileVersion) =
+      extractIdentityFromFilename(artifact.filenameWithNoPath).getOrElse((None, None, None))
 
-    (fromProps orElse fromExternal orElse fromEmbedded orElse fromManifest orElse fromFilename)
-      .getOrElse((None, None, None))
+    // Per-field priority:
+    // groupId:    pom.properties > external POM > embedded pom.xml > manifest > filename
+    // artifactId: pom.properties > external POM > embedded pom.xml > filename > manifest
+    // version:    pom.properties > external POM > embedded pom.xml > manifest > filename
+    val groupId = propsGroupId.orElse(extGroupId).orElse(embGroupId).orElse(manGroupId).orElse(fileGroupId)
+    val artifactId = propsArtifactId.orElse(extArtifactId).orElse(embArtifactId).orElse(fileArtifactId).orElse(manArtifactId)
+    val version = propsVersion.orElse(extVersion).orElse(embVersion).orElse(manVersion).orElse(fileVersion)
+
+    // Last-resort fallback: Maven pURLs require a namespace (groupId).
+    // If no groupId was found from any source but artifactId exists,
+    // use artifactId as both groupId and artifactId. This produces
+    // e.g. pkg:maven/collections-generic/collections-generic@4.01
+    // which is a valid pURL even if the groupId is not the "real" one.
+    // Better to have a lookupable pURL than none at all.
+    val finalGroupId = groupId.orElse(artifactId)
+
+    (finalGroupId, artifactId, version)
   }
 
-  /** Build a fallback (groupId, artifactId, version) from MANIFEST headers. */
+  /** Derive a groupId from a package-path-style manifest header value.
+    *
+    * Many JAR manifests store Java package paths in headers like
+    * Bundle-SymbolicName, Extension-Name, Implementation-Title, etc.
+    * These often follow the convention `groupId.artifactId` (e.g.
+    * `org.apache.commons.lang`), so the groupId can be derived by taking
+    * all segments except the last.
+    *
+    * Handles:
+    *   - `org.apache.commons.codec.*` → `org.apache.commons` (strip `.*`)
+    *   - `org.apache.commons.lang` → `org.apache.commons`
+    *   - `collections-generic` → `None` (no dots, can't derive groupId)
+    *   - `.*` → `None` (only wildcard, nothing useful)
+    */
+  private def groupIdFromPackagePath(value: String): Option[String] = {
+    val cleaned = value.stripSuffix(".*").trim
+    val parts = cleaned.split("\\.")
+    if (parts.length > 1) {
+      val groupId = parts.init.mkString(".")
+      if (groupId.nonEmpty) Some(groupId) else None
+    } else None
+  }
+
+  /** Extract individual groupId, artifactId, and version from MANIFEST headers.
+    *
+    * Returns a tuple of individual Option[String] values WITHOUT a gate on
+    * artifactId. This allows field-level merge in `resolveGAV` to use the
+    * manifest's groupId and version even when the manifest has no artifactId
+    * headers (e.g., manifest with only Implementation-Vendor-Id and
+    * Implementation-Version).
+    *
+    * groupId is resolved from multiple manifest headers in priority order:
+    *   1. Implementation-Vendor-Id (most specific, Maven-native)
+    *   2. Bundle-SymbolicName (OSGi, derive parent path)
+    *   3. Automatic-Module-Name (Java module, derive parent path)
+    *   4. Extension-Name (Java extension, derive parent path)
+    *   5. Implementation-Title (if it looks like a package path)
+    *   6. Package (Java package, derive parent path)
+    *
+    * All empty-string values are filtered to None so they don't block
+    * the orElse chain.
+    */
   private def resolveGAVFromManifest(
       manifest: TreeMap[String, TreeSet[StringOrPair]]
-  ): Option[(Option[String], Option[String], Option[String])] = {
-    val bundleSymOpt =
-      manifest.get("bundle-symbolicname").flatMap(_.headOption).map(_.value)
-    val bundleVerOpt =
-      manifest.get("bundle-version").flatMap(_.headOption).map(_.value)
-    val bundleNameOpt =
-      manifest.get("bundle-name").flatMap(_.headOption).map(_.value)
-    val implVendorOpt = manifest
-      .get("implementation-vendor-id")
-      .flatMap(_.headOption)
-      .map(_.value)
-    val implTitleOpt =
-      manifest.get("implementation-title").flatMap(_.headOption).map(_.value)
-    val implVerOpt =
-      manifest.get("implementation-version").flatMap(_.headOption).map(_.value)
-    val specVerOpt =
-      manifest.get("specification-version").flatMap(_.headOption).map(_.value)
-    val extNameOpt =
-      manifest.get("extension-name").flatMap(_.headOption).map(_.value)
-    val createdByOpt =
-      manifest.get("created-by").flatMap(_.headOption).map(_.value)
+  ): (Option[String], Option[String], Option[String]) = {
+    // Helper: read a manifest header value, filtering empty strings.
+    // Java's Manifest parser stores "Key: " (trailing space, no value) as "",
+    // which must be treated as missing to avoid PurlException and to
+    // prevent Some("") from blocking the orElse chain.
+    def header(key: String): Option[String] =
+      manifest.get(key).flatMap(_.headOption).map(_.value).filter(_.nonEmpty)
+
+    val bundleSymOpt = header("bundle-symbolicname")
+    val bundleVerOpt = header("bundle-version")
+    val bundleNameOpt = header("bundle-name")
+    val implVendorOpt = header("implementation-vendor-id")
+    val implTitleOpt = header("implementation-title")
+    val implVerOpt = header("implementation-version")
+    val specVerOpt = header("specification-version")
+    val extNameOpt = header("extension-name")
+    val createdByOpt = header("created-by")
+    val autoModuleOpt = header("automatic-module-name")
+    val packageOpt = header("package")
 
     val artifactIdOpt = bundleSymOpt
       .map { raw =>
@@ -321,17 +384,27 @@ case class MavenState(
       .orElse(bundleNameOpt)
       .orElse(extNameOpt)
 
-    val groupIdOpt = implVendorOpt.orElse {
-      bundleSymOpt
-        .map(_.split(";")(0).trim.split("\\.").init.mkString("."))
-        .filter(_.nonEmpty)
-    }
+    // groupId priority chain within manifest:
+    //   1. Implementation-Vendor-Id (direct, Maven-native)
+    //   2. Bundle-SymbolicName (derive parent path, e.g. org.apache.commons.lang → org.apache.commons)
+    //   3. Automatic-Module-Name (derive parent path)
+    //   4. Extension-Name (derive parent path, strip .* wildcard)
+    //   5. Implementation-Title (derive parent path if it has dots)
+    //   6. Package (derive parent path, strip .* wildcard)
+    val groupIdOpt = implVendorOpt
+      .orElse {
+        bundleSymOpt
+          .map(_.split(";")(0).trim)
+          .flatMap(groupIdFromPackagePath)
+      }
+      .orElse(autoModuleOpt.flatMap(groupIdFromPackagePath))
+      .orElse(extNameOpt.flatMap(groupIdFromPackagePath))
+      .orElse(implTitleOpt.flatMap(groupIdFromPackagePath))
+      .orElse(packageOpt.flatMap(groupIdFromPackagePath))
 
     val versionOpt = bundleVerOpt.orElse(implVerOpt).orElse(specVerOpt)
 
-    if (artifactIdOpt.isDefined) {
-      Some((groupIdOpt, artifactIdOpt, versionOpt))
-    } else None
+    (groupIdOpt, artifactIdOpt, versionOpt)
   }
 
   /** Extract (groupId, artifactId, version) from a Maven-style filename.
@@ -572,20 +645,23 @@ case class MavenState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: MavenMarkers
-  ): (Vector[String], MavenState) = {
-    // For JAR markers, GAV is not yet resolved at this point in the pipeline.
-    // getPurls is called BEFORE children are processed, but GAV depends on
-    // data accumulated from children (manifest, pom.properties, etc.).
+  ): (PurlSet, MavenState) = {
+    // For JAR markers, groupId/artifactId/version is not yet resolved at this
+    // point in the pipeline. getPurls is called BEFORE children are processed,
+    // but the groupId/artifactId/version depends on data accumulated from
+    // children (manifest, pom.properties, etc.).
     // The pURL is instead generated in applyAccumulatedAugmentation after
-    // all children have been processed and GAV has been resolved.
+    // all children have been processed and the groupId/artifactId/version has
+    // been resolved.
     //
-    // For non-JAR markers (POM, Sources, JavaDocs, Metadata), GAV is already
-    // available from beginProcessing, so we generate the pURL here as before.
+    // For non-JAR markers (POM, Sources, JavaDocs, Metadata), the
+    // groupId/artifactId/version is already available from beginProcessing,
+    // so we generate the pURL here as before.
     (groupId, artifactId, version, jarAccumulated) match {
       case (_, _, _, Some(_)) =>
-        // JAR accumulation in progress — GAV not yet resolved.
-        // pURL will be created in applyAccumulatedAugmentation.
-        (Vector.empty, this)
+        // JAR accumulation in progress — groupId/artifactId/version not yet
+        // resolved. pURLs will be created in applyAccumulatedAugmentation.
+        PurlSet.empty -> this
       case (Some(g), Some(a), Some(v), None) =>
         val classifier = marker match {
           case MavenMarkers.JAR      => None
@@ -594,18 +670,22 @@ case class MavenState(
           case MavenMarkers.JavaDocs => Some("javadoc")
           case MavenMarkers.Metadata => None
         }
-        val purl = PURLHelpers
-          .buildPackageURL(
-            Ecosystems.Maven,
-            Some(g),
-            a,
-            v,
-            classifier
-          )
-          .toCanonical()
-          .nn
-        Vector(purl) -> this
-      case _ => (Vector.empty, this)
+        // Return the Purl object (not a string). PurlSet.canonicalStrings
+        // will handle toCanonical() at the storage boundary, wrapped in Try.
+        val purlOpt = scala.util.Try {
+          PURLHelpers
+            .buildPackageURL(
+              Ecosystems.Maven,
+              Some(g),
+              a,
+              v,
+              classifier
+            )
+        }.toOption
+        purlOpt
+          .map(p => PurlSet.single(p))
+          .getOrElse(PurlSet.empty) -> this
+      case _ => PurlSet.empty -> this
     }
   }
 
@@ -1084,33 +1164,60 @@ case class MavenState(
           )
         }
 
-        // ---- Step 2: Create/update pURL and fix backlinks ----
-        // For a complete GAV, create a pURL item and establish bidirectional
-        // alias edges:
+        // ---- Step 2: Create/update pURLs and fix backlinks ----
+        // For a complete groupId/artifactId/version, create pURL items and
+        // establish bidirectional alias edges:
         //   - pURL item gets aliasTo -> JAR item
         //   - JAR item gets aliasFrom -> pURL
         //
         // A single pURL can have multiple aliasTo entries (e.g., if the
-        // same GAV appears in multiple JARs, each JAR gets its own aliasTo
-        // entry on the shared pURL item).
+        // same pURL appears in multiple JARs, each JAR gets its own
+        // aliasTo entry on the shared pURL item).
+        //
+        // In addition to the canonical pURL (from the primary
+        // groupId/artifactId/version), we also emit pURLs for ALL
+        // non-primary embedded packages found inside the JAR (e.g.,
+        // shaded dependencies from META-INF/maven/*/pom.properties).
+        // This achieves parity with Syft, which emits a pURL for every
+        // embedded package.
         (g, a, v) match {
           case (Some(groupId), Some(artId), Some(ver)) =>
-            val purl = PURLHelpers
-              .buildPackageURL(
-                Ecosystems.Maven,
-                Some(groupId),
-                artId,
-                ver,
-                None
-              )
-              .toCanonical()
-              .nn
+            // Build the canonical pURL string. Split buildPackageURL and
+            // toCanonical into separate Try blocks: the constructor rarely
+            // throws, but toCanonical() can throw PurlException for malformed
+            // pURLs (e.g., maven with null namespace).
+            val canonicalPurlStr: Option[String] = scala.util.Try {
+              PURLHelpers
+                .buildPackageURL(
+                  Ecosystems.Maven,
+                  Some(groupId),
+                  artId,
+                  ver,
+                  None
+                )
+            }.toOption.flatMap(p => scala.util.Try(p.toCanonical()).toOption)
 
-            // Register the pURL with the store's pURL index
+            // Merge canonical pURL metadata into fullMeta so it is written
+            // alongside the manifest, pom, and jar-structure metadata.
+            val metaWithCanonical = canonicalPurlStr match {
+              case Some(purlStr) =>
+                Helpers.mergeTreeMaps(
+                  fullMeta,
+                  TreeMap(
+                    MetadataKeyConstants.CANONICAL_PURL ->
+                      TreeSet(StringOrPair(purlStr))
+                  )
+                )
+              case None => fullMeta
+            }
+
+            canonicalPurlStr match {
+              case Some(purl) =>
+            // Register the canonical pURL with the store's pURL index
             store.addPurl(purl)
 
             // WRITE 1: Update JAR item — add aliasFrom -> pURL and merge
-            // full metadata (manifest, pom, jar-structure, etc.).
+            // full metadata (manifest, pom, jar-structure, canonical pURL, etc.).
             // Uses store.write callback to ensure atomic read-modify-write
             // under the row-level lock.
             // No prior store.read call; no nested store.write for same path.
@@ -1123,9 +1230,9 @@ case class MavenState(
                       existing.connections + (EdgeType.aliasFrom -> purl)
                   )
                   val withMeta =
-                    if (fullMeta.nonEmpty)
+                    if (metaWithCanonical.nonEmpty)
                       withAlias.enhanceWithMetadata(
-                        extra = fullMeta,
+                        extra = metaWithCanonical,
                         filenames = Vector.empty,
                         mimeTypes = Vector.empty
                       )
@@ -1137,9 +1244,9 @@ case class MavenState(
                       item.connections + (EdgeType.aliasFrom -> purl)
                   )
                   val withMeta =
-                    if (fullMeta.nonEmpty)
+                    if (metaWithCanonical.nonEmpty)
                       base.enhanceWithMetadata(
-                        extra = fullMeta,
+                        extra = metaWithCanonical,
                         filenames = Vector.empty,
                         mimeTypes = Vector.empty
                       )
@@ -1152,7 +1259,7 @@ case class MavenState(
             // WRITE 2: Create/update pURL item with aliasTo -> JAR item.
             // Different path from WRITE 1, so different row lock — no
             // deadlock risk. If the pURL item already exists (another JAR
-            // with the same GAV), we add another aliasTo entry.
+            // with the same pURL), we add another aliasTo entry.
             store.write(
               purl,
               {
@@ -1186,10 +1293,75 @@ case class MavenState(
               _ => s"pURL item for $purl"
             )
 
+            // WRITE 3+: Emit pURLs for ALL non-primary embedded packages.
+            // Each embedded pom.properties inside the JAR (e.g., shaded
+            // dependencies) gets its own pURL with alias edges. This achieves
+            // parity with Syft, which emits a pURL for every embedded package.
+            // The primary tuple is excluded — it was already written above as
+            // the canonical pURL. Duplicates are removed.
+            // PurlAliasWriter handles store.addPurl + aliasFrom + aliasTo for
+            // each secondary pURL. No metadata is merged (metadata was already
+            // written in WRITE 1). The item now exists in the store (from
+            // WRITE 1), so PurlAliasWriter's None case won't trigger.
+            val secondaryTuples: Vector[(String, String, String)] =
+              acc.embeddedGavs.distinct
+                .filter(t => !primaryOpt.contains(t))
+
+            secondaryTuples.foreach { case (sg, sa, sv) =>
+              scala.util.Try {
+                PURLHelpers
+                  .buildPackageURL(
+                    Ecosystems.Maven,
+                    Some(sg),
+                    sa,
+                    sv,
+                    None
+                  )
+              }.toOption
+                .flatMap(p => scala.util.Try(p.toCanonical()).toOption)
+                .foreach(secondaryPurl =>
+                  PurlAliasWriter.writeAlias(
+                    secondaryPurl,
+                    item.identifier,
+                    store
+                  )
+                )
+            }
+
+              case None =>
+                // pURL construction failed (e.g. PurlException from
+                // malformed namespace/name). Still apply metadata so the
+                // JAR item is not left empty.
+                if (metaWithCanonical.nonEmpty) {
+                  store.write(
+                    item.identifier,
+                    {
+                      case Some(existing) =>
+                        Some(
+                          existing.enhanceWithMetadata(
+                            extra = metaWithCanonical,
+                            filenames = Vector.empty,
+                            mimeTypes = Vector.empty
+                          )
+                        )
+                      case None =>
+                        Some(
+                          item.enhanceWithMetadata(
+                            extra = metaWithCanonical,
+                            filenames = Vector.empty,
+                            mimeTypes = Vector.empty
+                          )
+                        )
+                    },
+                    _ => s"accumulated augmentation: metadata only (pURL construction failed)"
+                  )
+                }
+            }
+
           case _ =>
-            // Incomplete GAV — no pURL generated, but still apply full
-            // metadata (manifest, pom, jar-structure, etc.) from accumulated
-            // state
+            // Incomplete groupId/artifactId/version — no pURL generated, but
+            // still apply full metadata (manifest, pom, jar-structure, etc.)
+            // from accumulated state
             if (fullMeta.nonEmpty) {
               store.write(
                 item.identifier,

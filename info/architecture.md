@@ -431,17 +431,26 @@ val item = Item.decode(bytes)
 
 ---
 
-## Maven GAV Resolution
+## Maven GroupId/ArtifactId/Version Resolution
 
-The Maven strategy uses a 5-level priority chain for GroupId:ArtifactId:Version (GAV) resolution, implemented in `MavenState.resolveGAV()`:
+The Maven strategy uses field-level merge for groupId/artifactId/version resolution, implemented in `MavenState.resolveGAV()`. Instead of picking the first source that provides all three fields, each field is resolved independently from the highest-priority source that provides it:
 
 1. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata.
 2. **External POM** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`.
 3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by matching its `<artifactId>` to the filename when multiple are present.
-4. **MANIFEST.MF** — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin.
-5. **Filename heuristics** — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
+4. **MANIFEST.MF** (for groupId and version) / **Filename** (for artifactId) — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin. For artifactId, filename has higher priority than manifest because `Implementation-Title` is human-readable, not a Maven artifactId.
+5. **Filename heuristics** (for groupId and version) / **MANIFEST.MF** (for artifactId) — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
 
-Each layer short-circuits on the first complete `(groupId, artifactId, version)` tuple; if all layers fail, the fields remain `None`.
+Per-field priority:
+- **groupId**: pom.properties > external POM > embedded pom.xml > manifest > filename
+- **artifactId**: pom.properties > external POM > embedded pom.xml > filename > manifest
+- **version**: pom.properties > external POM > embedded pom.xml > manifest > filename
+
+The key difference from source-level priority: **filename and manifest swap positions for artifactId**. This produces pURLs more likely to exist in Maven Central because the filename usually matches the Maven artifactId, while `Implementation-Title` is a human-readable display name.
+
+`resolveGAVFromManifest` returns individual fields without an artifactId gate, allowing the manifest to contribute groupId and version even when it has no artifactId headers.
+
+If no groupId is found from any source but artifactId exists, artifactId is used as both groupId and artifactId (last resort fallback). See ADR 0008 for the full decision rationale, trust model, and security concerns.
 
 ### PomParser Integration
 

@@ -15,6 +15,7 @@ object MetadataKeyConstants {
   def LICENSE = "License"
   def DEPENDENCIES = "Dependencies"
   def URL = "Url"
+  def CANONICAL_PURL = "CanonicalPurl"
 
   /** Function to generate a prefix for an ad hoc key. This is intended to be
     * used for keys that are not defined as above and to be able to identify

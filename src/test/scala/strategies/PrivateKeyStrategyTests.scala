@@ -528,11 +528,12 @@ class PrivateKeyStrategyTests extends FunSuite {
     )
     val claim = Certificates.classifyAndParse(w).get
     val state = new CertificatesState(w, Some(claim))
-    val (purls, _) = state.getPurls(
+    val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
       io.spicelabs.goatrodeo.omnibor.SingleMarker()
     )
+    val purls = purlSet.canonicalStrings
     assertEquals(
       purls,
       Vector.empty,
@@ -572,11 +573,12 @@ class PrivateKeyStrategyTests extends FunSuite {
     )
     val claim = Certificates.classifyAndParse(w).get
     val state = new CertificatesState(w, Some(claim))
-    val (purls, _) = state.getPurls(
+    val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
       io.spicelabs.goatrodeo.omnibor.SingleMarker()
     )
+    val purls = purlSet.canonicalStrings
     assertEquals(
       purls,
       Vector.empty,
@@ -592,11 +594,12 @@ class PrivateKeyStrategyTests extends FunSuite {
     )
     val claim = Certificates.classifyAndParse(w).get
     val state = new CertificatesState(w, Some(claim))
-    val (purls, _) = state.getPurls(
+    val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
       io.spicelabs.goatrodeo.omnibor.SingleMarker()
     )
+    val purls = purlSet.canonicalStrings
     assertEquals(purls.length, 1)
     val canon = purls.head
     assertEquals(

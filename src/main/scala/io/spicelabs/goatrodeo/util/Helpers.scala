@@ -245,7 +245,7 @@ object Helpers {
               }
             }
           } catch {
-            case _: OutOfMemoryError => None
+            case _: Exception => None
           }
 
         val sourceGitOID = for {

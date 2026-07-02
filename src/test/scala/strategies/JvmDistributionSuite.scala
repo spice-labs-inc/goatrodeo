@@ -199,11 +199,12 @@ class JvmDistributionSuite extends FunSuite {
     val data = JvmDistribution.parseReleaseFile(content)
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) = state.getPurls(
+    val (purlSet, _) = state.getPurls(
       wrapper,
       createTestItem("test"),
       SingleMarker()
     )
+    val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty, "Should produce at least one pURL")
     val purl = purls.head
     assert(
@@ -230,11 +231,12 @@ class JvmDistributionSuite extends FunSuite {
     val data = JvmDistribution.parseReleaseFile(content)
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) = state.getPurls(
+    val (purlSet, _) = state.getPurls(
       wrapper,
       createTestItem("test"),
       SingleMarker()
     )
+    val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty)
     val purl = purls.head
     assert(
@@ -297,8 +299,9 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty, "Adoptium corpus should produce pURL")
 
     val (meta, _) =
@@ -324,8 +327,9 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty, "Oracle JDK 8 corpus should produce pURL")
     assert(purls.head.contains("oracle"), "pURL should reference oracle")
   }
@@ -341,8 +345,9 @@ class JvmDistributionSuite extends FunSuite {
     )
     val state = new JvmState(wrapper, data)
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val purls = purlSet.canonicalStrings
     assert(purls.head.contains("amazon"), "Corretto should map to amazon")
   }
 

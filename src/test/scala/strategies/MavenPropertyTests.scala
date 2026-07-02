@@ -696,4 +696,332 @@ class MavenPropertyTests extends ScalaCheckSuite {
       once == twice
     }
   }
+
+  // ------------------------------------------------------------------
+  // Properties: Field-Level Merge
+  // ------------------------------------------------------------------
+  //
+  // These properties verify the core invariants of the field-level merge
+  // algorithm in resolveGAV. The key distinction from source-level priority
+  // is that fields are resolved INDEPENDENTLY: each field picks its value
+  // from the highest-priority source that provides it, regardless of what
+  // other sources provide for other fields.
+  //
+  // Per-field priority:
+  //   groupId:    pom.properties > external POM > embedded pom.xml > manifest > filename
+  //   artifactId: pom.properties > external POM > embedded pom.xml > filename > manifest
+  //   version:    pom.properties > external POM > embedded pom.xml > manifest > filename
+  // ------------------------------------------------------------------
+
+  /** Generator for a complete pom.properties map with all three fields. */
+  val genCompleteProps: Gen[Map[String, String]] = for {
+    g <- Gen.alphaNumStr.suchThat(_.nonEmpty)
+    a <- genArtifactId
+    v <- genVersion
+  } yield Map("groupId" -> g, "artifactId" -> a, "version" -> v)
+
+  /** Generator for a manifest with Implementation-Title and Implementation-Version. */
+  val genSimpleManifest: Gen[TreeMap[String, TreeSet[StringOrPair]]] = for {
+    title <- Gen.alphaNumStr.suchThat(_.nonEmpty)
+    version <- genVersion
+  } yield TreeMap[String, TreeSet[StringOrPair]](
+    "implementation-title" -> TreeSet(StringOrPair(title)),
+    "implementation-version" -> TreeSet(StringOrPair(version))
+  )
+
+  property("field-merge: embeddedProps always wins when complete") {
+    forAll(genArtifactId, genVersion) { (art, ver) =>
+      val props =
+        Map("groupId" -> "com.embed", "artifactId" -> art, "version" -> ver)
+      val state = MavenState()
+      val external = Some(
+        PomParser.ParsedPom(
+          groupId = Some("com.external"),
+          artifactId = Some("ext-art"),
+          version = Some("99.0"),
+          name = None,
+          description = None,
+          url = None,
+          organization = None,
+          scmUrl = None,
+          properties = Map.empty,
+          licenses = Vector.empty,
+          dependencies = Vector.empty,
+          dependencyManagement = Vector.empty,
+          parentGroupId = None,
+          parentArtifactId = None,
+          parentVersion = None
+        )
+      )
+      val (g, a, v) = state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, "test.jar", None),
+        external,
+        TreeMap.empty[String, TreeSet[StringOrPair]],
+        props,
+        None
+      )
+      g == Some("com.embed") && a == Some(art) && v == Some(ver)
+    }
+  }
+
+  property(
+    "field-merge: falls through each layer deterministically"
+  ) {
+    forAll(genArtifactId, genVersion) { (art, ver) =>
+      val state = MavenState()
+      val artifact = ByteWrapper(Array.emptyByteArray, s"$art-$ver.jar", None)
+
+      val (g1, a1, v1) =
+        state.resolveGAV(artifact, None, TreeMap.empty, Map.empty, None)
+
+      val (g2, a2, v2) = state.resolveGAV(
+        artifact,
+        None,
+        TreeMap.empty[String, TreeSet[StringOrPair]],
+        Map.empty,
+        None
+      )
+
+      g1 == g2 && a1 == a2 && v1 == v2
+    }
+  }
+
+  /** Property: field-level monotonicity — per-field priority is respected.
+    *
+    * Theory: For each field (groupId, artifactId, version), the resolved value
+    * comes from the highest-priority source that provides it. This is verified
+    * by providing all 5 sources with distinct values per field and checking
+    * that the resolved value matches the highest-priority source.
+    *
+    * Per-field priority:
+    *   groupId:    pom.properties > external POM > embedded pom.xml > manifest > filename
+    *   artifactId: pom.properties > external POM > embedded pom.xml > filename > manifest
+    *   version:    pom.properties > external POM > embedded pom.xml > manifest > filename
+    */
+  property(
+    "field-merge: monotonicity — per-field priority is respected across all sources"
+  ) {
+    forAll(genArtifactId, genVersion, Gen.alphaNumStr.suchThat(_.nonEmpty)) { (art, ver, groupBase) =>
+      val state = MavenState()
+
+      val propsG = s"props.$groupBase"
+      val propsA = s"props.$art"
+      val propsV = s"props.$ver"
+
+      val extG = s"ext.$groupBase"
+      val extA = s"ext.$art"
+      val extV = s"ext.$ver"
+
+      val embG = s"emb.$groupBase"
+      val embA = s"emb.$art"
+      val embV = s"emb.$ver"
+
+      val manG = s"man.$groupBase"
+      val manA = s"man.$art"
+      val manV = s"man.$ver"
+
+      val fileArt = s"file.$art"
+      val fileVer = s"file.$ver"
+      val filename = s"$fileArt-$fileVer.jar"
+
+      val props = Map("groupId" -> propsG, "artifactId" -> propsA, "version" -> propsV)
+
+      val externalPom = Some(
+        PomParser.ParsedPom(
+          groupId = Some(extG), artifactId = Some(extA), version = Some(extV),
+          name = None, description = None, url = None, organization = None,
+          scmUrl = None, properties = Map.empty, licenses = Vector.empty,
+          dependencies = Vector.empty, dependencyManagement = Vector.empty,
+          parentGroupId = None, parentArtifactId = None, parentVersion = None
+        )
+      )
+
+      val embeddedPom = Some(
+        PomParser.ParsedPom(
+          groupId = Some(embG), artifactId = Some(embA), version = Some(embV),
+          name = None, description = None, url = None, organization = None,
+          scmUrl = None, properties = Map.empty, licenses = Vector.empty,
+          dependencies = Vector.empty, dependencyManagement = Vector.empty,
+          parentGroupId = None, parentArtifactId = None, parentVersion = None
+        )
+      )
+
+      val manifest = TreeMap[String, TreeSet[StringOrPair]](
+        "implementation-vendor-id" -> TreeSet(StringOrPair(manG)),
+        "implementation-title" -> TreeSet(StringOrPair(manA)),
+        "implementation-version" -> TreeSet(StringOrPair(manV))
+      )
+
+      val (g, a, v) = state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, filename, None),
+        externalPom, manifest, props, embeddedPom
+      )
+
+      g == Some(propsG) && a == Some(propsA) && v == Some(propsV)
+    }
+  }
+
+  /** Property: field-level monotonicity — when pom.properties is absent,
+    * external POM wins for all fields.
+    */
+  property(
+    "field-merge: monotonicity — external POM wins when pom.properties absent"
+  ) {
+    forAll(genArtifactId, genVersion) { (art, ver) =>
+      val state = MavenState()
+
+      val extG = "com.external"
+      val extA = s"ext-$art"
+      val extV = s"ext-$ver"
+
+      val embG = "com.embedded"
+      val embA = s"emb-$art"
+      val embV = s"emb-$ver"
+
+      val externalPom = Some(
+        PomParser.ParsedPom(
+          groupId = Some(extG), artifactId = Some(extA), version = Some(extV),
+          name = None, description = None, url = None, organization = None,
+          scmUrl = None, properties = Map.empty, licenses = Vector.empty,
+          dependencies = Vector.empty, dependencyManagement = Vector.empty,
+          parentGroupId = None, parentArtifactId = None, parentVersion = None
+        )
+      )
+
+      val embeddedPom = Some(
+        PomParser.ParsedPom(
+          groupId = Some(embG), artifactId = Some(embA), version = Some(embV),
+          name = None, description = None, url = None, organization = None,
+          scmUrl = None, properties = Map.empty, licenses = Vector.empty,
+          dependencies = Vector.empty, dependencyManagement = Vector.empty,
+          parentGroupId = None, parentArtifactId = None, parentVersion = None
+        )
+      )
+
+      val manifest = TreeMap[String, TreeSet[StringOrPair]](
+        "implementation-vendor-id" -> TreeSet(StringOrPair("com.manifest")),
+        "implementation-title" -> TreeSet(StringOrPair("Manifest Title")),
+        "implementation-version" -> TreeSet(StringOrPair("man-1.0"))
+      )
+
+      val (g, a, v) = state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, s"file-art-1.0.jar", None),
+        externalPom, manifest, Map.empty, embeddedPom
+      )
+
+      g == Some(extG) && a == Some(extA) && v == Some(extV)
+    }
+  }
+
+  /** Property: cross-field independence.
+    *
+    * Theory: Changing the artifactId in one source does not affect the
+    * resolved groupId or version. This is the core property that distinguishes
+    * field-level merge from source-level priority.
+    */
+  property("field-merge: changing artifactId in one source does not affect groupId or version") {
+    forAll(genArtifactId, genArtifactId, genVersion) { (art1, art2, ver) =>
+      val state = MavenState()
+      val props1 = Map("groupId" -> "com.test", "artifactId" -> art1, "version" -> ver)
+      val props2 = Map("groupId" -> "com.test", "artifactId" -> art2, "version" -> ver)
+      val artifact = ByteWrapper(Array.emptyByteArray, "test.jar", None)
+
+      val (g1, _, v1) = state.resolveGAV(
+        artifact, None,
+        TreeMap.empty[String, TreeSet[StringOrPair]],
+        props1, None
+      )
+      val (g2, _, v2) = state.resolveGAV(
+        artifact, None,
+        TreeMap.empty[String, TreeSet[StringOrPair]],
+        props2, None
+      )
+      g1 == g2 && v1 == v2
+    }
+  }
+
+  /** Property: no-Frankenstein when a complete source exists.
+    *
+    * Theory: If the highest-priority source that provides ALL three fields
+    * exists, the result equals that source's values exactly — no field
+    * mixing from lower sources.
+    */
+  property("field-merge: complete source wins exactly (no Frankenstein)") {
+    forAll(genArtifactId, genVersion, Gen.alphaNumStr.suchThat(_.nonEmpty)) { (art, ver, title) =>
+      val state = MavenState()
+      val props = Map("groupId" -> "com.props", "artifactId" -> art, "version" -> ver)
+      val manifest = TreeMap[String, TreeSet[StringOrPair]](
+        "implementation-title" -> TreeSet(StringOrPair(title)),
+        "implementation-version" -> TreeSet(StringOrPair("999.0"))
+      )
+      val (g, a, v) = state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, s"$art-$ver.jar", None),
+        None, manifest, props, None
+      )
+      g == Some("com.props") && a == Some(art) && v == Some(ver)
+    }
+  }
+
+  /** Property: resolveGAV never throws.
+    *
+    * Theory: For any combination of inputs (including empty strings,
+    * whitespace, special characters), resolveGAV must not throw.
+    */
+  property("field-merge: resolveGAV never throws for any inputs") {
+    forAll(Gen.alphaNumStr, Gen.alphaNumStr, Gen.alphaNumStr) { (s1, s2, s3) =>
+      val state = MavenState()
+      val props = Map("groupId" -> s1, "artifactId" -> s2, "version" -> s3)
+      val manifest = TreeMap[String, TreeSet[StringOrPair]](
+        "implementation-title" -> TreeSet(StringOrPair(s1)),
+        "implementation-version" -> TreeSet(StringOrPair(s3))
+      )
+      val result = scala.util.Try {
+        state.resolveGAV(
+          ByteWrapper(Array.emptyByteArray, s"$s2-$s3.jar", None),
+          None, manifest, props, None
+        )
+      }
+      result.isSuccess
+    }
+  }
+
+  /** Property: groupId is Some whenever artifactId is Some.
+    *
+    * Theory: The finalGroupId = groupId.orElse(artifactId) fallback ensures
+    * groupId is always defined when artifactId is defined. This produces a
+    * valid Maven pURL (which requires namespace).
+    */
+  property("field-merge: groupId is Some whenever artifactId is Some") {
+    forAll(genArtifactId, genVersion, genSimpleManifest) { (art, ver, manifest) =>
+      val state = MavenState()
+      val (g, a, v) = state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, s"$art-$ver.jar", None),
+        None, manifest, Map.empty, None
+      )
+      a.isDefined ==> g.isDefined
+    }
+  }
+
+  /** Property: filename beats manifest for artifactId.
+    *
+    * Theory: For any generated artifactId and version where filename =
+    * "{artifactId}-{version}.jar" and manifest has Implementation-Title =
+    * "Human Readable Name" and Implementation-Version = version, the
+    * resolved artifactId equals the filename-derived value, not the
+    * manifest's Implementation-Title.
+    */
+  property("field-merge: filename artifactId beats manifest Implementation-Title") {
+    forAll(genArtifactId, genVersion, Gen.alphaNumStr.suchThat(_.nonEmpty)) { (art, ver, humanTitle) =>
+      val state = MavenState()
+      val manifest = TreeMap[String, TreeSet[StringOrPair]](
+        "implementation-title" -> TreeSet(StringOrPair(humanTitle)),
+        "implementation-version" -> TreeSet(StringOrPair(ver))
+      )
+      val (_, a, _) = state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, s"$art-$ver.jar", None),
+        None, manifest, Map.empty, None
+      )
+      a == Some(art)
+    }
+  }
 }

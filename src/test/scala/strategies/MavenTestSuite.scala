@@ -116,7 +116,8 @@ class MavenTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
-    val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
+    val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
     val purl = Purl.parse(purls.head).nn
@@ -136,7 +137,8 @@ class MavenTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
-    val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
+    val purls = purlSet.canonicalStrings
 
     assert(purls.isEmpty)
   }
@@ -147,7 +149,8 @@ class MavenTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
-    val (purls, _) = state.getPurls(artifact, item, MavenMarkers.POM)
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.POM)
+    val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
     val purl = Purl.parse(purls.head).nn
@@ -160,7 +163,8 @@ class MavenTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
-    val (purls, _) = state.getPurls(artifact, item, MavenMarkers.Sources)
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.Sources)
+    val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
     val purl = Purl.parse(purls.head).nn
@@ -173,7 +177,8 @@ class MavenTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
-    val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JavaDocs)
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.JavaDocs)
+    val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
     val purl = Purl.parse(purls.head).nn
@@ -194,7 +199,8 @@ class MavenTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
 
-    val (purls, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.JAR)
+    val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
     assertEquals(Purl.parse(purls.head).nn.version, "2.0.0")

@@ -68,13 +68,14 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
     * @param marker
     *   the marker (e.g., a pom vs javadoc vs. JAR marker)
     * @return
-    *   the computed Package URLs as any update to the State object
+    *   a [[PurlSet]] containing the canonical pURL (if any) and all pURLs
+    *   for this artifact, plus any update to the State object
     */
   def getPurls(
       artifact: ArtifactWrapper,
       item: Item,
       marker: PM
-  ): (Vector[String], ME)
+  ): (PurlSet, ME)
 
   /** Get the `extra` information for the artifact
     *
@@ -381,13 +382,29 @@ trait ToProcess {
               val itemScope1 =
                 parentScope.beginProcessing(store, artifact, item)
               // get purls
-              val (purls, state2) = state.getPurls(artifact, itemScope1, marker)
+              val (purlSet, state2) = state.getPurls(artifact, itemScope1, marker)
+              val purlStrings = purlSet.canonicalStrings
 
               // enhance with package URLs
-              val item2 = itemScope1.enhanceItemWithPurls(purls)
+              val itemPreCanonical = itemScope1.enhanceItemWithPurls(purlStrings)
+
+              // Store canonical pURL as metadata on the gitoid Item.
+              // canonicalString returns Option[String] — None if canonical is
+              // absent or canonicalization fails. No exceptions, no Try needed
+              // at this call site.
+              val item2 = purlSet.canonicalString match {
+                case Some(canonicalStr) =>
+                  itemPreCanonical.enhanceWithMetadata(
+                    extra = TreeMap(
+                      MetadataKeyConstants.CANONICAL_PURL ->
+                        TreeSet(StringOrPair(canonicalStr))
+                    )
+                  )
+                case None => itemPreCanonical
+              }
 
               val itemScope2 =
-                parentScope.enhanceWithPurls(store, artifact, item2, purls)
+                parentScope.enhanceWithPurls(store, artifact, item2, purlStrings)
 
               // compute metadata
               val (metadata, state3) =
@@ -580,7 +597,7 @@ trait ToProcess {
                 .get // we know we just wrote an item
 
               // update purls
-              purls.foreach(p => store.addPurl(p))
+              purlStrings.foreach(p => store.addPurl(p))
 
               parentScope.postFixReferencesAndStore(store, artifact, answerItem)
 
@@ -753,28 +770,31 @@ object ToProcess {
   ): Vector[ToProcess] = {
 
     val totalCnt = artifacts.length
+
+    val largeCnt_? = totalCnt > 100000
+
     val by50 = (totalCnt / 50) match {
       case 0 => 1
       case x => x
     }
-    if (infoMsgs_?) logger.info("Creating strategies for artifacts")
+    if (infoMsgs_? && largeCnt_?) logger.info("Creating strategies for artifacts")
     // create the list of the files
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
-      if (idx % by50 == 0 && infoMsgs_?) {
+      if (idx % by50 == 0 && infoMsgs_? && largeCnt_?) {
         logger.info(f"Initial file setup ${idx}%,d of ${totalCnt}%,d")
       }
       f.uuid -> f
     }*)
 
-    if (infoMsgs_?) logger.debug("Built UUID map")
+    if (infoMsgs_? && largeCnt_?) logger.debug("Built UUID map")
     // Keyed by full path (not bare filename) so that strategies can
     // disambiguate files with the same name in different directories.
     // groupBy preserves per-key insertion order and avoids the O(n)
     // immutable-map/vector rebuilds of a foldLeft + `:+`.
     val byName: ByName = artifacts.groupBy(_.path())
 
-    if (infoMsgs_?)
+    if (infoMsgs_? && largeCnt_?)
       logger.info("Finished setting up files for per-ecosystem specialization")
 
     val (processSet, finalByUUID, finalByName) =

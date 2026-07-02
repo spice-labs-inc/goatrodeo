@@ -9,6 +9,7 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -96,11 +97,16 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], AnnattoState) = {
-    // annatto returns a com.github.packageurl.PackageURL; emit its own canonical
-    // form. We keep the reader's canonicalization rather than re-validating
-    // through coordinates, which is stricter than what some readers produce.
-    pkg.toPurl().toScala.toVector.map(_.canonicalize().nn) -> this
+  ): (PurlSet, AnnattoState) = {
+    // annatto returns a com.github.packageurl.PackageURL; convert to
+    // io.spicelabs.coordinates.Purl via string round-trip.
+    // Wrap in Try — a malformed pURL should not abort processing.
+    pkg.toPurl().toScala
+      .flatMap(p => scala.util.Try {
+        io.spicelabs.coordinates.Purl.parse(p.canonicalize())
+      }.toOption)
+      .map(p => PurlSet.single(p))
+      .getOrElse(PurlSet.empty) -> this
   }
 
   override def getMetadata(

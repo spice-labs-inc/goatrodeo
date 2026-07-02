@@ -473,7 +473,8 @@ class DockerSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = DockerState(Map())
 
-    val (purls, _) = state.getPurls(artifact, item, DockerMarkers.Manifest)
+    val (purlSet, _) = state.getPurls(artifact, item, DockerMarkers.Manifest)
+    val purls = purlSet.canonicalStrings
     assert(purls.isEmpty)
   }
 
@@ -482,8 +483,9 @@ class DockerSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = DockerState(Map())
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(artifact, item, DockerMarkers.Layer("sha256:abc"))
+    val purls = purlSet.canonicalStrings
     assert(purls.isEmpty)
   }
 

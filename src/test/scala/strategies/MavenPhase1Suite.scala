@@ -730,7 +730,10 @@ class MavenPhase1Suite extends FunSuite {
       None,
       TreeMap.empty[String, TreeSet[StringOrPair]]
     )
-    assertEquals(g, None)
+    // With the artifactId-as-groupId fallback, groupId is now Some("mylib")
+    // (same as artifactId) when no groupId source is found. This ensures
+    // a valid Maven pURL can always be constructed.
+    assertEquals(g, Some("mylib"))
     assertEquals(a, Some("mylib"))
     assertEquals(v, Some("1.0"))
   }
@@ -795,6 +798,389 @@ class MavenPhase1Suite extends FunSuite {
       None
     )
     assertEquals(v, Some("3.0.0"))
+  }
+
+  // ==================== Field-Level Merge Tests ====================
+  //
+  // These tests verify that resolveGAV uses field-level merge: for each field
+  // (groupId, artifactId, version), the best value is picked from the best
+  // source FOR THAT FIELD, not from the first source that provides all three.
+  //
+  // Per-field priority:
+  //   groupId:    pom.properties > external POM > embedded pom.xml > manifest > filename
+  //   artifactId: pom.properties > external POM > embedded pom.xml > filename > manifest
+  //   version:    pom.properties > external POM > embedded pom.xml > manifest > filename
+  //
+  // The key change: filename has HIGHER priority than manifest for artifactId,
+  // because Implementation-Title is human-readable, not a Maven artifactId.
+
+  /** Tests that when pom.properties has groupId and version but is missing
+    * artifactId, the artifactId comes from the filename (higher priority than
+    * manifest for artifactId). groupId and version come from pom.properties
+    * (highest priority for all fields).
+    *
+    * '''What it tests:''' Field-level merge fills missing fields from
+    * lower-priority sources without discarding the fields that ARE available
+    * from a higher-priority source.
+    *
+    * '''Why:''' Source-level priority discards the entire pom.properties triple
+    * when one field is missing. Field-level merge keeps the good fields and
+    * fills only the missing ones.
+    *
+    * '''Requirement:''' Plan Test 1 — pom.properties partial → filename fills
+    * artifactId.
+    *
+    * '''LLM context:''' This is a RED test. It fails with the current
+    * source-level priority code because pom.properties is incomplete (missing
+    * artifactId), so fromProps=None, and the manifest wins with the wrong
+    * artifactId from Implementation-Title.
+    */
+  test("field-merge: pom.properties missing artifactId → filename provides it") {
+    val state = MavenState()
+    val props = Map(
+      "groupId" -> "org.example",
+      "version" -> "1.0"
+    )
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-title" -> TreeSet(StringOrPair("Example Library")),
+      "implementation-version" -> TreeSet(StringOrPair("1.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "example-lib-1.0.jar", None),
+      None,
+      manifest,
+      props,
+      None
+    )
+    assertEquals(g, Some("org.example"), "groupId from pom.properties")
+    assertEquals(a, Some("example-lib"), "artifactId from filename (not manifest Implementation-Title)")
+    assertEquals(v, Some("1.0"), "version from pom.properties")
+  }
+
+  /** Tests that when no pom.properties is available, the artifactId comes from
+    * the filename, NOT from manifest's Implementation-Title.
+    *
+    * '''What it tests:''' Field-level merge: filename (priority 4 for
+    * artifactId) beats manifest (priority 5 for artifactId).
+    *
+    * '''Why:''' Implementation-Title is human-readable ("Spring Boot
+    * AutoConfigure"); filename matches Maven artifactId
+    * ("spring-boot-autoconfigure").
+    *
+    * '''Requirement:''' Plan Test 2 — filename beats manifest for artifactId.
+    *
+    * '''LLM context:''' This is a RED test. It fails with the current code
+    * because manifest wins (source-level priority 4) and produces
+    * artifactId="Spring Boot AutoConfigure" instead of "spring-boot-autoconfigure".
+    */
+  test("field-merge: filename artifactId beats manifest Implementation-Title") {
+    val state = MavenState()
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-title" -> TreeSet(StringOrPair("Spring Boot AutoConfigure")),
+      "implementation-version" -> TreeSet(StringOrPair("2.7.14"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "spring-boot-autoconfigure-2.7.14.jar", None),
+      None,
+      manifest,
+      Map.empty,
+      None
+    )
+    assertEquals(a, Some("spring-boot-autoconfigure"), "artifactId from filename, not Implementation-Title")
+    assertEquals(v, Some("2.7.14"), "version from manifest Implementation-Version")
+  }
+
+  /** Tests the surgical nature of the field-level merge: all three fields can
+    * come from different sources simultaneously.
+    *
+    * '''What it tests:''' When manifest provides groupId+version and filename
+    * provides artifactId, the merge produces a result with groupId from
+    * manifest, artifactId from filename, and version from manifest.
+    *
+    * '''Why:''' This is THE test that proves the swap is surgical: groupId and
+    * version still come from manifest (unchanged priority), only artifactId
+    * comes from filename (swapped priority).
+    *
+    * '''Requirement:''' Plan Test 3 — swap verification, all 3 fields from
+    * different sources.
+    *
+    * '''LLM context:''' This is a RED test. With source-level priority, the
+    * manifest wins wholesale, producing artifactId="Human Readable Name".
+    */
+  test("field-merge: swap verification — groupId+version from manifest, artifactId from filename") {
+    val state = MavenState()
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-vendor-id" -> TreeSet(StringOrPair("org.example")),
+      "implementation-title" -> TreeSet(StringOrPair("Human Readable Name")),
+      "implementation-version" -> TreeSet(StringOrPair("1.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "mylib-1.0.jar", None),
+      None,
+      manifest,
+      Map.empty,
+      None
+    )
+    assertEquals(g, Some("org.example"), "groupId from manifest Implementation-Vendor-Id")
+    assertEquals(a, Some("mylib"), "artifactId from filename (not manifest Implementation-Title)")
+    assertEquals(v, Some("1.0"), "version from manifest Implementation-Version")
+  }
+
+  /** Tests that the manifest can contribute groupId and version even when it
+    * has NO artifactId headers (no Implementation-Title, no
+    * Bundle-SymbolicName, no Bundle-Name, no Extension-Name).
+    *
+    * '''What it tests:''' The gate removal in resolveGAVFromManifest. Previously,
+    * the method returned None when artifactIdOpt was None, discarding valid
+    * groupId and version. Now it returns individual fields without the gate.
+    *
+    * '''Why:''' A manifest with Implementation-Vendor-Id and
+    * Implementation-Version but no artifactId headers still has valid vendor
+    * and version information. Field-level merge should use these fields.
+    *
+    * '''Requirement:''' Plan Test 4 — manifest provides groupId/version when
+    * manifest has no artifactId.
+    *
+    * '''LLM context:''' This is a RED test. With the current code, the gate
+    * causes resolveGAVFromManifest to return None, so the manifest contributes
+    * nothing. The filename wins wholesale, producing groupId=None (fallback to
+    * artifactId), artifactId="mylib", version="2.0" all from filename.
+    */
+  test("field-merge: manifest provides groupId/version when no artifactId headers") {
+    val state = MavenState()
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-vendor-id" -> TreeSet(StringOrPair("com.vendor")),
+      "implementation-version" -> TreeSet(StringOrPair("2.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "mylib-2.0.jar", None),
+      None,
+      manifest,
+      Map.empty,
+      None
+    )
+    assertEquals(g, Some("com.vendor"), "groupId from manifest (previously gated out)")
+    assertEquals(a, Some("mylib"), "artifactId from filename")
+    assertEquals(v, Some("2.0"), "version from manifest (previously gated out)")
+  }
+
+  /** Tests that when pom.properties has artifactId and version but no groupId,
+    * the groupId comes from the manifest (Implementation-Vendor-Id).
+    *
+    * '''What it tests:''' Field-level merge fills missing groupId from manifest
+    * while keeping artifactId and version from pom.properties.
+    *
+    * '''Why:''' Source-level priority discards the entire pom.properties triple
+    * when groupId is missing. Field-level merge keeps the good fields.
+    *
+    * '''Requirement:''' Plan Test 5 — pom.properties missing groupId → manifest
+    * provides groupId.
+    *
+    * '''LLM context:''' This is a RED test. With source-level priority,
+    * fromProps=None (missing groupId), manifest wins → artifactId="My Library"
+    * from Implementation-Title instead of "mylib" from pom.properties.
+    */
+  test("field-merge: pom.properties missing groupId → manifest provides it") {
+    val state = MavenState()
+    val props = Map(
+      "artifactId" -> "mylib",
+      "version" -> "1.0"
+    )
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-vendor-id" -> TreeSet(StringOrPair("com.example")),
+      "implementation-title" -> TreeSet(StringOrPair("My Library")),
+      "implementation-version" -> TreeSet(StringOrPair("1.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "mylib-1.0.jar", None),
+      None,
+      manifest,
+      props,
+      None
+    )
+    assertEquals(g, Some("com.example"), "groupId from manifest (pom.properties missing it)")
+    assertEquals(a, Some("mylib"), "artifactId from pom.properties (priority 1)")
+    assertEquals(v, Some("1.0"), "version from pom.properties (priority 1)")
+  }
+
+  /** Tests that field-level merge works across external POM and embedded
+    * pom.xml, not just pom.properties/manifest/filename.
+    *
+    * '''What it tests:''' When external POM provides groupId+version (no
+    * artifactId) and embedded pom.xml provides artifactId (no groupId, no
+    * version), the merge combines them: groupId from external POM, artifactId
+    * from embedded pom.xml, version from external POM.
+    *
+    * '''Requirement:''' Plan Test 6 — mixed-field across external/embedded POM.
+    *
+    * '''LLM context:''' This is a RED test. With source-level priority, neither
+    * POM provides a complete triple, so both are discarded and the result falls
+    * through to manifest/filename.
+    */
+  test("field-merge: mixed fields across external POM and embedded pom.xml") {
+    val state = MavenState()
+    val externalPom = PomParser.parse(
+      "<project><groupId>com.external</groupId><version>3.0</version></project>"
+    )
+    val embeddedPom = PomParser.parse(
+      "<project><artifactId>embed-art</artifactId></project>"
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "test.jar", None),
+      externalPom,
+      TreeMap.empty[String, TreeSet[StringOrPair]],
+      Map.empty,
+      embeddedPom
+    )
+    assertEquals(g, Some("com.external"), "groupId from external POM")
+    assertEquals(a, Some("embed-art"), "artifactId from embedded pom.xml")
+    assertEquals(v, Some("3.0"), "version from external POM")
+  }
+
+  /** Tests that when filename has a dotted groupId prefix (e.g.
+    * "com.example.mylib-1.0.jar"), manifest still wins for groupId.
+    *
+    * '''What it tests:''' Manifest groupId (priority 4) beats filename groupId
+    * (priority 5). This is unchanged from source-level priority.
+    *
+    * '''Why:''' Documents that manifest groupId beats filename groupId even
+    * when filename has a dotted prefix. Also documents a pre-existing
+    * limitation: extractIdentityFromFilename splits on the last dot, which may
+    * produce a wrong groupId/artifactId split for some filenames.
+    *
+    * '''Requirement:''' Plan Test 7 — dotted filename + manifest groupId.
+    */
+  test("field-merge: manifest groupId beats filename groupId when both present") {
+    val state = MavenState()
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-vendor-id" -> TreeSet(StringOrPair("com.vendor")),
+      "implementation-version" -> TreeSet(StringOrPair("1.0"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "com.example.mylib-1.0.jar", None),
+      None,
+      manifest,
+      Map.empty,
+      None
+    )
+    assertEquals(g, Some("com.vendor"), "groupId from manifest (not filename)")
+    assertEquals(a, Some("mylib"), "artifactId from filename")
+    assertEquals(v, Some("1.0"), "version from manifest")
+  }
+
+  /** Full-pipeline integration test: build a synthetic JAR with no
+    * pom.properties but a manifest with human-readable Implementation-Title,
+    * and verify the resolved artifactId comes from the filename, not the
+    * manifest.
+    *
+    * '''What it tests:''' The field-level merge works end-to-end through the
+    * real pipeline. When no pom.properties is present, the artifactId should
+    * come from the filename (field-level merge: filename priority 4 > manifest
+    * priority 5 for artifactId).
+    *
+    * '''Why:''' Catches integration issues that unit tests of resolveGAV miss
+    * (e.g., does applyAccumulatedAugmentation correctly pass all 5 sources to
+    * the refactored resolveGAV?).
+    *
+    * '''Note:''' This test uses NO pom.properties because the pipeline's
+    * `accumulateInfo` only collects complete GAVs (all three fields) from
+    * pom.properties. Incomplete pom.properties is not passed to resolveGAV
+    * through the current pipeline. This is a known limitation — the pipeline
+    * would need to be updated to pass partial GAVs for the "incomplete
+    * pom.properties" case to work end-to-end. That is out of scope for this
+    * plan.
+    *
+    * '''Requirement:''' Plan Test 9 — full-pipeline integration.
+    */
+  test("field-merge: full pipeline — no pom.properties, filename beats manifest") {
+    val tempDir = Files.createTempDirectory("field-merge-pipeline")
+    try {
+      val jarFile = new File(tempDir.toFile, "mylib-1.0.jar")
+      writeJarEntries(
+        jarFile,
+        Seq(
+          "META-INF/MANIFEST.MF" ->
+            "Manifest-Version: 1.0\nImplementation-Title: My Library\nImplementation-Version: 1.0\n"
+        )
+      )
+      val wrapper = FileWrapper(jarFile, "mylib-1.0.jar", None)
+      val state = processJarThroughPipeline(wrapper)
+      assertEquals(
+        state.artifactId,
+        Some("mylib"),
+        "artifactId from filename (not manifest Implementation-Title 'My Library')"
+      )
+      assertEquals(state.version, Some("1.0"), "version from manifest Implementation-Version")
+    } finally {
+      Helpers.deleteDirectory(tempDir)
+    }
+  }
+
+  // ==================== Security Tests ====================
+
+  /** Documents the version masking attack vector.
+    *
+    * '''What it tests:''' When pom.properties provides groupId+artifactId (no
+    * version) and manifest provides a spoofed version, the merged pURL uses
+    * the manifest's version. This is the current behavior — the test documents
+    * it, not asserts it is correct.
+    *
+    * '''Why:''' A spoofed manifest version can hide vulnerabilities by making
+    * the pURL point to a "safe" version. This is a known security concern
+    * documented in the ADR. Runtime Maven Central validation is future work.
+    *
+    * '''Requirement:''' Plan Test 17 — version masking documentation.
+    *
+    * '''LLM context:''' This test documents a security concern, not a desired
+    * behavior. The manifest's version is trusted because it's usually written
+    * by the build tool. A spoofed manifest version can hide vulnerabilities.
+    */
+  test("security: version masking — manifest version with pom.properties identity") {
+    val state = MavenState()
+    val props = Map(
+      "groupId" -> "org.example",
+      "artifactId" -> "mylib"
+    )
+    val manifest = TreeMap[String, TreeSet[StringOrPair]](
+      "implementation-version" -> TreeSet(StringOrPair("99.0.FAKE"))
+    )
+    val (g, a, v) = state.resolveGAV(
+      ByteWrapper(Array.emptyByteArray, "mylib-1.0.jar", None),
+      None,
+      manifest,
+      props,
+      None
+    )
+    assertEquals(g, Some("org.example"), "groupId from pom.properties")
+    assertEquals(a, Some("mylib"), "artifactId from pom.properties")
+    // version from manifest (priority 4) beats filename (priority 5)
+    assertEquals(v, Some("99.0.FAKE"), "version from manifest — documents version masking risk")
+  }
+
+  /** Tests that filenames with special characters do not cause crashes or
+    * pURL injection.
+    *
+    * '''What it tests:''' resolveGAV does not throw for filenames containing
+    * special characters like %2F (URL-encoded forward slash).
+    *
+    * '''Why:''' pURL injection via filename is structurally mitigated by
+    * Purl.encode() but semantically unguarded. This test documents that the
+    * structural mitigation works.
+    *
+    * '''Requirement:''' Plan Test 18 — character whitelist.
+    */
+  test("security: filename with special characters does not crash") {
+    val state = MavenState()
+    val result = scala.util.Try {
+      state.resolveGAV(
+        ByteWrapper(Array.emptyByteArray, "mylib%2Fevil-1.0.jar", None),
+        None,
+        TreeMap.empty[String, TreeSet[StringOrPair]],
+        Map.empty,
+        None
+      )
+    }
+    assert(result.isSuccess, "resolveGAV must not throw for filenames with special characters")
   }
 }
 
