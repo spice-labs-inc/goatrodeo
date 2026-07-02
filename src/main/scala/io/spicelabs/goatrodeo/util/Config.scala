@@ -143,6 +143,22 @@ case class Config(
 object Config {
   private val logger = Logger(getClass())
 
+  /** System property supplying the expiry cutoff when it is not set explicitly (via
+    * `--expiry` or `withExpiry`). This lets an in-JVM caller — or `-Dgoatrodeo.expiry=…` on
+    * the command line — enable the file-modification cutoff without depending on the builder
+    * API: an older build that does not read this property simply ignores it and runs
+    * normally. Accepts epoch milliseconds, an ISO-8601 instant, or a flexible date string. */
+  val ExpiryProperty = "goatrodeo.expiry"
+
+  def expiryFromProperty: Option[Instant] =
+    Option(System.getProperty(ExpiryProperty)).map(_.trim).filter(_.nonEmpty).flatMap { raw =>
+      val fromMillis =
+        if (raw.forall(_.isDigit)) Try(Instant.ofEpochMilli(raw.toLong)).toOption else None
+      fromMillis
+        .orElse(Try(Instant.parse(raw)).toOption)
+        .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
+    }
+
   /** The scopt parser builder instance. */
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
 

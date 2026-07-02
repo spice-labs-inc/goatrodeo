@@ -4,6 +4,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.util.Config
 
 import java.time.Instant
 import scala.collection.immutable.TreeMap
@@ -96,5 +97,24 @@ class ExpiryPruneSuite extends munit.FunSuite {
     )
     val pruned = Builder.pruneExpired(Vector(shared), cutoff)
     assertEquals(pruned.map(_.identifier).toSet, Set("shared"))
+  }
+
+  test("expiryFromProperty parses epoch millis and ISO, and is empty when unset") {
+    val prop = Config.ExpiryProperty
+    val saved = Option(System.getProperty(prop))
+    try {
+      System.clearProperty(prop)
+      assertEquals(Config.expiryFromProperty, None)
+
+      val millis = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
+      System.setProperty(prop, millis.toString)
+      assertEquals(Config.expiryFromProperty.map(_.toEpochMilli()), Some(millis))
+
+      System.setProperty(prop, "2026-01-01T00:00:00Z")
+      assertEquals(Config.expiryFromProperty.map(_.toString), Some("2026-01-01T00:00:00Z"))
+    } finally saved match {
+      case Some(v) => System.setProperty(prop, v)
+      case None    => System.clearProperty(prop)
+    }
   }
 }
