@@ -1,0 +1,287 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>wps-demo</artifactId>
+  <packaging>war</packaging>
+  <name>WPS Demo</name>
+  <parent>
+    <groupId>net.disy.wps</groupId>
+    <artifactId>wps-parent</artifactId>
+    <version>1.3.0</version>
+    <relativePath>../wps-parent/pom.xml</relativePath>
+  </parent>
+  <dependencies>
+    <dependency>
+      <groupId>com.sun.xml.bind</groupId>
+      <artifactId>jaxb-impl</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.disy.wps</groupId>
+      <artifactId>wps-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>net.disy.wps</groupId>
+      <artifactId>wps-proxy</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.disy.wps</groupId>
+      <artifactId>wps-samples</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>1.4</version>
+    </dependency>
+    <dependency>
+      <groupId>commons-httpclient</groupId>
+      <artifactId>commons-httpclient</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>servlet-api</artifactId>
+      <version>2.5</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.disy.legato</groupId>
+      <artifactId>legato-tools</artifactId>
+      <version>1.3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>net.disy.legato</groupId>
+      <artifactId>legato-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <defaultGoal>install</defaultGoal>
+    <plugins>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>src/main/webapp</directory>
+              <includes>
+                <include>*</include>
+              </includes>
+
+              <excludes>
+                <exclude>.svn</exclude>
+                <exclude>WEB-INF/**</exclude>
+              </excludes>
+            </fileset>
+          </filesets>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.1</version>
+        <executions>
+          <execution>
+            <id>unpack-javascript</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>net.disy.wps</groupId>
+                  <artifactId>wps-demo-dev</artifactId>
+                  <version>${project.version}</version>
+                  <type>war</type>
+                  <outputDirectory>src/main/webapp</outputDirectory>
+                  <excludes>META-INF/**,WEB-INF/**</excludes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>net.disy.legato</groupId>
+                  <artifactId>legato-openlayers</artifactId>
+                  <version>${legato-core.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>target/unpacked-dependencies</outputDirectory>
+                  <excludes>META-INF/**</excludes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>net.disy.legato</groupId>
+                  <artifactId>legato-scripts</artifactId>
+                  <version>${legato-core.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>target/unpacked-dependencies</outputDirectory>
+                  <excludes>META-INF/**</excludes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>net.disy.wps</groupId>
+                  <artifactId>wps-scripts</artifactId>
+                  <version>${project.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>target/unpacked-dependencies</outputDirectory>
+                  <excludes>META-INF/**</excludes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>net.disy.prototype</groupId>
+                  <artifactId>prototype</artifactId>
+                  <version>1.6.0.3</version>
+                  <type>jar</type>
+                  <outputDirectory>target/unpacked-dependencies</outputDirectory>
+                  <excludes>META-INF/**</excludes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>net.disy.jquery</groupId>
+                  <artifactId>jquery</artifactId>
+                  <version>1.4.2</version>
+                  <type>jar</type>
+                  <outputDirectory>target/unpacked-dependencies</outputDirectory>
+                  <excludes>META-INF/**</excludes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>net.disy.jquery</groupId>
+                  <artifactId>jquery-ui</artifactId>
+                  <version>1.8.6</version>
+                  <type>jar</type>
+                  <outputDirectory>target/unpacked-dependencies</outputDirectory>
+                  <excludes>META-INF/**</excludes>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-javascript</id>
+            <phase>process-sources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <!-- Extract prototype files -->
+                <mkdir dir="src/main/webapp/js/prototype/lib" />
+                <copy todir="src/main/webapp/js/prototype/lib">
+                  <fileset dir="target/unpacked-dependencies/org/prototypejs">
+                    <include name="prototype.js" />
+                  </fileset>
+                </copy>
+
+                <!-- Extract jquery files -->
+                <mkdir dir="src/main/webapp/js/jquery" />
+                <copy todir="src/main/webapp/js/jquery">
+                  <fileset dir="target/unpacked-dependencies/com/jquery">
+                    <include name="jquery.js" />
+                  </fileset>
+                </copy>
+
+                <!-- Extract jquery-ui files -->
+                <mkdir dir="src/main/webapp/js/jquery-ui" />
+                <copy todir="src/main/webapp/js/jquery-ui">
+                  <fileset dir="target/unpacked-dependencies/com/jquery/ui">
+                    <include name="aggregated/**/*.*" />
+                    <include name="css/**/*.*" />
+                  </fileset>
+                </copy>
+
+                <!-- Extract OpenLayers files -->
+                <mkdir dir="src/main/webapp/js/OpenLayers/lib" />
+                <mkdir dir="src/main/webapp/js/OpenLayers/img" />
+                <mkdir dir="src/main/webapp/js/OpenLayers/theme" />
+                <copy todir="src/main/webapp/js/OpenLayers">
+                  <fileset dir="target/unpacked-dependencies/org/openlayers/aggregated">
+                    <include name="OpenLayers.js" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/OpenLayers/lib">
+                  <fileset dir="target/unpacked-dependencies/org/openlayers">
+                    <include name="Firebug/**/*.*" />
+                    <include name="Gears/**/*.*" />
+                    <include name="OpenLayers/**/*.*" />
+                    <include name="Rico/**/*.*" />
+                    <include name="OpenLayers.js" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/OpenLayers/img">
+                  <fileset dir="target/unpacked-dependencies/org/openlayers/img">
+                    <include name="**/*.*" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/OpenLayers/theme">
+                  <fileset dir="target/unpacked-dependencies/org/openlayers/theme">
+                    <include name="**/*.*" />
+                  </fileset>
+                </copy>
+                <!-- Extract Proj4js files -->
+                <mkdir dir="src/main/webapp/js/Proj4js/lib" />
+                <copy todir="src/main/webapp/js/Proj4js/lib">
+                  <fileset dir="target/unpacked-dependencies/org/proj4js">
+                    <include name="proj4js*.js" />
+                  </fileset>
+                </copy>
+                <!-- Extract Legato files -->
+                <mkdir dir="src/main/webapp/js/Legato/lib" />
+                <mkdir dir="src/main/webapp/js/Legato/img" />
+                <mkdir dir="src/main/webapp/js/Legato/theme" />
+                <copy todir="src/main/webapp/js/Legato">
+                  <fileset dir="target/unpacked-dependencies/net/disy/legato/aggregated">
+                    <include name="Legato.js" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/Legato/lib">
+                  <fileset dir="target/unpacked-dependencies/net/disy/legato">
+                    <include name="Legato/**/*.*" />
+                    <include name="Legato.js" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/Legato/theme">
+                  <fileset dir="target/unpacked-dependencies/net/disy/legato/theme">
+                    <include name="**/*.*" />
+                  </fileset>
+                </copy>
+                <!-- Extract WPS files -->
+                <mkdir dir="src/main/webapp/js/WPS/lib" />
+                <mkdir dir="src/main/webapp/js/WPS/img" />
+                <mkdir dir="src/main/webapp/js/WPS/theme" />
+                <copy todir="src/main/webapp/js/WPS">
+                  <fileset dir="target/unpacked-dependencies/net/disy/wps/aggregated">
+                    <include name="WPS.js" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/WPS/lib">
+                  <fileset dir="target/unpacked-dependencies/net/disy/wps">
+                    <include name="WPS/**/*.*" />
+                    <include name="WPS.js" />
+                  </fileset>
+                </copy>
+                <copy todir="src/main/webapp/js/WPS/theme">
+                  <fileset dir="target/unpacked-dependencies/net/disy/wps/theme">
+                    <include name="**/*.*" />
+                  </fileset>
+                </copy>
+              </tasks>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.mycila.maven-license-plugin</groupId>
+        <artifactId>maven-license-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>target-eclipse/**</exclude>
+            <exclude>src/test/resources/**</exclude>
+            <exclude>src/main/webapp/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

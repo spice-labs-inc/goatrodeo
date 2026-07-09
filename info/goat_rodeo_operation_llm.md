@@ -8,7 +8,7 @@ Pipeline: File Discovery → Strategy Determination → ADG Building.
 ## Tags
 - **Survey Tag** (`--tag`): single run anchor.
 - **Sub-Tag** (`--package-tags`): per-package tag created by strategies (Maven, Docker, Baharat, Annatto, Dotnet, JVM/JDK, Gradle). Keys: `tag`, `version`, `date`. JSON marker `"package_tag": true`.
-- **Short names** (`--package-tags-short-name`): uses `artifactId` instead of full GAV for Maven; short name for other strategies where applicable.
+- **Short names** (`--package-tags-short-name`): uses `artifactId` instead of full groupId/artifactId/version for Maven; short name for other strategies where applicable.
 
 ## CLI Flags
 - `-b, --build`, `-o, --out`, `-t, --threads`, `--maxrecords`, `--block`, `--tempdir`
@@ -68,7 +68,7 @@ First complete `(groupId, artifactId, version)` wins:
 
 ## POM Parsing (Phase 2)
 `PomParser` (hardened, no `scala.xml.XML`):
-- GAV with parent fallback for missing child fields.
+- groupId/artifactId/version with parent fallback for missing child fields.
 - Property interpolation (`${key}`) with 10-level depth cap and cycle detection.
 - Secure XML parser: DTD, external entities, entity expansion, XInclude all disabled.
 

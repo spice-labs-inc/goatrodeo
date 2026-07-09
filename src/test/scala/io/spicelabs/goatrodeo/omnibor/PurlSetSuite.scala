@@ -19,52 +19,49 @@ import munit.FunSuite
 
 /** Unit tests for the [[PurlSet]] type.
   *
-  * == What these tests test ==
+  * ==What these tests test==
   *
   * [[PurlSet]] is the return type of [[ProcessingState.getPurls]]. It bundles
-  * an optional canonical pURL (the primary identity) with a vector of ALL
-  * pURLs for an artifact (including the canonical one). These tests verify:
+  * an optional canonical pURL (the primary identity) with a vector of ALL pURLs
+  * for an artifact (including the canonical one). These tests verify:
   *
-  *  1. '''Construction safety''' — constructing a PurlSet never throws,
-  *     even with inconsistent data (canonical not in purls). This enforces
-  *     the project rule that code must not throw exceptions for expected,
-  *     recoverable conditions.
-  *  2. '''Factory method consistency''' — `single` and `build` produce
-  *     well-formed PurlSets where the canonical pURL is a member of the
-  *     purls vector.
-  *  3. '''String conversion safety''' — `canonicalString` and
-  *     `canonicalStrings` never throw; malformed pURLs are silently dropped
-  *     via `Try`.
-  *  4. '''Canonical inclusion''' — `canonicalStrings` always includes the
-  *     canonical pURL, even if it was not a member of the `purls` vector
-  *     (which can happen with direct construction).
-  *  5. '''Deduplication''' — `canonicalStrings` removes duplicate strings
-  *     (String has proper equals/hashCode, unlike Purl which uses reference
-  *     equality).
+  *   1. '''Construction safety''' — constructing a PurlSet never throws, even
+  *      with inconsistent data (canonical not in purls). This enforces the
+  *      project rule that code must not throw exceptions for expected,
+  *      recoverable conditions. 2. '''Factory method consistency''' — `single`
+  *      and `build` produce well-formed PurlSets where the canonical pURL is a
+  *      member of the purls vector. 3. '''String conversion safety''' —
+  *      `canonicalString` and `canonicalStrings` never throw; malformed pURLs
+  *      are silently dropped via `Try`. 4. '''Canonical inclusion''' —
+  *      `canonicalStrings` always includes the canonical pURL, even if it was
+  *      not a member of the `purls` vector (which can happen with direct
+  *      construction). 5. '''Deduplication''' — `canonicalStrings` removes
+  *      duplicate strings (String has proper equals/hashCode, unlike Purl which
+  *      uses reference equality).
   *
-  * == Why these tests exist ==
+  * ==Why these tests exist==
   *
-  * The previous design used a `require` check in the case class body that
-  * would throw `IllegalArgumentException` if the canonical pURL was not a
-  * member of the purls vector. This was rejected because:
-  *  - The project policy forbids throwing exceptions for recoverable
-  *    conditions.
-  *  - A `Purl` is a Java `final class` that does not override `equals`, so
-  *    `contains` uses reference equality — the `require` check could fail
-  *    even for semantically-equal pURLs.
+  * The previous design used a `require` check in the case class body that would
+  * throw `IllegalArgumentException` if the canonical pURL was not a member of
+  * the purls vector. This was rejected because:
+  *   - The project policy forbids throwing exceptions for recoverable
+  *     conditions.
+  *   - A `Purl` is a Java `final class` that does not override `equals`, so
+  *     `contains` uses reference equality — the `require` check could fail even
+  *     for semantically-equal pURLs.
   *
   * Instead, the invariant is enforced by the factory methods (`single`,
   * `build`) and verified by these tests. `canonicalStrings` defensively
   * includes the canonical pURL regardless.
   *
-  * == LLM-friendly summary ==
+  * ==LLM-friendly summary==
   *
   * `PurlSet` is a data container: `Option[Purl]` (canonical) + `Vector[Purl]`
   * (all). It never throws. Factory methods ensure consistency. String
   * conversion drops malformed pURLs via `Try`. The canonical pURL is always
   * included in the string output.
   *
-  * == Requirements covered ==
+  * ==Requirements covered==
   *
   * Plan Part 1: PurlSet type — all 10 tests from the plan's "PurlSet unit
   * tests" section.
@@ -80,8 +77,8 @@ class PurlSetSuite extends FunSuite {
 
   /** Create a malformed pURL that will throw on `toCanonical()`.
     *
-    * Maven pURLs require a namespace. A null namespace causes
-    * `toCanonical()` to throw `Purl.PurlException`.
+    * Maven pURLs require a namespace. A null namespace causes `toCanonical()`
+    * to throw `Purl.PurlException`.
     */
   private def mkBadPurl(name: String): Purl = {
     new Purl(
@@ -133,13 +130,21 @@ class PurlSetSuite extends FunSuite {
   // a PurlSet where the canonical pURL is in the purls vector (by reference),
   // the secondary pURL is present, and both string conversion methods work.
 
-  test("PurlSet.build - canonical and secondary are in purls, strings correct") {
+  test(
+    "PurlSet.build - canonical and secondary are in purls, strings correct"
+  ) {
     val canonical = mkPurl("org.foo", "bar", "1.0")
     val secondary = mkPurl("org.baz", "qux", "2.0")
     val ps = PurlSet.build(Some(canonical), Vector(secondary))
     assertEquals(ps.canonical, Some(canonical))
-    assert(ps.purls.contains(canonical), "canonical must be in purls by reference")
-    assert(ps.purls.contains(secondary), "secondary must be in purls by reference")
+    assert(
+      ps.purls.contains(canonical),
+      "canonical must be in purls by reference"
+    )
+    assert(
+      ps.purls.contains(secondary),
+      "secondary must be in purls by reference"
+    )
     assertEquals(ps.canonicalString, Some("pkg:maven/org.foo/bar@1.0"))
     assert(ps.canonicalStrings.contains("pkg:maven/org.foo/bar@1.0"))
     assert(ps.canonicalStrings.contains("pkg:maven/org.baz/qux@2.0"))
@@ -152,11 +157,21 @@ class PurlSetSuite extends FunSuite {
   // entries in purls. Since Purl uses reference equality, `distinct` removes
   // the duplicate by identity. The resulting purls vector should have length 1.
 
-  test("PurlSet.build - same Purl object in canonical and secondary deduplicated") {
+  test(
+    "PurlSet.build - same Purl object in canonical and secondary deduplicated"
+  ) {
     val p = mkPurl("org.foo", "bar", "1.0")
     val ps = PurlSet.build(Some(p), Vector(p))
-    assertEquals(ps.purls.length, 1, "duplicate Purl object should be removed by distinct")
-    assertEquals(ps.canonicalStrings.length, 1, "duplicate string should be removed")
+    assertEquals(
+      ps.purls.length,
+      1,
+      "duplicate Purl object should be removed by distinct"
+    )
+    assertEquals(
+      ps.canonicalStrings.length,
+      1,
+      "duplicate string should be removed"
+    )
   }
 
   // ---- Test 5: Direct construction does NOT throw ----
@@ -170,7 +185,9 @@ class PurlSetSuite extends FunSuite {
   // This test replaces the old `require` check that threw
   // `IllegalArgumentException`.
 
-  test("PurlSet direct construction - does not throw even with inconsistent data") {
+  test(
+    "PurlSet direct construction - does not throw even with inconsistent data"
+  ) {
     val p = mkPurl("org.foo", "bar", "1.0")
     val other = mkPurl("org.baz", "qux", "2.0")
 
@@ -200,8 +217,14 @@ class PurlSetSuite extends FunSuite {
     val ps = PurlSet(Some(p), Vector(other))
 
     val strings = ps.canonicalStrings
-    assert(strings.contains("pkg:maven/org.foo/bar@1.0"), "canonical must be in canonicalStrings")
-    assert(strings.contains("pkg:maven/org.baz/qux@2.0"), "other must be in canonicalStrings")
+    assert(
+      strings.contains("pkg:maven/org.foo/bar@1.0"),
+      "canonical must be in canonicalStrings"
+    )
+    assert(
+      strings.contains("pkg:maven/org.baz/qux@2.0"),
+      "other must be in canonicalStrings"
+    )
     assertEquals(strings.length, 2)
   }
 
@@ -235,8 +258,14 @@ class PurlSetSuite extends FunSuite {
     val ps = PurlSet(None, Vector(good, bad))
 
     val strings = ps.canonicalStrings
-    assert(strings.contains("pkg:maven/org.foo/bar@1.0"), "valid pURL must be present")
-    assert(strings.length == 1, "malformed pURL must be dropped, only 1 string expected")
+    assert(
+      strings.contains("pkg:maven/org.foo/bar@1.0"),
+      "valid pURL must be present"
+    )
+    assert(
+      strings.length == 1,
+      "malformed pURL must be dropped, only 1 string expected"
+    )
   }
 
   test("canonicalString - returns None when canonical pURL is malformed") {
@@ -244,8 +273,15 @@ class PurlSetSuite extends FunSuite {
     val good = mkPurl("org.foo", "bar", "1.0")
     val ps = PurlSet(Some(bad), Vector(good))
 
-    assertEquals(ps.canonicalString, None, "malformed canonical must produce None")
-    assert(ps.canonicalStrings.contains("pkg:maven/org.foo/bar@1.0"), "valid secondary must still be present")
+    assertEquals(
+      ps.canonicalString,
+      None,
+      "malformed canonical must produce None"
+    )
+    assert(
+      ps.canonicalStrings.contains("pkg:maven/org.foo/bar@1.0"),
+      "valid secondary must still be present"
+    )
   }
 
   // ---- Test 9: Property-based — single round-trip ----
@@ -265,7 +301,10 @@ class PurlSetSuite extends FunSuite {
     testCases.foreach { s =>
       val p = Purl.parse(s)
       val ps = PurlSet.single(p)
-      assert(ps.canonicalStrings.contains(s), s"single round-trip failed for $s")
+      assert(
+        ps.canonicalStrings.contains(s),
+        s"single round-trip failed for $s"
+      )
       assert(ps.canonicalString.contains(s), s"canonicalString failed for $s")
     }
   }
@@ -302,14 +341,20 @@ class PurlSetSuite extends FunSuite {
   // objects that produce the same canonical string are deduplicated in
   // `canonicalStrings`.
 
-  test("canonicalStrings - deduplicates semantically equal pURLs at string level") {
+  test(
+    "canonicalStrings - deduplicates semantically equal pURLs at string level"
+  ) {
     // Two different Purl objects with the same canonical string
     val p1 = Purl.parse("pkg:maven/org.foo/bar@1.0")
     val p2 = Purl.parse("pkg:maven/org.foo/bar@1.0")
     assert(p1 ne p2, "p1 and p2 must be different objects")
 
     val ps = PurlSet(None, Vector(p1, p2))
-    assertEquals(ps.canonicalStrings.length, 1, "semantically equal pURLs must be deduplicated at string level")
+    assertEquals(
+      ps.canonicalStrings.length,
+      1,
+      "semantically equal pURLs must be deduplicated at string level"
+    )
   }
 
   // ---- Test 12: build with None canonical and empty secondary ----

@@ -433,22 +433,22 @@ val item = Item.decode(bytes)
 
 ## Maven GroupId/ArtifactId/Version Resolution
 
-The Maven strategy uses field-level merge for groupId/artifactId/version resolution, implemented in `MavenState.resolveGAV()`. Instead of picking the first source that provides all three fields, each field is resolved independently from the highest-priority source that provides it:
+The Maven strategy uses field-level merge for groupId/artifactId/version resolution, implemented in `MavenState.resolveGroupIdArtifactIdVersion()`. Instead of picking the first source that provides all three fields, each field is resolved independently from the highest-priority source that provides it:
 
-1. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata.
-2. **External POM** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`.
-3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by matching its `<artifactId>` to the filename when multiple are present.
+1. **External POM (companion)** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`. This is the HIGHEST priority source because it is the authoritative published Maven metadata (REQ-3). See ADR 0012.
+2. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId best matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata. Matching uses `matchScore`: exact match (score 3) > prefix match with separator (score 2) > reverse prefix match with separator (score 1) > no match (score 0). Among same-score matches, the longest artifactId is preferred. See ADR 0014.
+3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by the same `matchScore` logic as pom.properties when multiple are present.
 4. **MANIFEST.MF** (for groupId and version) / **Filename** (for artifactId) — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin. For artifactId, filename has higher priority than manifest because `Implementation-Title` is human-readable, not a Maven artifactId.
 5. **Filename heuristics** (for groupId and version) / **MANIFEST.MF** (for artifactId) — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
 
 Per-field priority:
-- **groupId**: pom.properties > external POM > embedded pom.xml > manifest > filename
-- **artifactId**: pom.properties > external POM > embedded pom.xml > filename > manifest
-- **version**: pom.properties > external POM > embedded pom.xml > manifest > filename
+- **groupId**: external POM > pom.properties > embedded pom.xml > manifest > filename
+- **artifactId**: external POM > pom.properties > embedded pom.xml > filename > manifest
+- **version**: external POM > pom.properties > embedded pom.xml > manifest > filename
 
-The key difference from source-level priority: **filename and manifest swap positions for artifactId**. This produces pURLs more likely to exist in Maven Central because the filename usually matches the Maven artifactId, while `Implementation-Title` is a human-readable display name.
+The companion POM (external POM) is the HIGHEST priority for canonical pURL resolution because it is the authoritative published Maven metadata. pom.properties is filename-gated by `determinePrimaryGroupIdArtifactIdVersion` — it only contributes fields when its artifactId matches the JAR filename via `matchScore` (exact > prefix-with-separator > None), preventing cross-artifact mixing and pURL hijacking via short artifactIds. The key difference from source-level priority: **filename and manifest swap positions for artifactId**. This produces pURLs more likely to exist in Maven Central because the filename usually matches the Maven artifactId, while `Implementation-Title` is a human-readable display name. See ADR 0014 for the matching algorithm details.
 
-`resolveGAVFromManifest` returns individual fields without an artifactId gate, allowing the manifest to contribute groupId and version even when it has no artifactId headers.
+`resolveGroupIdArtifactIdVersionFromManifest` returns individual fields without an artifactId gate, allowing the manifest to contribute groupId and version even when it has no artifactId headers.
 
 If no groupId is found from any source but artifactId exists, artifactId is used as both groupId and artifactId (last resort fallback). See ADR 0008 for the full decision rationale, trust model, and security concerns.
 
@@ -462,7 +462,7 @@ If no groupId is found from any source but artifactId exists, artifactId is used
 
 If a POM contains a benign DOCTYPE, a stripping fallback removes the declaration and retries parsing. Entity references in the body remain undeclared after stripping, causing the parse to fail safely rather than expanding them.
 
-`PomParser` extracts and interpolates properties (`${key}` → value), walks `<parent>` references for missing GAV fields, reads `<dependencyManagement>`, and extracts `<licenses>`, `<scm>`, `<organization>`, and `<dependencies>`. The results are stored in `MavenState` as `Option[ParsedPom]` rather than the legacy `scala.xml.NodeSeq`.
+`PomParser` extracts and interpolates properties (`${key}` → value), walks `<parent>` references for missing groupId/artifactId/version fields, reads `<dependencyManagement>`, and extracts `<licenses>`, `<scm>`, `<organization>`, and `<dependencies>`. The results are stored in `MavenState` as `Option[ParsedPom]` rather than the legacy `scala.xml.NodeSeq`.
 
 ### Metadata Emission
 
@@ -474,11 +474,27 @@ Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
 - `PUBLISHER` — from `<organization><name>`.
 
 **Verified by:**
-- `MavenPhase1Suite` — GAV chain, filename parsing, OSGi manifest, XXE protection, DOCTYPE edge cases.
+- `MavenPhase1Suite` — groupId/artifactId/version chain, filename parsing, OSGi manifest, XXE protection, DOCTYPE edge cases.
 - `MavenPhase2Suite` — PomParser interpolation, extended metadata, build dates.
 - `MavenPhase3Suite` — dependency JSON, license extraction, scope filtering.
 - `MavenPropertyTests` — ScalaCheck property tests for interpolation, filename extraction, date parsing, and priority-chain determinism.
+- `Phase3MatchingSuite` — exact match > prefix match > None matching algorithm, pURL hijacking prevention, DoS guard.
+- `Phase3MatchingPropertySuite` — property tests for exact match preference and short artifactId hijacking prevention.
+- `Phase2CanonicalPrioritySuite` — canonical pURL priority chain.
+- `Phase4SecondaryClassifierSuite` — secondary pURL classifier fix (sources/javadoc JARs emit classifier on ALL pURLs).
+- `Phase5MetadataParitySourcesJavadocSuite` — corpus-based metadata parity for sources/javadoc JARs (53 tests, real JARs, HS-4 compliant). See ADR 0015.
+- `Phase6MetadataParityRegularBestPurlSuite` — Maven Central validation for regular JARs (47 tests, 12 coordinates verified against Maven Central). See ADR 0016.
+- `MultiplePurlSuite` — metadata parity for regular JARs/WARs (113 tests).
+- `BestPurlSuite` — field-level merge produces Maven Central pURLs (2 tests).
 - `PackageTagIntegrationSuite` — end-to-end processing of real Maven JARs from `test_data/pqc_jars`.
+
+### Sources/Javadoc pURL Emission
+
+- Sources JARs: `?packaging=sources` on ALL pURLs (canonical + secondary)
+- Javadoc JARs: `?classifier=javadoc` on ALL pURLs
+- Standalone sources JARs (no main JAR): emit pURLs from pom.properties/manifest/filename
+- Companion POM for sources JAR: `foo-1.0.pom` (shared with main JAR, not `foo-1.0-sources.pom`)
+- Corpus: 3051 sources, 1 javadoc, 2995 with companion POM, 56 standalone
 
 ---
 

@@ -130,14 +130,14 @@ object PomParser {
       val base = baseProperties(doc) ++ props
       ParsedPom(
         groupId = interpolate(
-          tagText(doc, "groupId")
+          projectTagText(doc, "groupId")
             .orElse(parentTagText(doc, "groupId"))
             .getOrElse(""),
           base
         ).filter(_.nonEmpty),
-        artifactId = tagText(doc, "artifactId"),
+        artifactId = projectTagText(doc, "artifactId"),
         version = interpolate(
-          tagText(doc, "version")
+          projectTagText(doc, "version")
             .orElse(parentTagText(doc, "version"))
             .getOrElse(""),
           base
@@ -188,6 +188,30 @@ object PomParser {
       }
     }
     if (failed) None else Some(result)
+  }
+
+  /** Get the text content of a tag that is a direct child of the document's
+    * root element (i.e., <project>), NOT inside a <parent> or other nested
+    * element. This is essential for groupId/artifactId/version because
+    * getElementsByTagName returns elements in document order, and <parent>
+    * (which always comes first) contains its own groupId/artifactId/version
+    * that would shadow the project's own values.
+    */
+  private def projectTagText(doc: Document, tagName: String): Option[String] = {
+    val root = doc.getDocumentElement
+    val children = root.getChildNodes
+    var result: Option[String] = None
+    var i = 0
+    while (i < children.getLength && result.isEmpty) {
+      children.item(i) match {
+        case e: Element if e.getTagName == tagName =>
+          val text = e.getTextContent.trim
+          if (text.nonEmpty) result = Some(text)
+        case _ =>
+      }
+      i += 1
+    }
+    result
   }
 
   private def tagText(doc: Document, tagName: String): Option[String] = {
@@ -252,9 +276,11 @@ object PomParser {
   }
 
   private def baseProperties(doc: Document): Map[String, String] = {
-    val g = tagText(doc, "groupId").getOrElse("")
-    val a = tagText(doc, "artifactId").getOrElse("")
-    val v = tagText(doc, "version")
+    val g = projectTagText(doc, "groupId")
+      .orElse(parentTagText(doc, "groupId"))
+      .getOrElse("")
+    val a = projectTagText(doc, "artifactId").getOrElse("")
+    val v = projectTagText(doc, "version")
       .orElse(parentTagText(doc, "version"))
       .getOrElse("")
     Map(

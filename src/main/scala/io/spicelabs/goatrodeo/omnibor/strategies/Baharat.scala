@@ -127,9 +127,11 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
     // baharat returns a com.github.packageurl.PackageURL; convert to
     // io.spicelabs.coordinates.Purl via string round-trip.
     // Wrap in Try — a malformed pURL should not abort processing.
-    scala.util.Try {
-      pkg.metadata().purl()
-    }.toOption
+    scala.util
+      .Try {
+        pkg.metadata().purl()
+      }
+      .toOption
       .map(p => PurlSet.single(p))
       .getOrElse(PurlSet.empty) -> this
   }

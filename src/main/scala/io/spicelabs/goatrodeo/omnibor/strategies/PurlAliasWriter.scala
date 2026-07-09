@@ -27,27 +27,26 @@ import scala.collection.immutable.TreeSet
   *
   * This object extracts the mechanical pURL alias-writing logic that was
   * previously duplicated in [[Maven.applyAccumulatedAugmentation]]. It keeps
-  * Maven.scala focused on groupId/artifactId/version resolution and
-  * delegates the store writes here.
+  * Maven.scala focused on groupId/artifactId/version resolution and delegates
+  * the store writes here.
   *
-  * == What it does ==
+  * ==What it does==
   *
   * For each pURL string, `writeAlias` performs three operations:
   *
-  *  1. Registers the pURL via `store.addPurl(purl)`
-  *  2. '''WRITE 1''': Updates the artifact's gitoid Item with
-  *     `aliasFrom -> purl`, optionally merging extra metadata
-  *  3. '''WRITE 2''': Creates or updates the pURL Item node with
-  *     `aliasTo -> gitoid`
+  *   1. Registers the pURL via `store.addPurl(purl)` 2. '''WRITE 1''': Updates
+  *      the artifact's gitoid Item with `aliasFrom -> purl`, optionally merging
+  *      extra metadata 3. '''WRITE 2''': Creates or updates the pURL Item node
+  *      with `aliasTo -> gitoid`
   *
-  * WRITE 1 and WRITE 2 write to different paths (gitoid vs pURL string),
-  * so they acquire different row locks — no deadlock risk.
+  * WRITE 1 and WRITE 2 write to different paths (gitoid vs pURL string), so
+  * they acquire different row locks — no deadlock risk.
   *
-  * == Why it exists ==
+  * ==Why it exists==
   *
-  * Maven.scala is already ~2000 lines. Adding the multiple-pURL emission
-  * loop (one pURL per embedded package) without extracting this helper
-  * would push it past the 20000-token limit (CLAUDE.md invariant 9).
+  * Maven.scala is already ~2000 lines. Adding the multiple-pURL emission loop
+  * (one pURL per embedded package) without extracting this helper would push it
+  * past the 20000-token limit (CLAUDE.md invariant 9).
   */
 object PurlAliasWriter {
 
@@ -83,8 +82,7 @@ object PurlAliasWriter {
       {
         case Some(existing) =>
           val withAlias = existing.copy(
-            connections =
-              existing.connections + (EdgeType.aliasFrom -> purl)
+            connections = existing.connections + (EdgeType.aliasFrom -> purl)
           )
           val withMeta =
             if (extra.nonEmpty)

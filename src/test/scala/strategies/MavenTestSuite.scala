@@ -85,7 +85,7 @@ class MavenTestSuite extends munit.FunSuite {
     assertEquals(newState.pomXml, NodeSeq.Empty)
   }
 
-  test("MavenState.beginProcessing - does not capture for Sources marker") {
+  test("MavenState.beginProcessing - sets up accumulator for Sources marker") {
     val srcBytes = "class Test {}".getBytes("UTF-8")
     val artifact = ByteWrapper(srcBytes, "test-sources.jar", None)
     val item = createTestItem("test-id")
@@ -93,7 +93,18 @@ class MavenTestSuite extends munit.FunSuite {
 
     val newState = state.beginProcessing(artifact, item, MavenMarkers.Sources)
 
-    assert(newState.pomFile.isEmpty)
+    // Sources no longer a no-op: sets up sourcesAccumulated and currentMarker
+    assert(newState.pomFile.isEmpty, "Sources should not parse POM")
+    assert(
+      newState.sourcesAccumulated.isDefined,
+      "sourcesAccumulated should be set"
+    )
+    assertEquals(newState.currentMarker, Some(MavenMarkers.Sources))
+    assertEquals(newState.currentClassifier, Some("sources"))
+    // Accumulator should be fresh
+    assert(
+      newState.sourcesAccumulated.get.embeddedGroupIdArtifactIdVersions.isEmpty
+    )
   }
 
   test("MavenState.beginProcessing - handles invalid XML gracefully") {
@@ -157,7 +168,13 @@ class MavenTestSuite extends munit.FunSuite {
     assertEquals(purl.qualifiers.get("type"), "pom")
   }
 
-  test("MavenState.getPurls - includes sources qualifier for Sources marker") {
+  test(
+    "MavenState.getPurls - includes sources qualifier for Sources marker (fallback)"
+  ) {
+    // This tests the backward-compatibility fallback path in getPurls
+    // when beginProcessing(Sources) is NOT called first (jarAccumulated is None).
+    // In the real pipeline, beginProcessing(Sources) sets jarAccumulated=Some,
+    // causing getPurls to defer to applyAccumulatedAugmentation.
     val pomBytes = pomXml.getBytes("UTF-8")
     val artifact = ByteWrapper(pomBytes, "test.pom", None)
     val item = createTestItem("test-id")
@@ -171,7 +188,11 @@ class MavenTestSuite extends munit.FunSuite {
     assertEquals(purl.qualifiers.get("packaging"), "sources")
   }
 
-  test("MavenState.getPurls - includes javadoc qualifier for JavaDocs marker") {
+  test(
+    "MavenState.getPurls - includes javadoc qualifier for JavaDocs marker (fallback)"
+  ) {
+    // This tests the backward-compatibility fallback path in getPurls
+    // when beginProcessing(JavaDocs) is NOT called first (jarAccumulated is None).
     val pomBytes = pomXml.getBytes("UTF-8")
     val artifact = ByteWrapper(pomBytes, "test.pom", None)
     val item = createTestItem("test-id")

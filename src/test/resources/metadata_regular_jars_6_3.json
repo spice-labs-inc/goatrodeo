@@ -1,0 +1,86 @@
+[
+  {
+    "name": "AddOnJavaAntTasks-2.11.jar",
+    "path": "test_data/download/adg_tests/repo_ea/AddOnJavaAntTasks-2.11.jar",
+    "purls": [
+      "pkg:maven/AddOnJavaAntTasks/AddOnJavaAntTasks@2.11"
+    ]
+  },
+  {
+    "name": "AddRemoveComboBox-0.5.jar",
+    "path": "test_data/download/adg_tests/repo_ea/AddRemoveComboBox-0.5.jar",
+    "purls": [
+      "pkg:maven/tech.ugma.customcomponents/AddRemoveComboBox@0.5"
+    ]
+  },
+  {
+    "name": "Agrona-0.1.jar",
+    "path": "test_data/download/adg_tests/repo_ea/Agrona-0.1.jar",
+    "purls": [
+      "pkg:maven/Agrona/Agrona@0.1"
+    ]
+  },
+  {
+    "name": "Allen4J-1.0.1.jar",
+    "path": "test_data/download/adg_tests/repo_ea/Allen4J-1.0.1.jar",
+    "purls": [
+      "pkg:maven/xyz.lamergameryt/Allen4J@1.0.1"
+    ]
+  },
+  {
+    "name": "AnnotationSummariser-1.2.0.jar",
+    "path": "test_data/download/adg_tests/repo_ea/AnnotationSummariser-1.2.0.jar",
+    "purls": [
+      "pkg:maven/uk.ac.mmu.tdmlab.uima/AnnotationSummariser@1.2.0"
+    ]
+  },
+  {
+    "name": "ArgoWirelineFormat-0.3.1.jar",
+    "path": "test_data/download/adg_tests/repo_ea/ArgoWirelineFormat-0.3.1.jar",
+    "purls": [
+      "pkg:maven/ws.argo.wireline/ArgoWirelineFormat@0.3.1"
+    ]
+  },
+  {
+    "name": "abris-0.0.1.jar",
+    "path": "test_data/download/adg_tests/repo_ea/abris-0.0.1.jar",
+    "purls": [
+      "pkg:maven/za.co.absa/abris@0.0.1"
+    ]
+  },
+  {
+    "name": "absa-shaded-jackson-0.0.1.jar",
+    "path": "test_data/download/adg_tests/repo_ea/absa-shaded-jackson-0.0.1.jar",
+    "purls": [
+      "pkg:maven/za.co.absa.shaded/absa-shaded-jackson@0.0.1"
+    ]
+  },
+  {
+    "name": "abstraction-models-1.0.48.jar",
+    "path": "test_data/download/adg_tests/repo_ea/abstraction-models-1.0.48.jar",
+    "purls": [
+      "pkg:maven/tech.rsqn.useful-things/abstraction-models@1.0.48"
+    ]
+  },
+  {
+    "name": "ac-client-2.0.0.jar",
+    "path": "test_data/download/adg_tests/repo_ea/ac-client-2.0.0.jar",
+    "purls": [
+      "pkg:maven/ac-client/ac-client@2.0.0"
+    ]
+  },
+  {
+    "name": "access-system-0.0.14.jar",
+    "path": "test_data/download/adg_tests/repo_ea/access-system-0.0.14.jar",
+    "purls": [
+      "pkg:maven/access-system/access-system@0.0.14"
+    ]
+  },
+  {
+    "name": "acpgeo-0.0.2.jar",
+    "path": "test_data/download/adg_tests/repo_ea/acpgeo-0.0.2.jar",
+    "purls": [
+      "pkg:maven/uk.ac.cam.ch.wwmm/acpgeo@0.0.2"
+    ]
+  }
+]

@@ -101,10 +101,14 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
     // annatto returns a com.github.packageurl.PackageURL; convert to
     // io.spicelabs.coordinates.Purl via string round-trip.
     // Wrap in Try — a malformed pURL should not abort processing.
-    pkg.toPurl().toScala
-      .flatMap(p => scala.util.Try {
-        io.spicelabs.coordinates.Purl.parse(p.canonicalize())
-      }.toOption)
+    pkg
+      .toPurl()
+      .toScala
+      .flatMap(p =>
+        scala.util.Try {
+          io.spicelabs.coordinates.Purl.parse(p.canonicalize())
+        }.toOption
+      )
       .map(p => PurlSet.single(p))
       .getOrElse(PurlSet.empty) -> this
   }

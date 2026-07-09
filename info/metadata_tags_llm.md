@@ -29,7 +29,7 @@ All metadata keys Goat Rodeo can emit, by source strategy. Keys are sorted by so
 |---|---|---|
 | maven:SCM_URL | POM `<scm><url>` | String URL |
 | maven:Timestamp | Build timestamp | ISO 8601 string |
-| maven:ParentPOM | POM `<parent>` GAV | JSON `{"groupId": ..., "artifactId": ..., "version": ...}` |
+| maven:ParentPOM | POM `<parent>` groupId/artifactId/version | JSON `{"groupId": ..., "artifactId": ..., "version": ...}` |
 | maven:Latest | `maven-metadata.xml` latest | String |
 | maven:Release | `maven-metadata.xml` release | String |
 | maven:Versions | All versions in metadata | JSON array of strings |

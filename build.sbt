@@ -220,7 +220,7 @@ lazy val root = project
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
     // Spice Labs "readers"
-    libraryDependencies += "io.spicelabs" % "baharat" % "0.1.0",
+    libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.1.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.2.3",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.80",

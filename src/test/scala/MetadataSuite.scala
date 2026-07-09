@@ -88,7 +88,7 @@ class MetadataSuite extends munit.FunSuite {
 
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:deb/not-a-real-package@1.2.3",
+      "pkg:deb/debian/not-a-real-package@1.2.3",
       "gitoid:blob:sha256:9ae1be82894af5681fcd9947792bc9e8e5dcea5f81b848dc5a0068d50b93ac51"
     )
     val extra = metadata.extra
@@ -118,7 +118,7 @@ class MetadataSuite extends munit.FunSuite {
     val store = getStore("acf-squid-0.11.0-r4.apk")
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:apk/acf-squid@0.11.0-r4",
+      "pkg:apk/alpine/acf-squid@0.11.0-r4",
       "gitoid:blob:sha256:5781f775b64f2ab814668b201ee92bc5894188e991fda98dd2257775e01ad07a"
     )
     val extra = metadata.extra
@@ -155,7 +155,7 @@ class MetadataSuite extends munit.FunSuite {
     val store = getStore("axel-doc-2.17.14-r1.apk")
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:apk/axel-doc@2.17.14-r1",
+      "pkg:apk/alpine/axel-doc@2.17.14-r1",
       "gitoid:blob:sha256:b345b85b60077889633adac722c369396b7d7ba803c97e0546eb108c66017b70"
     )
     val extra = metadata.extra
@@ -197,7 +197,7 @@ class MetadataSuite extends munit.FunSuite {
     val store = getStore("busybox-1.37.0-160099.8.2.aarch64.rpm")
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:rpm/busybox@1.37.0-160099.8.2?arch=aarch64",
+      "pkg:rpm/opensuse/busybox@1.37.0-160099.8.2?arch=aarch64",
       "gitoid:blob:sha256:7a73dfe7ec1f3328ee9a4fecef20285cb31eaee3fff3de1d6735b6cfc738deb1"
     )
     val extra = metadata.extra
@@ -251,7 +251,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
       "usr/share/licenses/busybox/LICENSE",
       "busybox-1.37.0-160099.8.2.aarch64.rpm",
       "usr/share/man/man1/busybox.1.gz",
-      "pkg:rpm/busybox@1.37.0-160099.8.2?arch=aarch64",
+      "pkg:rpm/opensuse/busybox@1.37.0-160099.8.2?arch=aarch64",
       "usr/bin/busybox",
       "usr/share/doc/packages/busybox/mdev.txt",
       "etc/man.conf",
@@ -285,7 +285,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
     val store = getStore("cpufreqctl-8-1-x86_64.pkg.tar.zst")
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:alpm/cpufreqctl@8-1?arch=x86_64",
+      "pkg:alpm/arch/cpufreqctl@8-1?arch=x86_64",
       "gitoid:blob:sha256:1709591f89ea5594900f3be2f0ec2bb3848783953d0f3ce558825f74cc56c31b"
     )
     val extra = metadata.extra
@@ -324,7 +324,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
     val store = getStore("lxterminal_0.4.0-2build2_amd64.deb")
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:deb/lxterminal@0.4.0-2build2?arch=amd64",
+      "pkg:deb/debian/lxterminal@0.4.0-2build2?arch=amd64",
       "gitoid:blob:sha256:3d442511c5eedcdebacc42c8e9eeb654fcb5ea531b398c3837dd4b0c2ec2014d"
     )
     val extra = metadata.extra
@@ -367,7 +367,7 @@ the performance, all instances of the terminal are sharing a single process."""
     val store = getStore("paru-1.11.0-1-x86_64.pkg.tar.zst")
     val metadata = assertPurlsAndMainItem(
       store,
-      "pkg:alpm/paru@1.11.0-1?arch=x86_64",
+      "pkg:alpm/arch/paru@1.11.0-1?arch=x86_64",
       "gitoid:blob:sha256:ce0fd905ba8bb4886fc67e573a07540afa17752c22dd12bf8cd2317250e76fdb"
     )
     val extra = metadata.extra

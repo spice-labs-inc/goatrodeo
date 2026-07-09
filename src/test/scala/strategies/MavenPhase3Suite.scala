@@ -529,8 +529,9 @@ class MavenPhase3Suite extends munit.FunSuite {
     )
     // getMetadata does not take manifestMap directly; metadata is built from parsedPom only for POM marker.
     // Instead construct a state with manifest to test the merge path used for JAR marker.
-    val jarState = state.copy(jarAccumulated =
-      Some(JarAccumulatedState(manifest = manifestMap))
+    val jarState = state.copy(
+      jarAccumulated = Some(JarAccumulatedState(manifest = manifestMap)),
+      currentMarker = Some(MavenMarkers.JAR)
     )
     val (jarMeta, _) = jarState.getMetadata(
       artifact,
@@ -560,8 +561,9 @@ class MavenPhase3Suite extends munit.FunSuite {
     val manifestMap = TreeMap[String, TreeSet[StringOrPair]](
       "plugin-license-name" -> TreeSet(StringOrPair("EPL 2.0"))
     )
-    val jarState = state.copy(jarAccumulated =
-      Some(JarAccumulatedState(manifest = manifestMap))
+    val jarState = state.copy(
+      jarAccumulated = Some(JarAccumulatedState(manifest = manifestMap)),
+      currentMarker = Some(MavenMarkers.JAR)
     )
     val (jarMeta, _) = jarState.getMetadata(
       artifact,
@@ -579,7 +581,9 @@ class MavenPhase3Suite extends munit.FunSuite {
 
   // ==================== Gap fill: embedded pom.xml path traversal ====================
 
-  test("1.3 path traversal: extractAllEmbeddedGavs skips pom.xml with ..") {
+  test(
+    "1.3 path traversal: extractAllEmbeddedGroupIdArtifactIdVersion skips pom.xml with .."
+  ) {
     val tempDir = Files.createTempDirectory("maven-phase1-jar-pomxml")
     try {
       val jarFile = new File(tempDir.toFile, "test.jar")
@@ -604,14 +608,16 @@ class MavenPhase3Suite extends munit.FunSuite {
           state.accumulateInfo(item.identifier, item, entry, store)
         }
       }
-      val gavs =
-        state.jarAccumulated.map(_.embeddedGavs).getOrElse(Vector.empty)
+      val coordinates =
+        state.jarAccumulated
+          .map(_.embeddedGroupIdArtifactIdVersions)
+          .getOrElse(Vector.empty)
       assert(
-        !gavs.exists(_._2 == "evil"),
+        !coordinates.exists(_._2 == "evil"),
         "Traversal pom.xml with .. should be skipped"
       )
       assert(
-        gavs.exists(_._2 == "good-art"),
+        coordinates.exists(_._2 == "good-art"),
         "Legitimate pom.xml / pom.properties should be included"
       )
     } finally {

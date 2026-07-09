@@ -49,7 +49,7 @@ import scala.util.Using
   * @param tempDir
   *   directory for temporary files (ideally a RAM disk)
   * @param useStaticMetadata
-  *   whether to enhance metadata using Syft
+  *   whether to enhance metadata
   * @param dumpRootDir
   *   optional directory to dump root items as JSON
   * @param emitJsonDir

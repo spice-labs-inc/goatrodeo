@@ -68,8 +68,8 @@ trait ProcessingState[PM <: ProcessingMarker, ME <: ProcessingState[PM, ME]] {
     * @param marker
     *   the marker (e.g., a pom vs javadoc vs. JAR marker)
     * @return
-    *   a [[PurlSet]] containing the canonical pURL (if any) and all pURLs
-    *   for this artifact, plus any update to the State object
+    *   a [[PurlSet]] containing the canonical pURL (if any) and all pURLs for
+    *   this artifact, plus any update to the State object
     */
   def getPurls(
       artifact: ArtifactWrapper,
@@ -382,11 +382,13 @@ trait ToProcess {
               val itemScope1 =
                 parentScope.beginProcessing(store, artifact, item)
               // get purls
-              val (purlSet, state2) = state.getPurls(artifact, itemScope1, marker)
+              val (purlSet, state2) =
+                state.getPurls(artifact, itemScope1, marker)
               val purlStrings = purlSet.canonicalStrings
 
               // enhance with package URLs
-              val itemPreCanonical = itemScope1.enhanceItemWithPurls(purlStrings)
+              val itemPreCanonical =
+                itemScope1.enhanceItemWithPurls(purlStrings)
 
               // Store canonical pURL as metadata on the gitoid Item.
               // canonicalString returns Option[String] — None if canonical is
@@ -404,7 +406,12 @@ trait ToProcess {
               }
 
               val itemScope2 =
-                parentScope.enhanceWithPurls(store, artifact, item2, purlStrings)
+                parentScope.enhanceWithPurls(
+                  store,
+                  artifact,
+                  item2,
+                  purlStrings
+                )
 
               // compute metadata
               val (metadata, state3) =
@@ -777,7 +784,8 @@ object ToProcess {
       case 0 => 1
       case x => x
     }
-    if (infoMsgs_? && largeCnt_?) logger.info("Creating strategies for artifacts")
+    if (infoMsgs_? && largeCnt_?)
+      logger.info("Creating strategies for artifacts")
     // create the list of the files
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
