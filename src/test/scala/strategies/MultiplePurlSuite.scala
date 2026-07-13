@@ -35,7 +35,6 @@ import scala.jdk.CollectionConverters.*
   * pURLs come from recursively-processed nested JARs, not from embedded
   * pom.properties in the uberjar itself.
   *
-  *
   * '''LLM Summary:''' This test suite checks metadata parity for
   * uberjar/assembly JARs. Each test copies the JAR and its companion POM to a
   * temp directory, processes them through the full Maven pipeline, and asserts

@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PomParser
 import munit.ScalaCheckSuite
 import org.json4s.JsonDSL.*
@@ -163,7 +164,11 @@ class MavenPropertyTests extends ScalaCheckSuite {
       val filename = s"${artifact}-${version}.jar"
       val (_, a, v) =
         MavenState().resolveGroupIdArtifactIdVersionFromFilename(filename)
-      a == Some(artifact) && v == Some(version)
+      val expectedArtifact =
+        PURLComponentSanitizer.sanitizeMavenArtifactId(artifact)
+      val expectedVersion =
+        PURLComponentSanitizer.sanitizeMavenVersion(version)
+      a == expectedArtifact && v == expectedVersion
     }
   }
 
@@ -915,7 +920,11 @@ class MavenPropertyTests extends ScalaCheckSuite {
           embeddedPom
         )
 
-        g == Some(extG) && a == Some(extA) && v == Some(extV)
+        val expectedG = PURLComponentSanitizer.sanitizeMavenGroupId(extG)
+        val expectedA = PURLComponentSanitizer.sanitizeMavenArtifactId(extA)
+        val expectedV = PURLComponentSanitizer.sanitizeMavenVersion(extV)
+
+        g == expectedG && a == expectedA && v == expectedV
     }
   }
 
@@ -990,7 +999,11 @@ class MavenPropertyTests extends ScalaCheckSuite {
         embeddedPom
       )
 
-      g == Some(extG) && a == Some(extA) && v == Some(extV)
+      val expectedG = PURLComponentSanitizer.sanitizeMavenGroupId(extG)
+      val expectedA = PURLComponentSanitizer.sanitizeMavenArtifactId(extA)
+      val expectedV = PURLComponentSanitizer.sanitizeMavenVersion(extV)
+
+      g == expectedG && a == expectedA && v == expectedV
     }
   }
 
@@ -1052,7 +1065,9 @@ class MavenPropertyTests extends ScalaCheckSuite {
           props,
           None
         )
-        g == Some("com.props") && a == Some(art) && v == Some(ver)
+        val expectedA = PURLComponentSanitizer.sanitizeMavenArtifactId(art)
+        val expectedV = PURLComponentSanitizer.sanitizeMavenVersion(ver)
+        g == Some("com.props") && a == expectedA && v == expectedV
     }
   }
 

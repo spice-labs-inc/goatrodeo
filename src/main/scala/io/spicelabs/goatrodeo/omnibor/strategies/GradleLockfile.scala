@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.JsonDSL.*
@@ -234,15 +235,25 @@ class GradleLockfileState(deps: Vector[GradleDependency])
     // PurlSet.canonicalStrings will handle toCanonical() at the storage
     // boundary, wrapped in Try.
     val purls = deps.flatMap { d =>
-      scala.util.Try {
-        PURLHelpers
-          .purl(
-            `type` = "maven",
-            name = d.artifactId,
-            namespace = d.groupId,
-            version = d.version
-          )
-      }.toOption
+      val groupIdOpt =
+        PURLComponentSanitizer.sanitizeMavenGroupId(d.groupId)
+      val artifactIdOpt =
+        PURLComponentSanitizer.sanitizeMavenArtifactId(d.artifactId)
+      val versionOpt =
+        PURLComponentSanitizer.sanitizeMavenVersion(d.version)
+      (groupIdOpt, artifactIdOpt, versionOpt) match {
+        case (Some(groupId), Some(artifactId), Some(version)) =>
+          scala.util.Try {
+            PURLHelpers
+              .purl(
+                `type` = "maven",
+                name = artifactId,
+                namespace = Some(groupId),
+                version = Some(version)
+              )
+          }.toOption
+        case _ => None
+      }
     }
     PurlSet.build(None, purls) -> this
   }

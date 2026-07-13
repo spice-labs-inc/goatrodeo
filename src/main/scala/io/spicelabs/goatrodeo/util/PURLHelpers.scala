@@ -42,8 +42,9 @@ object PURLHelpers {
     * Replaces the old `PackageURLBuilder`: `type` and `name` are required, the
     * rest optional. A blank namespace/version/subpath is treated as absent (the
     * canonical purl form distinguishes "missing" from "empty", and some types —
-    * e.g. `nuget` — forbid a namespace entirely). Normalization and validation
-    * happen canonically in [[Purl.toCanonical]].
+    * e.g. `nuget` — forbid a namespace entirely). The Scala API uses
+    * `Option[String]`; `null` is only introduced at the Java constructor
+    * boundary and does not leak into the Scala API.
     *
     * @param qualifiers
     *   key/value qualifiers, in insertion order (canonicalization sorts them)
@@ -51,24 +52,31 @@ object PURLHelpers {
   def purl(
       `type`: String,
       name: String,
-      namespace: String | Null = null,
-      version: String | Null = null,
+      namespace: Option[String] = None,
+      version: Option[String] = None,
       qualifiers: Seq[(String, String)] = Seq(),
-      subpath: String | Null = null
+      subpath: Option[String] = None
   ): Purl = {
-    def blankToNull(s: String | Null): String | Null =
-      if (s == null || s.isEmpty) null else s
+
+    /** Convert `Option[String]` to the Java `String` expected by
+      * `coordinates.Purl`. This localizes `null` to the interop boundary so the
+      * rest of the codebase does not need `String | Null`.
+      */
+    def optToJava[A](o: Option[A]): A = o match {
+      case Some(v) => v
+      case None    => null.asInstanceOf[A]
+    }
 
     val q = new java.util.LinkedHashMap[String, String]()
     for ((k, v) <- qualifiers) q.put(k, v)
 
     new Purl(
       `type`,
-      blankToNull(namespace),
+      optToJava(namespace),
       name,
-      blankToNull(version),
+      optToJava(version),
       q,
-      blankToNull(subpath)
+      optToJava(subpath)
     )
   }
 
@@ -110,8 +118,8 @@ object PURLHelpers {
     purl(
       `type` = ecosystemText,
       name = artifactId,
-      namespace = namespace.orNull,
-      version = version,
+      namespace = namespace,
+      version = Some(version),
       qualifiers = namedQualifier ++ qualifiers
     )
   }

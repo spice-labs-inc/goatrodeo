@@ -16,6 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
@@ -504,18 +505,31 @@ case class DockerState(
           )
       }
 
+      val cleanNamespace = namespace.flatMap(
+        PURLComponentSanitizer.sanitizeDockerNamespace
+      )
+      val cleanName =
+        PURLComponentSanitizer.sanitizeDockerName(path)
+      val cleanVersion = version.flatMap(
+        PURLComponentSanitizer.sanitizeDockerTag
+      )
+
       // construct a Docker Package URL based on the pURL examples
       // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
-      scala.util.Try {
-        PURLHelpers
-          .purl(
-            `type` = "docker",
-            name = path,
-            namespace = namespace.orNull,
-            version = version.orNull
-          )
-          .toCanonical()
-      }.toOption
+      (cleanName, cleanVersion) match {
+        case (Some(name), Some(ver)) =>
+          scala.util.Try {
+            PURLHelpers
+              .purl(
+                `type` = "docker",
+                name = name,
+                namespace = cleanNamespace,
+                version = Some(ver)
+              )
+              .toCanonical()
+          }.toOption
+        case _ => None
+      }
     }
 
     purls.flatten.toVector

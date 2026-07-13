@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
@@ -267,15 +268,20 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
     // will handle toCanonical() at the storage boundary, wrapped in Try.
     val purlOpt = for {
       ver <- versionOpt
+      cleanVendor <-
+        PURLComponentSanitizer.sanitizeGenericIdentifier(vendorNamespace)
+      cleanProduct <-
+        PURLComponentSanitizer.sanitizeGenericIdentifier(productName)
+      cleanVersion <- PURLComponentSanitizer.sanitizeGenericVersion(ver)
     } yield {
       val qualifier = releaseData.sourceRepo.toSeq.map("repository_url" -> _)
       scala.util.Try {
         PURLHelpers
           .purl(
             `type` = "generic",
-            name = productName,
-            namespace = vendorNamespace,
-            version = ver,
+            name = cleanProduct,
+            namespace = Some(cleanVendor),
+            version = Some(cleanVersion),
             qualifiers = qualifier
           )
       }.toOption

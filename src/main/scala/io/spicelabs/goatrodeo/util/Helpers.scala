@@ -211,8 +211,8 @@ object Helpers {
               // walking method bodies (the bulk of the class). Do NOT use SKIP_DEBUG --
               // it would suppress the SourceFile attribute we depend on.
               val reader = new ClassReader(is)
-              var className: String | Null = null
-              var sourceFile: String | Null = null
+              var className: Option[String] = None
+              var sourceFile: Option[String] = None
               reader.accept(
                 new ClassVisitor(Opcodes.ASM9) {
                   override def visit(
@@ -222,26 +222,24 @@ object Helpers {
                       signature: String,
                       superName: String,
                       interfaces: Array[String]
-                  ): Unit = className = name
+                  ): Unit = className = Some(name)
                   override def visitSource(
                       source: String,
                       debug: String
-                  ): Unit = sourceFile = source
+                  ): Unit = sourceFile = Some(source)
                 },
                 ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES
               )
               // Reproduce BCEL's getSourceFilePath(): the package-qualified path,
               // e.g. "com/example/Foo.java", derived from the class's internal name.
-              sourceFile match {
-                case null => None
-                case sf: String =>
-                  val pkg = className match {
-                    case null => ""
-                    case cn: String =>
-                      val i = cn.lastIndexOf('/')
-                      if (i >= 0) cn.substring(0, i + 1) else ""
-                  }
-                  Some(pkg + sf)
+              sourceFile.map { sf =>
+                val pkg = className match {
+                  case Some(cn) =>
+                    val i = cn.lastIndexOf('/')
+                    if (i >= 0) cn.substring(0, i + 1) else ""
+                  case None => ""
+                }
+                pkg + sf
               }
             }
           } catch {

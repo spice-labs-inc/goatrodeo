@@ -325,8 +325,8 @@ class ItemTestSuite extends munit.FunSuite {
     val purl = PURLHelpers.purl(
       `type` = "deb",
       name = "artifact",
-      namespace = "debian",
-      version = "1.0"
+      namespace = Some("debian"),
+      version = Some("1.0")
     )
 
     val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
@@ -339,8 +339,8 @@ class ItemTestSuite extends munit.FunSuite {
     val purl = PURLHelpers.purl(
       `type` = "deb",
       name = "artifact",
-      namespace = "debian",
-      version = "1.0"
+      namespace = Some("debian"),
+      version = Some("1.0")
     )
 
     val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
@@ -359,13 +359,13 @@ class ItemTestSuite extends munit.FunSuite {
     val purl1 = PURLHelpers.purl(
       `type` = "deb",
       name = "artifact1",
-      namespace = "ubuntu",
-      version = "1.0"
+      namespace = Some("ubuntu"),
+      version = Some("1.0")
     )
     val purl2 = PURLHelpers.purl(
       `type` = "npm",
       name = "package",
-      version = "2.0"
+      version = Some("2.0")
     )
 
     val enhanced =
@@ -381,8 +381,8 @@ class ItemTestSuite extends munit.FunSuite {
     val purl = PURLHelpers.purl(
       `type` = "deb",
       name = "artifact",
-      namespace = "debian",
-      version = "1.0"
+      namespace = Some("debian"),
+      version = Some("1.0")
     )
 
     val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))

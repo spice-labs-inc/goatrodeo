@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 import io.spicelabs.goatrodeo.util.PomParser
@@ -359,15 +360,25 @@ case class MavenState(
       .orElse(manVersion)
       .orElse(fileVersion)
 
+    // Sanitize each component. Any source that produced an illegal value
+    // becomes None, allowing the per-field priority chain to fall through to
+    // the next best source. No exceptions are thrown.
+    val sanitizedGroupId =
+      groupId.flatMap(PURLComponentSanitizer.sanitizeMavenGroupId)
+    val sanitizedArtifactId =
+      artifactId.flatMap(PURLComponentSanitizer.sanitizeMavenArtifactId)
+    val sanitizedVersion =
+      version.flatMap(PURLComponentSanitizer.sanitizeMavenVersion)
+
     // Last-resort fallback: Maven pURLs require a namespace (groupId).
     // If no groupId was found from any source but artifactId exists,
     // use artifactId as both groupId and artifactId. This produces
     // e.g. pkg:maven/collections-generic/collections-generic@4.01
     // which is a valid pURL even if the groupId is not the "real" one.
     // Better to have a lookupable pURL than none at all.
-    val finalGroupId = groupId.orElse(artifactId)
+    val finalGroupId = sanitizedGroupId.orElse(sanitizedArtifactId)
 
-    (finalGroupId, artifactId, version)
+    (finalGroupId, sanitizedArtifactId, sanitizedVersion)
   }
 
   /** Derive a groupId from a package-path-style manifest header value.
@@ -471,7 +482,11 @@ case class MavenState(
 
     val versionOpt = bundleVerOpt.orElse(implVerOpt).orElse(specVerOpt)
 
-    (groupIdOpt, artifactIdOpt, versionOpt)
+    (
+      groupIdOpt.flatMap(PURLComponentSanitizer.sanitizeMavenGroupId),
+      artifactIdOpt.flatMap(PURLComponentSanitizer.sanitizeMavenArtifactId),
+      versionOpt.flatMap(PURLComponentSanitizer.sanitizeMavenVersion)
+    )
   }
 
   /** Extract (groupId, artifactId, version) from a Maven-style filename.
@@ -487,6 +502,13 @@ case class MavenState(
   private[strategies] def extractIdentityFromFilename(
       filename: String
   ): Option[(Option[String], Option[String], Option[String])] = {
+    def cleanGroupId(o: Option[String]): Option[String] =
+      o.flatMap(PURLComponentSanitizer.sanitizeMavenGroupId)
+    def cleanArtifactId(o: Option[String]): Option[String] =
+      o.flatMap(PURLComponentSanitizer.sanitizeMavenArtifactId)
+    def cleanVersion(o: Option[String]): Option[String] =
+      o.flatMap(PURLComponentSanitizer.sanitizeMavenVersion)
+
     val extIdx = filename.lastIndexOf('.')
     val name = if (extIdx > 0) filename.substring(0, extIdx) else filename
     val splitIdx = name.zipWithIndex
@@ -505,14 +527,32 @@ case class MavenState(
             // Avoid splitting on dots that are part of a Scala binary suffix
             // (e.g. lib_2.13 → afterDot "13" is purely numeric).
             if (afterDot.matches("\\d+(\\.\\d+)?")) {
-              Some((None, Some(artifactPart), Some(versionPart)))
+              Some(
+                (
+                  None,
+                  cleanArtifactId(Some(artifactPart)),
+                  cleanVersion(Some(versionPart))
+                )
+              )
             } else {
               val groupId = artifactPart.substring(0, lastDot)
               val artifactId = artifactPart.substring(lastDot + 1)
-              Some((Some(groupId), Some(artifactId), Some(versionPart)))
+              Some(
+                (
+                  cleanGroupId(Some(groupId)),
+                  cleanArtifactId(Some(artifactId)),
+                  cleanVersion(Some(versionPart))
+                )
+              )
             }
           } else {
-            Some((None, Some(artifactPart), Some(versionPart)))
+            Some(
+              (
+                None,
+                cleanArtifactId(Some(artifactPart)),
+                cleanVersion(Some(versionPart))
+              )
+            )
           }
         } else None
       case _ => None
@@ -805,6 +845,10 @@ case class MavenState(
             extractIdentityFromFilename(artifact.filenameWithNoPath)
               .getOrElse((None, None, None))
         }
+        val groupIdOpt = g.flatMap(PURLComponentSanitizer.sanitizeMavenGroupId)
+        val artifactIdOpt =
+          a.flatMap(PURLComponentSanitizer.sanitizeMavenArtifactId)
+        val versionOpt = v.flatMap(PURLComponentSanitizer.sanitizeMavenVersion)
         val classifier = marker match {
           case MavenMarkers.JAR      => None
           case MavenMarkers.Sources  => Some("sources")
@@ -812,7 +856,7 @@ case class MavenState(
           case MavenMarkers.JavaDocs => Some("javadoc")
           case MavenMarkers.Metadata => None
         }
-        (g, a, v) match {
+        (groupIdOpt, artifactIdOpt, versionOpt) match {
           case (Some(groupId), Some(artId), Some(ver)) =>
             val purlOpt = scala.util.Try {
               PURLHelpers
@@ -1033,15 +1077,29 @@ case class MavenState(
           val parsed = parsePropertiesString(content).filter { case (_, v) =>
             v.length <= 1024
           }
-          for {
-            g <- parsed.get("groupid")
-            a <- parsed.get("artifactid")
-            v <- parsed.get("version")
-          } {
+          val rawG = parsed.get("groupid")
+          val rawA = parsed.get("artifactid")
+          val rawV = parsed.get("version")
+          val sanitized = for {
+            g <- rawG
+            a <- rawA
+            v <- rawV
+            sg <- PURLComponentSanitizer.sanitizeMavenGroupId(g)
+            sa <- PURLComponentSanitizer.sanitizeMavenArtifactId(a)
+            sv <- PURLComponentSanitizer.sanitizeMavenVersion(v)
+          } yield (sg, sa, sv)
+          sanitized.foreach { case (sg, sa, sv) =>
             acc.embeddedGroupIdArtifactIdVersions =
-              acc.embeddedGroupIdArtifactIdVersions :+ (g, a, v)
+              acc.embeddedGroupIdArtifactIdVersions :+ (sg, sa, sv)
           }
-          acc.embeddedProps = acc.embeddedProps ++ parsed
+          // Merge sanitized coordinate values back into embeddedProps so the
+          // priority chain in resolveGroupIdArtifactIdVersion sees clean data.
+          val sanitizedProps = sanitized
+            .map { case (sg, sa, sv) =>
+              Map("groupid" -> sg, "artifactid" -> sa, "version" -> sv)
+            }
+            .getOrElse(Map.empty)
+          acc.embeddedProps = acc.embeddedProps ++ parsed ++ sanitizedProps
         }
 
         // ---- META-INF/maven/*/pom.xml ----
