@@ -993,8 +993,8 @@ object Certificates {
     PURLHelpers.purl(
       `type` = "generic",
       name = "fingerprint",
-      namespace = "pgp",
-      version = key.fingerprintHex,
+      namespace = Some("pgp"),
+      version = Some(key.fingerprintHex),
       qualifiers = parts.map(q => q.key -> q.value)
     )
   }
@@ -1788,15 +1788,15 @@ object Certificates {
       PURLHelpers.purl(
         `type` = "generic",
         name = "spki-sha256",
-        namespace = "x509",
-        version = spkiSha,
+        namespace = Some("x509"),
+        version = Some(spkiSha),
         qualifiers = spkiQuals.map(q => q.key -> q.value)
       ),
       PURLHelpers.purl(
         `type` = "generic",
         name = "cert-sha256",
-        namespace = "x509",
-        version = certSha,
+        namespace = Some("x509"),
+        version = Some(certSha),
         qualifiers = certQuals.map(q => q.key -> q.value)
       )
     )

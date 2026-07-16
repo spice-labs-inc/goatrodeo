@@ -37,7 +37,7 @@ import java.io.File
   *   - R1: --package-tags CLI option generates tags
   *   - R2: --package-tags-short-name generates short names
   *   - R3: Tag JSON has correct structure (tag, version, date)
-  *   - R4: Maven strategy extracts GAV and build date
+  *   - R4: Maven strategy extracts groupId/artifactId/version and build date
   *   - R5: Baharat strategy extracts name/version from .deb
   *   - R6: Docker strategy extracts repository:tag and created date
   */

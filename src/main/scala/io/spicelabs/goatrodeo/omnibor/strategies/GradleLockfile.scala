@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -17,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.JsonDSL.*
@@ -227,19 +229,33 @@ class GradleLockfileState(deps: Vector[GradleDependency])
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], GradleLockfileState) = {
-    val purls = deps.map { d =>
-      PURLHelpers
-        .purl(
-          `type` = "maven",
-          name = d.artifactId,
-          namespace = d.groupId,
-          version = d.version
-        )
-        .toCanonical()
-        .nn
+  ): (PurlSet, GradleLockfileState) = {
+    // Build Purl objects (not strings). The lockfile itself is not a package,
+    // so there is no canonical pURL — all pURLs are secondary.
+    // PurlSet.canonicalStrings will handle toCanonical() at the storage
+    // boundary, wrapped in Try.
+    val purls = deps.flatMap { d =>
+      val groupIdOpt =
+        PURLComponentSanitizer.sanitizeMavenGroupId(d.groupId)
+      val artifactIdOpt =
+        PURLComponentSanitizer.sanitizeMavenArtifactId(d.artifactId)
+      val versionOpt =
+        PURLComponentSanitizer.sanitizeMavenVersion(d.version)
+      (groupIdOpt, artifactIdOpt, versionOpt) match {
+        case (Some(groupId), Some(artifactId), Some(version)) =>
+          scala.util.Try {
+            PURLHelpers
+              .purl(
+                `type` = "maven",
+                name = artifactId,
+                namespace = Some(groupId),
+                version = Some(version)
+              )
+          }.toOption
+        case _ => None
+      }
     }
-    purls.toVector -> this
+    PurlSet.build(None, purls) -> this
   }
 
   override def getMetadata(

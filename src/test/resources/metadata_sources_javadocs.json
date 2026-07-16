@@ -1,0 +1,410 @@
+[
+  {
+    "name": "AddOnJavaAntTasks-2.11-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/AddOnJavaAntTasks-2.11-sources.jar",
+    "purls": [
+      "pkg:maven/AddOnJavaAntTasks/AddOnJavaAntTasks@2.11-sources"
+    ]
+  },
+  {
+    "name": "abris_2.12-3.1.1-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/abris_2.12-3.1.1-sources.jar",
+    "purls": [
+      "pkg:maven/za.co.absa/abris_2.12@3.1.1"
+    ]
+  },
+  {
+    "name": "ac-localtools-3.0.2-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/ac-localtools-3.0.2-sources.jar",
+    "purls": [
+      "pkg:maven/ac-localtools/ac-localtools@3.0.2-sources"
+    ]
+  },
+  {
+    "name": "ac-verifier-3.8.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/ac-verifier-3.8.0-sources.jar",
+    "purls": [
+      "pkg:maven/ac-verifier/ac-verifier@3.8.0-sources"
+    ]
+  },
+  {
+    "name": "accumulo-rest-1.10.2-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/accumulo-rest-1.10.2-sources.jar",
+    "purls": [
+      "pkg:maven/accumulo-rest/accumulo-rest@1.10.2-sources"
+    ]
+  },
+  {
+    "name": "accumulo-rest-2.0.0-alpha-0.3-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/accumulo-rest-2.0.0-alpha-0.3-sources.jar",
+    "purls": [
+      "pkg:maven/uk.gov.gchq.gaffer/accumulo-rest@2.0.0-alpha-0.3"
+    ]
+  },
+  {
+    "name": "accumulo-store-1.20.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/accumulo-store-1.20.0-sources.jar",
+    "purls": [
+      "pkg:maven/accumulo-store/accumulo-store@1.20.0-sources"
+    ]
+  },
+  {
+    "name": "activities-1.3.0-RELEASE-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/activities-1.3.0-RELEASE-sources.jar",
+    "purls": [
+      "pkg:maven/activities/activities@1.3.0-RELEASE-sources"
+    ]
+  },
+  {
+    "name": "adif-processor-1.0.55-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/adif-processor-1.0.55-sources.jar",
+    "purls": [
+      "pkg:maven/uk.m0nom/adif-processor@1.0.55"
+    ]
+  },
+  {
+    "name": "adifweb-1.0.2-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/adifweb-1.0.2-sources.jar",
+    "purls": [
+      "pkg:maven/uk.m0nom/adifweb@1.0.2"
+    ]
+  },
+  {
+    "name": "aeron-client-0.2.3-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/aeron-client-0.2.3-sources.jar",
+    "purls": [
+      "pkg:maven/aeron-client/aeron-client@0.2.3-sources"
+    ]
+  },
+  {
+    "name": "affiliate-sdk-java-20.1.1-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/affiliate-sdk-java-20.1.1-sources.jar",
+    "purls": [
+      "pkg:maven/affiliate-sdk-java/affiliate-sdk-java@20.1.1-sources"
+    ]
+  },
+  {
+    "name": "agent-core_2.11-0.6.3-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/agent-core_2.11-0.6.3-sources.jar",
+    "purls": [
+      "pkg:maven/za.co.absa.spline.agent.spark/agent-core_2.11@0.6.3"
+    ]
+  },
+  {
+    "name": "agent-core_2.12-1.2.1-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/agent-core_2.12-1.2.1-sources.jar",
+    "purls": [
+      "pkg:maven/za.co.absa.spline.agent.spark/agent-core_2.12@1.2.1"
+    ]
+  },
+  {
+    "name": "aim-all-1.2.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/aim-all-1.2.0-sources.jar",
+    "purls": [
+      "pkg:maven/aim-all/aim-all@1.2.0-sources",
+      "pkg:maven/xin.alum/aim-cluster@1.2.0",
+      "pkg:maven/xin.alum/aim-starter@1.2.0"
+    ]
+  },
+  {
+    "name": "aim-cluster-1.4.5-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/aim-cluster-1.4.5-sources.jar",
+    "purls": [
+      "pkg:maven/xin.alum/aim-cluster@1.4.5"
+    ]
+  },
+  {
+    "name": "aim-starter-1.4.5-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/aim-starter-1.4.5-sources.jar",
+    "purls": [
+      "pkg:maven/xin.alum/aim-starter@1.4.5"
+    ]
+  },
+  {
+    "name": "akka-logitechmediaserver_2.12-1.0.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/akka-logitechmediaserver_2.12-1.0.0-sources.jar",
+    "purls": [
+      "pkg:maven/akka-logitechmediaserver_2.12/akka-logitechmediaserver_2.12@1.0.0-sources"
+    ]
+  },
+  {
+    "name": "akkaeventhubs_2.12-0.9.6-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/akkaeventhubs_2.12-0.9.6-sources.jar",
+    "purls": [
+      "pkg:maven/akkaeventhubs_2.12/akkaeventhubs_2.12@0.9.6-sources"
+    ]
+  },
+  {
+    "name": "alchemy-collections-1.1-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/alchemy-collections-1.1-sources.jar",
+    "purls": [
+      "pkg:maven/alchemy-collections/alchemy-collections@1.1-sources"
+    ]
+  },
+  {
+    "name": "alchemy-kotlin-1.3.7-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/alchemy-kotlin-1.3.7-sources.jar",
+    "purls": [
+      "pkg:maven/tech.sirwellington.alchemy/alchemy-kotlin@1.3.7"
+    ]
+  },
+  {
+    "name": "alerting-storm-1.1.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/alerting-storm-1.1.0-sources.jar",
+    "purls": [
+      "pkg:maven/uk.co.gresearch.siembol/alerting-storm@1.1.0"
+    ]
+  },
+  {
+    "name": "alita-validator-0.7-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/alita-validator-0.7-sources.jar",
+    "purls": [
+      "pkg:maven/alita-validator/alita-validator@0.7-sources"
+    ]
+  },
+  {
+    "name": "alpine-common-2.2.2-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/alpine-common-2.2.2-sources.jar",
+    "purls": [
+      "pkg:maven/us.springett/alpine-common@2.2.2"
+    ]
+  },
+  {
+    "name": "amd64-10.5-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/amd64-10.5-sources.jar",
+    "purls": [
+      "pkg:maven/amd64/amd64@10.5-sources"
+    ]
+  },
+  {
+    "name": "amp-errors-9.11-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/amp-errors-9.11-sources.jar",
+    "purls": [
+      "pkg:maven/amp-errors/amp-errors@9.11-sources"
+    ]
+  },
+  {
+    "name": "analytics-functions-1.19.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/analytics-functions-1.19.0-sources.jar",
+    "purls": [
+      "pkg:maven/analytics-functions/analytics-functions@1.19.0-sources"
+    ]
+  },
+  {
+    "name": "android-api-0.2.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/android-api-0.2.0-sources.jar",
+    "purls": [
+      "pkg:maven/android-api/android-api@0.2.0-sources"
+    ]
+  },
+  {
+    "name": "android-live-stream-0.1.3-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/android-live-stream-0.1.3-sources.jar",
+    "purls": [
+      "pkg:maven/android-live-stream/android-live-stream@0.1.3-sources"
+    ]
+  },
+  {
+    "name": "androidlib-17.7-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/androidlib-17.7-sources.jar",
+    "purls": [
+      "pkg:maven/androidlib/androidlib@17.7-sources"
+    ]
+  },
+  {
+    "name": "annotations-1.0.4-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/annotations-1.0.4-sources.jar",
+    "purls": [
+      "pkg:maven/annotations/annotations@1.0.4-sources"
+    ]
+  },
+  {
+    "name": "antlr4-runtime-4.5.3-CUSTOM-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/antlr4-runtime-4.5.3-CUSTOM-sources.jar",
+    "purls": [
+      "pkg:maven/antlr4-runtime/antlr4-runtime@4.5.3-CUSTOM-sources"
+    ]
+  },
+  {
+    "name": "api-0.16.1-alpha-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/api-0.16.1-alpha-sources.jar",
+    "purls": [
+      "pkg:maven/api/api@0.16.1-alpha-sources"
+    ]
+  },
+  {
+    "name": "api-proto-0.1.6-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/api-proto-0.1.6-sources.jar",
+    "purls": [
+      "pkg:maven/api-proto/api-proto@0.1.6-sources"
+    ]
+  },
+  {
+    "name": "app_runtime_with_db-lib_2.11-1.0.4-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/app_runtime_with_db-lib_2.11-1.0.4-sources.jar",
+    "purls": [
+      "pkg:maven/app_runtime_with_db-lib_2.11/app_runtime_with_db-lib_2.11@1.0.4-sources"
+    ]
+  },
+  {
+    "name": "appcompat-0.3.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/appcompat-0.3.0-sources.jar",
+    "purls": [
+      "pkg:maven/appcompat/appcompat@0.3.0-sources"
+    ]
+  },
+  {
+    "name": "application-utilities-1.0.31-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/application-utilities-1.0.31-sources.jar",
+    "purls": [
+      "pkg:maven/tech.rsqn.useful-things/application-utilities@1.0.31"
+    ]
+  },
+  {
+    "name": "applikation-runtime-android-1.3.30-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-android-1.3.30-sources.jar",
+    "purls": [
+      "pkg:maven/applikation-runtime-android/applikation-runtime-android@1.3.30-sources"
+    ]
+  },
+  {
+    "name": "applikation-runtime-iosx64-1.5.3-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-iosx64-1.5.3-sources.jar",
+    "purls": [
+      "pkg:maven/applikation-runtime-iosx64/applikation-runtime-iosx64@1.5.3-sources"
+    ]
+  },
+  {
+    "name": "applikation-runtime-linuxarm32hfp-1.4.61-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-linuxarm32hfp-1.4.61-sources.jar",
+    "purls": [
+      "pkg:maven/applikation-runtime-linuxarm32hfp/applikation-runtime-linuxarm32hfp@1.4.61-sources"
+    ]
+  },
+  {
+    "name": "applikation-runtime-metadata-1.2.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-metadata-1.2.0-sources.jar",
+    "purls": [
+      "pkg:maven/applikation-runtime-metadata/applikation-runtime-metadata@1.2.0-sources"
+    ]
+  },
+  {
+    "name": "ar_runtime_web_console-lib_2.11-1.0.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/ar_runtime_web_console-lib_2.11-1.0.0-sources.jar",
+    "purls": [
+      "pkg:maven/ar_runtime_web_console-lib_2.11/ar_runtime_web_console-lib_2.11@1.0.0-sources"
+    ]
+  },
+  {
+    "name": "argo-analysis-engine-archetype-1.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/argo-analysis-engine-archetype-1.0-sources.jar",
+    "purls": [
+      "pkg:maven/uk.ac.nactem.argo/argo-analysis-engine-archetype@1.0"
+    ]
+  },
+  {
+    "name": "arknights-helper-1.3.4-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/arknights-helper-1.3.4-sources.jar",
+    "purls": [
+      "pkg:maven/arknights-helper/arknights-helper@1.3.4-sources"
+    ]
+  },
+  {
+    "name": "aroma-thrift-2.0-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/aroma-thrift-2.0-sources.jar",
+    "purls": [
+      "pkg:maven/tech.aroma/aroma-thrift@2.0"
+    ]
+  },
+  {
+    "name": "artcodes-scanner-3.4.2-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artcodes-scanner-3.4.2-sources.jar",
+    "purls": [
+      "pkg:maven/artcodes-scanner/artcodes-scanner@3.4.2-sources"
+    ]
+  },
+  {
+    "name": "artio-binary-entrypoint-codecs-0.124-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-binary-entrypoint-codecs-0.124-sources.jar",
+    "purls": [
+      "pkg:maven/artio-binary-entrypoint-codecs/artio-binary-entrypoint-codecs@0.124-sources"
+    ]
+  },
+  {
+    "name": "artio-binary-entrypoint-impl-0.122-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-binary-entrypoint-impl-0.122-sources.jar",
+    "purls": [
+      "pkg:maven/artio-binary-entrypoint-impl/artio-binary-entrypoint-impl@0.122-sources"
+    ]
+  },
+  {
+    "name": "artio-binary-entrypoint-system-tests-0.120-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-binary-entrypoint-system-tests-0.120-sources.jar",
+    "purls": [
+      "pkg:maven/artio-binary-entrypoint-system-tests/artio-binary-entrypoint-system-tests@0.120-sources"
+    ]
+  },
+  {
+    "name": "artio-codecs-0.119-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-codecs-0.119-sources.jar",
+    "purls": [
+      "pkg:maven/artio-codecs/artio-codecs@0.119-sources"
+    ]
+  },
+  {
+    "name": "artio-codecs-0.47-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-codecs-0.47-sources.jar",
+    "purls": [
+      "pkg:maven/artio-codecs/artio-codecs@0.47-sources"
+    ]
+  },
+  {
+    "name": "artio-codecs-0.99-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-codecs-0.99-sources.jar",
+    "purls": [
+      "pkg:maven/artio-codecs/artio-codecs@0.99-sources"
+    ]
+  },
+  {
+    "name": "artio-core-0.26-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-core-0.26-sources.jar",
+    "purls": [
+      "pkg:maven/artio-core/artio-core@0.26-sources"
+    ]
+  },
+  {
+    "name": "artio-core-0.83-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-core-0.83-sources.jar",
+    "purls": [
+      "pkg:maven/artio-core/artio-core@0.83-sources"
+    ]
+  },
+  {
+    "name": "artio-ilink3-codecs-0.136.1-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-ilink3-codecs-0.136.1-sources.jar",
+    "purls": [
+      "pkg:maven/artio-ilink3-codecs/artio-ilink3-codecs@0.136.1-sources"
+    ]
+  },
+  {
+    "name": "artio-ilink3-codecs-0.94-sources.jar",
+    "path": "test_data/download/adg_tests/repo_ea/artio-ilink3-codecs-0.94-sources.jar",
+    "purls": [
+      "pkg:maven/artio-ilink3-codecs/artio-ilink3-codecs@0.94-sources"
+    ]
+  },
+  {
+    "name": "wps-demo-1.3.0-javadoc.jar",
+    "path": "test_data/wps_war_test/wps-demo-1.3.0-javadoc.jar",
+    "purls": [
+      "pkg:maven/wps-demo/wps-demo@1.3.0-javadoc"
+    ]
+  },
+  {
+    "name": "wps-demo-1.3.0-sources.jar",
+    "path": "test_data/wps_war_test/wps-demo-1.3.0-sources.jar",
+    "purls": [
+      "pkg:maven/wps-demo/wps-demo@1.3.0-sources"
+    ]
+  }
+]

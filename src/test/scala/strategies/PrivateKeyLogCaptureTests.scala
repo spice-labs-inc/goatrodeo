@@ -42,8 +42,27 @@ class PrivateKeyLogCaptureTests extends FunSuite {
   import org.slf4j.LoggerFactory
   import scala.jdk.CollectionConverters.*
 
+  private def waitForLoggerContext(maxRetries: Int = 20): LoggerContext = {
+    var attempts = 0
+    while (attempts < maxRetries) {
+      LoggerFactory.getILoggerFactory match {
+        case c: LoggerContext => return c
+        case _                =>
+      }
+      Thread.sleep(50)
+      attempts += 1
+    }
+    throw new IllegalStateException(
+      "Logback LoggerContext not available after initialization"
+    )
+  }
+
   private def runWithCapture[T](body: () => T): (T, Vector[ILoggingEvent]) = {
-    val ctx = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+    // Force SLF4J to bind to logback. With forked/parallel test runs,
+    // getILoggerFactory may briefly return SubstituteLoggerFactory while
+    // logback initializes, so retry until the real LoggerContext appears.
+    LoggerFactory.getLogger(getClass)
+    val ctx = waitForLoggerContext()
     val root = ctx.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
     val appender = new ListAppender[ILoggingEvent]()
     appender.setContext(ctx)

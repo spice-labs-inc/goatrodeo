@@ -10,6 +10,7 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -21,6 +22,7 @@ import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.toHex
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
@@ -99,23 +101,33 @@ class DotnetState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], DotnetState) = {
-    assemblyOpt
-      .map(assembly =>
-        // nuget purls take no namespace (the spec prohibits it).
-        PURLHelpers
-          .purl(
-            `type` = "nuget",
-            name = assembly.name.name,
-            // if the build number is 0, it won't show in the nuget version number,
-            // so we get a string without the build number.
-            // The full number goes into the the VERSION metadata, however.
-            version = sanitizeVersion(assembly.name.version)
-          )
-          .toCanonical()
-          .nn
-      )
-      .toVector -> this
+  ): (PurlSet, DotnetState) = {
+    // Return the Purl object directly (not a string). PurlSet.canonicalStrings
+    // will handle toCanonical() at the storage boundary, wrapped in Try.
+    val purlOpt: Option[io.spicelabs.coordinates.Purl] =
+      assemblyOpt
+        .flatMap { assembly =>
+          val nameOpt =
+            PURLComponentSanitizer.sanitizeGenericIdentifier(assembly.name.name)
+          val versionOpt = PURLComponentSanitizer
+            .sanitizeGenericVersion(sanitizeVersion(assembly.name.version))
+          (nameOpt, versionOpt) match {
+            case (Some(name), Some(version)) =>
+              // nuget purls take no namespace (the spec prohibits it).
+              scala.util.Try {
+                PURLHelpers
+                  .purl(
+                    `type` = "nuget",
+                    name = name,
+                    version = Some(version)
+                  )
+              }.toOption
+            case _ => None
+          }
+        }
+    purlOpt
+      .map(p => PurlSet.single(p))
+      .getOrElse(PurlSet.empty) -> this
   }
 
   override def getMetadata(

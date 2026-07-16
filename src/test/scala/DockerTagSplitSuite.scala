@@ -146,7 +146,7 @@ class DockerTagSplitSuite extends FunSuite {
     ManifestInfo(
       manifest = dummyWrapper,
       manifestConfig = manifestConfig,
-      configHash = "abc123",
+      configPath = "abc123",
       configFile = dummyWrapper,
       configJson = JObject(),
       layers = List.empty

@@ -3,6 +3,7 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -47,7 +48,7 @@ class GenericFileState extends ProcessingState[SingleMarker, GenericFileState] {
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], GenericFileState) = Vector.empty -> this
+  ): (PurlSet, GenericFileState) = PurlSet.empty -> this
 
   override def getMetadata(
       artifact: ArtifactWrapper,

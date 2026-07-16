@@ -194,7 +194,7 @@ class GoatRodeoBuilder {
     this
   }
 
-  /** Set whether to use Syft for static metadata gathering.
+  /** Set whether to use static metadata gathering.
     *
     * @param b
     *   true to enable, false to disable

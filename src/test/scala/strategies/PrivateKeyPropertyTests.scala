@@ -143,7 +143,8 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
             wrap(f),
             Certificates.classifyAndParse(wrap(f))
           )
-          val (purls, _) = state.getPurls(wrap(f), stubItem(), SingleMarker())
+          val (purlSet, _) = state.getPurls(wrap(f), stubItem(), SingleMarker())
+          val purls = purlSet.canonicalStrings
           purls.isEmpty
         case _ => true
       }
@@ -159,7 +160,8 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
             wrap(f),
             Certificates.classifyAndParse(wrap(f))
           )
-          val (purls, _) = state.getPurls(wrap(f), stubItem(), SingleMarker())
+          val (purlSet, _) = state.getPurls(wrap(f), stubItem(), SingleMarker())
+          val purls = purlSet.canonicalStrings
           purls.length == 1
         case _ => true
       }

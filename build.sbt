@@ -161,6 +161,10 @@ if (System.getenv("TEST_THREAD_CNT") == null) {
 
 }
 
+// Run independent test classes in parallel only when not in CI.
+// CI is detected by TEST_THREAD_CNT being set in build_test.yml.
+Test / testForkedParallel := System.getenv("TEST_THREAD_CNT") == null
+
 ThisBuild / scalacOptions ++=
   Seq(
     "-deprecation",
@@ -220,7 +224,7 @@ lazy val root = project
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
     // Spice Labs "readers"
-    libraryDependencies += "io.spicelabs" % "baharat" % "0.0.4",
+    libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.1.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.2.3",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.80",

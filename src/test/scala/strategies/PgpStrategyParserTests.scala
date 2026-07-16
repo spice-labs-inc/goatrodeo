@@ -390,7 +390,7 @@ class PgpStrategyParserTests extends FunSuite {
       fps.contains("59915a0a243d30d5002d6aa58ed81ea8adfb3a65"),
       "ring 2 ECDH cv25519 subkey must be present"
     )
-    // Documented design choice (N7 / ADR): top-level primaryUserId is the
+    // top-level primaryUserId is the
     // first ring's primary uid, not a concat. Pin this contract.
     assert(
       r.primaryUserId.exists(_.contains("rsa3072")),

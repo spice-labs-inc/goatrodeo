@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -61,7 +62,7 @@ class CertificatesState(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], CertificatesState) = {
+  ): (PurlSet, CertificatesState) = {
     import Certificates.*
     val purls: Vector[Purl] = claim match {
       case None                => Vector.empty
@@ -89,7 +90,11 @@ class CertificatesState(
       case Some(_: PrivateKeyEncrypted) =>
         Vector.empty // envelope-only; no pURL
     }
-    purls.map(_.toCanonical().nn) -> this
+    // Return Purl objects (not strings). The first pURL is the canonical one.
+    // PurlSet.canonicalStrings will handle toCanonical() at the storage
+    // boundary, wrapped in Try — a malformed pURL will be silently dropped
+    // rather than aborting processing of sibling artifacts.
+    PurlSet.build(purls.headOption, purls) -> this
   }
 
   def applyAccumulatedAugmentation(
@@ -113,8 +118,8 @@ class CertificatesState(
     PURLHelpers.purl(
       `type` = "generic",
       name = "spki-sha256",
-      namespace = "x509",
-      version = spkiSha,
+      namespace = Some("x509"),
+      version = Some(spkiSha),
       qualifiers = parts.map(p => p.key -> p.value)
     )
   }
@@ -129,8 +134,8 @@ class CertificatesState(
     PURLHelpers.purl(
       `type` = "generic",
       name = "sha256",
-      namespace = "ssh",
-      version = fp,
+      namespace = Some("ssh"),
+      version = Some(fp),
       qualifiers = quals.map(q => q.key -> q.value)
     )
   }
@@ -145,8 +150,8 @@ class CertificatesState(
     PURLHelpers.purl(
       `type` = "generic",
       name = "sha256",
-      namespace = "ssh",
-      version = fp,
+      namespace = Some("ssh"),
+      version = Some(fp),
       qualifiers = quals.map(q => q.key -> q.value)
     )
   }
@@ -162,8 +167,8 @@ class CertificatesState(
     val keyPurl = PURLHelpers.purl(
       `type` = "generic",
       name = "sha256",
-      namespace = "ssh",
-      version = signedKeyFp,
+      namespace = Some("ssh"),
+      version = Some(signedKeyFp),
       qualifiers = keyQuals.map(q => q.key -> q.value)
     )
 
@@ -180,8 +185,8 @@ class CertificatesState(
     val certPurl = PURLHelpers.purl(
       `type` = "generic",
       name = "cert-sha256",
-      namespace = "ssh",
-      version = certHex,
+      namespace = Some("ssh"),
+      version = Some(certHex),
       qualifiers = certQuals.map(cq => cq.key -> cq.value)
     )
 
@@ -225,8 +230,8 @@ class CertificatesState(
     PURLHelpers.purl(
       `type` = "generic",
       name = "crl-sha256",
-      namespace = "x509",
-      version = crlSha,
+      namespace = Some("x509"),
+      version = Some(crlSha),
       qualifiers = Seq("sig-alg" -> sigAlg)
     )
 

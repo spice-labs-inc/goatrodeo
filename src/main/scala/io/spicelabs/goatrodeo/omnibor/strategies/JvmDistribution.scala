@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -18,6 +19,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
@@ -261,23 +263,32 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], JvmState) = {
-    val purls = for {
+  ): (PurlSet, JvmState) = {
+    // Return the Purl object directly (not a string). PurlSet.canonicalStrings
+    // will handle toCanonical() at the storage boundary, wrapped in Try.
+    val purlOpt = for {
       ver <- versionOpt
+      cleanVendor <-
+        PURLComponentSanitizer.sanitizeGenericIdentifier(vendorNamespace)
+      cleanProduct <-
+        PURLComponentSanitizer.sanitizeGenericIdentifier(productName)
+      cleanVersion <- PURLComponentSanitizer.sanitizeGenericVersion(ver)
     } yield {
       val qualifier = releaseData.sourceRepo.toSeq.map("repository_url" -> _)
-      PURLHelpers
-        .purl(
-          `type` = "generic",
-          name = productName,
-          namespace = vendorNamespace,
-          version = ver,
-          qualifiers = qualifier
-        )
-        .toCanonical()
-        .nn
+      scala.util.Try {
+        PURLHelpers
+          .purl(
+            `type` = "generic",
+            name = cleanProduct,
+            namespace = Some(cleanVendor),
+            version = Some(cleanVersion),
+            qualifiers = qualifier
+          )
+      }.toOption
     }
-    purls.toVector -> this
+    purlOpt.flatten
+      .map(p => PurlSet.single(p))
+      .getOrElse(PurlSet.empty) -> this
   }
 
   override def getMetadata(

@@ -80,8 +80,9 @@ class GradleLockfileSuite extends FunSuite {
       None
     )
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val purls = purlSet.canonicalStrings
     assertEquals(purls.size, 3, "Should generate 3 pURLs")
 
     assert(
@@ -210,8 +211,9 @@ class GradleLockfileSuite extends FunSuite {
     val deps = GradleLockfile.parseLockfile(content, None)
     val state = new GradleLockfileState(deps)
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty, "Buildscript lockfile should produce pURLs")
     assert(
       purls.forall(_.startsWith("pkg:maven/")),
@@ -230,8 +232,9 @@ class GradleLockfileSuite extends FunSuite {
     val deps = GradleLockfile.parseLockfile(content, configFromFilename)
     val state = new GradleLockfileState(deps)
 
-    val (purls, _) =
+    val (purlSet, _) =
       state.getPurls(wrapper, createTestItem("t"), SingleMarker())
+    val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty, "Runtime lockfile should produce pURLs")
     assert(
       purls.exists(_.contains("postgresql")),

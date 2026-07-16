@@ -224,7 +224,8 @@ class PgpPropertyTests extends ScalaCheckSuite {
         case Some(r) =>
           val w = FileWrapper(f, f.getName, None)
           val state = new CertificatesState(w, Some(r))
-          val (emittedPurls, _) = state.getPurls(w, stubItem(), SingleMarker())
+          val (purlSet, _) = state.getPurls(w, stubItem(), SingleMarker())
+          val emittedPurls = purlSet.canonicalStrings
           val emittedSet = emittedPurls.toSet
           val unitSet = r.keys
             .map(k => Certificates.purlForPgpKey(k).toCanonical().nn)

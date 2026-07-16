@@ -431,17 +431,26 @@ val item = Item.decode(bytes)
 
 ---
 
-## Maven GAV Resolution
+## Maven GroupId/ArtifactId/Version Resolution
 
-The Maven strategy uses a 5-level priority chain for GroupId:ArtifactId:Version (GAV) resolution, implemented in `MavenState.resolveGAV()`:
+The Maven strategy uses field-level merge for groupId/artifactId/version resolution, implemented in `MavenState.resolveGroupIdArtifactIdVersion()`. Instead of picking the first source that provides all three fields, each field is resolved independently from the highest-priority source that provides it:
 
-1. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata.
-2. **External POM** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`.
-3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by matching its `<artifactId>` to the filename when multiple are present.
-4. **MANIFEST.MF** — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin.
-5. **Filename heuristics** — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
+1. **External POM (companion)** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`. This is the HIGHEST priority source because it is the authoritative published Maven metadata (REQ-3). See ADR 0012.
+2. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId best matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata. Matching uses `matchScore`: exact match (score 3) > prefix match with separator (score 2) > reverse prefix match with separator (score 1) > no match (score 0). Among same-score matches, the longest artifactId is preferred. See ADR 0014.
+3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by the same `matchScore` logic as pom.properties when multiple are present.
+4. **MANIFEST.MF** (for groupId and version) / **Filename** (for artifactId) — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin. For artifactId, filename has higher priority than manifest because `Implementation-Title` is human-readable, not a Maven artifactId.
+5. **Filename heuristics** (for groupId and version) / **MANIFEST.MF** (for artifactId) — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
 
-Each layer short-circuits on the first complete `(groupId, artifactId, version)` tuple; if all layers fail, the fields remain `None`.
+Per-field priority:
+- **groupId**: external POM > pom.properties > embedded pom.xml > manifest > filename
+- **artifactId**: external POM > pom.properties > embedded pom.xml > filename > manifest
+- **version**: external POM > pom.properties > embedded pom.xml > manifest > filename
+
+The companion POM (external POM) is the HIGHEST priority for canonical pURL resolution because it is the authoritative published Maven metadata. pom.properties is filename-gated by `determinePrimaryGroupIdArtifactIdVersion` — it only contributes fields when its artifactId matches the JAR filename via `matchScore` (exact > prefix-with-separator > None), preventing cross-artifact mixing and pURL hijacking via short artifactIds. The key difference from source-level priority: **filename and manifest swap positions for artifactId**. This produces pURLs more likely to exist in Maven Central because the filename usually matches the Maven artifactId, while `Implementation-Title` is a human-readable display name. See ADR 0014 for the matching algorithm details.
+
+`resolveGroupIdArtifactIdVersionFromManifest` returns individual fields without an artifactId gate, allowing the manifest to contribute groupId and version even when it has no artifactId headers.
+
+If no groupId is found from any source but artifactId exists, artifactId is used as both groupId and artifactId (last resort fallback). See ADR 0008 for the full decision rationale, trust model, and security concerns.
 
 ### PomParser Integration
 
@@ -453,7 +462,7 @@ Each layer short-circuits on the first complete `(groupId, artifactId, version)`
 
 If a POM contains a benign DOCTYPE, a stripping fallback removes the declaration and retries parsing. Entity references in the body remain undeclared after stripping, causing the parse to fail safely rather than expanding them.
 
-`PomParser` extracts and interpolates properties (`${key}` → value), walks `<parent>` references for missing GAV fields, reads `<dependencyManagement>`, and extracts `<licenses>`, `<scm>`, `<organization>`, and `<dependencies>`. The results are stored in `MavenState` as `Option[ParsedPom]` rather than the legacy `scala.xml.NodeSeq`.
+`PomParser` extracts and interpolates properties (`${key}` → value), walks `<parent>` references for missing groupId/artifactId/version fields, reads `<dependencyManagement>`, and extracts `<licenses>`, `<scm>`, `<organization>`, and `<dependencies>`. The results are stored in `MavenState` as `Option[ParsedPom]` rather than the legacy `scala.xml.NodeSeq`.
 
 ### Metadata Emission
 
@@ -464,7 +473,7 @@ Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
 - `LICENSE` — merged from POM `<licenses>`, `Bundle-License`, and `Plugin-License-Name` manifest headers.
 - `PUBLISHER` — from `<organization><name>`.
 - `maven:Timestamp` — build timestamp from POM or manifest.
-- `maven:ParentPOM` — parent GAV as JSON object.
+- `maven:ParentPOM` — parent groupId/artifactId/version as JSON object.
 - `maven:Latest`, `maven:Release`, `maven:Versions` — from `maven-metadata.xml`.
 - `maven:JarType`, `maven:NestedJars`, `maven:SpringBootMainClass`, `maven:LayersIdx`, `maven:ClasspathIdx` — for Spring Boot / shaded JARs.
 - `maven:WarLibJars` — for WAR archives.
@@ -479,7 +488,7 @@ Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
 - `osgi:BundleName`, `osgi:BundleSymbolicName`, `osgi:BundleDescription`, `osgi:BundleVendor`, `osgi:BundleDocURL`, `osgi:ExportPackage`, `osgi:ImportPackage`, `osgi:RequireCapability`, `osgi:ProvideCapability`, `osgi:FragmentHost` — from OSGi manifest headers (Export-Package and Import-Package parsed for directives).
 
 **Verified by:**
-- `MavenPhase1Suite` — GAV chain, filename parsing, OSGi manifest, XXE protection, DOCTYPE edge cases.
+- `MavenPhase1Suite` — groupId/artifactId/version chain, filename parsing, OSGi manifest, XXE protection, DOCTYPE edge cases.
 - `MavenPhase2Suite` — PomParser interpolation, extended metadata, build dates.
 - `MavenPhase3Suite` — dependency JSON, license extraction, scope filtering, Plugin-License-Name.
 - `MavenPhase4Suite` — parent POM metadata, maven-metadata.xml, pqc_jars end-to-end identity and tags.
@@ -487,7 +496,38 @@ Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
 - `MavenPhase5ModuleInfoSuite` — BCEL-based parsing of JPMS `module-info.class`.
 - `MavenPhase5CorpusSuite` — corpus integration tests against all 10 structural `test_data/` artifacts.
 - `MavenPropertyTests` — ScalaCheck property tests for interpolation, filename extraction, date parsing, and priority-chain determinism.
+- `Phase3MatchingSuite` — exact match > prefix match > None matching algorithm, pURL hijacking prevention, DoS guard.
+- `Phase3MatchingPropertySuite` — property tests for exact match preference and short artifactId hijacking prevention.
+- `Phase2CanonicalPrioritySuite` — canonical pURL priority chain (external POM > pom.properties > embedded pom.xml > manifest > filename).
+- `Phase4SecondaryClassifierSuite` — secondary pURL classifier fix (sources/javadoc JARs emit `?packaging=sources` / `?classifier=javadoc` on ALL pURLs, not just canonical).
+- `Phase5MetadataParitySourcesJavadocSuite` — corpus-based metadata parity for sources/javadoc JARs (53 tests, opens real JARs at test time per HS-4, verifies pURL superset, classifier on all pURLs, canonical pURL from companion POM, standalone sources JAR emission). See ADR 0015.
+- `Phase6MetadataParityRegularBestPurlSuite` — Maven Central validation for regular JARs (47 tests: 12 "better than the reference scanner" groupId checks, 12 Maven Central coordinate matches, 10 pURL count checks, 12 companion POM priority checks). Coordinates manually verified against Maven Central on 2026-07-08. See ADR 0016.
+- `MultiplePurlSuite` — metadata parity for regular JARs/WARs (113 tests, `alias:from` connections, companion POM, fat JAR filtering).
+- `BestPurlSuite` — field-level merge produces Maven Central pURLs (2 tests, `resolveGroupIdArtifactIdVersion` with `externalPom=None`).
 - `PackageTagIntegrationSuite` — end-to-end processing of real Maven JARs from `test_data/pqc_jars`.
+
+### Sources and Javadoc JAR pURL Emission
+
+Sources JARs (`-sources.jar`) and javadoc JARs (`-javadoc.jar`) are NOT
+treated as main JARs (`isMavenArchive` returns `false` for them). They are
+processed in two ways:
+
+1. **As companions to main JARs** — `computeMavenFiles` bundles
+   sources/javadoc JARs with their main JAR in a `MavenToProcess` entry.
+   The main JAR's POM provides the canonical groupId/artifactId/version.
+2. **As standalone artifacts** — `computeMavenFiles` second pass claims
+   standalone sources/javadoc JARs (no main JAR in the same directory) as
+   `MavenToProcess(a, None, None, None, None)`. The canonical pURL falls
+   back to JAR contents (pom.properties, manifest) then filename.
+
+All pURLs emitted from sources JARs include `?packaging=sources`. All pURLs
+from javadoc JARs include `?classifier=javadoc`. This applies to BOTH
+canonical and secondary pURLs (fixed in Phase 4, see ADR 0013).
+
+**Corpus stats**: 3051 sources JARs, 1 javadoc JAR in `test_data/`.
+2995 sources JARs have companion POMs. 56 are standalone (no main JAR, no POM).
+
+**Verified by:** `Phase5MetadataParitySourcesJavadocSuite` (53 tests, all pass).
 
 ---
 

@@ -31,6 +31,25 @@ Complete guide to how Goat Rodeo processes artifacts:
 - Memory management with `MemStorage`
 - Thread tuning guidelines
 
+### [pURL Resolution: Theory of Operation](purl_theory_of_operation.md)
+How Goat Rodeo resolves Maven package URLs:
+- Canonical pURL priority chain (companion POM > pom.properties > manifest > filename)
+- Field-level independence (each field from highest-priority source)
+- Secondary pURL emission (pom.properties only, never filename)
+- Classifier on all pURLs from sources/javadoc
+- Matching algorithm (exact > prefix > none)
+- Metadata parity verification
+
+### [Metadata Parity: Sources and Javadoc](metadata_parity_sources_javadoc.md)
+How to run and interpret sources/javadoc metadata parity tests:
+- 53 corpus-based tests opening real JAR files at test time
+- pURL superset verification, classifier checks, standalone sources JAR
+
+### [Metadata Parity: Regular JARs](metadata_parity_regular_jars.md)
+How to run and interpret regular JAR metadata parity tests:
+- 47 tests including 12 Maven Central-verified coordinates
+- "Better than the reference scanner" verification, companion POM priority, count checks
+
 ### [Append-Only Graph Database](append_only_graph.md)
 Technical deep-dive into the graph database design:
 - Graph structure and relationships

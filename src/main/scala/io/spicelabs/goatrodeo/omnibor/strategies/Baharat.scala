@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ProcessingState
+import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -122,11 +123,17 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
-  ): (Vector[String], BaharatState) = {
-    // baharat returns a com.github.packageurl.PackageURL; emit its own canonical
-    // form. We keep the reader's canonicalization rather than re-validating
-    // through coordinates, which is stricter than what some readers produce.
-    Vector(pkg.packageUrl().canonicalize().nn) -> this
+  ): (PurlSet, BaharatState) = {
+    // baharat returns a com.github.packageurl.PackageURL; convert to
+    // io.spicelabs.coordinates.Purl via string round-trip.
+    // Wrap in Try — a malformed pURL should not abort processing.
+    scala.util
+      .Try {
+        pkg.metadata().purl()
+      }
+      .toOption
+      .map(p => PurlSet.single(p))
+      .getOrElse(PurlSet.empty) -> this
   }
 
   def applyAccumulatedAugmentation(

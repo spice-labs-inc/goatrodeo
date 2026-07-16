@@ -37,7 +37,7 @@ object JavaArchiveDetector {
 
   private val JavaArchiveMime: String = "application/java-archive"
 
-  private val javaArchiveExtensions = Set(
+  val javaArchiveExtensions = Set(
     ".ear",
     ".par",
     ".sar",

@@ -2,10 +2,10 @@
    Maven Phase 2 tests §2.1–2.5
 
    Phase 2 integrates PomParser into MavenState so that:
-   - POM processing uses PomParser for property-interpolated GAV extraction
+   - POM processing uses PomParser for property-interpolated groupId/artifactId/version extraction
    - Extended POM metadata (name, description, url, organization, scm) is
      stored in MavenState and emitted via getMetadata
-   - The existing resolveGAV (used by JAR marker) continues to work
+   - The existing resolveGroupIdArtifactIdVersion (used by JAR marker) continues to work
  */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
@@ -43,7 +43,7 @@ class MavenPhase2Suite extends FunSuite {
     val item = createTestItem("interp-ver")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(
-      state.version,
+      state.parsedPom.flatMap(_.version),
       Some("2.0.0"),
       "Version should be interpolated via PomParser"
     )
@@ -60,7 +60,7 @@ class MavenPhase2Suite extends FunSuite {
     val item = createTestItem("interp-gid")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(
-      state.groupId,
+      state.parsedPom.flatMap(_.groupId),
       Some("com.resolved"),
       "GroupId should be interpolated via PomParser"
     )
@@ -77,7 +77,7 @@ class MavenPhase2Suite extends FunSuite {
     val item = createTestItem("pom-ver-prop")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(
-      state.version,
+      state.parsedPom.flatMap(_.version),
       Some("3.1.0"),
       "Explicit version should be used; pom.version is available for other fields"
     )
@@ -98,9 +98,18 @@ class MavenPhase2Suite extends FunSuite {
       state.parsedPom.flatMap(_.version).isEmpty,
       "PomParser should return None for unresolvable property"
     )
+    // With the new design, filename fallback happens in getPurls,
+    // not beginProcessing. Verify that getPurls resolves the version
+    // from the filename.
+    val (purlSet, _) = state.getPurls(artifact, item, MavenMarkers.POM)
+    val purls = purlSet.canonicalStrings
     assert(
-      state.version.isDefined,
-      "MavenState should fall back to filename when PomParser returns None"
+      purls.nonEmpty,
+      "getPurls should produce a pURL from filename fallback"
+    )
+    assert(
+      purls.head.contains("2.0"),
+      s"pURL should contain version 2.0 from filename, got: $purls"
     )
   }
 
@@ -120,7 +129,7 @@ class MavenPhase2Suite extends FunSuite {
     val item = createTestItem("parent-ver")
     val state = MavenState().beginProcessing(artifact, item, MavenMarkers.POM)
     assertEquals(
-      state.version,
+      state.parsedPom.flatMap(_.version),
       Some("5.0.0"),
       "Version should come from parent when missing in child"
     )
@@ -384,5 +393,153 @@ class MavenPhase2Suite extends FunSuite {
     val result =
       PomParser.resolveProperty("a", Map("a" -> "${b}", "b" -> "${a}"))
     assertEquals(result, None)
+  }
+
+  // ==================== Gap: Parent vs Project groupId/artifactId/version ====================
+
+  /* Bug: PomParser.tagText uses getElementsByTagName which returns elements in
+   * document order. When a POM has a <parent> block (which always comes first
+   * in document order), the parent's groupId/artifactId/version are returned
+   * instead of the project's own.
+   *
+   * Example POM that triggers the bug:
+   *   <project>
+   *     <parent>
+   *       <groupId>za.co.absa.spline</groupId>
+   *       <artifactId>parent</artifactId>
+   *       <version>0.4.0</version>
+   *     </parent>
+   *     <artifactId>admin</artifactId>
+   *   </project>
+   *
+   * Expected: artifactId = "admin" (project's own)
+   * Actual (buggy): artifactId = "parent" (from <parent> block)
+   *
+   * This test verifies that PomParser correctly distinguishes between
+   * project-level and parent-level elements, returning the project's own
+   * values when they exist, and only falling back to parent values when
+   * the project doesn't specify its own.
+   *
+   * Requirement: REQ-2 (canonical pURL priority) — the external POM must
+   * provide the correct project-level groupId/artifactId/version, not the
+   * parent's values.
+   */
+
+  test("PomParser: project artifactId not shadowed by parent artifactId") {
+    val pom = """<?xml version="1.0" encoding="UTF-8"?>
+      <project xmlns="http://maven.apache.org/POM/4.0.0">
+        <modelVersion>4.0.0</modelVersion>
+        <parent>
+          <groupId>za.co.absa.spline</groupId>
+          <artifactId>parent</artifactId>
+          <version>0.4.0</version>
+          <relativePath>../parent/pom.xml</relativePath>
+        </parent>
+        <artifactId>admin</artifactId>
+        <packaging>jar</packaging>
+      </project>"""
+
+    val parsed = PomParser.parse(pom)
+    assert(parsed.isDefined, "PomParser should successfully parse this POM")
+    assertEquals(
+      parsed.get.artifactId,
+      Some("admin"),
+      "Project artifactId must be 'admin', not 'parent' from the <parent> block"
+    )
+  }
+
+  test("PomParser: project groupId not shadowed by parent groupId") {
+    val pom = """<?xml version="1.0" encoding="UTF-8"?>
+      <project xmlns="http://maven.apache.org/POM/4.0.0">
+        <modelVersion>4.0.0</modelVersion>
+        <parent>
+          <groupId>com.example.parent</groupId>
+          <artifactId>parent</artifactId>
+          <version>1.0</version>
+        </parent>
+        <groupId>com.example.project</groupId>
+        <artifactId>my-artifact</artifactId>
+        <version>2.0</version>
+      </project>"""
+
+    val parsed = PomParser.parse(pom)
+    assert(parsed.isDefined, "PomParser should successfully parse this POM")
+    assertEquals(
+      parsed.get.groupId,
+      Some("com.example.project"),
+      "Project groupId must be 'com.example.project', not 'com.example.parent' from <parent>"
+    )
+    assertEquals(
+      parsed.get.artifactId,
+      Some("my-artifact"),
+      "Project artifactId must be 'my-artifact'"
+    )
+    assertEquals(
+      parsed.get.version,
+      Some("2.0"),
+      "Project version must be '2.0', not '1.0' from <parent>"
+    )
+  }
+
+  test(
+    "PomParser: falls back to parent groupId/version when project omits them"
+  ) {
+    /* When the project doesn't specify its own groupId or version (which is
+     * common — they inherit from parent), PomParser should fall back to the
+     * parent's values. But the project's artifactId should always be its own.
+     */
+    val pom = """<?xml version="1.0" encoding="UTF-8"?>
+      <project xmlns="http://maven.apache.org/POM/4.0.0">
+        <modelVersion>4.0.0</modelVersion>
+        <parent>
+          <groupId>za.co.absa.spline</groupId>
+          <artifactId>parent</artifactId>
+          <version>0.4.0</version>
+        </parent>
+        <artifactId>admin</artifactId>
+        <packaging>jar</packaging>
+      </project>"""
+
+    val parsed = PomParser.parse(pom)
+    assert(parsed.isDefined, "PomParser should successfully parse this POM")
+    assertEquals(
+      parsed.get.groupId,
+      Some("za.co.absa.spline"),
+      "GroupId should be inherited from parent: 'za.co.absa.spline'"
+    )
+    assertEquals(
+      parsed.get.artifactId,
+      Some("admin"),
+      "ArtifactId must be project's own: 'admin'"
+    )
+    assertEquals(
+      parsed.get.version,
+      Some("0.4.0"),
+      "Version should be inherited from parent: '0.4.0'"
+    )
+  }
+
+  test("PomParser: parent fields are separately accessible") {
+    /* The parent's groupId/artifactId/version should still be accessible via
+     * the parentGroupId/parentArtifactId/parentVersion fields for metadata.
+     */
+    val pom = """<?xml version="1.0" encoding="UTF-8"?>
+      <project xmlns="http://maven.apache.org/POM/4.0.0">
+        <modelVersion>4.0.0</modelVersion>
+        <parent>
+          <groupId>com.example.parent</groupId>
+          <artifactId>parent-art</artifactId>
+          <version>1.0</version>
+        </parent>
+        <groupId>com.example.project</groupId>
+        <artifactId>my-artifact</artifactId>
+        <version>2.0</version>
+      </project>"""
+
+    val parsed = PomParser.parse(pom)
+    assert(parsed.isDefined, "PomParser should successfully parse this POM")
+    assertEquals(parsed.get.parentGroupId, Some("com.example.parent"))
+    assertEquals(parsed.get.parentArtifactId, Some("parent-art"))
+    assertEquals(parsed.get.parentVersion, Some("1.0"))
   }
 }

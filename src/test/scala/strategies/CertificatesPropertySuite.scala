@@ -503,11 +503,12 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       Certificates.classifyAndParse(w) match {
         case Some(c: Certificates.SshCert) =>
           val state = new CertificatesState(w, Some(c))
-          val (purls, _) = state.getPurls(
+          val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
+          val purls = purlSet.canonicalStrings
           val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
           certPurls.forall { p =>
             val ct =
@@ -525,11 +526,12 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       Certificates.classifyAndParse(w) match {
         case Some(c: Certificates.SshCert) =>
           val state = new CertificatesState(w, Some(c))
-          val (purls, _) = state.getPurls(
+          val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
+          val purls = purlSet.canonicalStrings
           val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
           certPurls.forall(_.contains("sig-alg="))
         case _ => true
@@ -543,11 +545,12 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       Certificates.classifyAndParse(w) match {
         case Some(crl: Certificates.Crl) =>
           val state = new CertificatesState(w, Some(crl))
-          val (purls, _) = state.getPurls(
+          val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
+          val purls = purlSet.canonicalStrings
           purls.forall(p => p.contains("sig-alg="))
         case _ => true
       }
@@ -564,11 +567,12 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           val derBytes = crl.crl.getEncoded
           val expectedHex = sha256Hex(derBytes)
           val state = new CertificatesState(w, Some(crl))
-          val (purls, _) = state.getPurls(
+          val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
             io.spicelabs.goatrodeo.omnibor.SingleMarker()
           )
+          val purls = purlSet.canonicalStrings
           purls.exists(p => p.contains(expectedHex))
         case _ => true
       }

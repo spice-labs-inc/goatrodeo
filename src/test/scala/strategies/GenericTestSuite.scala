@@ -59,7 +59,8 @@ class GenericTestSuite extends munit.FunSuite {
     val item = createTestItem("test-id")
     val state = GenericFileState()
 
-    val (purls, _) = state.getPurls(artifact, item, SingleMarker())
+    val (purlSet, _) = state.getPurls(artifact, item, SingleMarker())
+    val purls = purlSet.canonicalStrings
     assert(purls.isEmpty)
   }
 

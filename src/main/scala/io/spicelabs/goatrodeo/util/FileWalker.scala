@@ -546,6 +546,7 @@ object FileWalker {
         case None => Files.createTempDirectory("goatrodeo_temp_dir")
       }
 
+      val oldTempDir = threadTempDir.get()
       try {
         threadTempDir.set(Some(tempDir))
         tryToConstructArchiveStream(artifact, tempDir) match {
@@ -566,7 +567,7 @@ object FileWalker {
             }
         }
       } finally {
-        threadTempDir.set(None)
+        threadTempDir.set(oldTempDir)
         // clean up
         Helpers.deleteDirectory(tempDir)
 
