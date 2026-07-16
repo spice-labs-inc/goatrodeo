@@ -27,6 +27,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scala.version>3.8.3</scala.version>
     <maven.compiler.release>17</maven.compiler.release>
+    <spice-bom.version>0.1.0-SNAPSHOT</spice-bom.version>
   </properties>
 
   <licenses>
@@ -54,8 +55,24 @@
     </repository>
   </repositories>
 
+  <!-- Canonical versions come from the shared Spice Labs BOM; see spice-labs-cli/bom.
+       Only versions not managed by the BOM (the Scala 3 standard library, pinned to the
+       compiler's scala.version) are declared inline below. -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.spicelabs</groupId>
+        <artifactId>spice-bom</artifactId>
+        <version>${spice-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
-    <!-- Scala 3 standard library (implicit under sbt, explicit under Maven) -->
+    <!-- Scala 3 standard library (implicit under sbt, explicit under Maven).
+         Pinned to scala.version — intentionally not BOM-managed. -->
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala3-library_3</artifactId>
@@ -66,128 +83,104 @@
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-xml_3</artifactId>
-      <version>2.3.0</version>
     </dependency>
     <dependency>
       <groupId>org.ow2.asm</groupId>
       <artifactId>asm</artifactId>
-      <version>9.8</version>
     </dependency>
     <dependency>
       <groupId>org.apache.bcel</groupId>
       <artifactId>bcel</artifactId>
-      <version>6.11.0</version>
     </dependency>
     <dependency>
       <groupId>com.github.scopt</groupId>
       <artifactId>scopt_3</artifactId>
-      <version>4.1.0</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>2.18.0</version>
     </dependency>
     <dependency>
       <groupId>io.bullet</groupId>
       <artifactId>borer-derivation_3</artifactId>
-      <version>1.14.1</version>
     </dependency>
     <dependency>
       <groupId>com.palantir.isofilereader</groupId>
       <artifactId>isofilereader</artifactId>
-      <version>0.6.1</version>
     </dependency>
     <dependency>
       <groupId>org.json4s</groupId>
       <artifactId>json4s-native_3</artifactId>
-      <version>4.0.7</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
-      <version>1.28.0</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.15</version>
     </dependency>
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-parallel-collections_3</artifactId>
-      <version>1.2.0</version>
     </dependency>
     <dependency>
       <groupId>com.typesafe.scala-logging</groupId>
       <artifactId>scala-logging_3</artifactId>
-      <version>3.9.4</version>
     </dependency>
     <dependency>
       <groupId>org.apache.tika</groupId>
       <artifactId>tika-core</artifactId>
-      <version>3.2.3</version>
     </dependency>
     <dependency>
       <groupId>com.github.package-url</groupId>
       <artifactId>packageurl-java</artifactId>
-      <version>1.5.0</version>
     </dependency>
 
     <!-- Spice Labs -->
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>cilantro_3</artifactId>
-      <version>0.1.17</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>coordinates</artifactId>
-      <version>1.1.0</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>baharat</artifactId>
-      <version>0.0.4</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>annatto</artifactId>
-      <version>0.1.0</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>saffron</artifactId>
-      <version>0.2.3</version>
     </dependency>
 
     <!-- BouncyCastle -->
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <version>1.80</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-      <version>1.80</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpg-jdk18on</artifactId>
-      <version>1.80</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcutil-jdk18on</artifactId>
-      <version>1.80</version>
     </dependency>
 
     <!-- Compile-time only macro (`% "provided"` in sbt) -->
     <dependency>
       <groupId>com.github.dwickern</groupId>
       <artifactId>scala-nameof_3</artifactId>
-      <version>5.0.0</version>
       <scope>provided</scope>
     </dependency>
 
@@ -195,19 +188,16 @@
     <dependency>
       <groupId>org.scalameta</groupId>
       <artifactId>munit_3</artifactId>
-      <version>0.7.29</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.scalameta</groupId>
       <artifactId>munit-scalacheck_3</artifactId>
-      <version>0.7.29</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.scalacheck</groupId>
       <artifactId>scalacheck_3</artifactId>
-      <version>1.18.1</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
