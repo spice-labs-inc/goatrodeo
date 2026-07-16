@@ -161,6 +161,10 @@ if (System.getenv("TEST_THREAD_CNT") == null) {
 
 }
 
+// Run independent test classes in parallel only when not in CI.
+// CI is detected by TEST_THREAD_CNT being set in build_test.yml.
+Test / testForkedParallel := System.getenv("TEST_THREAD_CNT") == null
+
 ThisBuild / scalacOptions ++=
   Seq(
     "-deprecation",
