@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.spicelabs</groupId>
+  <artifactId>goatrodeo_3</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>GoatRodeo</name>
+  <description>Static analysis toolkit for unpacking artifacts</description>
+  <url>https://github.com/spice-labs-inc/goatrodeo</url>
+
+  <!--
+    Compile-from-source Maven build, ported from build.sbt. This is a
+    proof-of-concept living alongside the sbt build; `maven/pom.xml` remains
+    the publish-only shell used by the release workflow.
+
+    Quick start:
+      mvn -DskipTests compile     # fast: verify it compiles
+      mvn test                    # runs the suite (see PreflightSuite for
+                                  # the test-data / git-lfs prerequisites)
+  -->
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <scala.version>3.8.3</scala.version>
+    <maven.compiler.release>17</maven.compiler.release>
+    <spice-bom.version>0.1.0-SNAPSHOT</spice-bom.version>
+  </properties>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.html</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <repositories>
+    <repository>
+      <id>central</id>
+      <url>https://repo1.maven.org/maven2/</url>
+    </repository>
+    <!-- Spice Labs libraries (cilantro, baharat, annatto, saffron) live here.
+         Requires a <server id="github"> with a PAT in ~/.m2/settings.xml. -->
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
+    </repository>
+    <repository>
+      <id>ow2</id>
+      <url>https://repository.ow2.org/nexus/content/repositories/public/</url>
+    </repository>
+  </repositories>
+
+  <!-- Canonical versions come from the shared Spice Labs BOM; see spice-labs-cli/bom.
+       Only versions not managed by the BOM (the Scala 3 standard library, pinned to the
+       compiler's scala.version) are declared inline below. -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.spicelabs</groupId>
+        <artifactId>spice-bom</artifactId>
+        <version>${spice-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Scala 3 standard library (implicit under sbt, explicit under Maven).
+         Pinned to scala.version — intentionally not BOM-managed. -->
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala3-library_3</artifactId>
+      <version>${scala.version}</version>
+    </dependency>
+
+    <!-- `%%` deps from build.sbt carry the _3 suffix here -->
+    <dependency>
+      <groupId>org.scala-lang.modules</groupId>
+      <artifactId>scala-xml_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.bcel</groupId>
+      <artifactId>bcel</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.scopt</groupId>
+      <artifactId>scopt_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.bullet</groupId>
+      <artifactId>borer-derivation_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.palantir.isofilereader</groupId>
+      <artifactId>isofilereader</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.json4s</groupId>
+      <artifactId>json4s-native_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang.modules</groupId>
+      <artifactId>scala-parallel-collections_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.typesafe.scala-logging</groupId>
+      <artifactId>scala-logging_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.tika</groupId>
+      <artifactId>tika-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.package-url</groupId>
+      <artifactId>packageurl-java</artifactId>
+    </dependency>
+
+    <!-- Spice Labs -->
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>cilantro_3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>coordinates</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>baharat</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>annatto</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>saffron</artifactId>
+    </dependency>
+
+    <!-- BouncyCastle -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpg-jdk18on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcutil-jdk18on</artifactId>
+    </dependency>
+
+    <!-- Compile-time only macro (`% "provided"` in sbt) -->
+    <dependency>
+      <groupId>com.github.dwickern</groupId>
+      <artifactId>scala-nameof_3</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.scalameta</groupId>
+      <artifactId>munit_3</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scalameta</groupId>
+      <artifactId>munit-scalacheck_3</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scalacheck</groupId>
+      <artifactId>scalacheck_3</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <sourceDirectory>src/main/scala</sourceDirectory>
+    <testSourceDirectory>src/test/scala</testSourceDirectory>
+
+    <plugins>
+      <!-- Read the current git commit for BuildInfo -->
+      <plugin>
+        <groupId>io.github.git-commit-id</groupId>
+        <artifactId>git-commit-id-maven-plugin</artifactId>
+        <version>9.0.1</version>
+        <executions>
+          <execution>
+            <id>get-git-info</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>revision</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <failOnNoGitDirectory>false</failOnNoGitDirectory>
+          <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
+          <generateGitPropertiesFile>false</generateGitPropertiesFile>
+        </configuration>
+      </plugin>
+
+      <!-- Generate hellogoat.BuildInfo from the template (replaces sbt-buildinfo) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>generate-buildinfo</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/generated-sources/scala/hellogoat</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/maven/buildinfo</directory>
+                  <includes>
+                    <include>BuildInfo.scala</include>
+                  </includes>
+                  <filtering>true</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Register the generated BuildInfo dir as a source root -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <id>add-generated-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${project.build.directory}/generated-sources/scala</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Scala 3 compiler -->
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+        <version>4.9.2</version>
+        <configuration>
+          <scalaVersion>${scala.version}</scalaVersion>
+          <args>
+            <arg>-deprecation</arg>
+            <arg>-unchecked</arg>
+            <arg>-feature</arg>
+            <arg>-Wunused:imports</arg>
+            <arg>-Yexplicit-nulls</arg>
+            <arg>-no-indent</arg>
+            <arg>-release</arg>
+            <arg>17</arg>
+          </args>
+        </configuration>
+        <executions>
+          <execution>
+            <id>scala-compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>scala-test-compile</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Run munit via its JUnit4 runner (munit.MUnitRunner) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <includes>
+            <include>**/*Suite.class</include>
+            <include>**/*Test.class</include>
+            <include>**/*Tests.class</include>
+            <include>**/*Testing.class</include>
+            <include>**/*Probe.class</include>
+          </includes>
+          <excludes>
+            <!-- These assert on the packaged fat jar, which is built in the
+                 `package` phase (after `test`). Run them post-package instead. -->
+            <exclude>**/FatJarContentsTest.class</exclude>
+            <exclude>**/FatJarExecutionTest.class</exclude>
+          </excludes>
+          <argLine>-Xmx8G -Duser.timezone=GMT</argLine>
+        </configuration>
+      </plugin>
+
+      <!-- Fat jar (replaces sbt-assembly); strips signature files like the
+           sbt assemblyMergeStrategy did -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>fat</shadedClassifierName>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/*.EC</exclude>
+                    <exclude>META-INF/SIG-*</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>io.spicelabs.goatrodeo.Howdy</mainClass>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
