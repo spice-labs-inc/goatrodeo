@@ -318,8 +318,8 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
   property("ItemMetaData merge is commutative for fileNames union") {
     forAll(genItemMetaData, genItemMetaData) { (a, b) =>
       // Merge in both directions
-      val ab = a.merge(b, () => Vector(), () => Vector())
-      val ba = b.merge(a, () => Vector(), () => Vector())
+      val ab = a.merge(b)
+      val ba = b.merge(a)
 
       // File names should be the same regardless of order
       ab.fileNames == ba.fileNames
@@ -328,7 +328,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   property("ItemMetaData merge combines MIME types") {
     forAll(genItemMetaData, genItemMetaData) { (a, b) =>
-      val merged = a.merge(b, () => Vector(), () => Vector())
+      val merged = a.merge(b)
 
       // All MIME types from both should be present
       a.mimeType.subsetOf(merged.mimeType) &&
@@ -338,7 +338,7 @@ class PropertyBasedTestSuite extends ScalaCheckSuite {
 
   property("ItemMetaData merge preserves first item's fileSize") {
     forAll(genItemMetaData, genItemMetaData) { (a, b) =>
-      val merged = a.merge(b, () => Vector(), () => Vector())
+      val merged = a.merge(b)
       // The implementation uses `this.fileSize` (first argument's fileSize)
       merged.fileSize == a.fileSize
     }

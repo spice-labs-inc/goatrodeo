@@ -205,6 +205,7 @@ lazy val root = project
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,
     libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
+    libraryDependencies += "com.networknt" % "json-schema-validator" % "1.5.4" % Test,
     libraryDependencies += "commons-io" % "commons-io" % "2.18.0",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
     libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
@@ -226,7 +227,7 @@ lazy val root = project
     // Spice Labs "readers"
     libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.1.0",
-    libraryDependencies += "io.spicelabs" % "saffron" % "0.2.3",
+    libraryDependencies += "io.spicelabs" % "saffron" % "0.1.0-SNAPSHOT",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.80",
     libraryDependencies += "org.bouncycastle" % "bcpkix-jdk18on" % "1.80",
     libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on" % "1.80",

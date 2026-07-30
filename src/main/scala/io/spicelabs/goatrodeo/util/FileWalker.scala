@@ -237,7 +237,8 @@ object FileWalker {
     "application/x-vhd",
     "application/x-vhdx",
     "application/x-vdi",
-    "application/x-ami"
+    "application/x-ami",
+    "application/x-saffron-raw-disk"
   )
 
   private def isSaffronSupported(mime: Set[String], path: Path) = {

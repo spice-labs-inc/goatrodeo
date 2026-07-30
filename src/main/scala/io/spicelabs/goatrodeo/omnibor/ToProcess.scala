@@ -619,7 +619,7 @@ trait ToProcess {
                   FileWalker.withinArchiveStream(artifact = artifact) {
                     rawFoundItems =>
 
-                      val foundItems = rawFoundItems.filter(_.size() > 4)
+                      val foundItems = rawFoundItems.filter(_.size() >= 0)
 
                     for {
                       item <- foundItems
@@ -691,8 +691,15 @@ object ToProcess {
       DotnetFile.computeDotnetFiles,
       AnnattoStrategy.computeAnnattoFiles,
       Certificates.computeCertificateFiles,
+      ShadowPasswordStrategy.computeShadowPasswordFiles,
+      UsignKeysStrategy.computeUsignKeyFiles,
+      SSHKeysStrategy.computeSSHKeyFiles,
+      ServiceTlsConfigStrategy.computeServiceTlsConfigFiles,
+      EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
       JvmDistribution.computeJvmFiles,
       GradleLockfile.computeGradleLockfiles,
+      OpenSSLConfigToProcess.computeOpenSSLConfigFiles,
+      JavaSecurityToProcess.computeJavaSecurityFiles,
       GenericFile.computeGenericFiles
     )
   )
@@ -735,8 +742,15 @@ object ToProcess {
         DotnetFile.computeDotnetFiles,
         AnnattoStrategy.computeAnnattoFiles,
         Certificates.computeCertificateFiles,
+        ShadowPasswordStrategy.computeShadowPasswordFiles,
+        UsignKeysStrategy.computeUsignKeyFiles,
+        SSHKeysStrategy.computeSSHKeyFiles,
+        ServiceTlsConfigStrategy.computeServiceTlsConfigFiles,
+        EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
         JvmDistribution.computeJvmFiles,
         GradleLockfile.computeGradleLockfiles,
+        OpenSSLConfigToProcess.computeOpenSSLConfigFiles,
+        JavaSecurityToProcess.computeJavaSecurityFiles,
         GenericFile.computeGenericFiles
       )
     })

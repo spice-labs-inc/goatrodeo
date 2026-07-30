@@ -29,6 +29,8 @@ There is a one to one correspondence between the `with` methods and command-line
 - `withTag(String t)`
 - `withStaticMetadata(Boolean b)`
 - `withTagJson(String t)`
+- `withCbomDir(String d)`
+- `withCbomVersion(String v)`
 - `withExtraArgs(java.util.Map<String, String> args)`
 - `withExtraArg(String arg, String value)` - possibly an accumulator
 
@@ -45,6 +47,8 @@ There is a one to one correspondence between the `with` methods and command-line
 - tempDir
 - tag-json
 - tag
+- emitCbomDir
+- cbomVersion
 
 Each arg corresponds to a `with` method above. The args `threads` and `maxRecords` take a String representation of an integer. The parsing is simple and will throw an exception if conversion fails.
 

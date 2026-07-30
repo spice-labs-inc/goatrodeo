@@ -329,7 +329,7 @@ class ItemTestSuite extends munit.FunSuite {
       version = Some("1.0")
     )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
+    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical()))
     val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
     assert(purlConnections.nonEmpty)
   }
@@ -343,7 +343,7 @@ class ItemTestSuite extends munit.FunSuite {
       version = Some("1.0")
     )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
+    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical()))
     val body = enhanced.bodyAsItemMetaData.get
     assert(body.fileNames.exists(_.startsWith("pkg:")))
   }
@@ -370,7 +370,7 @@ class ItemTestSuite extends munit.FunSuite {
 
     val enhanced =
       item.enhanceItemWithPurls(
-        Seq(purl1.toCanonical().nn, purl2.toCanonical().nn)
+        Seq(purl1.toCanonical(), purl2.toCanonical())
       )
     val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
     assertEquals(purlConnections.size, 2)
@@ -385,7 +385,7 @@ class ItemTestSuite extends munit.FunSuite {
       version = Some("1.0")
     )
 
-    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical().nn))
+    val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical()))
     assert(enhanced.bodyAsItemMetaData.isDefined)
   }
 

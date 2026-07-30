@@ -50,7 +50,7 @@ class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
         Option(dir.listFiles()).map(_.toVector).getOrElse(Vector.empty)
       kids.flatMap { f =>
         if (f == null) Vector.empty
-        else if (f.getName.nn.startsWith(".")) Vector.empty
+        else if (f.getName.startsWith(".")) Vector.empty
         else if (f.isDirectory()) allFiles(f)
         else Vector(f)
       }
@@ -58,8 +58,8 @@ class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
   }
 
   private def isUnderInfrastructureDir(f: File): Boolean = {
-    val rootPath = corpusRoot.getAbsolutePath.nn
-    val p = f.getAbsolutePath.nn
+    val rootPath = corpusRoot.getAbsolutePath
+    val p = f.getAbsolutePath
     if (!p.startsWith(rootPath)) false
     else {
       val rel = p.substring(rootPath.length).stripPrefix("/").stripPrefix("\\")
@@ -69,8 +69,8 @@ class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
   }
 
   private def categoryOf(f: File): String = {
-    val rootPath = corpusRoot.getAbsolutePath.nn
-    val p = f.getAbsolutePath.nn
+    val rootPath = corpusRoot.getAbsolutePath
+    val p = f.getAbsolutePath
     if (!p.startsWith(rootPath)) "<root>"
     else {
       val rel = p.substring(rootPath.length).stripPrefix("/").stripPrefix("\\")
@@ -80,17 +80,17 @@ class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
   }
 
   private def isSidecar(f: File): Boolean =
-    f.getName.nn.endsWith(sidecarSuffix)
+    f.getName.endsWith(sidecarSuffix)
 
   private def isFixtureCandidate(f: File): Boolean = {
-    val name = f.getName.nn
+    val name = f.getName
     !isSidecar(f) &&
     !infrastructureNames.contains(name) &&
     !isUnderInfrastructureDir(f)
   }
 
   private def fixtureNameForSidecar(sidecar: File): String = {
-    val sName = sidecar.getName.nn
+    val sName = sidecar.getName
     sName.substring(0, sName.length - sidecarSuffix.length)
   }
 
@@ -106,9 +106,9 @@ class CertificatesFixtureInventoryImpl(val corpusRoot: File) {
   /** Pairs where both a fixture and its sidecar exist in the same directory. */
   def pairs: Vector[FixturePair] = {
     val candidatesByDir: Map[String, Vector[File]] =
-      allFixtureCandidates.groupBy(f => f.getParentFile.nn.getAbsolutePath.nn)
+      allFixtureCandidates.groupBy(f => f.getParentFile.getAbsolutePath)
     allSidecars.flatMap { side =>
-      val dirPath = side.getParentFile.nn.getAbsolutePath.nn
+      val dirPath = side.getParentFile.getAbsolutePath
       val wantName = fixtureNameForSidecar(side)
       candidatesByDir
         .getOrElse(dirPath, Vector.empty)

@@ -44,6 +44,8 @@ Goat Rodeo is an open-source tool that analyzes software artifacts and builds **
 | 🔗 | **Bidirectional Graph** | Query both "what contains X" and "what does X contain" |
 | 🛡️ | **Hidden Reaper Detection** | Find vulnerabilities hidden from traditional SCA tools |
 | 📊 | **pURL Support** | Generates Package URLs for ecosystem compatibility |
+| 🔐 | **Cryptographic Inventory** | Capture X.509 certificates, OpenSSL configs, and Java `java.security` policies |
+| 📋 | **CycloneDX CBOM Emission** | Emit cryptographic bills-of-materials (CBOM) in CycloneDX 1.6/1.7 format |
 | 🔌 | **Embeddable** | Use as CLI tool, Docker container, or Java/Scala library |
 
 ---
@@ -145,6 +147,13 @@ goatrodeo [OPTIONS]
 | `--package-tags` | Create per-package tags for identified packages (Maven, Docker, etc.) |
 | `--package-tags-short-name` | Use short package names when `--package-tags` is enabled |
 | `--block <file>` | Skip known/common GitOIDs |
+
+### Cryptographic Bill of Materials (CBOM)
+
+| Option | Description |
+|--------|-------------|
+| `--emit-cbom-dir <dir>` | Emit one CycloneDX CBOM JSON file per top-level input into this directory |
+| `--cbom-version <1.6\|1.7>` | CycloneDX CBOM version to emit (default: 1.6) |
 
 <details>
 <summary><b>Performance Tips</b></summary>

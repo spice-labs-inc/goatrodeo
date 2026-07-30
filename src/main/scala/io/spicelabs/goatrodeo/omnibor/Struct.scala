@@ -284,44 +284,12 @@ case class ItemMetaData(
     * attach "contains" to each of the names
     */
   def merge(
-      other: ItemMetaData,
-      thisContains: () => Vector[String],
-      otherContains: () => Vector[String]
+      other: ItemMetaData
   ): ItemMetaData = {
-
-    def fix(filename: String, gitoids: Vector[String]): TreeSet[String] = {
-      TreeSet(gitoids.map(go => f"${go}!${filename}") :+ filename*)
-    }
-
     val mergedFilenames = this.fileNames ++ other.fileNames
 
-    val resolvedFilenames =
-      (mergedFilenames.size, this.fileNames.size, other.fileNames.size) match {
-        // if there's only one filename, then it's a clean merge
-        case (1, _, _) => mergedFilenames
-
-        // if both have already done the filename to gitoid mapping, then it's safe to merge
-        case (_, tsize, osize) if tsize > 1 && osize > 1 => mergedFilenames
-
-        // create the mapping
-        case (_, tsize, osize) =>
-          val thisWithMapping =
-            if (tsize > 1) this.fileNames
-            else
-              this.fileNames.headOption
-                .map(fn => fix(fn, thisContains()))
-                .getOrElse(this.fileNames)
-          val otherWithMapping =
-            if (osize > 1) other.fileNames
-            else
-              other.fileNames.headOption
-                .map(fn => fix(fn, otherContains()))
-                .getOrElse(other.fileNames)
-          thisWithMapping ++ otherWithMapping
-      }
-
     val ret = ItemMetaData(
-      fileNames = resolvedFilenames,
+      fileNames = mergedFilenames,
       mimeType = this.mimeType ++ other.mimeType,
       fileSize = this.fileSize,
       extra = Helpers.mergeTreeMaps(this.extra, other.extra)

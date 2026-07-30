@@ -476,6 +476,23 @@ object Builder {
               case (writeIt, preWriteFunc) => writeIt & preWriteFunc(storage)
             }
 
+            args.cbomDir.foreach { cbomDir =>
+              if (!dead_?.get()) {
+                CbomEmitter
+                  .emitForStorage(storage, args.cbomVersion, cbomDir) match {
+                  case scala.util.Success(files) =>
+                    logger.info(
+                      f"Wrote ${files.length}%,d CBOM file(s) to ${cbomDir}"
+                    )
+                  case scala.util.Failure(e) =>
+                    logger.error(
+                      f"Failed to emit CBOMs to ${cbomDir}: ${e.getMessage()}",
+                      e
+                    )
+                }
+              }
+            }
+
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>

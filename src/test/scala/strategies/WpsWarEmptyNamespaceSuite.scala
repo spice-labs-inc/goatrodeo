@@ -440,7 +440,7 @@ class WpsWarEmptyNamespaceSuite extends FunSuite {
         None
       )
       .toCanonical()
-      .nn
+
     assert(
       purl.toString.contains("collections-generic"),
       s"pURL must contain artifactId: ${purl.toString}"

@@ -322,7 +322,7 @@ class GoatRodeoBuilder {
     *
     * Supported keys: payload, output, threads, maxRecords, ingested, ignore,
     * fileList, excludePattern, blockList, tempDir, tag-json, tag, mimeFilter,
-    * mimeFilterFile, emitJsonDir
+    * mimeFilterFile, emitJsonDir, emitCbomDir, cbomVersion
     *
     * @param key
     *   the argument name
@@ -352,6 +352,12 @@ class GoatRodeoBuilder {
       case "emitJsonDir" =>
         config = config.copy(emitJsonDir = Some(Paths.get(value).toFile()))
         this
+      case "emitCbomDir" =>
+        config = config.copy(cbomDir = Some(Paths.get(value).toFile()))
+        this
+      case "cbomVersion" =>
+        config = config.copy(cbomVersion = value)
+        this
       case unknown =>
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
         this
@@ -371,6 +377,33 @@ class GoatRodeoBuilder {
     */
   def withProgressListener(listener: ProgressListener): GoatRodeoBuilder = {
     config = config.copy(progressListener = Option(listener))
+    this
+  }
+
+  /** Set the directory to emit CycloneDX CBOM files to.
+    *
+    * One CBOM JSON file is written per top-level input file. CBOM emission is
+    * disabled when this is not set.
+    *
+    * @param d
+    *   the path to the CBOM output directory
+    * @return
+    *   this builder
+    */
+  def withCbomDir(d: String): GoatRodeoBuilder = {
+    config = config.copy(cbomDir = Some(Paths.get(d).toFile()))
+    this
+  }
+
+  /** Set the CycloneDX CBOM specification version to emit.
+    *
+    * @param v
+    *   the version string, "1.6" or "1.7"
+    * @return
+    *   this builder
+    */
+  def withCbomVersion(v: String): GoatRodeoBuilder = {
+    config = config.copy(cbomVersion = v)
     this
   }
 

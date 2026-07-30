@@ -217,7 +217,7 @@ case class Item(
       (this.body, other.body, this.bodyMimeType == other.bodyMimeType) match {
         case (Some(a: ItemMetaData), Some(b: ItemMetaData), true) =>
           Some(
-            a.merge(b, () => this.listContains(), () => other.listContains())
+            a.merge(b)
           ) -> this.bodyMimeType
         case (Some(a: ItemTagData), Some(b: ItemTagData), true) =>
           Some(

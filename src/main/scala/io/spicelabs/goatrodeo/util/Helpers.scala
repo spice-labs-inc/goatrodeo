@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
+import scala.util.Try
 
 /** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
   * content-addressable identifier based on Git's object hashing scheme.
@@ -78,9 +79,12 @@ object Helpers {
       manifestString: String
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
-    val manifest = java.util.jar.Manifest.apply(bis)
+    val manifestVec = Try {
+      java.util.jar.Manifest.apply(bis)
+    }.toOption.toVector
 
     val mapping = for {
+      manifest <- manifestVec
       entry <- manifest.getMainAttributes().entrySet().asScala.toVector
 
     } yield {
@@ -380,7 +384,7 @@ object Helpers {
     */
   def md5hashHex(in: String): String = {
     // Delegate to `coordinates`, the canonical definition of this identifier.
-    Coordinates.md5(in.getBytes("UTF-8")).nn
+    Coordinates.md5(in.getBytes("UTF-8"))
   }
 
   /** Convert a String to an InputStream using UTF-8 encoding.
@@ -489,7 +493,7 @@ object Helpers {
   }
 
   // Canonical lowercase-hex SHA-256, computed by `coordinates`.
-  def sha256Hex(bytes: Array[Byte]): String = Coordinates.sha256(bytes).nn
+  def sha256Hex(bytes: Array[Byte]): String = Coordinates.sha256(bytes)
 
   def computeSHA256(in: InputStream): Array[Byte] = {
     val md = MessageDigest.getInstance("SHA256")
@@ -874,10 +878,11 @@ object Helpers {
   def tempFileFromStream(
       what: InputStream,
       close_? : Boolean,
-      tempDir: Path
+      tempDir: Path,
+      suffix: String = ".temp"
   ): File = {
 
-    val retFile = Files.createTempFile(tempDir, "goats", ".temp").toFile()
+    val retFile = Files.createTempFile(tempDir, "goats", suffix).toFile()
     val ret = FileOutputStream(retFile)
     val buffer = new Array[Byte](4096)
 

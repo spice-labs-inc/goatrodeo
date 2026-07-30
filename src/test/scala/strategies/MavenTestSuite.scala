@@ -131,7 +131,7 @@ class MavenTestSuite extends munit.FunSuite {
     val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
-    val purl = Purl.parse(purls.head).nn
+    val purl = Purl.parse(purls.head)
     assertEquals(purl.`type`, "maven")
     assertEquals(purl.namespace, "org.example")
     assertEquals(purl.name, "test-artifact")
@@ -164,7 +164,7 @@ class MavenTestSuite extends munit.FunSuite {
     val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
-    val purl = Purl.parse(purls.head).nn
+    val purl = Purl.parse(purls.head)
     assertEquals(purl.qualifiers.get("type"), "pom")
   }
 
@@ -184,7 +184,7 @@ class MavenTestSuite extends munit.FunSuite {
     val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
-    val purl = Purl.parse(purls.head).nn
+    val purl = Purl.parse(purls.head)
     assertEquals(purl.qualifiers.get("packaging"), "sources")
   }
 
@@ -202,7 +202,7 @@ class MavenTestSuite extends munit.FunSuite {
     val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
-    val purl = Purl.parse(purls.head).nn
+    val purl = Purl.parse(purls.head)
     assertEquals(purl.qualifiers.get("classifier"), "javadoc")
   }
 
@@ -224,7 +224,7 @@ class MavenTestSuite extends munit.FunSuite {
     val purls = purlSet.canonicalStrings
 
     assert(purls.nonEmpty)
-    assertEquals(Purl.parse(purls.head).nn.version, "2.0.0")
+    assertEquals(Purl.parse(purls.head).version, "2.0.0")
   }
 
   // ==================== MavenState.getMetadata Tests ====================

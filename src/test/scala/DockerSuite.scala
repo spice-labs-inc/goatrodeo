@@ -436,24 +436,6 @@ class DockerSuite extends munit.FunSuite {
 
   // ==================== Unit tests (no traversal) ====================
 
-  test("ItemMetaData.merge - combines file names from both items") {
-    val a = ItemMetaData(TreeSet("foo"), TreeSet(), 1, TreeMap())
-    val b = ItemMetaData(TreeSet("bar"), TreeSet(), 1, TreeMap())
-
-    val aGitoids = () => Vector("yak", "moose")
-    val bGitoids = () => Vector("dog", "cat")
-
-    val mergedAA = a.merge(a, aGitoids, bGitoids)
-    assertEquals(a, mergedAA, "merging with self should be same")
-
-    val mergedAB = a.merge(b, aGitoids, bGitoids)
-    assertNotEquals(a, mergedAB, "They should differ")
-    assert(
-      mergedAB.fileNames.size == 6,
-      f"there should be 6 different filenames, but got ${mergedAB.fileNames}"
-    )
-  }
-
   test("DockerState - begins with empty layer mapping") {
     val state = DockerState(Map())
     assert(state.layerToGitoidMapping.isEmpty)

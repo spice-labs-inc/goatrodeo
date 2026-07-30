@@ -42,16 +42,14 @@ import scala.collection.immutable.TreeSet
   *
   * ## LLM-friendly summary
   *
-  * | Test           | Left fileNames | Right fileNames | Expected                           |
-  * |:---------------|:---------------|:----------------|:-----------------------------------|
-  * | empty left     | TreeSet()      | TreeSet("b")    | merged OK                          |
-  * | empty right    | TreeSet("a")   | TreeSet()       | merged OK                          |
-  * | both non-empty | TreeSet("a")   | TreeSet("b")    | merged with gitoid-qualified names |
-  * | both empty     | TreeSet()      | TreeSet()       | merged OK, fileNames empty         |
+  * | Test           | Left fileNames | Right fileNames | Expected                   |
+  * |:---------------|:---------------|:----------------|:---------------------------|
+  * | empty left     | TreeSet()      | TreeSet("b")    | merged OK                  |
+  * | empty right    | TreeSet("a")   | TreeSet()       | merged OK                  |
+  * | both non-empty | TreeSet("a")   | TreeSet("b")    | merged with both filenames |
+  * | both empty     | TreeSet()      | TreeSet()       | merged OK, fileNames empty |
   */
 class StructMergeSuite extends FunSuite {
-
-  private val emptyContains = () => Vector.empty[String]
 
   test("ItemMetaData - merge handles empty fileNames on left side") {
 
@@ -74,7 +72,7 @@ class StructMergeSuite extends FunSuite {
       extra = TreeMap()
     )
 
-    val merged = left.merge(right, emptyContains, () => Vector("gitoid1"))
+    val merged = left.merge(right)
 
     assert(
       merged.fileNames.nonEmpty,
@@ -107,7 +105,7 @@ class StructMergeSuite extends FunSuite {
       extra = TreeMap()
     )
 
-    val merged = left.merge(right, () => Vector("gitoid1"), emptyContains)
+    val merged = left.merge(right)
 
     assert(
       merged.fileNames.nonEmpty,
@@ -123,8 +121,8 @@ class StructMergeSuite extends FunSuite {
 
     /** What: Merges two ItemMetaData instances both with non-empty fileNames.
       * Why: When both sides have a single filename and they differ, the merge
-      * should produce gitoid-qualified filenames per the merge logic.
-      * Requirement: Phase 0 §0.11 — merge correctly handles both non-empty.
+      * should preserve both filenames. Requirement: Phase 0 §0.11 — merge
+      * correctly handles both non-empty.
       */
     val left = ItemMetaData(
       fileNames = TreeSet("foo.txt"),
@@ -139,15 +137,11 @@ class StructMergeSuite extends FunSuite {
       extra = TreeMap("key2" -> TreeSet(StringOrPair("val2")))
     )
 
-    val merged = left.merge(
-      right,
-      () => Vector("gitoid1"),
-      () => Vector("gitoid2")
-    )
+    val merged = left.merge(right)
 
     assert(
       merged.fileNames.size >= 2,
-      s"When both sides have different filenames, merged should have gitoid-qualified names; got ${merged.fileNames}"
+      s"When both sides have different filenames, merged should preserve both; got ${merged.fileNames}"
     )
     assert(
       merged.mimeType.contains("text/plain"),
@@ -187,7 +181,7 @@ class StructMergeSuite extends FunSuite {
       extra = TreeMap()
     )
 
-    val merged = left.merge(right, emptyContains, emptyContains)
+    val merged = left.merge(right)
 
     assertEquals(
       merged.fileNames,

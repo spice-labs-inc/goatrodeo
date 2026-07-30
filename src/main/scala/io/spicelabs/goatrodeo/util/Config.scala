@@ -78,6 +78,11 @@ import scala.util.Using
   *   processing loop. Set via
   *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]]; not
   *   exposed on the command line.
+  * @param cbomDir
+  *   optional directory to emit CycloneDX cryptographic bill-of-materials
+  *   (CBOM) files, one per top-level input
+  * @param cbomVersion
+  *   CycloneDX CBOM specification version to emit ("1.6" or "1.7")
   */
 case class Config(
     out: Option[File] = None,
@@ -106,7 +111,9 @@ case class Config(
     packageTagsShortName: Boolean = false,
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
-    progressListener: Option[ProgressListener] = None
+    progressListener: Option[ProgressListener] = None,
+    cbomDir: Option[File] = None,
+    cbomVersion: String = "1.6"
 ) {
 
   /** Build a list of file list builders from the configuration.
@@ -234,6 +241,18 @@ object Config {
       opt[File]("dump-json")
         .text("Make a directory and dump the ADG as JSON in to directory")
         .action((x, c) => c.copy(emitJsonDir = Some(x))),
+      opt[File]("emit-cbom-dir")
+        .text(
+          "Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input into this directory"
+        )
+        .action((x, c) => c.copy(cbomDir = Some(x))),
+      opt[String]("cbom-version")
+        .text("CycloneDX CBOM version to emit (1.6 or 1.7). Default 1.6")
+        .action((v, c) => c.copy(cbomVersion = v))
+        .validate(v =>
+          if (Set("1.6", "1.7").contains(v)) success
+          else failure(s"--cbom-version must be 1.6 or 1.7, got $v")
+        ),
       opt[File]("tempdir")
         .text("Where to temporarily store files... should be a RAM disk")
         .action((x, c) => c.copy(tempDir = Some(x))),

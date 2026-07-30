@@ -21,7 +21,13 @@ object SaffronDetector {
     artifact.withFile(file => {
       Try(DiskFormat.detect(file.toPath())).toOption
         .flatMap(_.toScala)
-        .map(d => Set(d.mimeType()))
+        .map(d =>
+          // RAW disk images report the generic octet-stream MIME type. Promote
+          // it to a Saffron-specific MIME type so FileWalker does not reject
+          // the file as "definitely not an archive".
+          if (d == DiskFormat.RAW) Set("application/x-saffron-raw-disk")
+          else Set(d.mimeType())
+        )
         .getOrElse(Set.empty[String])
     })
   }

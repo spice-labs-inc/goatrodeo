@@ -198,7 +198,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     val derBytes = cert.getEncoded
     val artifact: ArtifactWrapper = ByteWrapper(derBytes, "generated.der", None)
     val parsed = Certificates.parseSingleCert(artifact).get
-    val purls = Certificates.purlsForCert(parsed).map(_.toCanonical().nn)
+    val purls = Certificates.purlsForCert(parsed).map(_.toCanonical())
     (parsed, purls)
   }
 
@@ -260,8 +260,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       purls.forall { purl =>
         val sizeMatch = "size=([0-9]+)".r.findFirstMatchIn(purl)
         sizeMatch.exists { m =>
-          val n = m.group(1).nn.toInt
-          n > 0
+          Option(m.group(1)).exists(_.toInt > 0)
         }
       }
     }
@@ -288,7 +287,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       purls.forall { purl =>
         "curve=([a-z0-9-]+)".r
           .findFirstMatchIn(purl)
-          .map(_.group(1).nn)
+          .flatMap(m => Option(m.group(1)))
           .exists(canonicalCurves.contains)
       }
     }
@@ -337,8 +336,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
         else {
           val quals = purl.substring(qIdx + 1)
           rxQual.findAllMatchIn(quals).forall { m =>
-            val v = m.group(2).nn
-            v.matches("[a-z0-9-]+")
+            Option(m.group(2)).exists(_.matches("[a-z0-9-]+"))
           }
         }
       }
@@ -512,7 +510,9 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
           certPurls.forall { p =>
             val ct =
-              "cert-type=([a-z]+)".r.findFirstMatchIn(p).map(_.group(1).nn)
+              "cert-type=([a-z]+)".r
+                .findFirstMatchIn(p)
+                .flatMap(m => Option(m.group(1)))
             ct.contains("user") || ct.contains("host")
           }
         case _ => true // not an SSH cert; property doesn't apply

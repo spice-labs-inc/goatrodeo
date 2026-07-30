@@ -59,7 +59,7 @@ object CertificatesPipelineRunner {
     * `items.head` get a deterministic Item when multiple Items are produced.
     */
   def runGoatRodeoOnSingleFile(file: File): Vector[Item] = {
-    val artifact = FileWrapper(file, file.getName.nn, None)
+    val artifact = FileWrapper(file, file.getName, None)
     val store =
       ToProcess.buildGraphFromArtifactWrapper(artifact, args = Config())
     val allItems = store
