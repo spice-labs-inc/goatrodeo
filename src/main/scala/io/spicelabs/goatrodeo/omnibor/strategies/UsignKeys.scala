@@ -31,6 +31,7 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -157,15 +158,38 @@ class UsignKeyState(artifact: ArtifactWrapper)
       .find(_.startsWith("untrusted comment:"))
       .map(_.stripPrefix("untrusted comment:").trim)
 
+    val keyLine =
+      lines.find(l => l.trim.nonEmpty && !l.startsWith("untrusted comment:"))
+    val parsedKey = keyLine.flatMap(decodeUsignKey)
+
     var tm = TreeMap[String, TreeSet[StringOrPair]](
       MKC.NAME -> TreeSet(StringOrPair(keyId)),
       MKC.DESCRIPTION -> TreeSet(StringOrPair("OpenWrt usign public key")),
       adHoc("KeyId") -> TreeSet(StringOrPair(keyId)),
+      adHoc("KeyAlgorithm") -> TreeSet(StringOrPair("ed25519")),
+      adHoc("KeySize") -> TreeSet(StringOrPair("256")),
+      adHoc("KeyFormat") -> TreeSet(StringOrPair("usign")),
       adHoc("FilePath") -> TreeSet(StringOrPair("/" + path))
     )
+    parsedKey.foreach { case (fp, _) =>
+      tm = tm + (adHoc("KeyFingerprint") -> TreeSet(StringOrPair(fp)))
+    }
     comment.foreach { c =>
       tm = tm + (adHoc("Comment") -> TreeSet(StringOrPair(c)))
     }
     tm
+  }
+
+  /** Decode a usign/signify public-key line. The raw key is 32 bytes for
+    * Ed25519; returns its SHA-256 hex fingerprint on success.
+    */
+  private def decodeUsignKey(line: String): Option[(String, Array[Byte])] = {
+    Try {
+      val raw = Base64.getDecoder.decode(line.trim)
+      if (raw.length == 32) {
+        val fp = Helpers.sha256Hex(raw)
+        Some(fp -> raw)
+      } else None
+    }.toOption.flatten
   }
 }

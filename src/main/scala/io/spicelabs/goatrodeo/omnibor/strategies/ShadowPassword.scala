@@ -98,30 +98,78 @@ object ShadowPasswordStrategy {
   }
 
   /** Map a crypt(3) hash prefix to a human-readable algorithm name. */
-  def hashAlgorithm(hash: String): String = {
+  def hashAlgorithm(hash: String): String = hashDetails(hash).algorithm
+
+  /** Parsed crypt(3) envelope details. */
+  final case class HashDetails(
+      algorithm: String,
+      cost: Option[String] = None,
+      params: Option[String] = None,
+      salt: Option[String] = None
+  )
+
+  /** Parse a crypt(3) hash into algorithm, cost/params, and salt.
+    *
+    * Supported prefixes:
+    *   - `$1$` MD5 (no cost)
+    *   - `$2a$`, `$2b$`, `$2y$` bcrypt (cost is the decimal rounds field)
+    *   - `$5$` SHA-256 (no cost)
+    *   - `$6$` SHA-512 (no cost)
+    *   - `$y$` yescrypt (params string, e.g. `j9s`)
+    *   - `$7$` scrypt (`N=2^N,r,p` as params)
+    */
+  def hashDetails(hash: String): HashDetails = {
     if (
       hash == "*" || hash == "!" || hash == "!!" || hash == "x" || hash.isEmpty
     ) {
-      "locked"
+      HashDetails("locked")
     } else if (hash.startsWith("$1$")) {
-      "md5"
+      HashDetails("md5", salt = extractSalt(hash, 1))
     } else if (
       hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith(
         "$2y$"
       )
     ) {
-      "bcrypt"
+      val cost = extractField(hash, 2)
+      HashDetails("bcrypt", cost = cost, salt = extractSalt(hash, 2))
     } else if (hash.startsWith("$5$")) {
-      "sha256"
+      HashDetails("sha256", salt = extractSalt(hash, 1))
     } else if (hash.startsWith("$6$")) {
-      "sha512"
+      HashDetails("sha512", salt = extractSalt(hash, 1))
     } else if (hash.startsWith("$y$")) {
-      "yescrypt"
+      HashDetails(
+        "yescrypt",
+        params = extractField(hash, 2),
+        salt = extractSalt(hash, 2)
+      )
     } else if (hash.startsWith("$7$")) {
-      "scrypt"
+      HashDetails(
+        "scrypt",
+        params = extractField(hash, 2),
+        salt = extractSalt(hash, 2)
+      )
     } else {
-      "other"
+      HashDetails("other")
     }
+  }
+
+  /** Extract the field at the given dollar-delimited position (1-based). */
+  private def extractField(hash: String, idx: Int): Option[String] = {
+    val parts = hash.split("\\$")
+    if (parts.length > idx) Some(parts(idx)) else None
+  }
+
+  /** Extract the salt from a crypt(3) hash. The salt is the field immediately
+    * preceding the final hash value for most algorithms. For bcrypt the salt
+    * and hash are combined in the final field, so that field is returned as the
+    * salt.
+    */
+  private def extractSalt(hash: String, paramFields: Int): Option[String] = {
+    val parts = hash.split("\\$").filter(_.nonEmpty)
+    if (parts.length < 2) None
+    else if (hash.startsWith("$2")) Some(parts.last)
+    else if (parts.length >= 3) Some(parts(parts.length - 2))
+    else None
   }
 }
 
@@ -197,7 +245,7 @@ class ShadowPasswordState(artifact: ArtifactWrapper)
       adHoc("FilePath") -> TreeSet(StringOrPair("/" + path))
     )
 
-    if (path.endsWith("/etc/shadow") || path.endsWith("/etc/gshadow")) {
+    if (path.endsWith("etc/shadow") || path.endsWith("etc/gshadow")) {
       tm = parseShadow(artifact, tm)
     }
 
@@ -217,16 +265,34 @@ class ShadowPasswordState(artifact: ArtifactWrapper)
         case Array(user, hash, _*)
             if user.nonEmpty && ShadowPasswordStrategy
               .hashAlgorithm(hash) != "locked" =>
-          val alg = ShadowPasswordStrategy.hashAlgorithm(hash)
+          val details = ShadowPasswordStrategy.hashDetails(hash)
           val withUser = tm.updatedWith(adHoc("User")) {
             case Some(set) => Some(set + StringOrPair(user))
             case None      => Some(TreeSet(StringOrPair(user)))
           }
           val withAlg = withUser.updatedWith(adHoc("Algorithm")) {
-            case Some(set) => Some(set + StringOrPair(alg))
-            case None      => Some(TreeSet(StringOrPair(alg)))
+            case Some(set) => Some(set + StringOrPair(details.algorithm))
+            case None      => Some(TreeSet(StringOrPair(details.algorithm)))
           }
-          withAlg
+          val withCost = details.cost.fold(withAlg)(c =>
+            withAlg.updatedWith(adHoc("Cost")) {
+              case Some(set) => Some(set + StringOrPair(c))
+              case None      => Some(TreeSet(StringOrPair(c)))
+            }
+          )
+          val withParams = details.params.fold(withCost)(p =>
+            withCost.updatedWith(adHoc("Params")) {
+              case Some(set) => Some(set + StringOrPair(p))
+              case None      => Some(TreeSet(StringOrPair(p)))
+            }
+          )
+          val withSalt = details.salt.fold(withParams)(s =>
+            withParams.updatedWith(adHoc("Salt")) {
+              case Some(set) => Some(set + StringOrPair(s))
+              case None      => Some(TreeSet(StringOrPair(s)))
+            }
+          )
+          withSalt
         case _ => tm
       }
     }

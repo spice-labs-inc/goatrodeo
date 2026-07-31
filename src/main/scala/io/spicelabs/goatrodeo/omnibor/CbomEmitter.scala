@@ -213,7 +213,24 @@ object CbomEmitter {
       .toString()
     val timestamp = Instant.now().toString()
     val toolVersion = hellogoat.BuildInfo.version
-    val components = items.flatMap(componentForItem).toList
+    val components = {
+      val all = items.flatMap(buildComponentsForItem)
+      // Deduplicate synthetic algorithm components across the root by bom-ref,
+      // preserving the first occurrence of each referenced algorithm.
+      val seen = scala.collection.mutable.LinkedHashSet[String]()
+      all.filter { c =>
+        val ref = (c \ "bom-ref") match {
+          case JString(s) => s
+          case _          => ""
+        }
+        if (ref.isEmpty) true
+        else if (seen.contains(ref)) false
+        else {
+          seen += ref
+          true
+        }
+      }.toList
+    }
 
     val baseFields: List[JField] = List(
       "bomFormat" -> JString("CycloneDX"),
@@ -254,8 +271,135 @@ object CbomEmitter {
     JObject(fields)
   }
 
-  /** Map a single Item to a CycloneDX component. */
-  private def componentForItem(item: Item): Option[JObject] = {
+  /** Description of an algorithm asset emitted alongside a crypto component. */
+  private case class AlgorithmSpec(
+      name: String,
+      primitive: String,
+      parameter: Option[String] = None,
+      curve: Option[String] = None
+  )
+
+  private val HashNames: Set[String] = Set(
+    "md5",
+    "sha1",
+    "sha224",
+    "sha256",
+    "sha384",
+    "sha512",
+    "sha3-256",
+    "sha3-512",
+    "blake2b",
+    "blake2s",
+    "whirlpool",
+    "ripemd160",
+    "bcrypt",
+    "scrypt",
+    "yescrypt",
+    "argon2",
+    "argon2d",
+    "argon2i",
+    "argon2id"
+  )
+
+  private val BlockCipherNames: Set[String] =
+    Set("aes", "des", "3des", "camellia", "aria", "seed", "blowfish", "twofish")
+
+  private val StreamCipherNames: Set[String] = Set("chacha", "salsa", "rc4")
+
+  private val KdfNames: Set[String] =
+    Set("pbkdf", "hkdf", "kdf", "scrypt", "argon2")
+
+  private val KeyAgreeNames: Set[String] =
+    Set("dh", "ecdh", "x25519", "x448", "ml-kem", "kyber", "kem")
+
+  private val SignatureNames: Set[String] =
+    Set("dsa", "ed25519", "ed448", "falcon", "slh-dsa", "ml-dsa", "with")
+
+  /** Normalize an algorithm string for use in a stable bom-ref. */
+  private def normalizeAlgName(name: String): String = {
+    val sb = new StringBuilder
+    name.toLowerCase.foreach { c =>
+      if (c.isLetterOrDigit || c == '-') sb.append(c)
+      else if (sb.nonEmpty && sb.last != '-') sb.append('-')
+    }
+    val s = sb.toString.stripPrefix("-").stripSuffix("-")
+    if (s.isEmpty) "unknown" else s
+  }
+
+  /** Synthetic bom-ref for an algorithm asset. */
+  private def algorithmRef(spec: AlgorithmSpec): String =
+    s"alg:${spec.primitive}:${normalizeAlgName(spec.name)}"
+
+  /** Heuristic primitive classification from an algorithm name. */
+  private def inferPrimitive(alg: String): String = {
+    val lower = alg.toLowerCase
+    if (HashNames.exists(lower.contains(_))) "hash"
+    else if (lower.contains("hmac")) "mac"
+    else if (BlockCipherNames.exists(lower.contains(_))) "block-cipher"
+    else if (StreamCipherNames.exists(lower.contains(_))) "stream-cipher"
+    else if (KdfNames.exists(lower.contains(_))) "kdf"
+    else if (KeyAgreeNames.exists(lower.contains(_))) "key-agree"
+    else if (SignatureNames.exists(lower.contains(_))) "signature"
+    else if (lower.contains("rsa")) "pke"
+    else "other"
+  }
+
+  /** Choose the CycloneDX primitive based on the usage context. */
+  private def primitiveFor(alg: String, context: String): String =
+    context match {
+      case "pke"       => "pke"
+      case "signature" => "signature"
+      case "hash"      => "hash"
+      case "mac"       => "mac"
+      case _           => inferPrimitive(alg)
+    }
+
+  /** Extract a numeric parameter (key length, digest length, etc.) from an
+    * algorithm name when no explicit size or curve is available.
+    */
+  private def parameterFromName(name: String): Option[String] = {
+    val lower = name.toLowerCase
+    if (
+      lower.contains("ed25519") || lower.contains("ed448") ||
+      lower.contains("x25519") || lower.contains("x448")
+    ) {
+      None
+    } else {
+      """(\d+)""".r.findFirstIn(lower)
+    }
+  }
+
+  /** Build an `algorithm` cryptographic-asset component for an algorithm spec.
+    */
+  private def algorithmComponent(
+      spec: AlgorithmSpec
+  ): Option[(String, JObject)] = {
+    val normalized = normalizeAlgName(spec.name)
+    if (normalized.isEmpty || normalized == "unknown") return None
+    val ref = algorithmRef(spec)
+    val param = spec.parameter
+      .orElse(spec.curve)
+      .orElse(parameterFromName(spec.name))
+    val apFields: List[JField] = List(
+      "primitive" -> JString(spec.primitive)
+    ) ++ param.map(p => "parameterSetIdentifier" -> JString(p)) ++
+      spec.curve.map(c => "curve" -> JString(c))
+    val component = JObject(
+      "type" -> JString("cryptographic-asset"),
+      "bom-ref" -> JString(ref),
+      "name" -> JString(spec.name),
+      "cryptoProperties" -> JObject(
+        "assetType" -> JString("algorithm"),
+        "algorithmProperties" -> JObject(apFields)
+      )
+    )
+    Some(ref -> component)
+  }
+
+  /** Map a single Item to a list of CycloneDX components: the main item plus
+    * any algorithm assets referenced by it.
+    */
+  private def buildComponentsForItem(item: Item): List[JObject] = {
     val extra = metaExtra(item)
     val name = extra
       .get("Name")
@@ -264,7 +408,7 @@ object CbomEmitter {
       .getOrElse(item.identifier)
 
     if (name.isEmpty()) {
-      return None
+      return Nil
     }
 
     val baseFields: List[JField] = List(
@@ -282,10 +426,10 @@ object CbomEmitter {
       if (props.arr.isEmpty) JObject(baseFields)
       else JObject(baseFields :+ ("properties" -> props))
 
-    cryptoPropertiesFor(item, extra) match {
-      case Some(cp) => Some(withProps ~ ("cryptoProperties" -> cp))
-      case None     => Some(withProps)
-    }
+    val (mainOpt, algs) = cryptoPropertiesFor(item, extra)
+    val mainComponent =
+      mainOpt.map(cp => withProps ~ ("cryptoProperties" -> cp))
+    mainComponent.toList ++ algs.values.toList
   }
 
   /** Extract metadata extra as a plain Map for easier lookups. */
@@ -320,35 +464,152 @@ object CbomEmitter {
     JArray(props)
   }
 
-  /** Build `cryptoProperties` for an Item based on its metadata family. */
+  /** Build `cryptoProperties` for an Item based on its metadata family.
+    *
+    * Returns the main component's cryptoProperties (if any) plus a map of
+    * synthetic bom-ref -> algorithm components referenced by that item.
+    */
   private def cryptoPropertiesFor(
       item: Item,
       extra: Map[String, Set[String]]
-  ): Option[JObject] = {
+  ): (Option[JObject], Map[String, JObject]) = {
+    val algs = scala.collection.mutable.Map[String, JObject]()
+
+    def addAlg(
+        raw: String,
+        context: String,
+        size: Option[Int] = None,
+        curve: Option[String] = None
+    ): Option[String] = {
+      val param = size.map(_.toString)
+      val spec = AlgorithmSpec(raw, primitiveFor(raw, context), param, curve)
+      algorithmComponent(spec).map { case (ref, comp) =>
+        algs += ref -> comp
+        ref
+      }
+    }
+
+    def firstCertOrTop(key: String): Option[String] =
+      first(extra, key).orElse(
+        first(extra, "Certificates:Cert:0:" + key.stripPrefix("Certificates:"))
+      )
+
+    def keySize(prefix: String): Option[Int] = {
+      val top = first(extra, s"${prefix}KeySize")
+        .orElse(first(extra, "Usign:KeySize"))
+        .orElse(first(extra, "SSH:KeySize"))
+        .orElse(first(extra, "Certificates:KeySize"))
+      top.flatMap(s => Try(s.toInt).toOption)
+    }
+
+    def curve(prefix: String): Option[String] = {
+      first(extra, s"${prefix}Curve")
+        .orElse(first(extra, "SSH:Curve"))
+        .orElse(first(extra, "Certificates:Curve"))
+    }
+
+    def usignKeySize: Option[Int] =
+      first(extra, "Usign:KeySize").flatMap(s => Try(s.toInt).toOption)
+
     if (hasCertificate(extra)) {
-      Some(buildCertificateProperties(extra))
+      val keyAlg = firstCertOrTop("Certificates:KeyAlgorithm")
+      val sigAlg = firstCertOrTop("Certificates:SigAlgorithm")
+      val keyRef = keyAlg.flatMap(
+        addAlg(_, "pke", keySize("Certificates:"), curve("Certificates:"))
+      )
+      val sigRef = sigAlg.flatMap(addAlg(_, "signature"))
+      (
+        Some(buildCertificateProperties(extra, keyRef, sigRef)),
+        algs.toMap
+      )
     } else if (hasOpenSSLConfig(extra)) {
-      Some(buildProtocolProperties(extra))
+      (Some(buildProtocolProperties(extra)), algs.toMap)
     } else if (hasJavaSecurity(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "other"))
+      (Some(buildRelatedCryptoMaterialProperties(extra, "other")), algs.toMap)
     } else if (hasKeystore(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "key"))
+      (Some(buildRelatedCryptoMaterialProperties(extra, "key")), algs.toMap)
     } else if (hasCrl(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "other"))
+      val sigRef =
+        first(extra, "Certificates:SigAlgorithm").flatMap(
+          addAlg(_, "signature")
+        )
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other", sigRef)),
+        algs.toMap
+      )
     } else if (hasPublicKey(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "public-key"))
+      val keyRef = first(extra, "Certificates:KeyAlgorithm")
+        .flatMap(
+          addAlg(_, "pke", keySize("Certificates:"), curve("Certificates:"))
+        )
+      val sigRef =
+        first(extra, "Certificates:SshCertSigAlgorithm").flatMap(
+          addAlg(_, "signature")
+        )
+      (
+        Some(
+          buildRelatedCryptoMaterialProperties(
+            extra,
+            "public-key",
+            keyRef,
+            sigRef
+          )
+        ),
+        algs.toMap
+      )
     } else if (hasPasswordHash(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "password-hash"))
+      val hashRefs =
+        extra
+          .getOrElse("PasswordHash:Algorithm", Set())
+          .flatMap(addAlg(_, "hash"))
+      val hashRef = hashRefs.headOption
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "password", hashRef)),
+        algs.toMap
+      )
     } else if (hasUsign(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "public-key"))
+      val keyRef =
+        first(extra, "Usign:KeyAlgorithm").flatMap(
+          addAlg(_, "pke", usignKeySize, None)
+        )
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "public-key", keyRef)),
+        algs.toMap
+      )
     } else if (hasSSH(extra)) {
-      Some(buildSSHProperties(extra))
+      val materialType =
+        extra.get("SSH:MaterialType").flatMap(_.headOption).getOrElse("other")
+      val keyAlg =
+        first(extra, "SSH:KeyAlgorithm").orElse(
+          first(extra, "Certificates:KeyAlgorithm")
+        )
+      val keyRef = keyAlg.flatMap(
+        addAlg(_, "pke", keySize("SSH:"), curve("SSH:"))
+      )
+      val sigRef =
+        first(extra, "Certificates:SshCertSigAlgorithm").flatMap(
+          addAlg(_, "signature")
+        )
+      val cp =
+        if (
+          materialType == "public-key" || materialType == "private-key" || materialType == "private-key-placeholder"
+        ) {
+          buildRelatedCryptoMaterialProperties(extra, materialType, keyRef)
+        } else {
+          buildRelatedCryptoMaterialProperties(
+            extra,
+            materialType,
+            keyRef,
+            sigRef
+          )
+        }
+      (Some(cp), algs.toMap)
     } else if (hasTLSConfig(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "other"))
+      (Some(buildRelatedCryptoMaterialProperties(extra, "other")), algs.toMap)
     } else if (hasEmbeddedCertificate(extra)) {
-      Some(buildRelatedCryptoMaterialProperties(extra, "other"))
+      (Some(buildRelatedCryptoMaterialProperties(extra, "other")), algs.toMap)
     } else {
-      None
+      (None, algs.toMap)
     }
   }
 
@@ -402,14 +663,20 @@ object CbomEmitter {
   /** Build related-crypto-material properties for SSH keys, using the material
     * type captured in `SSH:MaterialType` (public-key or private-key).
     */
-  private def buildSSHProperties(extra: Map[String, Set[String]]): JObject = {
+  private def buildSSHProperties(
+      extra: Map[String, Set[String]],
+      keyRef: Option[String],
+      sigRef: Option[String]
+  ): JObject = {
     val materialType =
       extra.get("SSH:MaterialType").flatMap(_.headOption).getOrElse("other")
-    buildRelatedCryptoMaterialProperties(extra, materialType)
+    buildRelatedCryptoMaterialProperties(extra, materialType, keyRef, sigRef)
   }
 
   private def buildCertificateProperties(
-      extra: Map[String, Set[String]]
+      extra: Map[String, Set[String]],
+      keyRef: Option[String],
+      sigRef: Option[String]
   ): JObject = {
     val subject = first(extra, "Certificates:SubjectDN")
       .orElse(first(extra, "Certificates:Cert:0:SubjectDN"))
@@ -425,6 +692,8 @@ object CbomEmitter {
       issuer.map(s => "issuerName" -> JString(s)),
       notBefore.map(s => "notValidBefore" -> JString(s)),
       notAfter.map(s => "notValidAfter" -> JString(s)),
+      keyRef.map(r => "subjectPublicKeyRef" -> JString(r)),
+      sigRef.map(r => "signatureAlgorithmRef" -> JString(r)),
       Some("certificateFormat" -> JString("X.509"))
     ).flatten
 
@@ -471,14 +740,20 @@ object CbomEmitter {
 
   private def buildRelatedCryptoMaterialProperties(
       extra: Map[String, Set[String]],
-      materialType: String
+      materialType: String,
+      algorithmRef: Option[String] = None,
+      signatureRef: Option[String] = None
   ): JObject = {
     val size = first(extra, "Certificates:KeySize")
+      .orElse(first(extra, "Usign:KeySize"))
+      .orElse(first(extra, "SSH:KeySize"))
       .orElse(first(extra, "Certificates:Cert:0:KeySize"))
       .flatMap(s => Try(s.toInt).toOption)
 
+    val ref = algorithmRef.orElse(signatureRef)
     val matFields: List[JField] = List(
       Some("type" -> JString(materialType)),
+      ref.map(r => "algorithmRef" -> JString(r)),
       size.map(s => "size" -> JInt(s))
     ).flatten
 

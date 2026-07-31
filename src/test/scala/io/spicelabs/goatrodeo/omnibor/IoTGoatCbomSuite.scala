@@ -158,6 +158,53 @@ class IoTGoatCbomSuite extends FunSuite {
         ),
         "CBOM should not invent a WiFi PSK for the open AP"
       )
+
+      // Algorithmic metadata is promoted into structured CycloneDX fields.
+      val algorithmComponents = components.filter { c =>
+        c.path("cryptoProperties").path("assetType").asText("") == "algorithm"
+      }
+      assert(
+        algorithmComponents.nonEmpty,
+        "CBOM should contain algorithm components"
+      )
+      assert(
+        algorithmComponents.exists(
+          _.path("bom-ref").asText("").contains("ed25519")
+        ),
+        "CBOM should contain an ed25519 algorithm component for usign keys"
+      )
+      assert(
+        algorithmComponents.exists(
+          _.path("bom-ref").asText("").contains("md5")
+        ),
+        "CBOM should contain an md5 algorithm component for password hashes"
+      )
+
+      val usignWithSize = components.exists { c =>
+        val rcmp =
+          c.path("cryptoProperties").path("relatedCryptoMaterialProperties")
+        c.path("name").asText("").nonEmpty &&
+        rcmp.path("type").asText("").contains("public-key") &&
+        rcmp.path("algorithmRef").asText("").contains("ed25519") &&
+        rcmp.path("size").asInt(0) == 256
+      }
+      assert(
+        usignWithSize,
+        "At least one usign public-key should reference ed25519 with size 256"
+      )
+
+      val shadowHasAlgRef = components.exists { c =>
+        c.path("name").asText("").contains("shadow") &&
+        c.path("cryptoProperties")
+          .path("relatedCryptoMaterialProperties")
+          .path("algorithmRef")
+          .asText("")
+          .contains("alg:hash")
+      }
+      assert(
+        shadowHasAlgRef,
+        "The shadow component should reference a hash algorithm"
+      )
     } finally {
       deleteRecursive(outputDir)
       deleteRecursive(cbomDir)

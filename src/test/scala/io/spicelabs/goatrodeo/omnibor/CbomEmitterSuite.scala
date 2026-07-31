@@ -156,6 +156,19 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
+  private def findComponentByRef(json: JValue, ref: String): Option[JValue] = {
+    getComponents(json).find { c =>
+      (c \ "bom-ref") match {
+        case JString(s) => s == ref
+        case _          => false
+      }
+    }
+  }
+
+  private def cryptoProperties(component: JValue): JValue = {
+    component \ "cryptoProperties"
+  }
+
   // ----------------------------------------------------------------------
   // T3.1 / T3.17 CLI parsing
   // ----------------------------------------------------------------------
@@ -252,7 +265,7 @@ class CbomEmitterSuite extends FunSuite {
       val json = writeAndRead(storage, root, dir)
 
       val components = getComponents(json)
-      assertEquals(components.length, 1)
+      assertEquals(components.length, 3)
       val component = components.head
 
       assertEquals(getString(component, "type"), "cryptographic-asset")
@@ -272,11 +285,56 @@ class CbomEmitterSuite extends FunSuite {
         getString(cp, "certificateProperties", "certificateFormat"),
         "X.509"
       )
+      assertEquals(
+        getString(cp, "certificateProperties", "subjectPublicKeyRef"),
+        "alg:pke:rsa"
+      )
+      assertEquals(
+        getString(cp, "certificateProperties", "signatureAlgorithmRef"),
+        "alg:signature:sha256withrsa"
+      )
 
       val props = propertyMap(component)
       assertEquals(props("Certificates:KeyAlgorithm"), "RSA")
       assertEquals(props("Certificates:SigAlgorithm"), "SHA256withRSA")
       assertEquals(props("Certificates:KeySize"), "2048")
+
+      val keyAlg = findComponentByRef(json, "alg:pke:rsa").get
+      assertEquals(getString(keyAlg, "type"), "cryptographic-asset")
+      assertEquals(getString(keyAlg, "name"), "RSA")
+      assertEquals(
+        getString(keyAlg, "cryptoProperties", "assetType"),
+        "algorithm"
+      )
+      assertEquals(
+        getString(
+          keyAlg,
+          "cryptoProperties",
+          "algorithmProperties",
+          "primitive"
+        ),
+        "pke"
+      )
+      assertEquals(
+        getInt(
+          keyAlg,
+          "cryptoProperties",
+          "algorithmProperties",
+          "parameterSetIdentifier"
+        ),
+        2048
+      )
+
+      val sigAlg = findComponentByRef(json, "alg:signature:sha256withrsa").get
+      assertEquals(
+        getString(
+          sigAlg,
+          "cryptoProperties",
+          "algorithmProperties",
+          "primitive"
+        ),
+        "signature"
+      )
 
       assert(validate(compact(render(json)), schema16).isEmpty)
     } finally {
@@ -435,6 +493,8 @@ class CbomEmitterSuite extends FunSuite {
       val json = writeAndRead(storage, root, dir, "1.7")
 
       assertEquals(getString(json, "specVersion"), "1.7")
+      val components = getComponents(json)
+      assertEquals(components.length, 2)
       assert(validate(compact(render(json)), schema17).isEmpty)
     } finally {
       cleanup(dir)
@@ -860,6 +920,430 @@ class CbomEmitterSuite extends FunSuite {
         assert(!p.contains(PosixFilePermission.OTHERS_READ))
         assert(!p.contains(PosixFilePermission.OTHERS_WRITE))
       }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.23 related-crypto-material public key references its algorithm
+  // ----------------------------------------------------------------------
+  test("T3.23 public key material emits algorithmRef and size") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val keyId =
+        "gitoid:blob:sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+      val key = makeItem(
+        id = keyId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("test-key.pub"),
+        mimeTypes = TreeSet("application/x-openssh-public-key"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("test-key")),
+          "Certificates:KeyAlgorithm" -> TreeSet(StringOrPair("ed25519")),
+          "Certificates:KeySize" -> TreeSet(StringOrPair("256"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> keyId),
+        fileNames = TreeSet("root.tar"),
+        mimeTypes = TreeSet("application/x-tar")
+      )
+      storeItem(storage, key)
+      val json = writeAndRead(storage, root, dir)
+
+      val components = getComponents(json)
+      assertEquals(components.length, 2)
+      val keyComponent = components.find { c =>
+        (c \ "cryptoProperties" \ "assetType") == JString(
+          "related-crypto-material"
+        )
+      }.get
+      assertEquals(
+        getString(
+          keyComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "type"
+        ),
+        "public-key"
+      )
+      assertEquals(
+        getString(
+          keyComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "algorithmRef"
+        ),
+        "alg:pke:ed25519"
+      )
+      assertEquals(
+        getInt(
+          keyComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "size"
+        ),
+        256
+      )
+
+      val alg = findComponentByRef(json, "alg:pke:ed25519").get
+      assertEquals(getString(alg, "name"), "ed25519")
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "primitive"),
+        "pke"
+      )
+      assertEquals(
+        getInt(
+          alg,
+          "cryptoProperties",
+          "algorithmProperties",
+          "parameterSetIdentifier"
+        ),
+        256
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.24 CRL references its signature algorithm
+  // ----------------------------------------------------------------------
+  test("T3.24 CRL emits signature algorithmRef and algorithm component") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val crlId =
+        "gitoid:blob:sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+      val crl = makeItem(
+        id = crlId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("test.crl"),
+        mimeTypes = TreeSet("application/pkix-crl"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("test")),
+          "Certificates:CrlSha256" -> TreeSet(StringOrPair("abc123")),
+          "Certificates:SigAlgorithm" -> TreeSet(StringOrPair("SHA256withRSA")),
+          "Certificates:IssuerDN" -> TreeSet(StringOrPair("CN=issuer"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> crlId),
+        fileNames = TreeSet("root.zip"),
+        mimeTypes = TreeSet("application/zip")
+      )
+      storeItem(storage, crl)
+      val json = writeAndRead(storage, root, dir)
+
+      val components = getComponents(json)
+      assertEquals(components.length, 2)
+      val crlComponent = components.find { c =>
+        (c \ "cryptoProperties" \ "assetType") == JString(
+          "related-crypto-material"
+        )
+      }.get
+      assertEquals(
+        getString(
+          crlComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "algorithmRef"
+        ),
+        "alg:signature:sha256withrsa"
+      )
+
+      val alg = findComponentByRef(json, "alg:signature:sha256withrsa").get
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "primitive"),
+        "signature"
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.25 certificate with EC public key exposes curve in algorithm component
+  // ----------------------------------------------------------------------
+  test("T3.25 EC certificate promotes curve into algorithmProperties") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val certId =
+        "gitoid:blob:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+      val cert = makeItem(
+        id = certId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("ec-cert.pem"),
+        mimeTypes = TreeSet("application/x-pem-file"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("ec-cert")),
+          "Certificates:SubjectDN" -> TreeSet(StringOrPair("CN=test")),
+          "Certificates:KeyAlgorithm" -> TreeSet(StringOrPair("ec")),
+          "Certificates:Curve" -> TreeSet(StringOrPair("p-256")),
+          "Certificates:SigAlgorithm" -> TreeSet(
+            StringOrPair("ECDSAwithSHA256")
+          )
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> certId),
+        fileNames = TreeSet("root.jar"),
+        mimeTypes = TreeSet("application/java-archive")
+      )
+      storeItem(storage, cert)
+      val json = writeAndRead(storage, root, dir)
+
+      val alg = findComponentByRef(json, "alg:pke:ec").get
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "primitive"),
+        "pke"
+      )
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "curve"),
+        "p-256"
+      )
+      assertEquals(
+        getString(
+          alg,
+          "cryptoProperties",
+          "algorithmProperties",
+          "parameterSetIdentifier"
+        ),
+        "p-256"
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.26 password hash file references hash algorithm component
+  // ----------------------------------------------------------------------
+  test("T3.26 password hash file emits algorithmRef for hash family") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val hashId =
+        "gitoid:blob:sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+      val hashFile = makeItem(
+        id = hashId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("shadow"),
+        mimeTypes = TreeSet("text/plain"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("shadow")),
+          "PasswordHash:Algorithm" -> TreeSet(StringOrPair("bcrypt"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> hashId),
+        fileNames = TreeSet("root.tar"),
+        mimeTypes = TreeSet("application/x-tar")
+      )
+      storeItem(storage, hashFile)
+      val json = writeAndRead(storage, root, dir)
+
+      val components = getComponents(json)
+      assertEquals(components.length, 2)
+      val hashComponent = components.find { c =>
+        (c \ "cryptoProperties" \ "assetType") == JString(
+          "related-crypto-material"
+        )
+      }.get
+      assertEquals(
+        getString(
+          hashComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "type"
+        ),
+        "password"
+      )
+      assertEquals(
+        getString(
+          hashComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "algorithmRef"
+        ),
+        "alg:hash:bcrypt"
+      )
+
+      val alg = findComponentByRef(json, "alg:hash:bcrypt").get
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "primitive"),
+        "hash"
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.27 usign key emits ed25519 algorithmRef and key size
+  // ----------------------------------------------------------------------
+  test("T3.27 usign key emits ed25519 algorithmRef and size") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val keyId =
+        "gitoid:blob:sha256:9999999999999999999999999999999999999999999999999999999999999999"
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+      val key = makeItem(
+        id = keyId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("1035ac73cc4e59e3"),
+        mimeTypes = TreeSet("text/plain"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("1035ac73cc4e59e3")),
+          "Usign:KeyAlgorithm" -> TreeSet(StringOrPair("ed25519")),
+          "Usign:KeySize" -> TreeSet(StringOrPair("256"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> keyId),
+        fileNames = TreeSet("root.tar"),
+        mimeTypes = TreeSet("application/x-tar")
+      )
+      storeItem(storage, key)
+      val json = writeAndRead(storage, root, dir)
+
+      val components = getComponents(json)
+      assertEquals(components.length, 2)
+      val keyComponent = components.find { c =>
+        (c \ "cryptoProperties" \ "assetType") == JString(
+          "related-crypto-material"
+        )
+      }.get
+      assertEquals(
+        getString(
+          keyComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "type"
+        ),
+        "public-key"
+      )
+      assertEquals(
+        getString(
+          keyComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "algorithmRef"
+        ),
+        "alg:pke:ed25519"
+      )
+      assertEquals(
+        getInt(
+          keyComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "size"
+        ),
+        256
+      )
+
+      val alg = findComponentByRef(json, "alg:pke:ed25519").get
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "primitive"),
+        "pke"
+      )
+      assertEquals(
+        getInt(
+          alg,
+          "cryptoProperties",
+          "algorithmProperties",
+          "parameterSetIdentifier"
+        ),
+        256
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.28 md5 password hash emits hash algorithmRef
+  // ----------------------------------------------------------------------
+  test("T3.28 md5 password hash emits hash algorithmRef") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val hashId =
+        "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+      val hashFile = makeItem(
+        id = hashId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("shadow"),
+        mimeTypes = TreeSet("text/plain"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("shadow")),
+          "PasswordHash:Algorithm" -> TreeSet(StringOrPair("md5")),
+          "PasswordHash:Salt" -> TreeSet(StringOrPair("salt123"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> hashId),
+        fileNames = TreeSet("root.tar"),
+        mimeTypes = TreeSet("application/x-tar")
+      )
+      storeItem(storage, hashFile)
+      val json = writeAndRead(storage, root, dir)
+
+      val components = getComponents(json)
+      assertEquals(components.length, 2)
+      val hashComponent = components.find { c =>
+        (c \ "cryptoProperties" \ "assetType") == JString(
+          "related-crypto-material"
+        )
+      }.get
+      assertEquals(
+        getString(
+          hashComponent,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "algorithmRef"
+        ),
+        "alg:hash:md5"
+      )
+
+      val alg = findComponentByRef(json, "alg:hash:md5").get
+      assertEquals(
+        getString(alg, "cryptoProperties", "algorithmProperties", "primitive"),
+        "hash"
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
     } finally {
       cleanup(dir)
     }

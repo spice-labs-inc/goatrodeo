@@ -29,8 +29,11 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.SshWireReader
 
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.Base64
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -185,33 +188,19 @@ class SSHKeyState(artifact: ArtifactWrapper)
       )
     }
 
-    // Public key / authorized_keys file
-    val (types, comments) = text
-      .split("\n")
-      .toVector
-      .foldLeft(
-        (TreeSet.empty[StringOrPair], TreeSet.empty[StringOrPair])
-      ) { case ((types, comments), line) =>
-        val trimmed = line.trim
-        if (trimmed.isEmpty || trimmed.startsWith("#")) {
-          (types, comments)
-        } else {
-          val parts = trimmed.split("\\s+")
-          val (t, c) =
-            if (
-              parts.length >= 2 && SSHKeysStrategy.SshAlgs.contains(parts(0))
-            ) {
-              (
-                types + StringOrPair(SSHKeysStrategy.sshAlgorithm(parts(0))),
-                if (parts.length >= 3) comments + StringOrPair(parts(2))
-                else comments
-              )
-            } else {
-              (types, comments)
-            }
-          (t, c)
-        }
-      }
+    // Public key / authorized_keys file: parse each line for algorithm,
+    // key size, curve, and fingerprint.
+    val parsed = text.split("\n").toVector.flatMap(parseSshLine)
+    val keyTypes = TreeSet.from(parsed.map(_.keyType).map(StringOrPair(_)))
+    val keyAlgs = TreeSet.from(parsed.map(_.canonicalAlg).map(StringOrPair(_)))
+    val keySizes = TreeSet.from(
+      parsed.flatMap(_.keySize).map(s => StringOrPair(s.toString))
+    )
+    val curves = TreeSet.from(parsed.flatMap(_.curve).map(StringOrPair(_)))
+    val fingerprints = TreeSet.from(
+      parsed.map(_.fingerprint).map(StringOrPair(_))
+    )
+    val comments = TreeSet.from(parsed.flatMap(_.comment).map(StringOrPair(_)))
 
     var tm = TreeMap[String, TreeSet[StringOrPair]](
       MKC.NAME -> TreeSet(StringOrPair(fileName)),
@@ -219,12 +208,87 @@ class SSHKeyState(artifact: ArtifactWrapper)
       adHoc("MaterialType") -> TreeSet(StringOrPair("public-key")),
       adHoc("FilePath") -> TreeSet(StringOrPair("/" + path))
     )
-    if (types.nonEmpty) {
-      tm = tm + (adHoc("KeyType") -> types)
+    if (keyTypes.nonEmpty) {
+      tm = tm + (adHoc("KeyType") -> keyTypes)
+    }
+    if (keyAlgs.nonEmpty) {
+      tm = tm + (adHoc("KeyAlgorithm") -> keyAlgs)
+    }
+    if (keySizes.nonEmpty) {
+      tm = tm + (adHoc("KeySize") -> keySizes)
+    }
+    if (curves.nonEmpty) {
+      tm = tm + (adHoc("Curve") -> curves)
+    }
+    if (fingerprints.nonEmpty) {
+      tm = tm + (adHoc("KeyFingerprintSha256") -> fingerprints)
     }
     if (comments.nonEmpty) {
       tm = tm + (adHoc("Comment") -> comments)
     }
     tm
+  }
+
+  private case class ParsedSshKey(
+      keyType: String,
+      canonicalAlg: String,
+      keySize: Option[Int],
+      curve: Option[String],
+      fingerprint: String,
+      comment: Option[String]
+  )
+
+  /** Parse a single OpenSSH public-key line. Returns `None` for blank/comment
+    * lines or unsupported algorithms.
+    */
+  private def parseSshLine(line: String): Option[ParsedSshKey] = {
+    val trimmed = line.trim
+    if (trimmed.isEmpty || trimmed.startsWith("#")) return None
+    SshWireReader.parseFirstKeyLine(trimmed).flatMap {
+      case (algName, wire, optComment) =>
+        if (!SSHKeysStrategy.SshAlgs.contains(algName)) None
+        else {
+          val algInfo = Certificates.sshAlgMap(algName)
+          val canon = algInfo.alg
+          val companion = algInfo.data
+          val (size, curve) = canon match {
+            case "rsa" =>
+              val r = SshWireReader(wire)
+              val bits = for {
+                _ <- r.readMpint()
+                n <- r.readMpint()
+              } yield SshWireReader.mpintBitLength(n)
+              (bits, None)
+            case "dsa" =>
+              (Some(1024), None)
+            case "ec" =>
+              val c = companion.flatMap {
+                case ("curve", v) => Some(v)
+                case _            => None
+              }
+              (None, c)
+            case _ =>
+              (None, None)
+          }
+          val fp = sshFingerprintB64(wire)
+          Some(
+            ParsedSshKey(
+              keyType = algName,
+              canonicalAlg = canon,
+              keySize = size,
+              curve = curve,
+              fingerprint = fp,
+              comment = optComment
+            )
+          )
+        }
+    }
+  }
+
+  /** SHA-256 base64-no-padding fingerprint over an SSH wire blob. */
+  private def sshFingerprintB64(wire: Array[Byte]): String = {
+    val md = MessageDigest.getInstance("SHA-256")
+    val digest = md.digest(wire)
+    s"SHA-256:${Base64.getEncoder.withoutPadding.encodeToString(digest)}"
   }
 }
