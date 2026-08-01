@@ -98,7 +98,7 @@ class SaffronTests extends munit.FunSuite {
   // contents.
   test("check minimal squashfs for files") {
     val squashfs =
-      File("saffron/src/test/resources/squashfs/alpine-minimal.squashfs")
+      File("test_data/alpine-minimal.squashfs")
     assert(squashfs.exists())
     val artifact: ArtifactWrapper =
       FileWrapper(squashfs, squashfs.getName(), None)

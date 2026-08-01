@@ -13,20 +13,35 @@
   <url>https://github.com/spice-labs-inc/goatrodeo</url>
 
   <!--
-    Compile-from-source Maven build, ported from build.sbt. This is a
-    proof-of-concept living alongside the sbt build; `maven/pom.xml` remains
-    the publish-only shell used by the release workflow.
+    Compile-from-source Maven build, ported from build.sbt. It is intended
+    to be a first-class alternative to the sbt build for day-to-day
+    development; `maven/pom.xml` remains the publish-only shell used by the
+    release workflow.
 
     Quick start:
       mvn -DskipTests compile     # fast: verify it compiles
-      mvn test                    # runs the suite (see PreflightSuite for
-                                  # the test-data / git-lfs prerequisites)
+      mvn test                    # runs the unit-test suite (see PreflightSuite
+                                  # for the test-data / git-lfs prerequisites)
+      mvn verify                  # runs unit tests + fat-jar integration tests
+
+    Environment-based test tuning (mirrors build.sbt):
+      - TEST_THREAD_CNT unset -> dev mode: one forked JVM per test class
+      - TEST_THREAD_CNT set   -> CI mode: single non-forked JVM
+      - TEST_FORK set         -> force 4 forked JVMs even when TEST_THREAD_CNT is set
+
+    Publishing:
+      - distributionManagement points at GitHub Packages, matching build.sbt's
+        publishTo. Credentials must be supplied in ~/.m2/settings.xml; they
+        are intentionally NOT stored in this file.
+      - GPG signing and Sonatype Central publishing remain in maven/pom.xml.
   -->
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scala.version>3.8.3</scala.version>
     <maven.compiler.release>17</maven.compiler.release>
+    <!-- The sbt version used by the sibling build.sbt build; surfaced in BuildInfo for parity -->
+    <sbt.version>1.10.6</sbt.version>
 
     <!-- Library versions, aligned with build.sbt -->
     <scala-xml.version>2.3.0</scala-xml.version>
@@ -54,20 +69,26 @@
     <scalacheck.version>1.18.1</scalacheck.version>
     <jackson.version>2.18.1</jackson.version>
     <json-schema-validator.version>1.5.4</json-schema-validator.version>
+    <zstd-jni.version>1.5.6-9</zstd-jni.version>
 
     <!-- Test tuning (mirrors build.sbt) -->
     <!-- Test forking/parallelism tuning.
          TEST_THREAD_CNT=anything switches to a single non-forked JVM for CI.
          TEST_FORK=anything forces forking.
-         GC warnings are redirected to a file because the G1GC GCLocker
-         warning is written to the native console stream and corrupts Surefire's
-         IPC channel when tests fork; this made ADGTests look like an
-         InterruptedException failure. -->
-    <test.forkCount>4</test.forkCount>
-    <test.reuseForks>true</test.reuseForks>
+         GC warnings are redirected to a file (-Xlog:disable followed by a
+         file selector) because the G1GC GCLocker warning is written to the
+         native console stream and corrupts Surefire's IPC channel when tests
+         fork. A fresh JVM per test class (reuseForks=false) avoids heap
+         fragmentation from memory-intensive suites. -->
+    <test.forkCount>1</test.forkCount>
+    <test.reuseForks>false</test.reuseForks>
+    <!-- Dev mode mirrors build.sbt's `fork := true`: tests run in forked
+         JVMs. Set TEST_FORK to opt into the 4-fork parallel configuration. -->
     <test.parallel>none</test.parallel>
     <test.threadCount>4</test.threadCount>
-    <test.argLine>-Xmx8G -Duser.timezone=GMT -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+    <test.parallel>none</test.parallel>
+    <test.threadCount>4</test.threadCount>
+    <test.argLine>-Xmx12G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
   </properties>
 
   <licenses>
@@ -78,6 +99,27 @@
     </license>
   </licenses>
 
+  <scm>
+    <url>https://github.com/spice-labs-inc/goatrodeo</url>
+    <connection>scm:git:git://github.com/spice-labs-inc/goatrodeo.git</connection>
+    <developerConnection>scm:git:ssh://github.com/spice-labs-inc/goatrodeo.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
+  <developers>
+    <developer>
+      <id>spicelabs</id>
+      <name>Spice Labs</name>
+      <email>engineering@spicelabs.io</email>
+      <url>https://github.com/spice-labs-inc</url>
+    </developer>
+  </developers>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/spice-labs-inc/goatrodeo/issues</url>
+  </issueManagement>
+
   <repositories>
     <repository>
       <id>central</id>
@@ -87,7 +129,33 @@
       <id>ow2</id>
       <url>https://repository.ow2.org/nexus/content/repositories/public/</url>
     </repository>
+    <repository>
+      <id>github</id>
+      <name>GitHub Package Registry</name>
+      <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
+    </repository>
   </repositories>
+
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Package Registry</name>
+      <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
+    </repository>
+  </distributionManagement>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- zstd-jni is pulled in transitively by multiple archive readers;
+           align it to a single version to match build.sbt's
+           libraryDependencySchemes "Always" semantics. -->
+      <dependency>
+        <groupId>com.github.luben</groupId>
+        <artifactId>zstd-jni</artifactId>
+        <version>${zstd-jni.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- Scala 3 standard library (implicit under sbt, explicit under Maven).
@@ -360,6 +428,22 @@
         </executions>
       </plugin>
 
+      <!-- Don't bundle logback.xml in the library jar; consumers provide their own.
+           Matches build.sbt's `Compile / packageBin / mappings` filter. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <excludes>
+            <!-- Match sbt's default: do not bundle SemanticDB files or
+                 logback.xml in the published library jar. -->
+            <exclude>logback.xml</exclude>
+            <exclude>META-INF/semanticdb/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
       <!-- Scala 3 compiler -->
       <plugin>
         <groupId>net.alchim31.maven</groupId>
@@ -376,6 +460,8 @@
             <arg>-no-indent</arg>
             <arg>-release</arg>
             <arg>17</arg>
+            <!-- Enable SemanticDB output to match build.sbt's semanticdbEnabled -->
+            <arg>-Ysemanticdb</arg>
           </args>
         </configuration>
         <executions>
@@ -410,10 +496,11 @@
             <include>**/*Probe.class</include>
           </includes>
           <excludes>
-            <!-- These assert on the packaged fat jar, which is built in the
+            <!-- These assert on packaged jars, which are built in the
                  `package` phase (after `test`). Run them post-package instead. -->
             <exclude>**/FatJarContentsTest.class</exclude>
             <exclude>**/FatJarExecutionTest.class</exclude>
+            <exclude>**/JarPackagingTest.class</exclude>
           </excludes>
           <forkCount>${test.forkCount}</forkCount>
           <reuseForks>${test.reuseForks}</reuseForks>
@@ -425,7 +512,11 @@
       </plugin>
 
       <!-- Fat jar (replaces sbt-assembly); strips signature files like the
-           sbt assemblyMergeStrategy did -->
+           sbt assemblyMergeStrategy did. Note: sbt-assembly uses
+           MergeStrategy.last for all other duplicate resources, whereas Shade
+           keeps the first copy it sees. In practice this project has no known
+           conflicting non-signature resources; if one appears, add a targeted
+           ResourceTransformer rather than a custom "last wins" transformer. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -462,13 +553,30 @@
         </executions>
       </plugin>
 
-      <!-- Copy the shaded fat jar to the path the sbt-origin fat-jar tests
-           expect, so they can run unchanged under Maven. -->
+      <!-- Stage sbt-style output directories that tests reference directly.
+           Maven writes classes to target/classes; sbt writes them to
+           target/scala-3.8.3/classes. A symlink keeps the tests unchanged. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
         <version>3.1.0</version>
         <executions>
+          <execution>
+            <id>stage-classes-for-tests</id>
+            <phase>process-classes</phase>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.directory}/scala-3.8.3"/>
+                <symlink
+                  link="${project.build.directory}/scala-3.8.3/classes"
+                  resource="${project.build.directory}/classes"
+                  overwrite="true"/>
+              </target>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
           <execution>
             <id>stage-fat-jar-for-tests</id>
             <phase>package</phase>
@@ -507,6 +615,7 @@
           <includes>
             <include>**/FatJarContentsTest.class</include>
             <include>**/FatJarExecutionTest.class</include>
+            <include>**/JarPackagingTest.class</include>
           </includes>
           <argLine>${test.argLine}</argLine>
         </configuration>
@@ -515,9 +624,10 @@
   </build>
 
   <!-- Environment-based test tuning, matching build.sbt:
-       - TEST_THREAD_CNT set  -> CI mode: no forking, no parallelism
-       - TEST_THREAD_CNT unset -> dev mode: fork and run classes in parallel
-       - TEST_FORK set         -> force forking even when TEST_THREAD_CNT is set -->
+       - TEST_THREAD_CNT unset -> dev mode: forked JVMs, up to 4 concurrent forks
+       - TEST_THREAD_CNT set   -> CI mode: no forking, no parallelism
+       - TEST_FORK set         -> force forking even when TEST_THREAD_CNT is set,
+                                  but keep parallelism disabled (CI mode) -->
   <profiles>
     <profile>
       <id>ci</id>

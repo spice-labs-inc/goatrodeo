@@ -12,8 +12,9 @@ object BuildInfo {
   val name: String = "goatrodeo"
   val version: String = "${project.version}"
   val scalaVersion: String = "${scala.version}"
+  val sbtVersion: String = "${sbt.version}"
   val commit: String = "${git.commit.id}"
 
   override def toString: String =
-    s"name: $name, version: $version, scalaVersion: $scalaVersion, commit: $commit"
+    s"name: $name, version: $version, scalaVersion: $scalaVersion, sbtVersion: $sbtVersion, commit: $commit"
 }

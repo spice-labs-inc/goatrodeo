@@ -85,6 +85,16 @@ java -jar target/scala-3.7.4/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/
 
 > **Requirements:** Java 21+, Git LFS
 
+You can also build with Maven:
+
+```bash
+mvn -DskipTests package
+java -jar target/scala-3.8.3/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
+```
+
+See [docs/maven-build.md](docs/maven-build.md) for test tuning, publishing, and
+troubleshooting.
+
 ### Option 4: As a Library
 
 **Maven:**
