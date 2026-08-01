@@ -12,6 +12,7 @@ import scopt.OParserBuilder
 import java.io.File
 import java.io.FileFilter
 import java.nio.file.Files
+import java.time.Instant
 import java.util.Date
 import java.util.regex.Pattern
 import scala.io.Source
@@ -112,6 +113,7 @@ case class Config(
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
     progressListener: Option[ProgressListener] = None,
+    expiry: Option[Instant] = None,
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6"
 ) {
@@ -147,6 +149,29 @@ case class Config(
   */
 object Config {
   private val logger = Logger(getClass())
+
+  /** System property supplying the expiry cutoff when it is not set explicitly
+    * (via `--expiry` or `withExpiry`). This lets an in-JVM caller — or
+    * `-Dgoatrodeo.expiry=…` on the command line — enable the file-modification
+    * cutoff without depending on the builder API: an older build that does not
+    * read this property simply ignores it and runs normally. Accepts epoch
+    * milliseconds, an ISO-8601 instant, or a flexible date string.
+    */
+  val ExpiryProperty = "goatrodeo.expiry"
+
+  def expiryFromProperty: Option[Instant] =
+    Option(System.getProperty(ExpiryProperty))
+      .map(_.trim)
+      .filter(_.nonEmpty)
+      .flatMap { raw =>
+        val fromMillis =
+          if (raw.forall(_.isDigit))
+            Try(Instant.ofEpochMilli(raw.toLong)).toOption
+          else None
+        fromMillis
+          .orElse(Try(Instant.parse(raw)).toOption)
+          .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
+      }
 
   /** The scopt parser builder instance. */
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
@@ -188,6 +213,18 @@ object Config {
           "Tag all top level artifacts (files) with the current date and the text of the tag"
         )
         .action((x, c) => c.copy(tag = Some(x))),
+      opt[String]("expiry")
+        .text(
+          "Refuse to analyze internal files modified after this date/time (e.g. 2026-01-01); dependents are dropped too"
+        )
+        .action((x, c) =>
+          DateParser.parse(x) match {
+            case Right(date) => c.copy(expiry = Some(date.toInstant()))
+            case Left(error) =>
+              logger.error(f"Invalid --expiry value: ${error}")
+              c
+          }
+        ),
       opt[File]("ingested")
         .text(
           "Append all the ingested files to this file on successful completion"

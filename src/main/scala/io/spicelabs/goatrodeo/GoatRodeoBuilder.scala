@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
 
 import java.nio.file.Paths
+import java.time.Instant
 import java.util.regex.Pattern
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
@@ -265,6 +266,40 @@ class GoatRodeoBuilder {
     io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
       case Right(date) =>
         config = config.copy(tagDate = Some(date))
+        Right(this)
+      case Left(error) =>
+        Left(error)
+    }
+  }
+
+  /** Refuse to analyze internal files modified after `expiry`. Any archive
+    * entry whose modification time is after this instant is dropped from the
+    * ADG, along with everything that transitively contains it or is built from
+    * it (they must be at least as new), so no dangling references remain.
+    * Entries with no/unknown modification time are always kept.
+    *
+    * @param expiry
+    *   the cutoff instant
+    * @return
+    *   this builder
+    */
+  def withExpiry(expiry: Instant): GoatRodeoBuilder = {
+    config = config.copy(expiry = Some(expiry))
+    this
+  }
+
+  /** String form of [[withExpiry]] parsing a flexible date (e.g. "2026-01-01",
+    * "today").
+    *
+    * @param d
+    *   the date string
+    * @return
+    *   Right(this builder) if parsed successfully, Left(errorMessage) otherwise
+    */
+  def withExpiry(d: String): Either[String, GoatRodeoBuilder] = {
+    io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
+      case Right(date) =>
+        config = config.copy(expiry = Some(date.toInstant()))
         Right(this)
       case Left(error) =>
         Left(error)

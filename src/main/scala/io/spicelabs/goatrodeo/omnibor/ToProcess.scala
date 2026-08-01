@@ -364,7 +364,12 @@ trait ToProcess {
       val (finalState, ret) =
         elements.foldLeft(initialState -> Vector[GitOID]()) {
           case ((orgState, alreadyDone), (artifact, marker)) =>
-            val itemRaw = Item.itemFrom(artifact, parentId)
+            val itemRaw =
+              Item.itemFrom(
+                artifact,
+                parentId,
+                recordModified = args.expiry.isDefined
+              )
 
             // in blocklist do nothing
             if (blockList.contains(itemRaw.identifier)) {

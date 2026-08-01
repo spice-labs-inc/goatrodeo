@@ -496,7 +496,7 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                writeGoatRodeoFiles(lf)
+                writeGoatRodeoFiles(lf, args.expiry)
               case _ => logger.error("Didn't write"); None
             }
 
@@ -518,8 +518,70 @@ object Builder {
 
   }
 
+  /** Enforce an expiry cutoff on the fully-assembled graph: drop every node
+    * whose recorded file-modification time is after `cutoff`, plus every node
+    * that transitively contains it or is built from it (they must be at least
+    * as new), then strip any resulting dangling edges so no references to
+    * removed nodes remain. Nodes without a recorded modification time are
+    * always kept.
+    */
+  def pruneExpired(items: Vector[Item], cutoff: Instant): Vector[Item] = {
+    def earliestModified(item: Item): Option[Instant] = item.body match {
+      case Some(m: ItemMetaData) =>
+        m.extra
+          .get(Item.FileModifiedKey)
+          .flatMap { values =>
+            values.iterator
+              .collect { case StringOf(s) => s }
+              .flatMap(s => Try(Instant.ofEpochMilli(s.toLong)).toOption)
+              .minByOption(_.toEpochMilli())
+          }
+      case _ => None
+    }
+
+    val pastCutoff: Set[String] =
+      items.iterator
+        .filter(i => earliestModified(i).exists(_.isAfter(cutoff)))
+        .map(_.identifier)
+        .toSet
+
+    if (pastCutoff.isEmpty) items
+    else {
+      val byId = items.iterator.map(i => i.identifier -> i).toMap
+      val removed = scala.collection.mutable.Set.from(pastCutoff)
+      val queue = scala.collection.mutable.Queue.from(pastCutoff)
+      while (queue.nonEmpty) {
+        byId.get(queue.dequeue()).foreach { item =>
+          item.connections.foreach { case (edgeType, target) =>
+            // A removed node's dependents: its containers, artifacts built from it, its aliases.
+            val dependent =
+              EdgeType.isContainedByUp(edgeType) || EdgeType
+                .isBuildsTo(edgeType) ||
+                EdgeType.isAliasFrom(edgeType) || EdgeType.isAliasTo(edgeType)
+            if (dependent && removed.add(target)) queue.enqueue(target)
+          }
+        }
+      }
+
+      val survivors = items.filterNot(i => removed.contains(i.identifier))
+      val cleaned = survivors.map { i =>
+        val kept =
+          i.connections.filterNot { case (_, target) =>
+            removed.contains(target)
+          }
+        if (kept.size == i.connections.size) i
+        else i.copy(connections = kept)
+      }
+      logger.info(
+        f"Expiry ${cutoff}: removed ${removed.size}%,d nodes (${pastCutoff.size}%,d modified after cutoff, ${removed.size - pastCutoff.size}%,d dependents)"
+      )
+      cleaned
+    }
+  }
+
   def writeGoatRodeoFiles(
-      store: ListFileNames & Storage
+      store: ListFileNames & Storage,
+      expiry: Option[Instant] = None
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
@@ -557,17 +619,22 @@ object Builder {
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
 
-        sorted.par.foreach(_.cachedCBOR)
+        val finalItems = expiry match {
+          case Some(cutoff) => pruneExpired(sorted, cutoff)
+          case None         => sorted
+        }
+
+        finalItems.par.foreach(_.cachedCBOR)
 
         logger.info(
           f"Post CBOR cache at ${Duration.between(start, Instant.now())}"
         )
 
-        val cnt = sorted.length
+        val cnt = finalItems.length
 
         val ret = GraphManager.writeEntries(
           target,
-          sorted.iterator
+          finalItems.iterator
         )
 
         logger.info(

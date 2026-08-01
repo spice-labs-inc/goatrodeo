@@ -18,6 +18,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Failure
@@ -78,6 +79,14 @@ sealed trait ArtifactWrapper {
     * @return
     */
   def size(): Long
+
+  /** The artifact's last-modified time, if known — e.g. an archive entry's
+    * timestamp. None when the source has no meaningful timestamp (in-memory
+    * bytes, unknown mtime).
+    *
+    * @return
+    */
+  def lastModified: Option[Instant] = None
 
   private lazy val _mimeType: Set[String] = {
     val base = ExtensionMimeDetector.detect(this) match {
@@ -344,7 +353,8 @@ object ArtifactWrapper {
       size: Long,
       data: InputStream,
       tempDir: Option[File],
-      tempPath: Path
+      tempPath: Path,
+      lastModified: Option[Instant] = None
   ): ArtifactWrapper = {
     val name = fixPath(nominalPath)
     val forceTempFile = requireTempFile(name)
@@ -362,7 +372,7 @@ object ArtifactWrapper {
           f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
         )
       }
-      ByteWrapper(bytes, name, tempDir = tempDir)
+      ByteWrapper(bytes, name, tempDir = tempDir, lastModified = lastModified)
     } else {
       // Preserve the original extension so MIME-type augmenters and disk-format
       // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.
@@ -374,7 +384,12 @@ object ArtifactWrapper {
       Helpers.copy(data, fos)
       fos.flush()
       fos.close()
-      FileWrapper(tempFile, name, tempDir = tempDir)
+      FileWrapper(
+        tempFile,
+        name,
+        tempDir = tempDir,
+        lastModified = lastModified
+      )
     }
   }
 
@@ -431,7 +446,8 @@ final case class FileWrapper(
     wrappedFile: File,
     thePath: String,
     tempDir: Option[File],
-    finishedFunc: File => Unit = f => ()
+    finishedFunc: File => Unit = f => (),
+    override val lastModified: Option[Instant] = None
 ) extends ArtifactWrapper {
 
   // constructor
@@ -504,7 +520,8 @@ object FileWrapper {
 final case class ByteWrapper(
     bytes: Array[Byte],
     fileName: String,
-    tempDir: Option[File]
+    tempDir: Option[File],
+    override val lastModified: Option[Instant] = None
 ) extends ArtifactWrapper {
 
   override protected def getTikaInputStream(): TikaInputStream = {

@@ -21,6 +21,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
@@ -82,13 +83,16 @@ object FileWalker {
               .map(v => {
                 val name = v.getName()
                 val size = v.getSize()
+                val modified =
+                  Option(v.getLastModifiedTime()).map(_.toInstant())
                 ArtifactWrapper
                   .newWrapper(
                     name,
                     size,
                     zipFile.getInputStream(v),
                     in.tempDir,
-                    tempDir
+                    tempDir,
+                    lastModified = modified
                   )
               })
               .toVector
@@ -320,8 +324,17 @@ object FileWalker {
 
           val size = ae.getSize()
 
+          val modified = Option(ae.getLastModifiedDate()).map(_.toInstant())
+
           ArtifactWrapper
-            .newWrapper(artifactName, size, input, tempPath, tempDir)
+            .newWrapper(
+              artifactName,
+              size,
+              input,
+              tempPath,
+              tempDir,
+              lastModified = modified
+            )
         })
         .toVector
       input.close()
