@@ -57,7 +57,9 @@ class PreflightSuite extends munit.FunSuite {
     )
   }
 
-  test("downloaded test data is present (run bin/fetch-test-data.sh if this fails)") {
+  test(
+    "downloaded test data is present (run bin/fetch-test-data.sh if this fails)"
+  ) {
     val marker = new File("test_data/download/iso_tests/simple.iso")
     assume(
       new File("test_data/download").isDirectory,

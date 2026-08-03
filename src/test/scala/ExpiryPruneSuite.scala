@@ -45,10 +45,17 @@ class ExpiryPruneSuite extends munit.FunSuite {
     )
   }
 
-  test("removes too-new files, their containers/build-targets, and prunes dangling edges") {
+  test(
+    "removes too-new files, their containers/build-targets, and prunes dangling edges"
+  ) {
     val items = Vector(
       item("old", Some(old), EdgeType.containedBy -> "C"),
-      item("new", Some(recent), EdgeType.containedBy -> "C", EdgeType.buildsTo -> "A"),
+      item(
+        "new",
+        Some(recent),
+        EdgeType.containedBy -> "C",
+        EdgeType.buildsTo -> "A"
+      ),
       item("C", None, EdgeType.contains -> "old", EdgeType.contains -> "new"),
       item("A", None, EdgeType.builtFrom -> "new"),
       item("U", Some(old))
@@ -67,7 +74,9 @@ class ExpiryPruneSuite extends munit.FunSuite {
     )
   }
 
-  test("keeps everything when nothing is past the cutoff; unknown mtimes are kept") {
+  test(
+    "keeps everything when nothing is past the cutoff; unknown mtimes are kept"
+  ) {
     val items = Vector(
       item("old", Some(old), EdgeType.containedBy -> "C"),
       item("C", None, EdgeType.contains -> "old")
@@ -81,7 +90,9 @@ class ExpiryPruneSuite extends munit.FunSuite {
     )
   }
 
-  test("earliest recorded mtime wins: a blob seen before and after the cutoff is kept") {
+  test(
+    "earliest recorded mtime wins: a blob seen before and after the cutoff is kept"
+  ) {
     val extra: TreeMap[String, TreeSet[StringOrPair]] =
       TreeMap(
         Item.FileModifiedKey -> TreeSet[StringOrPair](
@@ -93,13 +104,17 @@ class ExpiryPruneSuite extends munit.FunSuite {
       "shared",
       TreeSet.empty[(String, String)],
       Some(ItemMetaData.mimeType),
-      Some(ItemMetaData(TreeSet(), TreeSet("application/octet-stream"), 0L, extra))
+      Some(
+        ItemMetaData(TreeSet(), TreeSet("application/octet-stream"), 0L, extra)
+      )
     )
     val pruned = Builder.pruneExpired(Vector(shared), cutoff)
     assertEquals(pruned.map(_.identifier).toSet, Set("shared"))
   }
 
-  test("expiryFromProperty parses epoch millis and ISO, and is empty when unset") {
+  test(
+    "expiryFromProperty parses epoch millis and ISO, and is empty when unset"
+  ) {
     val prop = Config.ExpiryProperty
     val saved = Option(System.getProperty(prop))
     try {
@@ -108,13 +123,20 @@ class ExpiryPruneSuite extends munit.FunSuite {
 
       val millis = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
       System.setProperty(prop, millis.toString)
-      assertEquals(Config.expiryFromProperty.map(_.toEpochMilli()), Some(millis))
+      assertEquals(
+        Config.expiryFromProperty.map(_.toEpochMilli()),
+        Some(millis)
+      )
 
       System.setProperty(prop, "2026-01-01T00:00:00Z")
-      assertEquals(Config.expiryFromProperty.map(_.toString), Some("2026-01-01T00:00:00Z"))
-    } finally saved match {
-      case Some(v) => System.setProperty(prop, v)
-      case None    => System.clearProperty(prop)
-    }
+      assertEquals(
+        Config.expiryFromProperty.map(_.toString),
+        Some("2026-01-01T00:00:00Z")
+      )
+    } finally
+      saved match {
+        case Some(v) => System.setProperty(prop, v)
+        case None    => System.clearProperty(prop)
+      }
   }
 }

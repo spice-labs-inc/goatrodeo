@@ -100,24 +100,25 @@ class CertificatesCoverageSuite extends FunSuite {
   private def parsePurl(purl: String): Option[(String, Map[String, String])] = {
     val schemeRx = "^pkg:generic/([a-z0-9-]+)/".r
     val schemeMatch = schemeRx.findFirstMatchIn(purl)
-    schemeMatch.map { sm =>
-      val scheme = sm.group(1).nn
-      val qIdx = purl.indexOf('?')
-      val quals: Map[String, String] =
-        if (qIdx < 0) Map.empty
-        else {
-          purl
-            .substring(qIdx + 1)
-            .split('&')
-            .toVector
-            .flatMap { kv =>
-              val eqIdx = kv.indexOf('=')
-              if (eqIdx <= 0) None
-              else Some(kv.substring(0, eqIdx) -> kv.substring(eqIdx + 1))
-            }
-            .toMap
-        }
-      scheme -> quals
+    schemeMatch.flatMap { sm =>
+      Option(sm.group(1)).map { scheme =>
+        val qIdx = purl.indexOf('?')
+        val quals: Map[String, String] =
+          if (qIdx < 0) Map.empty
+          else {
+            purl
+              .substring(qIdx + 1)
+              .split('&')
+              .toVector
+              .flatMap { kv =>
+                val eqIdx = kv.indexOf('=')
+                if (eqIdx <= 0) None
+                else Some(kv.substring(0, eqIdx) -> kv.substring(eqIdx + 1))
+              }
+              .toMap
+          }
+        scheme -> quals
+      }
     }
   }
 

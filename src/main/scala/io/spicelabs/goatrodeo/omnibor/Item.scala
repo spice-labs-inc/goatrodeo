@@ -217,7 +217,7 @@ case class Item(
       (this.body, other.body, this.bodyMimeType == other.bodyMimeType) match {
         case (Some(a: ItemMetaData), Some(b: ItemMetaData), true) =>
           Some(
-            a.merge(b, () => this.listContains(), () => other.listContains())
+            a.merge(b)
           ) -> this.bodyMimeType
         case (Some(a: ItemTagData), Some(b: ItemTagData), true) =>
           Some(
@@ -346,9 +346,10 @@ case class Item(
 object Item {
   protected val logger: Logger = Logger(getClass())
 
-  /** `ItemMetaData.extra` key under which an internal file's modification time (epoch
-    * milliseconds) is recorded. Populated only when an expiry cutoff is configured, and
-    * consumed by the expiry filter in the graph writer. */
+  /** `ItemMetaData.extra` key under which an internal file's modification time
+    * (epoch milliseconds) is recorded. Populated only when an expiry cutoff is
+    * configured, and consumed by the expiry filter in the graph writer.
+    */
   val FileModifiedKey = "file_modified_epoch_millis"
 
   /** Given an ArtifactWrapper, create an `Item` based on the hashes/gitoids for

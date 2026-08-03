@@ -256,7 +256,8 @@ box but need special configuration, like udhcpc, the dhcp client."""
       "usr/share/doc/packages/busybox/mdev.txt",
       "etc/man.conf",
       "usr/bin/busybox.install",
-      "usr/share/busybox/busybox.links"
+      "usr/share/busybox/busybox.links",
+      "payload" // Saffron 0.3.0 exposes the gzip decompressed content as a /payload entry
     )
 
     var meta = gitoids
@@ -272,7 +273,7 @@ box but need special configuration, like udhcpc, the dhcp client."""
       .map(meta => meta.fileNames)
       .flatten
       .toArray
-    assertEquals(meta.length, 9)
+    assertEquals(meta.length, 10)
     meta.foreach(fileName => {
       assert(
         expectedFiles.contains(fileName),

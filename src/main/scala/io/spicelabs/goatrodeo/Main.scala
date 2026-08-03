@@ -214,7 +214,8 @@ object Howdy {
       finishedFile = onFileFinish,
       done = onRunFinish,
       // Fall back to the goatrodeo.expiry system property when no explicit expiry was set.
-      args = params.copy(expiry = params.expiry.orElse(Config.expiryFromProperty)),
+      args =
+        params.copy(expiry = params.expiry.orElse(Config.expiryFromProperty)),
       preWriteDB = preWriteDB,
       fsFilePaths = params.fsFilePaths
     )

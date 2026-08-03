@@ -540,7 +540,7 @@ class SourcesJavadocSuite extends FunSuite {
     )
     val purls = purlSet.canonicalStrings
     assert(purls.nonEmpty, "Fallback should still emit a pURL")
-    val purl = Purl.parse(purls.head).nn
+    val purl = Purl.parse(purls.head)
     assertEquals(purl.qualifiers.get("packaging"), "sources")
   }
 

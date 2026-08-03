@@ -200,11 +200,11 @@ class StorageTestSuite extends munit.FunSuite {
       version = Some("1.0.0")
     )
 
-    storage.addPurl(purl.toCanonical().nn)
+    storage.addPurl(purl.toCanonical())
 
     val purls = storage.purls()
     assertEquals(purls.size, 1)
-    assert(purls.contains(purl.toCanonical().nn))
+    assert(purls.contains(purl.toCanonical()))
   }
 
   test("MemStorage - purls returns all added purls") {
@@ -221,8 +221,8 @@ class StorageTestSuite extends munit.FunSuite {
       version = Some("2.0")
     )
 
-    storage.addPurl(purl1.toCanonical().nn)
-    storage.addPurl(purl2.toCanonical().nn)
+    storage.addPurl(purl1.toCanonical())
+    storage.addPurl(purl2.toCanonical())
 
     val purls = storage.purls()
     assertEquals(purls.size, 2)
@@ -237,8 +237,8 @@ class StorageTestSuite extends munit.FunSuite {
       version = Some("1.0")
     )
 
-    storage.addPurl(purl.toCanonical().nn)
-    storage.addPurl(purl.toCanonical().nn)
+    storage.addPurl(purl.toCanonical())
+    storage.addPurl(purl.toCanonical())
 
     val purls = storage.purls()
     assertEquals(purls.size, 1)

@@ -88,10 +88,10 @@ class PurlConstructionTests extends FunSuite {
     ByteWrapper(Array.empty[Byte], "dummy", None)
 
   private def assertRoundTrips(purl: Purl, clue: String): Unit = {
-    val canonical = purl.toCanonical().nn
-    val reparsed = Purl.parse(canonical).nn
+    val canonical = purl.toCanonical()
+    val reparsed = Purl.parse(canonical)
     assertEquals(
-      reparsed.toCanonical().nn,
+      reparsed.toCanonical(),
       canonical,
       s"$clue — pURL must round-trip through the parser: $canonical"
     )
@@ -160,10 +160,10 @@ class PurlConstructionTests extends FunSuite {
     val state = new CertificatesState(dummyArtifact)
     val purls = state.purlsForSshCert(cert)
     assertEquals(purls.length, 2)
-    val certPurl = purls.find(_.toCanonical().nn.contains("cert-sha256")).get
+    val certPurl = purls.find(_.toCanonical().contains("cert-sha256")).get
     assertRoundTrips(certPurl, "SSH cert pURL with unknown certType")
     assert(
-      certPurl.toCanonical().nn.contains("cert-type=unknown-99"),
+      certPurl.toCanonical().contains("cert-type=unknown-99"),
       s"cert pURL must contain cert-type=unknown-99, got: ${certPurl.toCanonical()}"
     )
     purls.foreach(p => assertRoundTrips(p, "SSH cert pURL"))
@@ -198,7 +198,7 @@ class PurlConstructionTests extends FunSuite {
     val purl = Certificates.purlForPgpKey(key)
     assertRoundTrips(purl, "PGP key pURL with angle-bracket canonicalAlg")
     assert(
-      purl.toCanonical().nn.contains("alg="),
+      purl.toCanonical().contains("alg="),
       s"PGP pURL must contain alg= qualifier, got: ${purl.toCanonical()}"
     )
   }
@@ -218,7 +218,7 @@ class PurlConstructionTests extends FunSuite {
   test(
     "purlsForCert with unknown sig OID should return two valid pURLs that round-trip"
   ) {
-    val kp = KeyPairGenerator.getInstance("RSA").nn
+    val kp = KeyPairGenerator.getInstance("RSA")
     kp.initialize(2048, new SecureRandom())
     val pair = kp.generateKeyPair()
     val cert = buildCertWithUnknownSigOid(pair)
@@ -245,7 +245,7 @@ class PurlConstructionTests extends FunSuite {
   test(
     "purlForCrl with unknown sig OID should return valid pURL that round-trips"
   ) {
-    val kp = KeyPairGenerator.getInstance("RSA").nn
+    val kp = KeyPairGenerator.getInstance("RSA")
     kp.initialize(2048, new SecureRandom())
     val pair = kp.generateKeyPair()
     val crl = buildCrlWithUnknownSigOid(pair)
@@ -336,7 +336,7 @@ class PurlConstructionTests extends FunSuite {
     val purl = Certificates.purlForPgpKey(key)
     assertRoundTrips(purl, "PGP key pURL with raw OID curve")
     assert(
-      purl.toCanonical().nn.contains("curve="),
+      purl.toCanonical().contains("curve="),
       s"PGP pURL must contain curve= qualifier, got: ${purl.toCanonical()}"
     )
   }
@@ -410,7 +410,7 @@ class PurlConstructionTests extends FunSuite {
   test(
     "purlsForCert returns pURLs with type=generic, namespace=x509"
   ) {
-    val kp = KeyPairGenerator.getInstance("RSA").nn
+    val kp = KeyPairGenerator.getInstance("RSA")
     kp.initialize(2048, new SecureRandom())
     val pair = kp.generateKeyPair()
     val cert = buildCertWithUnknownSigOid(pair)
@@ -445,7 +445,7 @@ class PurlConstructionTests extends FunSuite {
   test(
     "purlForCrl returns pURL with type=generic, namespace=x509, name=crl-sha256"
   ) {
-    val kp = KeyPairGenerator.getInstance("RSA").nn
+    val kp = KeyPairGenerator.getInstance("RSA")
     kp.initialize(2048, new SecureRandom())
     val pair = kp.generateKeyPair()
     val crl = buildCrlWithUnknownSigOid(pair)

@@ -79,6 +79,11 @@ import scala.util.Using
   *   processing loop. Set via
   *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]]; not
   *   exposed on the command line.
+  * @param cbomDir
+  *   optional directory to emit CycloneDX cryptographic bill-of-materials
+  *   (CBOM) files, one per top-level input
+  * @param cbomVersion
+  *   CycloneDX CBOM specification version to emit ("1.6" or "1.7")
   */
 case class Config(
     out: Option[File] = None,
@@ -108,7 +113,9 @@ case class Config(
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
     progressListener: Option[ProgressListener] = None,
-    expiry: Option[Instant] = None
+    expiry: Option[Instant] = None,
+    cbomDir: Option[File] = None,
+    cbomVersion: String = "1.6"
 ) {
 
   /** Build a list of file list builders from the configuration.
@@ -143,21 +150,28 @@ case class Config(
 object Config {
   private val logger = Logger(getClass())
 
-  /** System property supplying the expiry cutoff when it is not set explicitly (via
-    * `--expiry` or `withExpiry`). This lets an in-JVM caller — or `-Dgoatrodeo.expiry=…` on
-    * the command line — enable the file-modification cutoff without depending on the builder
-    * API: an older build that does not read this property simply ignores it and runs
-    * normally. Accepts epoch milliseconds, an ISO-8601 instant, or a flexible date string. */
+  /** System property supplying the expiry cutoff when it is not set explicitly
+    * (via `--expiry` or `withExpiry`). This lets an in-JVM caller — or
+    * `-Dgoatrodeo.expiry=…` on the command line — enable the file-modification
+    * cutoff without depending on the builder API: an older build that does not
+    * read this property simply ignores it and runs normally. Accepts epoch
+    * milliseconds, an ISO-8601 instant, or a flexible date string.
+    */
   val ExpiryProperty = "goatrodeo.expiry"
 
   def expiryFromProperty: Option[Instant] =
-    Option(System.getProperty(ExpiryProperty)).map(_.trim).filter(_.nonEmpty).flatMap { raw =>
-      val fromMillis =
-        if (raw.forall(_.isDigit)) Try(Instant.ofEpochMilli(raw.toLong)).toOption else None
-      fromMillis
-        .orElse(Try(Instant.parse(raw)).toOption)
-        .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
-    }
+    Option(System.getProperty(ExpiryProperty))
+      .map(_.trim)
+      .filter(_.nonEmpty)
+      .flatMap { raw =>
+        val fromMillis =
+          if (raw.forall(_.isDigit))
+            Try(Instant.ofEpochMilli(raw.toLong)).toOption
+          else None
+        fromMillis
+          .orElse(Try(Instant.parse(raw)).toOption)
+          .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
+      }
 
   /** The scopt parser builder instance. */
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]
@@ -264,6 +278,18 @@ object Config {
       opt[File]("dump-json")
         .text("Make a directory and dump the ADG as JSON in to directory")
         .action((x, c) => c.copy(emitJsonDir = Some(x))),
+      opt[File]("emit-cbom-dir")
+        .text(
+          "Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input into this directory"
+        )
+        .action((x, c) => c.copy(cbomDir = Some(x))),
+      opt[String]("cbom-version")
+        .text("CycloneDX CBOM version to emit (1.6 or 1.7). Default 1.6")
+        .action((v, c) => c.copy(cbomVersion = v))
+        .validate(v =>
+          if (Set("1.6", "1.7").contains(v)) success
+          else failure(s"--cbom-version must be 1.6 or 1.7, got $v")
+        ),
       opt[File]("tempdir")
         .text("Where to temporarily store files... should be a RAM disk")
         .action((x, c) => c.copy(tempDir = Some(x))),

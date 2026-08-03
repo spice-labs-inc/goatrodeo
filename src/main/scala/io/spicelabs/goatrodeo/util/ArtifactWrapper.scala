@@ -80,8 +80,9 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  /** The artifact's last-modified time, if known — e.g. an archive entry's timestamp.
-    * None when the source has no meaningful timestamp (in-memory bytes, unknown mtime).
+  /** The artifact's last-modified time, if known — e.g. an archive entry's
+    * timestamp. None when the source has no meaningful timestamp (in-memory
+    * bytes, unknown mtime).
     *
     * @return
     */
@@ -206,11 +207,11 @@ object ArtifactWrapper {
       val detected = tika.getDetector.detect(data, metadata)
       massageMimeType(fileName, rawData, detected)
     } catch {
-      case e: Exception =>
-        logger.error(
-          f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
-          e
-        )
+      case e: Throwable =>
+        // logger.error(
+        //   f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
+        //   e
+        // )
         "application/octet-stream"
     }
   }
@@ -265,6 +266,8 @@ object ArtifactWrapper {
   addMimeTypeAugmenter(DotnetDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(SaffronDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(CryptoDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(OpenSSLConfigDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(JavaSecurityDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(JavaArchiveDetector.mimeTypeAugmenter)
 
   private def massageMimeType(
@@ -371,12 +374,22 @@ object ArtifactWrapper {
       }
       ByteWrapper(bytes, name, tempDir = tempDir, lastModified = lastModified)
     } else {
-      val tempFile = Files.createTempFile(tempPath, "goats", ".temp").toFile()
+      // Preserve the original extension so MIME-type augmenters and disk-format
+      // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.
+      val extension =
+        Option(extensionFromName(name)).filter(_.nonEmpty).getOrElse("temp")
+      val tempFile =
+        Files.createTempFile(tempPath, "goats", "." + extension).toFile()
       val fos = FileOutputStream(tempFile)
       Helpers.copy(data, fos)
       fos.flush()
       fos.close()
-      FileWrapper(tempFile, name, tempDir = tempDir, lastModified = lastModified)
+      FileWrapper(
+        tempFile,
+        name,
+        tempDir = tempDir,
+        lastModified = lastModified
+      )
     }
   }
 
@@ -397,6 +410,24 @@ object ArtifactWrapper {
       case "dll" | "exe" => true
       case _             => false
     }
+  }
+
+  /** Return the full filename extension, preserving multi-part extensions such
+    * as `.img.gz` or `.tar.gz`. This is important for disk-format detectors
+    * (e.g. Saffron) that look at the actual on-disk filename when probing a
+    * temp file spilled from an in-memory artifact.
+    *
+    * @param name
+    *   the filename to check
+    * @return
+    *   the extension after the first dot of the basename, or the empty string
+    *   if there is none
+    */
+  def extensionFromName(name: String): String = {
+    val base = FilenameUtils.getName(name)
+    val dot = base.indexOf('.')
+    if (dot > 0 && dot < base.length - 1) base.substring(dot + 1)
+    else ""
   }
 }
 
@@ -510,7 +541,14 @@ final case class ByteWrapper(
     */
   def withFile[T](func: File => T): T = {
     FileWalker.withinTempDir { path =>
-      val file = Helpers.tempFileFromStream(asStream(), false, path)
+      // Preserve the original extension so MIME-type augmenters and disk-format
+      // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.
+      val extension =
+        Option(ArtifactWrapper.extensionFromName(fileName))
+          .filter(_.nonEmpty)
+          .getOrElse("temp")
+      val file =
+        Helpers.tempFileFromStream(asStream(), false, path, "." + extension)
       try {
         func(file)
       } finally {

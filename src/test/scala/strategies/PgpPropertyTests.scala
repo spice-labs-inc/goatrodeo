@@ -148,7 +148,7 @@ class PgpPropertyTests extends ScalaCheckSuite {
         case None => true
         case Some(r) =>
           r.keys.forall { k =>
-            val purl = Certificates.purlForPgpKey(k).toCanonical().nn
+            val purl = Certificates.purlForPgpKey(k).toCanonical()
             // (a) shape: pkg:generic/pgp/fingerprint@{hex}?...
             purl.startsWith(
               s"pkg:generic/pgp/fingerprint@${k.fingerprintHex}?"
@@ -180,7 +180,7 @@ class PgpPropertyTests extends ScalaCheckSuite {
         case None => true
         case Some(r) =>
           val purls =
-            r.keys.map(k => Certificates.purlForPgpKey(k).toCanonical().nn)
+            r.keys.map(k => Certificates.purlForPgpKey(k).toCanonical())
           purls.distinct.length == r.keys.length &&
           // Every pURL contains its key's full fingerprint (regression
           // guard against truncation bugs like fp8 leaking into emission).
@@ -228,7 +228,7 @@ class PgpPropertyTests extends ScalaCheckSuite {
           val emittedPurls = purlSet.canonicalStrings
           val emittedSet = emittedPurls.toSet
           val unitSet = r.keys
-            .map(k => Certificates.purlForPgpKey(k).toCanonical().nn)
+            .map(k => Certificates.purlForPgpKey(k).toCanonical())
             .toSet
           emittedSet == unitSet
       }

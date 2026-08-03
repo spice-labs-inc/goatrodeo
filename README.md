@@ -44,6 +44,8 @@ Goat Rodeo is an open-source tool that analyzes software artifacts and builds **
 | 🔗 | **Bidirectional Graph** | Query both "what contains X" and "what does X contain" |
 | 🛡️ | **Hidden Reaper Detection** | Find vulnerabilities hidden from traditional SCA tools |
 | 📊 | **pURL Support** | Generates Package URLs for ecosystem compatibility |
+| 🔐 | **Cryptographic Inventory** | Capture X.509 certificates, OpenSSL configs, and Java `java.security` policies |
+| 📋 | **CycloneDX CBOM Emission** | Emit cryptographic bills-of-materials (CBOM) in CycloneDX 1.6/1.7 format |
 | 🔌 | **Embeddable** | Use as CLI tool, Docker container, or Java/Scala library |
 
 ---
@@ -82,6 +84,16 @@ java -jar target/scala-3.7.4/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/
 ```
 
 > **Requirements:** Java 21+, Git LFS
+
+You can also build with Maven:
+
+```bash
+mvn -DskipTests package
+java -jar target/scala-3.8.3/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
+```
+
+See [docs/maven-build.md](docs/maven-build.md) for test tuning, publishing, and
+troubleshooting.
 
 ### Option 4: As a Library
 
@@ -145,6 +157,13 @@ goatrodeo [OPTIONS]
 | `--package-tags` | Create per-package tags for identified packages (Maven, Docker, etc.) |
 | `--package-tags-short-name` | Use short package names when `--package-tags` is enabled |
 | `--block <file>` | Skip known/common GitOIDs |
+
+### Cryptographic Bill of Materials (CBOM)
+
+| Option | Description |
+|--------|-------------|
+| `--emit-cbom-dir <dir>` | Emit one CycloneDX CBOM JSON file per top-level input into this directory |
+| `--cbom-version <1.6\|1.7>` | CycloneDX CBOM version to emit (default: 1.6) |
 
 <details>
 <summary><b>Performance Tips</b></summary>
@@ -217,7 +236,7 @@ git clone https://github.com/spice-labs-inc/goatrodeo.git
 
 # Run tests
 cd goatrodeo
-sbt test
+mvn clean verify
 
 # Submit a PR against the `next` branch
 ```

@@ -601,7 +601,10 @@ class CertificatesState(
     val subject = c.getSubjectX500Principal
     val issuer = c.getIssuerX500Principal
     val version = c.getVersion
-    val (alg, _) = keyAlgAndQualifier(Option(c.getPublicKey), c)
+    val (alg, _) = keyAlgAndQualifier(
+      Try { c.getPublicKey }.toOption.flatMap(v => Option(v)),
+      c
+    )
     // PQC and composite certs append the alg suffix so the inventory makes
     // PQC presence obvious; classical algs stay bare to match the
     // historical sidecar contract from Phase 0b's `cert_sidecar.py`.

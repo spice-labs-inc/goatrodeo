@@ -217,7 +217,7 @@ class StructTestSuite extends munit.FunSuite {
     val a = ItemMetaData(TreeSet("file1"), TreeSet(), 100, TreeMap())
     val b = ItemMetaData(TreeSet("file2"), TreeSet(), 100, TreeMap())
 
-    val merged = a.merge(b, () => Vector(), () => Vector())
+    val merged = a.merge(b)
     assert(merged.fileNames.contains("file1"))
     assert(merged.fileNames.contains("file2"))
   }
@@ -227,7 +227,7 @@ class StructTestSuite extends munit.FunSuite {
     val a = ItemMetaData(TreeSet("file.txt"), TreeSet("mime1"), 100, TreeMap())
     val b = ItemMetaData(TreeSet("file.txt"), TreeSet("mime2"), 100, TreeMap())
 
-    val merged = a.merge(b, () => Vector(), () => Vector())
+    val merged = a.merge(b)
     assert(merged.mimeType.contains("mime1"))
     assert(merged.mimeType.contains("mime2"))
   }
@@ -237,7 +237,7 @@ class StructTestSuite extends munit.FunSuite {
     val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, TreeMap())
     val b = ItemMetaData(TreeSet("file.txt"), TreeSet(), 200, TreeMap())
 
-    val merged = a.merge(b, () => Vector(), () => Vector())
+    val merged = a.merge(b)
     assertEquals(merged.fileSize, 100L)
   }
 
@@ -256,30 +256,27 @@ class StructTestSuite extends munit.FunSuite {
       TreeMap("key2" -> TreeSet(StringOrPair("val2")))
     )
 
-    val merged = a.merge(b, () => Vector(), () => Vector())
+    val merged = a.merge(b)
     assert(merged.extra.contains("key1"))
     assert(merged.extra.contains("key2"))
   }
 
   test(
-    "ItemMetaData.merge - creates gitoid-qualified filenames for duplicates"
+    "ItemMetaData.merge - preserves distinct filenames from both sides"
   ) {
     val a = ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, TreeMap())
     val b = ItemMetaData(TreeSet("other.txt"), TreeSet(), 100, TreeMap())
 
-    val aContains = () => Vector("gitoid1", "gitoid2")
-    val bContains = () => Vector("gitoid3", "gitoid4")
-
-    val merged = a.merge(b, aContains, bContains)
-    // When there are multiple different filenames, they should be gitoid-qualified
-    assert(merged.fileNames.size > 2)
+    val merged = a.merge(b)
+    // When there are multiple different filenames, both are preserved
+    assertEquals(merged.fileNames.size, 2)
   }
 
   test("ItemMetaData.merge - single filename stays simple") {
     val a = ItemMetaData(TreeSet("same.txt"), TreeSet(), 100, TreeMap())
     val b = ItemMetaData(TreeSet("same.txt"), TreeSet(), 100, TreeMap())
 
-    val merged = a.merge(b, () => Vector(), () => Vector())
+    val merged = a.merge(b)
     assertEquals(merged.fileNames.size, 1)
     assertEquals(merged.fileNames.head, "same.txt")
   }

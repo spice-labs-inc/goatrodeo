@@ -476,6 +476,23 @@ object Builder {
               case (writeIt, preWriteFunc) => writeIt & preWriteFunc(storage)
             }
 
+            args.cbomDir.foreach { cbomDir =>
+              if (!dead_?.get()) {
+                CbomEmitter
+                  .emitForStorage(storage, args.cbomVersion, cbomDir) match {
+                  case scala.util.Success(files) =>
+                    logger.info(
+                      f"Wrote ${files.length}%,d CBOM file(s) to ${cbomDir}"
+                    )
+                  case scala.util.Failure(e) =>
+                    logger.error(
+                      f"Failed to emit CBOMs to ${cbomDir}: ${e.getMessage()}",
+                      e
+                    )
+                }
+              }
+            }
+
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
@@ -501,11 +518,12 @@ object Builder {
 
   }
 
-  /** Enforce an expiry cutoff on the fully-assembled graph: drop every node whose recorded
-    * file-modification time is after `cutoff`, plus every node that transitively contains it
-    * or is built from it (they must be at least as new), then strip any resulting dangling
-    * edges so no references to removed nodes remain. Nodes without a recorded modification
-    * time are always kept.
+  /** Enforce an expiry cutoff on the fully-assembled graph: drop every node
+    * whose recorded file-modification time is after `cutoff`, plus every node
+    * that transitively contains it or is built from it (they must be at least
+    * as new), then strip any resulting dangling edges so no references to
+    * removed nodes remain. Nodes without a recorded modification time are
+    * always kept.
     */
   def pruneExpired(items: Vector[Item], cutoff: Instant): Vector[Item] = {
     def earliestModified(item: Item): Option[Instant] = item.body match {
@@ -537,7 +555,8 @@ object Builder {
           item.connections.foreach { case (edgeType, target) =>
             // A removed node's dependents: its containers, artifacts built from it, its aliases.
             val dependent =
-              EdgeType.isContainedByUp(edgeType) || EdgeType.isBuildsTo(edgeType) ||
+              EdgeType.isContainedByUp(edgeType) || EdgeType
+                .isBuildsTo(edgeType) ||
                 EdgeType.isAliasFrom(edgeType) || EdgeType.isAliasTo(edgeType)
             if (dependent && removed.add(target)) queue.enqueue(target)
           }
@@ -547,7 +566,9 @@ object Builder {
       val survivors = items.filterNot(i => removed.contains(i.identifier))
       val cleaned = survivors.map { i =>
         val kept =
-          i.connections.filterNot { case (_, target) => removed.contains(target) }
+          i.connections.filterNot { case (_, target) =>
+            removed.contains(target)
+          }
         if (kept.size == i.connections.size) i
         else i.copy(connections = kept)
       }

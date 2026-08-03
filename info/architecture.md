@@ -40,7 +40,10 @@ src/main/scala/io/spicelabs/goatrodeo/
 │       ├── Certificates.scala       # X.509/CRL/keystore/SSH/PGP/private-key
 │       ├── CertificatesState.scala  # Per-artifact processing state for ^
 │       ├── CertificatesOidMaps.scala # OID lookup tables for ^
+│       ├── OpenSSLConfig.scala      # OpenSSL .cnf capture
+│       ├── JavaSecurity.scala       # Java java.security capture
 │       └── Generic.scala   # Fallback for unknown types
+│   └── CbomEmitter.scala   # CycloneDX CBOM post-processor
 ├── util/                   # Utilities
 │   ├── Helpers.scala       # Hash functions, I/O utilities
 │   ├── ArtifactWrapper.scala # File abstraction
@@ -137,7 +140,9 @@ trait ProcessingState[M, S] {
 7. `JvmDistribution` - JDK/JRE installations via `release` file
 8. `GradleLockfile` - Gradle lockfile dependency parsing
 9. `Certificates` - X.509 certs / CRLs / keystores / PEM bundles / SSH / PGP / private keys
-10. `GenericFile` - Everything else (fallback)
+10. `OpenSSLConfig` - OpenSSL `.cnf` configuration files
+11. `JavaSecurity` - Java `java.security` policy files
+12. `GenericFile` - Everything else (fallback)
 
 ### 3. Item (`omnibor/Item.scala`)
 
@@ -232,11 +237,28 @@ val strategies = Vector(
   JvmDistribution.computeJvmFiles,
   GradleLockfile.computeGradleLockfiles,
   Certificates.computeCertificateFiles,
+  OpenSSLConfigToProcess.computeOpenSSLConfigFiles,
+  JavaSecurityToProcess.computeJavaSecurityFiles,
   GenericFile.computeGenericFiles  // Must be last
 )
 ```
 
 Each strategy claims files it can handle; unclaimed files fall through to `GenericFile`.
+
+### Strategy Selection vs. Processing Boundary
+
+The strategy framework has a strict separation between **selection** and **processing**:
+
+1. **MIME detection** (completed before strategy selection) is the only stage that may open an `ArtifactWrapper` stream to inspect content. MIME augmenters are registered via `ArtifactWrapper.addMimeTypeAugmenter`. They must be conservative, bounded, and additive.
+2. **Strategy selection** (`computeXFiles` functions) receives `ByUUID` and `ByName` maps and must select files using only:
+   - Precomputed MIME type (`artifact.mimeType`)
+   - Logical path (`artifact.path()`)
+   - Size (`artifact.size()`) for thresholds
+
+   Selection functions must **not** call `artifact.withStream`, `artifact.withFile`, or any other method that reads content. Selection must be fast and content-agnostic.
+3. **Strategy processing** (`ToProcess.getElementsToProcess` and `ProcessingState` methods) may read the content of already-selected files to parse, resolve dependencies, order files, and emit metadata. All dependency resolution must be among files already selected by that strategy; a strategy may not return to `ByName`/`ByUUID` to claim additional files during processing.
+
+This boundary keeps strategy selection fast and ensures that content inspection happens only during MIME detection (where it is allowed) or during strategy processing (where the strategy already owns the file). If a strategy needs to coordinate multiple files (e.g., OpenSSL `.include` or Java `include` directives), it must select all relevant files by MIME type first and then resolve references within the selected set during processing.
 
 ### Phase 3: ADG Building
 
@@ -261,6 +283,11 @@ Writes:
 - `.grd` files - CBOR-encoded Items
 - `.gri` files - Index (MD5 hash → file offset)
 - `.grc` file - Cluster metadata
+
+Optional CBOM output (`--emit-cbom-dir`):
+- After the ADG is written, `Builder` calls `CbomEmitter.emitForStorage(storage, version, dir)`.
+- One CycloneDX CBOM JSON file is emitted per root Item.
+- The emitter walks `contains` edges, collects cryptographic Items, redacts private keys, and maps the rest to `cryptographic-asset` components.
 
 ---
 

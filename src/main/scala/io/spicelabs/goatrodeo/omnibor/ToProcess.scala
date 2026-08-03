@@ -365,7 +365,11 @@ trait ToProcess {
         elements.foldLeft(initialState -> Vector[GitOID]()) {
           case ((orgState, alreadyDone), (artifact, marker)) =>
             val itemRaw =
-              Item.itemFrom(artifact, parentId, recordModified = args.expiry.isDefined)
+              Item.itemFrom(
+                artifact,
+                parentId,
+                recordModified = args.expiry.isDefined
+              )
 
             // in blocklist do nothing
             if (blockList.contains(itemRaw.identifier)) {
@@ -620,7 +624,7 @@ trait ToProcess {
                   FileWalker.withinArchiveStream(artifact = artifact) {
                     rawFoundItems =>
 
-                      val foundItems = rawFoundItems.filter(_.size() > 4)
+                      val foundItems = rawFoundItems.filter(_.size() >= 0)
 
                     for {
                       item <- foundItems
@@ -692,8 +696,15 @@ object ToProcess {
       DotnetFile.computeDotnetFiles,
       AnnattoStrategy.computeAnnattoFiles,
       Certificates.computeCertificateFiles,
+      ShadowPasswordStrategy.computeShadowPasswordFiles,
+      UsignKeysStrategy.computeUsignKeyFiles,
+      SSHKeysStrategy.computeSSHKeyFiles,
+      ServiceTlsConfigStrategy.computeServiceTlsConfigFiles,
+      EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
       JvmDistribution.computeJvmFiles,
       GradleLockfile.computeGradleLockfiles,
+      OpenSSLConfigToProcess.computeOpenSSLConfigFiles,
+      JavaSecurityToProcess.computeJavaSecurityFiles,
       GenericFile.computeGenericFiles
     )
   )
@@ -736,8 +747,15 @@ object ToProcess {
         DotnetFile.computeDotnetFiles,
         AnnattoStrategy.computeAnnattoFiles,
         Certificates.computeCertificateFiles,
+        ShadowPasswordStrategy.computeShadowPasswordFiles,
+        UsignKeysStrategy.computeUsignKeyFiles,
+        SSHKeysStrategy.computeSSHKeyFiles,
+        ServiceTlsConfigStrategy.computeServiceTlsConfigFiles,
+        EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
         JvmDistribution.computeJvmFiles,
         GradleLockfile.computeGradleLockfiles,
+        OpenSSLConfigToProcess.computeOpenSSLConfigFiles,
+        JavaSecurityToProcess.computeJavaSecurityFiles,
         GenericFile.computeGenericFiles
       )
     })

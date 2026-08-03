@@ -65,6 +65,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Base64
 import java.util.Date
+import java.util.regex.Matcher
 import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -607,7 +608,7 @@ object Certificates {
   private[strategies] def sshFingerprintB64(wire: Array[Byte]): String = {
     val md = java.security.MessageDigest.getInstance("SHA-256")
     val digest = md.digest(wire)
-    Base64.getEncoder.nn.withoutPadding.nn.encodeToString(digest).nn
+    Base64.getEncoder.withoutPadding.encodeToString(digest)
   }
 
   /** Render an OpenSSH cert validity timestamp, using sentinelLabel for
@@ -769,8 +770,8 @@ object Certificates {
       ring.getPublicKeys.asScala.toVector.map(pgpKeyOf)
     }
     val primaryUid = rings.headOption.flatMap { ring =>
-      val primary = ring.getPublicKey
-      Option(primary).flatMap { pk =>
+      val primary = Try { ring.getPublicKey }.toOption.flatMap(v => Option(v))
+      primary.flatMap { pk =>
         val it = pk.getUserIDs
         if (it != null && it.hasNext) Option(it.next().toString) else None
       }
@@ -832,8 +833,8 @@ object Certificates {
       // Unencrypted: derive public-key projection per secret key.
       val pubKeys = secretKeys.map(sk => pgpKeyOf(sk.getPublicKey))
       val primaryUid = rings.headOption.flatMap { r =>
-        val pk = r.getPublicKey
-        Option(pk).flatMap { p =>
+        val pk = Try { r.getPublicKey }.toOption.flatMap(v => Option(v))
+        pk.flatMap { p =>
           val it = p.getUserIDs
           if (it != null && it.hasNext) Some(it.next().toString) else None
         }
@@ -1110,14 +1111,16 @@ object Certificates {
   private[strategies] def isSelfSigned(cert: X509Certificate): Boolean = {
     if (cert.getSubjectX500Principal != cert.getIssuerX500Principal) false
     else {
-      val pub = cert.getPublicKey
-      if (pub == null) {
-        true
-      } else
-        Try {
-          cert.verify(pub, "BC")
+      Try {
+        val pub = cert.getPublicKey
+        if (pub == null) {
           true
-        }.getOrElse(false)
+        } else
+          Try {
+            cert.verify(pub, "BC")
+            true
+          }.getOrElse(false)
+      }.toOption.getOrElse(false)
     }
   }
 
@@ -1208,11 +1211,14 @@ object Certificates {
     hexRun.replaceAllIn(
       rfc2253,
       m => {
-        val hex: String = m.group(1).nn
-        decodeAsn1HexString(hex) match {
-          case Some(decoded) =>
-            java.util.regex.Matcher.quoteReplacement(decoded)
-          case None => java.util.regex.Matcher.quoteReplacement(s"#$hex")
+        Option(m.group(1)) match {
+          case Some(hex) =>
+            decodeAsn1HexString(hex) match {
+              case Some(decoded) =>
+                Matcher.quoteReplacement(decoded)
+              case None => Matcher.quoteReplacement(s"#$hex")
+            }
+          case None => Matcher.quoteReplacement(m.matched)
         }
       }
     )
@@ -1433,7 +1439,7 @@ object Certificates {
 
       val spki: Option[SubjectPublicKeyInfo] =
         objects.headOption match {
-          case Some(kp: PEMKeyPair)      => Some(kp.getPublicKeyInfo)
+          case Some(kp: PEMKeyPair)      => Try { kp.getPublicKeyInfo }.toOption
           case Some(pki: PrivateKeyInfo) => spkiFromPrivateKeyInfo(pki)
           case _                         => None
         }
@@ -1763,7 +1769,10 @@ object Certificates {
     val spkiBytes = spkiBytesFromCert(c)
     val certSha = sha256Hex(derBytes)
     val spkiSha = sha256Hex(spkiBytes)
-    val (alg, qualMap) = keyAlgAndQualifier(Option(c.getPublicKey), c)
+    val (alg, qualMap) = keyAlgAndQualifier(
+      Try { c.getPublicKey }.toOption.flatMap(v => Option(v)),
+      c
+    )
     val sigAlg = canonicalSigAlg(c)
     val selfSigned = isSelfSigned(c)
     val version = c.getVersion
@@ -1811,7 +1820,10 @@ object Certificates {
     val spkiBytes = spkiBytesFromCert(c)
     val certSha = sha256Hex(derBytes)
     val spkiSha = sha256Hex(spkiBytes)
-    val (alg, qualMap) = keyAlgAndQualifier(Option(c.getPublicKey), c)
+    val (alg, qualMap) = keyAlgAndQualifier(
+      Try { c.getPublicKey }.toOption.flatMap(v => Option(v)),
+      c
+    )
     val sigAlg = canonicalSigAlg(c)
     val selfSigned = isSelfSigned(c)
     val version = c.getVersion

@@ -13,21 +13,85 @@
   <url>https://github.com/spice-labs-inc/goatrodeo</url>
 
   <!--
-    Compile-from-source Maven build, ported from build.sbt. This is a
-    proof-of-concept living alongside the sbt build; `maven/pom.xml` remains
-    the publish-only shell used by the release workflow.
+    Compile-from-source Maven build, ported from build.sbt. It is intended
+    to be a first-class alternative to the sbt build for day-to-day
+    development; `maven/pom.xml` remains the publish-only shell used by the
+    release workflow.
 
     Quick start:
       mvn -DskipTests compile     # fast: verify it compiles
-      mvn test                    # runs the suite (see PreflightSuite for
-                                  # the test-data / git-lfs prerequisites)
+      mvn test                    # runs the unit-test suite (see PreflightSuite
+                                  # for the test-data / git-lfs prerequisites)
+      mvn verify                  # runs unit tests + fat-jar integration tests
+
+    Environment-based test tuning (mirrors build.sbt):
+      - TEST_THREAD_CNT unset -> dev mode: up to 4 forked JVMs in parallel
+      - TEST_THREAD_CNT set   -> CI mode: single non-forked JVM
+      - TEST_FORK set         -> force 4 forked JVMs even when TEST_THREAD_CNT is set
+
+    Publishing:
+      - distributionManagement points at GitHub Packages, matching build.sbt's
+        publishTo. Credentials must be supplied in ~/.m2/settings.xml; they
+        are intentionally NOT stored in this file.
+      - GPG signing and Sonatype Central publishing remain in maven/pom.xml.
   -->
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scala.version>3.8.3</scala.version>
     <maven.compiler.release>17</maven.compiler.release>
-    <spice-bom.version>1.0.0-SNAPSHOT</spice-bom.version>
+    <!-- The sbt version used by the sibling build.sbt build; surfaced in BuildInfo for parity -->
+    <sbt.version>1.10.6</sbt.version>
+
+    <!-- Library versions, aligned with build.sbt -->
+    <scala-xml.version>2.3.0</scala-xml.version>
+    <asm.version>9.8</asm.version>
+    <bcel.version>6.11.0</bcel.version>
+    <scopt.version>4.1.0</scopt.version>
+    <commons-io.version>2.18.0</commons-io.version>
+    <borer.version>1.14.1</borer.version>
+    <isofilereader.version>0.6.1</isofilereader.version>
+    <json4s.version>4.0.7</json4s.version>
+    <commons-compress.version>1.28.0</commons-compress.version>
+    <logback.version>1.5.15</logback.version>
+    <scala-parallel-collections.version>1.2.0</scala-parallel-collections.version>
+    <scala-logging.version>3.9.4</scala-logging.version>
+    <tika.version>3.2.3</tika.version>
+    <packageurl.version>1.5.0</packageurl.version>
+    <cilantro.version>0.1.17</cilantro.version>
+    <coordinates.version>1.1.0</coordinates.version>
+    <baharat.version>0.1.1</baharat.version>
+    <annatto.version>0.1.0</annatto.version>
+    <saffron.version>0.3.1</saffron.version>
+    <bouncycastle.version>1.80</bouncycastle.version>
+    <scala-nameof.version>5.0.0</scala-nameof.version>
+    <munit.version>0.7.29</munit.version>
+    <scalacheck.version>1.18.1</scalacheck.version>
+    <jackson.version>2.18.1</jackson.version>
+    <json-schema-validator.version>1.5.4</json-schema-validator.version>
+    <zstd-jni.version>1.5.6-9</zstd-jni.version>
+
+    <!-- Test tuning (mirrors build.sbt) -->
+    <!-- Test forking/parallelism tuning.
+         TEST_THREAD_CNT=anything switches to a single non-forked JVM for CI.
+         TEST_FORK=anything forces forking.
+         Independent test classes run in parallel across up to 4 forked JVMs,
+         matching build.sbt's `Test / testForkedParallel := true`.
+         GC warnings are redirected to a file (-Xlog:disable followed by a
+         file selector) because the G1GC GCLocker warning is written to the
+         native console stream and corrupts Surefire's IPC channel when tests
+         fork. -Xmx16G is required for memory-intensive suites such as ADGTests. -->
+    <test.forkCount>4</test.forkCount>
+    <test.reuseForks>true</test.reuseForks>
+    <!-- Dev mode mirrors build.sbt's `fork := true` and
+         `Test / testForkedParallel := true`: independent test classes run in
+         parallel across up to 4 forked JVMs. -->
+    <test.parallel>none</test.parallel>
+    <test.threadCount>4</test.threadCount>
+    <!-- -Xmx16G is required for memory-intensive suites such as ADGTests.
+         GC warnings are redirected to a file so they do not corrupt
+         Surefire's IPC channel in forked JVMs. -->
+    <test.argLine>-Xmx16G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
   </properties>
 
   <licenses>
@@ -38,41 +102,67 @@
     </license>
   </licenses>
 
+  <scm>
+    <url>https://github.com/spice-labs-inc/goatrodeo</url>
+    <connection>scm:git:git://github.com/spice-labs-inc/goatrodeo.git</connection>
+    <developerConnection>scm:git:ssh://github.com/spice-labs-inc/goatrodeo.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
+  <developers>
+    <developer>
+      <id>spicelabs</id>
+      <name>Spice Labs</name>
+      <email>engineering@spicelabs.io</email>
+      <url>https://github.com/spice-labs-inc</url>
+    </developer>
+  </developers>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/spice-labs-inc/goatrodeo/issues</url>
+  </issueManagement>
+
   <repositories>
     <repository>
       <id>central</id>
       <url>https://repo1.maven.org/maven2/</url>
     </repository>
-    <!-- Spice Labs libraries (cilantro, baharat, annatto, saffron) live here.
-         Requires a <server id="github"> with a PAT in ~/.m2/settings.xml. -->
-    <repository>
-      <id>github</id>
-      <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
-    </repository>
     <repository>
       <id>ow2</id>
       <url>https://repository.ow2.org/nexus/content/repositories/public/</url>
     </repository>
+    <repository>
+      <id>github</id>
+      <name>GitHub Package Registry</name>
+      <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
+    </repository>
   </repositories>
 
-  <!-- Canonical versions come from the shared Spice Labs BOM; see spice-labs-cli/bom.
-       Only versions not managed by the BOM (the Scala 3 standard library, pinned to the
-       compiler's scala.version) are declared inline below. -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Package Registry</name>
+      <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
+    </repository>
+  </distributionManagement>
+
   <dependencyManagement>
     <dependencies>
+      <!-- zstd-jni is pulled in transitively by multiple archive readers;
+           align it to a single version to match build.sbt's
+           libraryDependencySchemes "Always" semantics. -->
       <dependency>
-        <groupId>io.spicelabs</groupId>
-        <artifactId>spice-bom</artifactId>
-        <version>${spice-bom.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
+        <groupId>com.github.luben</groupId>
+        <artifactId>zstd-jni</artifactId>
+        <version>${zstd-jni.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
 
   <dependencies>
     <!-- Scala 3 standard library (implicit under sbt, explicit under Maven).
-         Pinned to scala.version — intentionally not BOM-managed. -->
+         Pinned to scala.version. -->
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala3-library_3</artifactId>
@@ -83,104 +173,128 @@
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-xml_3</artifactId>
+      <version>${scala-xml.version}</version>
     </dependency>
     <dependency>
       <groupId>org.ow2.asm</groupId>
       <artifactId>asm</artifactId>
+      <version>${asm.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.bcel</groupId>
       <artifactId>bcel</artifactId>
+      <version>${bcel.version}</version>
     </dependency>
     <dependency>
       <groupId>com.github.scopt</groupId>
       <artifactId>scopt_3</artifactId>
+      <version>${scopt.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
+      <version>${commons-io.version}</version>
     </dependency>
     <dependency>
       <groupId>io.bullet</groupId>
       <artifactId>borer-derivation_3</artifactId>
+      <version>${borer.version}</version>
     </dependency>
     <dependency>
       <groupId>com.palantir.isofilereader</groupId>
       <artifactId>isofilereader</artifactId>
+      <version>${isofilereader.version}</version>
     </dependency>
     <dependency>
       <groupId>org.json4s</groupId>
       <artifactId>json4s-native_3</artifactId>
+      <version>${json4s.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
+      <version>${commons-compress.version}</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
+      <version>${logback.version}</version>
     </dependency>
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-parallel-collections_3</artifactId>
+      <version>${scala-parallel-collections.version}</version>
     </dependency>
     <dependency>
       <groupId>com.typesafe.scala-logging</groupId>
       <artifactId>scala-logging_3</artifactId>
+      <version>${scala-logging.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.tika</groupId>
       <artifactId>tika-core</artifactId>
+      <version>${tika.version}</version>
     </dependency>
     <dependency>
       <groupId>com.github.package-url</groupId>
       <artifactId>packageurl-java</artifactId>
+      <version>${packageurl.version}</version>
     </dependency>
 
     <!-- Spice Labs -->
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>cilantro_3</artifactId>
+      <version>${cilantro.version}</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>coordinates</artifactId>
+      <version>${coordinates.version}</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>baharat</artifactId>
+      <version>${baharat.version}</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>annatto</artifactId>
+      <version>${annatto.version}</version>
     </dependency>
     <dependency>
       <groupId>io.spicelabs</groupId>
       <artifactId>saffron</artifactId>
+      <version>${saffron.version}</version>
     </dependency>
 
     <!-- BouncyCastle -->
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
+      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
+      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpg-jdk18on</artifactId>
+      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcutil-jdk18on</artifactId>
+      <version>${bouncycastle.version}</version>
     </dependency>
 
     <!-- Compile-time only macro (`% "provided"` in sbt) -->
     <dependency>
       <groupId>com.github.dwickern</groupId>
       <artifactId>scala-nameof_3</artifactId>
+      <version>${scala-nameof.version}</version>
       <scope>provided</scope>
     </dependency>
 
@@ -188,16 +302,33 @@
     <dependency>
       <groupId>org.scalameta</groupId>
       <artifactId>munit_3</artifactId>
+      <version>${munit.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.scalameta</groupId>
       <artifactId>munit-scalacheck_3</artifactId>
+      <version>${munit.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.scalacheck</groupId>
       <artifactId>scalacheck_3</artifactId>
+      <version>${scalacheck.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- JSON parsing/validation used by CBOM tests -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>${json-schema-validator.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -277,6 +408,45 @@
         </executions>
       </plugin>
 
+      <!-- Fetch external test fixtures and git-lfs content before tests run.
+           Mirrors the Tests.Setup hook from build.sbt. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>fetch-test-data</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>bash</executable>
+              <arguments>
+                <argument>${project.basedir}/bin/fetch-test-data.sh</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Don't bundle logback.xml in the library jar; consumers provide their own.
+           Matches build.sbt's `Compile / packageBin / mappings` filter. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <excludes>
+            <!-- Match sbt's default: do not bundle SemanticDB files or
+                 logback.xml in the published library jar. -->
+            <exclude>logback.xml</exclude>
+            <exclude>META-INF/semanticdb/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
       <!-- Scala 3 compiler -->
       <plugin>
         <groupId>net.alchim31.maven</groupId>
@@ -293,6 +463,8 @@
             <arg>-no-indent</arg>
             <arg>-release</arg>
             <arg>17</arg>
+            <!-- Enable SemanticDB output to match build.sbt's semanticdbEnabled -->
+            <arg>-Ysemanticdb</arg>
           </args>
         </configuration>
         <executions>
@@ -327,17 +499,27 @@
             <include>**/*Probe.class</include>
           </includes>
           <excludes>
-            <!-- These assert on the packaged fat jar, which is built in the
+            <!-- These assert on packaged jars, which are built in the
                  `package` phase (after `test`). Run them post-package instead. -->
             <exclude>**/FatJarContentsTest.class</exclude>
             <exclude>**/FatJarExecutionTest.class</exclude>
+            <exclude>**/JarPackagingTest.class</exclude>
           </excludes>
-          <argLine>-Xmx8G -Duser.timezone=GMT</argLine>
+          <forkCount>${test.forkCount}</forkCount>
+          <reuseForks>${test.reuseForks}</reuseForks>
+          <parallel>${test.parallel}</parallel>
+          <threadCount>${test.threadCount}</threadCount>
+          <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          <argLine>${test.argLine}</argLine>
         </configuration>
       </plugin>
 
       <!-- Fat jar (replaces sbt-assembly); strips signature files like the
-           sbt assemblyMergeStrategy did -->
+           sbt assemblyMergeStrategy did. Note: sbt-assembly uses
+           MergeStrategy.last for all other duplicate resources, whereas Shade
+           keeps the first copy it sees. In practice this project has no known
+           conflicting non-signature resources; if one appears, add a targeted
+           ResourceTransformer rather than a custom "last wins" transformer. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -373,6 +555,105 @@
           </execution>
         </executions>
       </plugin>
+
+      <!-- Stage sbt-style output directories that tests reference directly.
+           Maven writes classes to target/classes; sbt writes them to
+           target/scala-3.8.3/classes. A symlink keeps the tests unchanged. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>stage-classes-for-tests</id>
+            <phase>process-classes</phase>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.directory}/scala-3.8.3"/>
+                <symlink
+                  link="${project.build.directory}/scala-3.8.3/classes"
+                  resource="${project.build.directory}/classes"
+                  overwrite="true"/>
+              </target>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>stage-fat-jar-for-tests</id>
+            <phase>package</phase>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.directory}/scala-3.8.3"/>
+                <copy
+                  file="${project.build.directory}/goatrodeo_3-${project.version}-fat.jar"
+                  tofile="${project.build.directory}/scala-3.8.3/goatrodeo-${project.version}-fat.jar"
+                  overwrite="true"/>
+              </target>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Fat-jar tests run after the package phase builds the fat jar.
+           Mirrors build.sbt's Test/test dependency on verifyJarContents/testFatJar. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.5.2</version>
+        <executions>
+          <execution>
+            <id>run-fat-jar-tests</id>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <includes>
+            <include>**/FatJarContentsTest.class</include>
+            <include>**/FatJarExecutionTest.class</include>
+            <include>**/JarPackagingTest.class</include>
+          </includes>
+          <argLine>${test.argLine}</argLine>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
+
+  <!-- Environment-based test tuning, matching build.sbt:
+       - TEST_THREAD_CNT unset -> dev mode: forked JVMs, up to 4 concurrent forks
+       - TEST_THREAD_CNT set   -> CI mode: no forking, no parallelism
+       - TEST_FORK set         -> force forking even when TEST_THREAD_CNT is set,
+                                  but keep parallelism disabled (CI mode) -->
+  <profiles>
+    <profile>
+      <id>ci</id>
+      <activation>
+        <property>
+          <name>env.TEST_THREAD_CNT</name>
+        </property>
+      </activation>
+      <properties>
+        <test.forkCount>0</test.forkCount>
+        <test.parallel>none</test.parallel>
+      </properties>
+    </profile>
+    <profile>
+      <id>force-fork</id>
+      <activation>
+        <property>
+          <name>env.TEST_FORK</name>
+        </property>
+      </activation>
+      <properties>
+        <test.forkCount>4</test.forkCount>
+      </properties>
+    </profile>
+  </profiles>
 </project>

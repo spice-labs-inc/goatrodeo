@@ -173,18 +173,20 @@ object PomParser {
     var result = value
     var failed = false
     for (m <- PropRegex.findAllMatchIn(value) if !failed) {
-      val key = m.group(1).nn
-      if (seen.contains(key)) {
-        failed = true
-      } else {
-        val resolved = props.get(key) match {
-          case Some(v) => interpolate0(v, props, depth + 1, seen + key)
-          case None    => None
-        }
-        resolved match {
-          case Some(r) => result = result.replace(m.matched, r)
-          case None    => failed = true
-        }
+      Option(m.group(1)) match {
+        case Some(key) if seen.contains(key) =>
+          failed = true
+        case Some(key) =>
+          val resolved = props.get(key) match {
+            case Some(v) => interpolate0(v, props, depth + 1, seen + key)
+            case None    => None
+          }
+          resolved match {
+            case Some(r) => result = result.replace(m.matched, r)
+            case None    => failed = true
+          }
+        case None =>
+          failed = true
       }
     }
     if (failed) None else Some(result)

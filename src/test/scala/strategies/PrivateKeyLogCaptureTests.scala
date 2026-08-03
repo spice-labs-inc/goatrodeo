@@ -62,7 +62,7 @@ class PrivateKeyLogCaptureTests extends FunSuite {
     // getILoggerFactory may briefly return SubstituteLoggerFactory while
     // logback initializes, so retry until the real LoggerContext appears.
     LoggerFactory.getLogger(getClass)
-    val ctx = waitForLoggerContext()
+    val ctx = waitForLoggerContext(maxRetries = 200)
     val root = ctx.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
     val appender = new ListAppender[ILoggingEvent]()
     appender.setContext(ctx)
