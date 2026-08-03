@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   build:
@@ -40,11 +41,22 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: 'sbt'
-    - name: Set up sbt
-      uses: sbt/setup-sbt@v1
+        cache: 'maven'
+    - name: Configure Maven settings.xml
+      run: |
+        mkdir -p ~/.m2
+        cat > ~/.m2/settings.xml <<EOF
+        <settings>
+          <servers>
+            <server>
+              <id>github</id>
+              <username>x-access-token</username>
+              <password>${GITHUB_TOKEN}</password>
+            </server>
+          </servers>
+        </settings>
+        EOF
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Run tests
-      run: SBT_OPTS="-Xmx8G  -Duser.timezone=GMT" TEST_THREAD_CNT="4" sbt test
-      # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
-    #- name: Upload dependency graph
-    # uses: scalacenter/sbt-dependency-submission@ab086b50c947c9774b70f39fc7f6e20ca2706c91
+      run: TEST_THREAD_CNT="4" MAVEN_OPTS="-Xmx8G -Duser.timezone=GMT" mvn -B clean verify

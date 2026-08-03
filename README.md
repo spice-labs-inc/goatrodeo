@@ -236,7 +236,7 @@ git clone https://github.com/spice-labs-inc/goatrodeo.git
 
 # Run tests
 cd goatrodeo
-sbt test
+mvn clean verify
 
 # Submit a PR against the `next` branch
 ```
