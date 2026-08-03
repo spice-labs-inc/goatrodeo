@@ -36,49 +36,15 @@ import scala.collection.immutable.TreeSet
   */
 class PrivateKeyLogCaptureTests extends FunSuite {
 
-  import ch.qos.logback.classic.{Level, LoggerContext}
   import ch.qos.logback.classic.spi.ILoggingEvent
-  import ch.qos.logback.core.read.ListAppender
-  import org.slf4j.LoggerFactory
+  import io.spicelabs.goatrodeo.testsupport.LogCapture
   import scala.jdk.CollectionConverters.*
 
-  private def waitForLoggerContext(maxRetries: Int = 20): LoggerContext = {
-    var attempts = 0
-    while (attempts < maxRetries) {
-      LoggerFactory.getILoggerFactory match {
-        case c: LoggerContext => return c
-        case _                =>
-      }
-      Thread.sleep(50)
-      attempts += 1
-    }
-    throw new IllegalStateException(
-      "Logback LoggerContext not available after initialization"
-    )
-  }
-
-  private def runWithCapture[T](body: () => T): (T, Vector[ILoggingEvent]) = {
-    // Force SLF4J to bind to logback. With forked/parallel test runs,
-    // getILoggerFactory may briefly return SubstituteLoggerFactory while
-    // logback initializes, so retry until the real LoggerContext appears.
-    LoggerFactory.getLogger(getClass)
-    val ctx = waitForLoggerContext(maxRetries = 200)
-    val root = ctx.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
-    val appender = new ListAppender[ILoggingEvent]()
-    appender.setContext(ctx)
-    appender.start()
-    root.addAppender(appender)
-    val priorLevel = root.getLevel
-    root.setLevel(Level.ALL)
-    try {
-      val result = body()
-      (result, appender.list.asScala.toVector)
-    } finally {
-      root.setLevel(priorLevel)
-      root.detachAppender(appender)
-      appender.stop()
-    }
-  }
+  // Root-logger capture, shared with GraphManagerReadNextSuite: serialised and
+  // thread-filtered so nothing can leak into the "nothing was logged"
+  // assertions below. See LogCapture.
+  private def runWithCapture[T](body: () => T): (T, Vector[ILoggingEvent]) =
+    LogCapture(body)
 
   private def stubItem(): Item = Item(
     identifier = "gitoid:blob:sha256:phase7-log-capture-stub",

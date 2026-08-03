@@ -46,6 +46,10 @@ import scala.collection.immutable.TreeSet
   */
 class CertificatesPropertySuite extends ScalaCheckSuite {
 
+  // The heavier properties take ~15s each on an idle machine; leave headroom
+  // for the contention introduced by running test classes in parallel.
+  override val munitTimeout = scala.concurrent.duration.Duration(5, "minutes")
+
   // Register BC if not already (idempotent — also done by Certificates).
   if (Security.getProvider("BC") == null) {
     Security.addProvider(

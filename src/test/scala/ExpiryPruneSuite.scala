@@ -112,31 +112,27 @@ class ExpiryPruneSuite extends munit.FunSuite {
     assertEquals(pruned.map(_.identifier).toSet, Set("shared"))
   }
 
-  test(
-    "expiryFromProperty parses epoch millis and ISO, and is empty when unset"
-  ) {
-    val prop = Config.ExpiryProperty
-    val saved = Option(System.getProperty(prop))
-    try {
-      System.clearProperty(prop)
+  // Asserts against `Config.parseExpiry` rather than setting the
+  // `goatrodeo.expiry` system property. The property is process-global, so a
+  // test that mutates it constrains how the suite may ever be scheduled; the
+  // parsing rules are what this test is actually about.
+  test("parseExpiry parses epoch millis and ISO, and is empty when blank") {
+    assertEquals(Config.parseExpiry(""), None)
+    assertEquals(Config.parseExpiry("   "), None)
+
+    val millis = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
+    assertEquals(Config.parseExpiry(millis.toString).map(_.toEpochMilli()), Some(millis))
+
+    assertEquals(
+      Config.parseExpiry("2026-01-01T00:00:00Z").map(_.toString),
+      Some("2026-01-01T00:00:00Z")
+    )
+  }
+
+  test("expiryFromProperty is empty when the property is unset") {
+    // Read-only, so it cannot disturb anything else. The parsing behaviour
+    // itself is covered by the `parseExpiry` test above.
+    if (System.getProperty(Config.ExpiryProperty) == null)
       assertEquals(Config.expiryFromProperty, None)
-
-      val millis = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
-      System.setProperty(prop, millis.toString)
-      assertEquals(
-        Config.expiryFromProperty.map(_.toEpochMilli()),
-        Some(millis)
-      )
-
-      System.setProperty(prop, "2026-01-01T00:00:00Z")
-      assertEquals(
-        Config.expiryFromProperty.map(_.toString),
-        Some("2026-01-01T00:00:00Z")
-      )
-    } finally
-      saved match {
-        case Some(v) => System.setProperty(prop, v)
-        case None    => System.clearProperty(prop)
-      }
   }
 }

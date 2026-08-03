@@ -159,19 +159,20 @@ object Config {
     */
   val ExpiryProperty = "goatrodeo.expiry"
 
+  /** Parse an expiry cutoff from its textual form: epoch milliseconds, an ISO-8601 instant, or
+    * a flexible date string. Kept separate from [[expiryFromProperty]] so the parsing rules
+    * can be tested without mutating the process-global system property. */
+  def parseExpiry(raw: String): Option[Instant] =
+    Option(raw).map(_.trim).filter(_.nonEmpty).flatMap { raw =>
+      val fromMillis =
+        if (raw.forall(_.isDigit)) Try(Instant.ofEpochMilli(raw.toLong)).toOption else None
+      fromMillis
+        .orElse(Try(Instant.parse(raw)).toOption)
+        .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
+    }
+
   def expiryFromProperty: Option[Instant] =
-    Option(System.getProperty(ExpiryProperty))
-      .map(_.trim)
-      .filter(_.nonEmpty)
-      .flatMap { raw =>
-        val fromMillis =
-          if (raw.forall(_.isDigit))
-            Try(Instant.ofEpochMilli(raw.toLong)).toOption
-          else None
-        fromMillis
-          .orElse(Try(Instant.parse(raw)).toOption)
-          .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
-      }
+    Option(System.getProperty(ExpiryProperty)).flatMap(parseExpiry)
 
   /** The scopt parser builder instance. */
   lazy val builder: OParserBuilder[Config] = OParser.builder[Config]

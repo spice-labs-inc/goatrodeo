@@ -13,23 +13,20 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
 import io.spicelabs.goatrodeo.omnibor.GRDWalker
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.testsupport.LogCapture
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
-import org.slf4j.LoggerFactory
 
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 /** Phase 0 (0.8) — GRDWalker.readNext returns None for corrupt CBOR entry.
@@ -173,27 +170,11 @@ class GraphManagerReadNextSuite extends FunSuite {
     }
   }
 
+  // Root-logger capture, shared with PrivateKeyLogCaptureTests, which ran an
+  // identical copy of this dance. See LogCapture.
   private def runWithCapture[T](
       body: () => T
-  ): (T, Vector[ILoggingEvent]) = {
-    val ctx =
-      LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val root = ctx.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
-    val appender = new ListAppender[ILoggingEvent]()
-    appender.setContext(ctx)
-    appender.start()
-    root.addAppender(appender)
-    val priorLevel = root.getLevel
-    root.setLevel(Level.ALL)
-    try {
-      val result = body()
-      (result, appender.list.asScala.toVector)
-    } finally {
-      root.setLevel(priorLevel)
-      root.detachAppender(appender)
-      appender.stop()
-    }
-  }
+  ): (T, Vector[ILoggingEvent]) = LogCapture(body)
 
   test("GRDWalker - readNext logs WARN on corrupt CBOR entry") {
 

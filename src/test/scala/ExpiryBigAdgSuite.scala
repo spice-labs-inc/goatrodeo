@@ -161,8 +161,11 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
       "corpus test_data/download/adg_tests not present"
     )
 
-    val fullDir = File("res_expiry_full")
-    val prunedDir = File("res_expiry_pruned")
+    // Under `target/` for the same reason as ADGTests: parallel suites should
+    // not scatter multi-GB build output across the repo root.
+    val fullDir = File("target/test-out/res_expiry_full")
+    val prunedDir = File("target/test-out/res_expiry_pruned")
+    fullDir.getParentFile().mkdirs()
 
     // --- Step 1: FULL build. Far-future cutoff prunes nothing but records mod-times. ---
     val farFuture = Instant.parse("3000-01-01T00:00:00Z")

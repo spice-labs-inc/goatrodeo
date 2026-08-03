@@ -14,6 +14,12 @@ import scala.util.Success
 import scala.util.Try
 
 class ADGTests extends munit.FunSuite {
+
+  // Builds an ADG over the whole ~10 GB adg_tests corpus; munit's 30-second
+  // default is nowhere near enough, and it is looser still when this runs
+  // alongside other test classes.
+  override val munitTimeout = scala.concurrent.duration.Duration(1, "hour")
+
   test("Questionable archives do not cause exceptions") {
     val source = File("test_data/download/adg_tests/repo_ea")
 
@@ -39,7 +45,12 @@ class ADGTests extends munit.FunSuite {
 
     if (source.isDirectory()) {
 
-      val resForBigTent = File("res_for_big_tent")
+      // Under `target/` rather than the repo root: suites now run in parallel
+      // forks that share one filesystem, and this build writes a multi-GB tree
+      // that should not land next to the sources or collide with another
+      // suite's output.
+      val resForBigTent = File("target/test-out/res_for_big_tent")
+      resForBigTent.getParentFile().mkdirs()
 
       // delete files if they exist
       if (resForBigTent.exists()) {
