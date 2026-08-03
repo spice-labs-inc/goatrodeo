@@ -408,7 +408,7 @@
     <bcel.version>6.11.0</bcel.version>
     <bouncycastle.version>1.80</bouncycastle.version>
     <sbt.version>1.10.6</sbt.version>
-    <test.forkCount>1</test.forkCount>
+    <test.forkCount>4</test.forkCount>
     <coordinates.version>1.1.0</coordinates.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <annatto.version>0.1.0</annatto.version>
@@ -416,14 +416,14 @@
     <baharat.version>0.1.1</baharat.version>
     <maven.compiler.release>17</maven.compiler.release>
     <scala-nameof.version>5.0.0</scala-nameof.version>
-    <test.argLine>-Xmx12G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+    <test.argLine>-Xmx16G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
     <asm.version>9.8</asm.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <commons-io.version>2.18.0</commons-io.version>
     <isofilereader.version>0.6.1</isofilereader.version>
     <scala-logging.version>3.9.4</scala-logging.version>
     <scala-parallel-collections.version>1.2.0</scala-parallel-collections.version>
-    <test.reuseForks>false</test.reuseForks>
+    <test.reuseForks>true</test.reuseForks>
     <test.threadCount>4</test.threadCount>
     <scala-xml.version>2.3.0</scala-xml.version>
     <saffron.version>0.3.1</saffron.version>

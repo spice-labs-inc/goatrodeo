@@ -25,7 +25,7 @@
       mvn verify                  # runs unit tests + fat-jar integration tests
 
     Environment-based test tuning (mirrors build.sbt):
-      - TEST_THREAD_CNT unset -> dev mode: one forked JVM per test class
+      - TEST_THREAD_CNT unset -> dev mode: up to 4 forked JVMs in parallel
       - TEST_THREAD_CNT set   -> CI mode: single non-forked JVM
       - TEST_FORK set         -> force 4 forked JVMs even when TEST_THREAD_CNT is set
 
@@ -75,20 +75,23 @@
     <!-- Test forking/parallelism tuning.
          TEST_THREAD_CNT=anything switches to a single non-forked JVM for CI.
          TEST_FORK=anything forces forking.
+         Independent test classes run in parallel across up to 4 forked JVMs,
+         matching build.sbt's `Test / testForkedParallel := true`.
          GC warnings are redirected to a file (-Xlog:disable followed by a
          file selector) because the G1GC GCLocker warning is written to the
          native console stream and corrupts Surefire's IPC channel when tests
-         fork. A fresh JVM per test class (reuseForks=false) avoids heap
-         fragmentation from memory-intensive suites. -->
-    <test.forkCount>1</test.forkCount>
-    <test.reuseForks>false</test.reuseForks>
-    <!-- Dev mode mirrors build.sbt's `fork := true`: tests run in forked
-         JVMs. Set TEST_FORK to opt into the 4-fork parallel configuration. -->
+         fork. -Xmx16G is required for memory-intensive suites such as ADGTests. -->
+    <test.forkCount>4</test.forkCount>
+    <test.reuseForks>true</test.reuseForks>
+    <!-- Dev mode mirrors build.sbt's `fork := true` and
+         `Test / testForkedParallel := true`: independent test classes run in
+         parallel across up to 4 forked JVMs. -->
     <test.parallel>none</test.parallel>
     <test.threadCount>4</test.threadCount>
-    <test.parallel>none</test.parallel>
-    <test.threadCount>4</test.threadCount>
-    <test.argLine>-Xmx12G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+    <!-- -Xmx16G is required for memory-intensive suites such as ADGTests.
+         GC warnings are redirected to a file so they do not corrupt
+         Surefire's IPC channel in forked JVMs. -->
+    <test.argLine>-Xmx16G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
   </properties>
 
   <licenses>
