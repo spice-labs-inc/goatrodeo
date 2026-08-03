@@ -43,6 +43,10 @@ import java.io.File
   */
 class PackageTagIntegrationSuite extends munit.FunSuite {
 
+  // Walks multi-hundred-MB docker tarballs, which takes well over munit's
+  // 30-second default — more so when other test classes run concurrently.
+  override val munitTimeout = scala.concurrent.duration.Duration(30, "minutes")
+
   // Helper to check if test files exist
   def checkTestFile(path: String): Boolean = new File(path).exists()
 

@@ -16,6 +16,12 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
 class DockerSuite extends munit.FunSuite {
+
+  // Whichever suite touches DockerTestFixtures first pays for parsing the
+  // multi-hundred-MB docker tarballs, which exceeds munit's 30-second default
+  // on its own — and more so when other test classes are running concurrently.
+  override val munitTimeout = scala.concurrent.duration.Duration(30, "minutes")
+
   val logger = Logger(getClass())
 
   def createTestItem(id: String): Item = {

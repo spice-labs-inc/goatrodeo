@@ -23,11 +23,14 @@
       mvn test                    # runs the unit-test suite (see PreflightSuite
                                   # for the test-data / git-lfs prerequisites)
       mvn verify                  # runs unit tests + fat-jar integration tests
+      mvn test -Dtest.forkCount=1 # serial run, for debugging test isolation
 
     Environment-based test tuning (mirrors build.sbt):
-      - TEST_THREAD_CNT unset -> dev mode: up to 4 forked JVMs in parallel
-      - TEST_THREAD_CNT set   -> CI mode: single non-forked JVM
-      - TEST_FORK set         -> force 4 forked JVMs even when TEST_THREAD_CNT is set
+      - TEST_THREAD_CNT unset -> dev mode: test classes spread over forked JVMs,
+                                 one fork per two cores
+      - TEST_THREAD_CNT set   -> CI mode: a single forked JVM
+      - TEST_FORK set         -> restore the parallel forks even when
+                                 TEST_THREAD_CNT is set
 
     Publishing:
       - distributionManagement points at GitHub Packages, matching build.sbt's
@@ -71,27 +74,29 @@
     <json-schema-validator.version>1.5.4</json-schema-validator.version>
     <zstd-jni.version>1.5.6-9</zstd-jni.version>
 
-    <!-- Test tuning (mirrors build.sbt) -->
-    <!-- Test forking/parallelism tuning.
-         TEST_THREAD_CNT=anything switches to a single non-forked JVM for CI.
-         TEST_FORK=anything forces forking.
-         Independent test classes run in parallel across up to 4 forked JVMs,
-         matching build.sbt's `Test / testForkedParallel := true`.
-         GC warnings are redirected to a file (-Xlog:disable followed by a
-         file selector) because the G1GC GCLocker warning is written to the
-         native console stream and corrupts Surefire's IPC channel when tests
-         fork. -Xmx16G is required for memory-intensive suites such as ADGTests. -->
-    <test.forkCount>4</test.forkCount>
+    <!-- Test parallelism: independent test classes are distributed over several
+         forked JVMs, restoring what sbt's default `Test / parallelExecution`
+         gave us. Lower it (-Dtest.forkCount=1) on a memory-constrained machine.
+
+         Surefire's in-JVM `<parallel>classes</parallel>` does NOT work here and
+         is deliberately not used: it is implemented by JUnit's ParallelComputer,
+         which can only schedule `ParentRunner`s, and munit's MUnitRunner is a
+         plain `Runner`. Setting it is silently a no-op — measured at 156s
+         against 153s serial for the same three suites, where forkCount=3 took
+         80s.
+
+         `0.5C` is half the available cores. Fewer, fatter forks measured
+         *slower* on a 12-core box (3 forks: 130s and 195s; 6 forks: 149s and
+         143s) — with only a handful of heavy suites, coarse forks sometimes put
+         two of them behind each other, and the heaviest suite is internally
+         multi-threaded anyway. -->
+    <test.forkCount>0.5C</test.forkCount>
     <test.reuseForks>true</test.reuseForks>
-    <!-- Dev mode mirrors build.sbt's `fork := true` and
-         `Test / testForkedParallel := true`: independent test classes run in
-         parallel across up to 4 forked JVMs. -->
-    <test.parallel>none</test.parallel>
-    <test.threadCount>4</test.threadCount>
-    <!-- -Xmx16G is required for memory-intensive suites such as ADGTests.
-         GC warnings are redirected to a file so they do not corrupt
-         Surefire's IPC channel in forked JVMs. -->
-    <test.argLine>-Xmx16G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+    <!-- Per fork, so keep forkCount * Xmx within the machine's RAM. GC warnings
+         go to a file because the G1 GCLocker warning is written to the native
+         console stream, which corrupts surefire's IPC channel with a forked
+         JVM. -->
+    <test.argLine>-Xmx4G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
   </properties>
 
   <licenses>
@@ -507,8 +512,12 @@
           </excludes>
           <forkCount>${test.forkCount}</forkCount>
           <reuseForks>${test.reuseForks}</reuseForks>
-          <parallel>${test.parallel}</parallel>
-          <threadCount>${test.threadCount}</threadCount>
+          <!-- Spread classes over the forks by their previous run's duration,
+               so the one dominant suite (ADGTests) starts first rather than
+               landing last on an otherwise idle fork. -->
+          <runOrder>balanced</runOrder>
+          <!-- munit writes progress to stdout; with several forks the
+               interleaved output is unreadable on the console. -->
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>${test.argLine}</argLine>
         </configuration>
@@ -626,11 +635,14 @@
     </plugins>
   </build>
 
-  <!-- Environment-based test tuning, matching build.sbt:
-       - TEST_THREAD_CNT unset -> dev mode: forked JVMs, up to 4 concurrent forks
-       - TEST_THREAD_CNT set   -> CI mode: no forking, no parallelism
-       - TEST_FORK set         -> force forking even when TEST_THREAD_CNT is set,
-                                  but keep parallelism disabled (CI mode) -->
+  <!-- Environment-based test tuning, matching build.sbt's conventions:
+       - TEST_THREAD_CNT unset -> dev mode: classes spread over forked JVMs,
+                                  one fork per two cores
+       - TEST_THREAD_CNT set   -> CI mode: a single forked JVM, which is all a
+                                  GitHub runner's memory can afford
+       - TEST_FORK set         -> restore the parallel forks even when
+                                  TEST_THREAD_CNT is set (declared last, so it
+                                  wins when both profiles are active) -->
   <profiles>
     <profile>
       <id>ci</id>
@@ -640,8 +652,8 @@
         </property>
       </activation>
       <properties>
-        <test.forkCount>0</test.forkCount>
-        <test.parallel>none</test.parallel>
+        <test.forkCount>1</test.forkCount>
+        <test.argLine>-Xmx8G -Duser.timezone=GMT</test.argLine>
       </properties>
     </profile>
     <profile>
@@ -652,7 +664,8 @@
         </property>
       </activation>
       <properties>
-        <test.forkCount>4</test.forkCount>
+        <test.forkCount>0.5C</test.forkCount>
+        <test.argLine>-Xmx4G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
       </properties>
     </profile>
   </profiles>

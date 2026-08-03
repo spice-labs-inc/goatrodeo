@@ -236,10 +236,22 @@ git clone https://github.com/spice-labs-inc/goatrodeo.git
 
 # Run tests
 cd goatrodeo
-mvn clean verify
+mvn clean verify  # independent test classes run in parallel forked JVMs
+sbt test          # the sbt build is still supported
 
 # Submit a PR against the `next` branch
 ```
+
+`mvn test` spreads test classes over forked JVMs — one per two cores, 4 GB heap
+each. Tune that for your machine, or disable it when investigating a
+test-isolation problem:
+
+```bash
+mvn test -Dtest.forkCount=1C  # one fork per core, needs more RAM
+mvn test -Dtest.forkCount=1   # one JVM, strictly serial
+```
+
+Setting `TEST_THREAD_CNT` (as CI does) selects a single-JVM serial run.
 
 ---
 

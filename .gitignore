@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Surefire's `runOrder=balanced` timing cache, written to the project root
+.surefire-*
+
 # sbt specific
 dist/*
 target/
