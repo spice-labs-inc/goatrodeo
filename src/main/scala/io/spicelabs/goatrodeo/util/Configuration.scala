@@ -131,6 +131,8 @@ inline def config(using configuration: Configuration): Configuration =
   *   (CBOM) files, one per top-level input
   * @param cbomVersion
   *   CycloneDX CBOM specification version to emit ("1.6" or "1.7")
+  * @param configFile
+  *   the TOML file this configuration was read from, when `--config` named one
   * @param runtime
   *   the ambient process state this run was started in
   */
@@ -165,6 +167,7 @@ case class Configuration(
     expiry: Option[Instant] = None,
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6",
+    configFile: Option[File] = None,
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
 

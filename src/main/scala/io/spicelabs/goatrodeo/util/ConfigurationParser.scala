@@ -46,12 +46,41 @@ object ConfigurationParser {
 
   /** Parse a command line into a [[Configuration]], seeded with the ambient
     * process state the run started in.
+    *
+    * When `--config` names a file, it is read first and the command line
+    * applied on top, so precedence runs defaults < config file < command line.
+    * That is done by parsing twice: once to discover `--config`, then again
+    * seeded with what the file said. Parsing is pure and cheap, and this keeps
+    * the flag definitions the single description of what the command line
+    * means.
     */
   def parse(
       args: Array[String],
       runtime: RuntimeEnvironment = RuntimeEnvironment.default
   ): Option[Configuration] =
-    OParser.parse(parser, args, Configuration(runtime = runtime))
+    parseWith(args, Configuration(runtime = runtime)).flatMap { discovered =>
+      discovered.configFile match {
+        case None => Some(discovered)
+        case Some(file) => {
+          ConfigurationToml.fromFile(
+            file.toPath(),
+            Configuration(runtime = runtime, configFile = Some(file))
+          ) match {
+            case Right(fromFile) => parseWith(args, fromFile)
+            case Left(error) => {
+              logger.error(f"Invalid config file ${file}: ${error}")
+              None
+            }
+          }
+        }
+      }
+    }
+
+  private def parseWith(
+      args: Array[String],
+      base: Configuration
+  ): Option[Configuration] =
+    OParser.parse(parser, args, base)
 
   /** Render the usage text. */
   def usage: String = OParser.usage(parser)
@@ -165,6 +194,11 @@ object ConfigurationParser {
       opt[File]("dump-json")
         .text("Make a directory and dump the ADG as JSON in to directory")
         .action((x, c) => c.copy(emitJsonDir = Some(x))),
+      opt[File]("config")
+        .text(
+          "Read settings from this TOML file. Anything also given on the command line wins."
+        )
+        .action((x, c) => c.copy(configFile = Some(x))),
       opt[File]("emit-cbom-dir")
         .text(
           "Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input into this directory"

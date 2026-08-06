@@ -18,6 +18,8 @@ import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ConfigurationToml
+import io.spicelabs.goatrodeo.util.TomlTables
 import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.nio.file.Paths
@@ -397,6 +399,46 @@ class GoatRodeoBuilder {
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
         this
     }
+  }
+
+  /** Apply a table of settings written in Goat Rodeo's config-file schema.
+    *
+    * This is how an embedding program — `spice`, Allspice — passes Goat Rodeo's
+    * settings through from its own config file without knowing what they mean.
+    * The table arrives as a plain nested map, which is what the plugin SPI
+    * carries so that it can stay dependency-free; see [[TomlTables]].
+    *
+    * Settings already given to this builder are the defaults the table is
+    * applied on top of, and anything the caller sets afterwards wins — so the
+    * embedding program keeps the final say, as it does for the command line.
+    *
+    * `expiry` is refused here: embedded, the analysis cutoff comes from the
+    * Spice Pass, which constrains what the platform will accept.
+    *
+    * @param table
+    *   the settings, keyed as in a Goat Rodeo config file
+    * @param label
+    *   the table's path in the caller's file, for error messages — e.g.
+    *   `registry.analysis`
+    * @throws IllegalArgumentException
+    *   if the table has an unknown key, a value of the wrong type, or a setting
+    *   that may not be given to an embedded run
+    * @return
+    *   this builder
+    */
+  def withConfiguration(
+      table: java.util.Map[String, Object],
+      label: String
+  ): GoatRodeoBuilder = {
+    ConfigurationToml.nestedFromToml(
+      TomlTables.fromJavaMap(table),
+      config,
+      label
+    ) match {
+      case Right(updated) => config = updated
+      case Left(error)    => throw IllegalArgumentException(error)
+    }
+    this
   }
 
   /** Attach a progress listener that is notified at phase boundaries (Scanning,

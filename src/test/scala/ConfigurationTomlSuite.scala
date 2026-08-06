@@ -1,0 +1,328 @@
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ConfigurationParser
+import io.spicelabs.goatrodeo.util.ConfigurationToml
+import io.spicelabs.goatrodeo.util.TomlTables
+import org.tomlj.Toml
+import org.tomlj.TomlTable
+
+import java.nio.file.Files
+import java.nio.file.Path
+import scala.jdk.CollectionConverters.*
+
+/** WHAT: covers reading a [[Configuration]] from TOML — the schema itself, the
+  * precedence of the command line over the file, the rules that keep a config
+  * file from becoming a second way to say something it should not, and the
+  * map-backed [[TomlTables]] adapter the plugin SPI hands tables through.
+  *
+  * WHY: this schema is now published in three places — the parser, the docs,
+  * and the templates Allspice generates. Tests are what stop those drifting.
+  * The previous cross-program configuration channel failed exactly there: an
+  * allowlist of Goat Rodeo flags kept inside Allspice drifted until it
+  * permitted flags Goat Rodeo does not have, and nothing noticed because
+  * nothing checked.
+  */
+class ConfigurationTomlSuite extends munit.FunSuite {
+
+  private def parse(toml: String): TomlTable = {
+    val result = Toml.parse(toml)
+    assert(
+      result.errors().isEmpty(),
+      s"fixture is not valid TOML: ${result.errors()}"
+    )
+    result
+  }
+
+  private def read(toml: String): Either[String, Configuration] =
+    ConfigurationToml.fromToml(parse(toml))
+
+  private def readOk(toml: String): Configuration =
+    read(toml) match {
+      case Right(config) => config
+      case Left(error)   => fail(s"expected success, got: $error")
+    }
+
+  // ==================== the schema ====================
+
+  test("every scalar key round-trips into the configuration") {
+    val config = readOk("""
+      |out = "/tmp/out"
+      |threads = 12
+      |max_records = 5000
+      |temp_dir = "/tmp/scratch"
+      |static_metadata = true
+      |fs_file_paths = true
+      |tag = "nightly"
+      |tag_version = "1.2.3"
+      |package_tags = true
+      |package_tags_short_name = true
+      |cbom_version = "1.7"
+      |""".stripMargin)
+
+    assertEquals(config.out.map(_.getPath()), Some("/tmp/out"))
+    assertEquals(config.threads, 12)
+    assertEquals(config.maxRecords, 5000)
+    assertEquals(config.tempDir.map(_.getPath()), Some("/tmp/scratch"))
+    assertEquals(config.useStaticMetadata, true)
+    assertEquals(config.fsFilePaths, true)
+    assertEquals(config.tag, Some("nightly"))
+    assertEquals(config.tagVersion, Some("1.2.3"))
+    assertEquals(config.packageTags, true)
+    assertEquals(config.packageTagsShortName, true)
+    assertEquals(config.cbomVersion, "1.7")
+  }
+
+  test("array keys accumulate onto the base configuration") {
+    val config = readOk("""
+      |build = ["/srv/a", "/srv/b"]
+      |mime_filter = ["+application/java-archive"]
+      |exclude_pattern = ["html$"]
+      |""".stripMargin)
+
+    assertEquals(config.build.map(_.getPath()), Vector("/srv/a", "/srv/b"))
+    assertEquals(config.exclude.map(_._1), Vector("html$"))
+    assert(
+      config.mimeFilter.shouldInclude(Set("application/java-archive")),
+      "the mime filter from the file must be in force"
+    )
+  }
+
+  test("a key the schema does not have is an error, not silence") {
+    // Silently ignoring a typo is how a config file becomes undebuggable: the
+    // value the user wrote is simply not in force and nothing says so.
+    val error = read("thraeds = 4").left.getOrElse(fail("expected an error"))
+    assert(error.contains("unknown key"), error)
+    assert(error.contains("thraeds"), error)
+  }
+
+  test("a key of the wrong type names the key and both types") {
+    val error =
+      read("""threads = "many"""").left.getOrElse(fail("expected an error"))
+    assert(error.contains("threads"), error)
+    assert(error.contains("integer"), error)
+  }
+
+  test("relative paths are rejected") {
+    // The `spice` wrapper bind-mounts paths it reads off the command line before
+    // the JVM starts; it cannot see inside a TOML table, so a relative path here
+    // has no dependable meaning.
+    val error =
+      read("""out = "relative/dir"""").left.getOrElse(fail("expected an error"))
+    assert(error.contains("absolute"), error)
+  }
+
+  test("validation matches the flags: threads >= 1, cbom_version 1.6 or 1.7") {
+    assert(read("threads = 0").isLeft)
+    assert(read("""cbom_version = "1.5"""").isLeft)
+    assert(read("""cbom_version = "1.6"""").isRight)
+  }
+
+  // ==================== nesting ====================
+
+  test("expiry is Goat Rodeo's own knob in its own config file") {
+    val config = readOk("""expiry = "2026-01-01"""")
+    assertEquals(config.expiry.map(_.toString), Some("2026-01-01T00:00:00Z"))
+  }
+
+  test("expiry is refused in a table nested inside another program's config") {
+    // Embedded, the cutoff is the Spice Pass's `x-cutoff`: it constrains what the
+    // platform will accept, so a config file must not be able to widen it.
+    val result = ConfigurationToml.nestedFromToml(
+      parse("""expiry = "2026-01-01""""),
+      Configuration(),
+      "registry.analysis"
+    )
+    val error = result.left.getOrElse(fail("expected an error"))
+    assert(error.contains("Spice Pass"), error)
+    assert(error.contains("registry.analysis"), error)
+  }
+
+  test("errors name the table the user wrote, not an internal component") {
+    val error = ConfigurationToml
+      .nestedFromToml(
+        parse("nonsense = 1"),
+        Configuration(),
+        "registry.analysis"
+      )
+      .left
+      .getOrElse(fail("expected an error"))
+    assert(error.contains("[registry.analysis]"), error)
+    assert(
+      !error.toLowerCase().contains("goat"),
+      s"leaked an internal name: $error"
+    )
+  }
+
+  // ==================== precedence ====================
+
+  test("the command line beats the config file") {
+    withConfigFile("threads = 4\nmax_records = 999999\n") { path =>
+      val config = ConfigurationParser
+        .parse(Array("--config", path.toString, "--threads", "9"))
+        .getOrElse(fail("expected a parse"))
+      assertEquals(config.threads, 9, "the flag must win")
+      assertEquals(
+        config.maxRecords,
+        999999,
+        "the file still supplies the rest"
+      )
+    }
+  }
+
+  test("--config records the file it read") {
+    withConfigFile("threads = 4\n") { path =>
+      val config = ConfigurationParser
+        .parse(Array("--config", path.toString))
+        .getOrElse(fail("expected a parse"))
+      assertEquals(config.configFile.map(_.toPath()), Some(path))
+    }
+  }
+
+  test(
+    "a config file that does not parse fails the run rather than being ignored"
+  ) {
+    withConfigFile("threads = \n") { path =>
+      assertEquals(
+        ConfigurationParser.parse(Array("--config", path.toString)),
+        None
+      )
+    }
+  }
+
+  private def withConfigFile[A](contents: String)(f: Path => A): A = {
+    val path = Files.createTempFile("goatrodeo-config", ".toml")
+    try {
+      Files.writeString(path, contents)
+      f(path)
+    } finally { Files.deleteIfExists(path); () }
+  }
+
+  // ==================== the map-backed adapter ====================
+
+  test("a table survives the round trip through a plain map") {
+    // This is the path a plugin's configuration takes: `spice` parses the file,
+    // hands the plugin `toMap()`, and the plugin adapts it back. Anything lost
+    // here is a setting that silently stops working when run under `spice`.
+    val original = parse("""
+      |out = "/tmp/out"
+      |threads = 7
+      |static_metadata = true
+      |mime_filter = ["+a", "-b"]
+      |
+      |[nested]
+      |inner = "value"
+      |depth = 2
+      |""".stripMargin)
+
+    val adapted = TomlTables.fromJavaMap(TomlTables.toPlainMap(original))
+
+    assertEquals(
+      adapted.keySet().asScala.toSet,
+      original.keySet().asScala.toSet
+    )
+    assertEquals(adapted.getString("out"), original.getString("out"))
+    assertEquals(adapted.getLong("threads"), original.getLong("threads"))
+    assertEquals(
+      adapted.getBoolean("static_metadata"),
+      original.getBoolean("static_metadata")
+    )
+    assertEquals(
+      adapted.getArray("mime_filter").toList().asScala.toVector,
+      original.getArray("mime_filter").toList().asScala.toVector
+    )
+    assertEquals(
+      adapted.getTable("nested").getString("inner"),
+      original.getTable("nested").getString("inner")
+    )
+    assertEquals(
+      adapted.dottedKeySet().asScala.toSet,
+      original.dottedKeySet().asScala.toSet
+    )
+  }
+
+  test(
+    "a configuration read through the adapter equals one read from the file"
+  ) {
+    val toml =
+      """
+        |out = "/tmp/out"
+        |threads = 7
+        |mime_filter = ["+application/java-archive"]
+        |package_tags = true
+        |""".stripMargin
+    val direct = readOk(toml)
+    val viaMap = ConfigurationToml
+      .fromToml(TomlTables.fromJavaMap(TomlTables.toPlainMap(parse(toml))))
+      .getOrElse(fail("expected success"))
+
+    assertEquals(viaMap.out, direct.out)
+    assertEquals(viaMap.threads, direct.threads)
+    assertEquals(viaMap.packageTags, direct.packageTags)
+    assertEquals(
+      viaMap.mimeFilter.shouldInclude(Set("application/java-archive")),
+      direct.mimeFilter.shouldInclude(Set("application/java-archive"))
+    )
+  }
+
+  // ==================== the embedding seam ====================
+
+  test("a table applied through the builder reaches the configuration") {
+    // This is the whole point of the exercise: `spice` hands its
+    // `[survey.inventory.analysis]` table over without knowing what is in it.
+    val builder = io.spicelabs.goatrodeo.GoatRodeo
+      .builder()
+      .withThreads(2)
+      .withConfiguration(
+        TomlTables.toPlainMap(parse("threads = 11\nmax_records = 4242")),
+        "survey.inventory.analysis"
+      )
+    val applied = builderConfig(builder)
+    assertEquals(applied.threads, 11)
+    assertEquals(applied.maxRecords, 4242)
+  }
+
+  test("the builder refuses a cutoff from an embedding program's config file") {
+    val error = intercept[IllegalArgumentException] {
+      io.spicelabs.goatrodeo.GoatRodeo
+        .builder()
+        .withConfiguration(
+          TomlTables.toPlainMap(parse("expiry = \"2026-01-01\"")),
+          "survey.inventory.analysis"
+        )
+    }
+    assert(error.getMessage().contains("Spice Pass"), error.getMessage())
+  }
+
+  test("the builder rejects an unknown key rather than ignoring it") {
+    val error = intercept[IllegalArgumentException] {
+      io.spicelabs.goatrodeo.GoatRodeo
+        .builder()
+        .withConfiguration(
+          TomlTables.toPlainMap(parse("thraeds = 4")),
+          "survey.inventory.analysis"
+        )
+    }
+    assert(error.getMessage().contains("thraeds"), error.getMessage())
+  }
+
+  /** The builder keeps its configuration private; tests read it reflectively
+    * rather than widening the API for their own convenience.
+    */
+  private def builderConfig(
+      b: io.spicelabs.goatrodeo.GoatRodeoBuilder
+  ): Configuration = {
+    val field = classOf[io.spicelabs.goatrodeo.GoatRodeoBuilder]
+      .getDeclaredField("config")
+    field.setAccessible(true)
+    field.get(b).asInstanceOf[Configuration]
+  }
+
+  test("an empty array claims no element type, matching tomlj") {
+    val original = parse("empty = []")
+    val adapted = TomlTables.fromJavaMap(TomlTables.toPlainMap(original))
+    assertEquals(
+      adapted.getArray("empty").containsStrings(),
+      original.getArray("empty").containsStrings()
+    )
+    assertEquals(adapted.getArray("empty").isEmpty(), true)
+  }
+}

@@ -8,16 +8,21 @@ everything that needs it as a `using` parameter named `config`:
 def buildDB(dest: File, tag: Option[TagInfo], …)(using config: Configuration): Unit
 ```
 
-There are exactly two ways to build one, and they produce the same value:
+There are three ways to build one, and they produce the same value:
 
 | Route | Entry point |
 | --- | --- |
 | Command line | `ConfigurationParser.parse(args)` — see `util/ConfigurationParser.scala` |
+| Config file | `--config <file>`, read by `ConfigurationToml` |
 | Embedded (library) | `GoatRodeoBuilder`, e.g. `GoatRodeo.builder().withOutput(…).run()` |
 
-**There is no third route.** No environment variable and no system property configures Goat
+**There is no fourth route.** No environment variable and no system property configures Goat
 Rodeo. If you find yourself reaching for one, add a field here and a flag there instead —
 that is the whole point of this file.
+
+Precedence, lowest to highest:
+
+    defaults  <  config file  <  command line
 
 ## Values
 
@@ -70,3 +75,56 @@ is captured once, in `RuntimeEnvironment.default`, and carried on the configurat
 the only place Goat Rodeo reads it. Tilde expansion (`ExpandFiles.fixTilde`) takes the home
 directory as a parameter rather than calling `System.getProperty("user.home")` at the point
 of use, so a test can supply a different one without mutating global JVM state.
+
+
+## The config file
+
+`--config <file>` reads a TOML file whose keys are the snake_case spelling of the
+corresponding flag — `--maxrecords` is `max_records`, `--fs-file-paths` is `fs_file_paths`:
+
+```toml
+out = "/srv/adg"
+build = ["/srv/artifacts"]
+threads = 16
+max_records = 100000
+mime_filter = ["+application/java-archive"]
+```
+
+Two rules are worth knowing:
+
+- **An unknown key is an error.** A mistyped key that is silently ignored is how a config file
+  becomes undebuggable: the value you wrote is simply not in force and nothing says so.
+- **Paths must be absolute.** A config file may be read from a directory the process cannot
+  see — a container mount, say — so a relative path in one has no dependable meaning. It also
+  keeps the `spice` wrapper's guarantee that every path it must bind-mount is visible on the
+  command line, since it cannot see inside a TOML table.
+
+### Embedded in another program's config file
+
+`ConfigurationToml.fromToml` takes a `TomlTable`, not a path, so the same schema and the same
+code serve both a whole Goat Rodeo config file and one table nested inside a `spice` or
+Allspice config:
+
+```toml
+# spice's config file — spice carries this table without understanding it
+[registry.analysis]
+threads = 16
+max_records = 100000
+```
+
+Callers pass the table path as a label so errors name the table the user actually wrote.
+
+`TomlTables` adapts a plain nested `Map` — how the plugin SPI hands a table over, to stay
+dependency-free — back to a `TomlTable`, so there is one reader either way. Use
+`TomlTables.toPlainMap` rather than `TomlTable.toMap()` when producing such a map:
+`toMap()` is shallow and leaves nested tables as tomlj objects.
+
+### `expiry` is the one key nesting changes
+
+`expiry` is a Goat Rodeo knob and is accepted in a Goat Rodeo config file: standalone, Goat
+Rodeo knows nothing about Spice Passes.
+
+Nested inside `spice` or Allspice it is **rejected**. There the cutoff is the pass's
+`x-cutoff`, which constrains what the platform is willing to accept, so letting a config file
+supply it would hand a user the ability to widen a scope the platform deliberately narrowed.
+`ConfigurationToml.nestedFromToml` is the entry point that enforces this.

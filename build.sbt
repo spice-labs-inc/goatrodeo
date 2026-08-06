@@ -207,6 +207,9 @@ lazy val root = project
     libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
     libraryDependencies += "com.networknt" % "json-schema-validator" % "1.5.4" % Test,
     libraryDependencies += "commons-io" % "commons-io" % "2.18.0",
+    // Config files. The same version Allspice uses, so a table parsed by one and
+    // handed to the other cannot disagree about TOML semantics.
+    libraryDependencies += "org.tomlj" % "tomlj" % "1.1.1",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
     libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
