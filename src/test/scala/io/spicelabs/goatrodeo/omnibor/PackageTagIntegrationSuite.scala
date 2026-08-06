@@ -14,7 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
@@ -112,10 +112,10 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   test("Maven JARs - package tags created for pqc_jars") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
-    val config = Config(packageTags = true, packageTagsShortName = false)
+    val config = Configuration(packageTags = true, packageTagsShortName = false)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
-    val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
+    val storage = ToProcess.buildGraphForToProcess(strategies)(using config)
 
     val packageTags = findPackageTags(storage)
 
@@ -151,10 +151,10 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   test("Maven JARs - short names use artifactId only") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
-    val config = Config(packageTags = true, packageTagsShortName = true)
+    val config = Configuration(packageTags = true, packageTagsShortName = true)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
-    val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
+    val storage = ToProcess.buildGraphForToProcess(strategies)(using config)
 
     val packageTags = findPackageTags(storage)
 
@@ -174,10 +174,10 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   test("Maven JARs - tag edges point to correct artifacts") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
-    val config = Config(packageTags = true)
+    val config = Configuration(packageTags = true)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
-    val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
+    val storage = ToProcess.buildGraphForToProcess(strategies)(using config)
 
     val packageTags = findPackageTags(storage)
 
@@ -205,13 +205,13 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       "Debian test data exists"
     )
 
-    val config = Config(packageTags = true)
+    val config = Configuration(packageTags = true)
     val source = FileWrapper(
       new File("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"),
       "libasound2_1.1.3-5ubuntu0.6_amd64.deb",
       None
     )
-    val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
+    val storage = ToProcess.buildGraphFromArtifactWrapper(source)(using config)
 
     val packageTags = findPackageTags(storage)
 
@@ -234,13 +234,13 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       "Debian with metadata test data exists"
     )
 
-    val config = Config(packageTags = true)
+    val config = Configuration(packageTags = true)
     val source = FileWrapper(
       new File("test_data/debwithmetadata.deb"),
       "debwithmetadata.deb",
       None
     )
-    val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
+    val storage = ToProcess.buildGraphFromArtifactWrapper(source)(using config)
 
     val packageTags = findPackageTags(storage)
 
@@ -264,13 +264,13 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       "RPM test data exists"
     )
 
-    val config = Config(packageTags = true)
+    val config = Configuration(packageTags = true)
     val source = FileWrapper(
       new File("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm"),
       "busybox-1.37.0-160099.8.2.aarch64.rpm",
       None
     )
-    val storage = ToProcess.buildGraphFromArtifactWrapper(source, args = config)
+    val storage = ToProcess.buildGraphFromArtifactWrapper(source)(using config)
 
     val packageTags = findPackageTags(storage)
 
@@ -359,7 +359,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
     assume(testCases.nonEmpty, "At least one test file exists")
 
-    val config = Config(packageTags = true)
+    val config = Configuration(packageTags = true)
 
     testCases.foreach { case (path, strategyName, isDirectory) =>
       val storage = (strategyName, isDirectory) match {
@@ -370,10 +370,10 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
         case (mavenDir, true) =>
           val strategies =
             ToProcess.strategyForDirectory(new File(path), false, None)
-          ToProcess.buildGraphForToProcess(strategies, args = config)
+          ToProcess.buildGraphForToProcess(strategies)(using config)
         case _ =>
           val source = FileWrapper(new File(path), path, None)
-          ToProcess.buildGraphFromArtifactWrapper(source, args = config)
+          ToProcess.buildGraphFromArtifactWrapper(source)(using config)
       }
 
       val packageTags = findPackageTags(storage)
@@ -403,10 +403,10 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   test("Tags index - contains package tags when package-tags enabled") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
-    val config = Config(packageTags = true)
+    val config = Configuration(packageTags = true)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
-    val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
+    val storage = ToProcess.buildGraphForToProcess(strategies)(using config)
 
     val tagsItem = storage.read("tags")
     assert(tagsItem.isDefined, "Should create tags index")
@@ -422,10 +422,10 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   test("Tags index - no package tag edges when package-tags disabled") {
     assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
-    val config = Config(packageTags = false)
+    val config = Configuration(packageTags = false)
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
-    val storage = ToProcess.buildGraphForToProcess(strategies, args = config)
+    val storage = ToProcess.buildGraphForToProcess(strategies)(using config)
 
     // Without --tag or --package-tags, tags index should not exist
     val tagsItem = storage.read("tags")

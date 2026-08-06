@@ -34,7 +34,7 @@ import scala.collection.immutable.TreeSet
   *   - primary artifact Items (body = `ItemMetaData`)
   *   - alias-stub Items written by the back-reference pass (body = None)
   *   - tag Items (body = `ItemTagData`, only present when `withTag(...)` is set
-  *     in Config; Certificates fixture tests do not set that)
+  *     in Configuration; Certificates fixture tests do not set that)
   *
   * Only primary items are what a sidecar's `itemCount` counts. The filter is
   * the seam that enforces that contract.

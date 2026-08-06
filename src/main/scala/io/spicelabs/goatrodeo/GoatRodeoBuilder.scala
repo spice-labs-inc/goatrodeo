@@ -17,8 +17,8 @@ package io.spicelabs.goatrodeo
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
-import io.spicelabs.goatrodeo.util.Config
-import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.nio.file.Paths
 import java.time.Instant
@@ -45,7 +45,7 @@ import scala.util.Try
 class GoatRodeoBuilder {
   private val log = Logger(classOf[GoatRodeoBuilder])
 
-  private var config = Config()
+  private var config = Configuration()
 
   /** Add a directory of artifacts to process.
     *
@@ -446,7 +446,7 @@ class GoatRodeoBuilder {
     */
   def run(): Unit = {
 
-    Howdy.run(config)
+    Howdy.run(using config)
   }
 }
 

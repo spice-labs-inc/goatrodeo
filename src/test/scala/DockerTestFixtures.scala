@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
@@ -10,6 +10,11 @@ import java.io.File
   * Storage without redundant traversals of 1+ GB tar files.
   */
 object DockerTestFixtures {
+
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
 
   def checkTestFile(path: String): Boolean = new File(path).exists()
 
@@ -21,16 +26,14 @@ object DockerTestFixtures {
   lazy val bigtentStorage: Storage = {
     val source = FileWrapper(File(bigtentPath), bigtentPath, None)
     ToProcess.buildGraphFromArtifactWrapper(
-      source,
-      args = Config(packageTags = true)
-    )
+      source
+    )(using Configuration(packageTags = true))
   }
 
   lazy val grinderStorage: Storage = {
     val source = FileWrapper(File(grinderPath), grinderPath, None)
     ToProcess.buildGraphFromArtifactWrapper(
-      source,
-      args = Config(packageTags = true)
-    )
+      source
+    )(using Configuration(packageTags = true))
   }
 }

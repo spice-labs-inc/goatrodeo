@@ -16,7 +16,7 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
@@ -25,6 +25,12 @@ import java.io.File
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
 class ISOFileSuite extends munit.FunSuite {
+
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
+
   val logger = Logger(getClass())
 
   test("withinArchiveStream - opens ISO file") {
@@ -64,7 +70,6 @@ class ISOFileSuite extends munit.FunSuite {
       None,
       store,
       ParentScope.forAndWith("Testing ISO", None, Map()),
-      args = Config(),
       tag = None
     )
     val cnt = store.keys().size

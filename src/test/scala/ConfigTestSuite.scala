@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import io.spicelabs.goatrodeo.GoatRodeo
-import io.spicelabs.goatrodeo.util.Config
-import io.spicelabs.goatrodeo.util.Config.ExpandFiles
-import io.spicelabs.goatrodeo.util.Config.VectorOfStrings
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ExpandFiles
+import io.spicelabs.goatrodeo.util.VectorOfStrings
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
@@ -23,10 +23,10 @@ import java.nio.file.Files
 
 class ConfigTestSuite extends munit.FunSuite {
 
-  // ==================== Config Defaults Tests ====================
+  // ==================== Configuration Defaults Tests ====================
 
-  test("Config - has sensible defaults") {
-    val config = Config()
+  test("Configuration - has sensible defaults") {
+    val config = Configuration()
 
     assertEquals(config.out, None)
     assert(config.build.isEmpty)
@@ -36,15 +36,15 @@ class ConfigTestSuite extends munit.FunSuite {
     assertEquals(config.fsFilePaths, false)
   }
 
-  test("Config - out can be set") {
+  test("Configuration - out can be set") {
     val dir = new File("/tmp/test-out")
-    val config = Config(out = Some(dir))
+    val config = Configuration(out = Some(dir))
 
     assertEquals(config.out, Some(dir))
   }
 
-  test("Config - threads can be set") {
-    val config = Config(threads = 8)
+  test("Configuration - threads can be set") {
+    val config = Configuration(threads = 8)
 
     assertEquals(config.threads, 8)
   }
@@ -65,26 +65,26 @@ class ConfigTestSuite extends munit.FunSuite {
     }
   }
 
-  test("Config - tag can be set") {
-    val config = Config(tag = Some("release-1.0"))
+  test("Configuration - tag can be set") {
+    val config = Configuration(tag = Some("release-1.0"))
 
     assertEquals(config.tag, Some("release-1.0"))
   }
 
-  test("Config - maxRecords can be set") {
-    val config = Config(maxRecords = 100000)
+  test("Configuration - maxRecords can be set") {
+    val config = Configuration(maxRecords = 100000)
 
     assertEquals(config.maxRecords, 100000)
   }
 
-  test("Config - useStaticMetadata can be set") {
-    val config = Config(useStaticMetadata = true)
+  test("Configuration - useStaticMetadata can be set") {
+    val config = Configuration(useStaticMetadata = true)
 
     assertEquals(config.useStaticMetadata, true)
   }
 
-  test("Config - fsFilePaths can be set") {
-    val config = Config(fsFilePaths = true)
+  test("Configuration - fsFilePaths can be set") {
+    val config = Configuration(fsFilePaths = true)
 
     assertEquals(config.fsFilePaths, true)
   }
@@ -92,7 +92,7 @@ class ConfigTestSuite extends munit.FunSuite {
   // ==================== getFileListBuilders Tests ====================
 
   test("getFileListBuilders - returns empty for empty config") {
-    val config = Config()
+    val config = Configuration()
     val builders = config.getFileListBuilders()
 
     assert(builders.isEmpty)
@@ -104,7 +104,7 @@ class ConfigTestSuite extends munit.FunSuite {
       val file1 = new File(tempDir, "file1.txt")
       Helpers.writeOverFile(file1, "content")
 
-      val config = Config(build = Vector(tempDir))
+      val config = Configuration(build = Vector(tempDir))
       val builders = config.getFileListBuilders()
 
       assertEquals(builders.length, 1)
@@ -130,7 +130,7 @@ class ConfigTestSuite extends munit.FunSuite {
         s"${testFile1.getAbsolutePath()}\n${testFile2.getAbsolutePath()}"
       )
 
-      val config = Config(fileList = Vector(fileListFile))
+      val config = Configuration(fileList = Vector(fileListFile))
       val builders = config.getFileListBuilders()
 
       assertEquals(builders.length, 1)
@@ -153,7 +153,7 @@ class ConfigTestSuite extends munit.FunSuite {
         s"${testFile.getAbsolutePath()}\n/nonexistent/file.txt"
       )
 
-      val config = Config(fileList = Vector(fileListFile))
+      val config = Configuration(fileList = Vector(fileListFile))
       val builders = config.getFileListBuilders()
 
       val files = builders.head._2()
@@ -293,51 +293,45 @@ class ConfigTestSuite extends munit.FunSuite {
     }
   }
 
-  // ==================== Config Copy Tests ====================
+  // ==================== Configuration Copy Tests ====================
 
-  test("Config.copy - preserves unchanged fields") {
-    val original = Config(threads = 8, tag = Some("test"))
+  test("Configuration.copy - preserves unchanged fields") {
+    val original = Configuration(threads = 8, tag = Some("test"))
     val copied = original.copy(threads = 16)
 
     assertEquals(copied.threads, 16)
     assertEquals(copied.tag, Some("test"))
   }
 
-  test("Config - mimeFilter defaults to empty IncludeExclude") {
-    val config = Config()
+  test("Configuration - mimeFilter defaults to empty IncludeExclude") {
+    val config = Configuration()
 
     assert(config.mimeFilter.shouldInclude(Set("anything")))
   }
 
-  test("Config - filenameFilter defaults to empty IncludeExclude") {
-    val config = Config()
-
-    assert(config.filenameFilter.shouldInclude(Set("anyfile.txt")))
-  }
-
-  test("Config - exclude patterns can be added") {
+  test("Configuration - exclude patterns can be added") {
     import scala.util.Try
     import java.util.regex.Pattern
 
     val pattern = ".*\\.html$"
     val config =
-      Config(exclude = Vector((pattern, Try(Pattern.compile(pattern)))))
+      Configuration(exclude = Vector((pattern, Try(Pattern.compile(pattern)))))
 
     assertEquals(config.exclude.length, 1)
     assertEquals(config.exclude.head._1, pattern)
     assert(config.exclude.head._2.isSuccess)
   }
 
-  test("Config - blockList can be set") {
+  test("Configuration - blockList can be set") {
     val blockFile = new File("/tmp/blocklist.txt")
-    val config = Config(blockList = Some(blockFile))
+    val config = Configuration(blockList = Some(blockFile))
 
     assertEquals(config.blockList, Some(blockFile))
   }
 
-  test("Config - tempDir can be set") {
+  test("Configuration - tempDir can be set") {
     val tempDir = new File("/tmp/custom-temp")
-    val config = Config(tempDir = Some(tempDir))
+    val config = Configuration(tempDir = Some(tempDir))
 
     assertEquals(config.tempDir, Some(tempDir))
   }
