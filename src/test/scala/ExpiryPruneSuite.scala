@@ -4,7 +4,8 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ConfigurationParser
 
 import java.time.Instant
 import scala.collection.immutable.TreeMap
@@ -112,27 +113,55 @@ class ExpiryPruneSuite extends munit.FunSuite {
     assertEquals(pruned.map(_.identifier).toSet, Set("shared"))
   }
 
-  // Asserts against `Config.parseExpiry` rather than setting the
-  // `goatrodeo.expiry` system property. The property is process-global, so a
-  // test that mutates it constrains how the suite may ever be scheduled; the
-  // parsing rules are what this test is actually about.
+  // Asserts against `ConfigurationParser.parseExpiry` rather than setting the
+  // `goatrodeo.expiry` system property. The parsing rules are what this test is
+  // actually about.
   test("parseExpiry parses epoch millis and ISO, and is empty when blank") {
-    assertEquals(Config.parseExpiry(""), None)
-    assertEquals(Config.parseExpiry("   "), None)
+    assertEquals(ConfigurationParser.parseExpiry(""), None)
+    assertEquals(ConfigurationParser.parseExpiry("   "), None)
 
     val millis = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
-    assertEquals(Config.parseExpiry(millis.toString).map(_.toEpochMilli()), Some(millis))
+    assertEquals(
+      ConfigurationParser.parseExpiry(millis.toString).map(_.toEpochMilli()),
+      Some(millis)
+    )
 
     assertEquals(
-      Config.parseExpiry("2026-01-01T00:00:00Z").map(_.toString),
+      ConfigurationParser.parseExpiry("2026-01-01T00:00:00Z").map(_.toString),
       Some("2026-01-01T00:00:00Z")
     )
   }
 
-  test("expiryFromProperty is empty when the property is unset") {
-    // Read-only, so it cannot disturb anything else. The parsing behaviour
-    // itself is covered by the `parseExpiry` test above.
-    if (System.getProperty(Config.ExpiryProperty) == null)
-      assertEquals(Config.expiryFromProperty, None)
+  test("--expiry is the only route to a cutoff on the command line") {
+    val parsed = ConfigurationParser.parse(Array("--expiry", "2026-01-01"))
+    assertEquals(
+      parsed.flatMap(_.expiry).map(_.toString),
+      Some("2026-01-01T00:00:00Z")
+    )
+  }
+
+  /** WHY: the cutoff used to have a second, ambient source — the
+    * `goatrodeo.expiry` system property — which `Howdy.run` consulted but the
+    * `GoatRodeoBuilder` library path did not, so the same value behaved
+    * differently depending on how Goat Rodeo was invoked. It now arrives only
+    * via `--expiry` or `withExpiry`. This guards against reintroducing it.
+    *
+    * Mutating the property here is safe precisely because nothing reads it any
+    * more: with no reader there is no cross-test coupling, which is what made
+    * the old `expiryFromProperty` test constrain how this suite could be
+    * scheduled.
+    */
+  test("no system property can set the expiry") {
+    val prop = "goatrodeo.expiry"
+    val saved = Option(System.getProperty(prop))
+    try {
+      System.setProperty(prop, "2026-01-01T00:00:00Z")
+      assertEquals(ConfigurationParser.parse(Array()).flatMap(_.expiry), None)
+      assertEquals(Configuration().expiry, None)
+    } finally
+      saved match {
+        case Some(v) => System.setProperty(prop, v)
+        case None    => System.clearProperty(prop)
+      }
   }
 }

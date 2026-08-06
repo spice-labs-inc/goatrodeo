@@ -4,7 +4,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.TagInfo
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
@@ -43,12 +43,16 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
     dest.mkdirs()
 
     var finished = false
+    given Configuration = Configuration(
+      expiry = Some(expiry),
+      tempDir = None,
+      threads = threadCnt,
+      maxRecords = 10000,
+      blockList = None,
+      fsFilePaths = true
+    )
     Builder.buildDB(
       dest = dest,
-      tempDir = None,
-      args = Config(expiry = Some(expiry)),
-      threadCnt = threadCnt,
-      maxRecords = 10000,
       tag = Some(TagInfo("foo", None)),
       fileListers = Vector(
         (
@@ -58,8 +62,6 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
       ),
       ignorePathSet = Set(),
       excludeFileRegex = Vector(),
-      blockList = None,
-      fsFilePaths = true,
       finishedFile = _ => (),
       done = b => { finished = b }
     )

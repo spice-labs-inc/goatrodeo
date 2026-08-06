@@ -19,9 +19,10 @@ import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.config
+import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
-import scopt.OParser
 
 import java.io.File
 import java.nio.file.Files
@@ -63,11 +64,11 @@ object Howdy {
     )
 
     // parse the CLI params
-    val parsed = OParser.parse(Config.parser1, args, Config())
+    val parsed = ConfigurationParser.parse(args)
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(params) => run(params)
+      case Some(config) => run(using config)
       case _            => Helpers.bailFail()
     }
   }
@@ -79,32 +80,32 @@ object Howdy {
     *      if requested 3. Processes files to build the ADG 4. Outputs results
     *      to the specified directory
     *
-    * @param params
-    *   the configuration parameters
+    * Everything it needs comes from the contextual [[Configuration]], reached
+    * as `config`.
     */
   @static
-  def run(params: Config): Unit = {
-    startComponents(params)
+  def run(using Configuration): Unit = {
+    startComponents
 
     val logger = Logger(getClass())
 
-    val fileListers = params.getFileListBuilders()
+    val fileListers = config.getFileListBuilders()
 
-    if (!params.nonexistantDirectories.isEmpty) {
+    if (!config.nonexistantDirectories.isEmpty) {
       logger.error(
         "One or more directories in a -b or --build option was not found: "
       )
-      params.nonexistantDirectories.foreach(f =>
+      config.nonexistantDirectories.foreach(f =>
         logger.error(f.getAbsolutePath())
       )
-      logger.info(OParser.usage(Config.parser1))
+      logger.info(ConfigurationParser.usage)
       Helpers.bailFail()
       return
     }
 
     if (fileListers.isEmpty) {
       logger.error("At least one `-b` or `--file-list` must be provided")
-      logger.info(OParser.usage(Config.parser1))
+      logger.info(ConfigurationParser.usage)
       Helpers.bailFail()
       return
     }
@@ -112,7 +113,7 @@ object Howdy {
     // if the `ingested` option was selected, build functions to
     // capture what was ingested and output it on successful run
     val (onFileFinish: (File => Unit), onRunFinish: (Boolean => Unit)) =
-      params.ingested match {
+      config.ingested match {
         case None => ((f: File) => {}, (good: Boolean) => {})
         case Some(destFile) => {
           @volatile
@@ -155,7 +156,7 @@ object Howdy {
     // get the set of paths to ignore
     val ignorePathSet = (
       for {
-        ignore <- params.ignore
+        ignore <- config.ignore
         lines <- Try {
           Files.readAllLines(ignore.toPath()).asScala
         }.toOption.toVector
@@ -163,7 +164,7 @@ object Howdy {
       } yield line
     ).toSet
 
-    val dest = params.out match {
+    val dest = config.out match {
       case None =>
         logger.error("Must provide an `--out` directory")
         Helpers.bailFail()
@@ -172,7 +173,7 @@ object Howdy {
     }
 
     var badPat = false
-    val excludePatterns = params.exclude.flatMap((str, pat) =>
+    val excludePatterns = config.exclude.flatMap((str, pat) =>
       pat match {
         case Failure(exception) =>
           logger.error(
@@ -190,19 +191,16 @@ object Howdy {
     }
 
     val preWriteDB: Vector[Storage => Boolean] =
-      params.dumpRootDir.toVector.map(dir =>
+      config.dumpRootDir.toVector.map(dir =>
         (storage: Storage) => { storage.emitRootsToDir(dir); true }
       ) ++
-        params.emitJsonDir.toVector.map(dir =>
+        config.emitJsonDir.toVector.map(dir =>
           (storage: Storage) => { storage.emitAllItemsToDir(dir); true }
         )
 
     Builder.buildDB(
       dest = dest,
-      tempDir = params.tempDir,
-      threadCnt = params.threads,
-      maxRecords = params.maxRecords,
-      tag = (params.tag, params.tagJson) match {
+      tag = (config.tag, config.tagJson) match {
         case (None, None)       => None
         case (Some(tag), v)     => Some(TagInfo(tag, v))
         case (_, Some(tagJson)) => Some(TagInfo("N/A", Some(tagJson)))
@@ -210,14 +208,9 @@ object Howdy {
       fileListers = fileListers,
       ignorePathSet = ignorePathSet,
       excludeFileRegex = excludePatterns,
-      blockList = params.blockList,
       finishedFile = onFileFinish,
       done = onRunFinish,
-      // Fall back to the goatrodeo.expiry system property when no explicit expiry was set.
-      args =
-        params.copy(expiry = params.expiry.orElse(Config.expiryFromProperty)),
-      preWriteDB = preWriteDB,
-      fsFilePaths = params.fsFilePaths
+      preWriteDB = preWriteDB
     )
 
   }
@@ -226,16 +219,13 @@ object Howdy {
     *
     * Starts the RodeoHost component runtime, processes component arguments, and
     * optionally prints component information.
-    *
-    * @param params
-    *   the configuration parameters containing component settings
     */
   @static
-  def startComponents(params: Config) = {
-    if (params.printComponentInfo) {
+  def startComponents(using Configuration) = {
+    if (config.printComponentInfo) {
       Helpers.exitZero()
     }
-    if (params.printComponentArgumentInfo) {
+    if (config.printComponentArgumentInfo) {
 
       Helpers.exitZero()
     }

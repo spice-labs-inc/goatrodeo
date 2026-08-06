@@ -17,7 +17,8 @@ package io.spicelabs.goatrodeo.omnibor
 import com.networknt.schema.JsonSchema
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
 import org.json4s.*
@@ -46,8 +47,8 @@ class CbomEmitterSuite extends FunSuite {
     schemaFactory.getSchema(is.get)
   }
 
-  private def parseConfig(args: String*): Option[Config] = {
-    OParser.parse(Config.parser1, args, Config())
+  private def parseConfig(args: String*): Option[Configuration] = {
+    ConfigurationParser.parse(args.toArray)
   }
 
   private def tempDir(): File = {
@@ -1365,19 +1366,21 @@ class CbomEmitterSuite extends FunSuite {
       var finished = false
       Builder.buildDB(
         dest = outputDir,
-        threadCnt = 1,
-        blockList = None,
-        maxRecords = 10000,
         tag = None,
-        tempDir = None,
-        args = Config(),
         fileListers = Vector((inputDir, () => Helpers.findFiles(inputDir))),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
         finishedFile = _ => (),
         done = b => { finished = b; () },
-        preWriteDB = Vector(),
-        fsFilePaths = false
+        preWriteDB = Vector()
+      )(using
+        Configuration(
+          threads = 1,
+          blockList = None,
+          maxRecords = 10000,
+          tempDir = None,
+          fsFilePaths = false
+        )
       )
       assert(finished)
 
