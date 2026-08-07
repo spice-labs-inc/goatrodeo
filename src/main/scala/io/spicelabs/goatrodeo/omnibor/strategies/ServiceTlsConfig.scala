@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CipherSuiteResolver
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -56,7 +57,7 @@ object ServiceTlsConfigStrategy {
     "\\s*option\\s+(\\w+)\\s+(\\d+|on|off|true|false)".r
   private[strategies] val NginxSsl = "\\s*ssl_(\\w+)\\s+(.+);".r
   private[strategies] val LighttpdSsl =
-    "\\s*ssl\\.(\\w+)\\s*=>\\s*['\"]([^'\"]+)['\"]".r
+    "\\s*ssl\\.([\\w-]+)\\s*=>\\s*['\"]([^'\"]+)['\"]".r
 
   /** Compute service TLS configuration files to process at a layer. */
   def computeServiceTlsConfigFiles(
@@ -193,11 +194,15 @@ class ServiceTlsConfigState(artifact: ArtifactWrapper)
       _.trim.startsWith("config")
     )
 
-    val (cert, key, redirect) = if (isUci) {
+    val values = if (isUci) {
       parseUci(text)
     } else {
       parseGeneric(text)
     }
+    val cert = values.cert
+    val key = values.key
+    val redirect = values.redirect
+    val cipherText = values.cipher
 
     var tm = TreeMap[String, TreeSet[StringOrPair]](
       MKC.NAME -> TreeSet(StringOrPair(service)),
@@ -210,12 +215,39 @@ class ServiceTlsConfigState(artifact: ArtifactWrapper)
     redirect.foreach(r =>
       tm = tm + (adHoc("RedirectHttps") -> TreeSet(StringOrPair(r)))
     )
+    // Phase A — cipher-suite decomposition for service TLS configs.
+    cipherText.foreach(c =>
+      tm = tm + (adHoc("CipherString") -> TreeSet(StringOrPair(c)))
+    )
+    cipherText.foreach { c =>
+      val algs = TreeSet.from(
+        CipherSuiteResolver
+          .resolveCipherString(c)
+          .flatMap(_.algorithms)
+          .map(StringOrPair(_))
+      )
+      if (algs.nonEmpty) {
+        tm = tm + (adHoc("algorithms") -> algs)
+      }
+    }
     tm
   }
 
+  /** Test-accessible alias for parseArtifact. */
+  private[strategies] def invokeParseArtifact(
+      artifact: ArtifactWrapper
+  ): TreeMap[String, TreeSet[StringOrPair]] = parseArtifact(artifact)
+
+  private case class TlsConfigValues(
+      cert: Option[String] = None,
+      key: Option[String] = None,
+      redirect: Option[String] = None,
+      cipher: Option[String] = None
+  )
+
   private def parseUci(
       text: String
-  ): (Option[String], Option[String], Option[String]) = {
+  ): TlsConfigValues = {
     var cert: Option[String] = None
     var key: Option[String] = None
     var redirect: Option[String] = None
@@ -230,28 +262,33 @@ class ServiceTlsConfigState(artifact: ArtifactWrapper)
         case _ =>
       }
     }
-    (cert, key, redirect)
+    TlsConfigValues(cert, key, redirect)
   }
 
   private def parseGeneric(
       text: String
-  ): (Option[String], Option[String], Option[String]) = {
+  ): TlsConfigValues = {
     var cert: Option[String] = None
     var key: Option[String] = None
     var redirect: Option[String] = None
+    var cipher: Option[String] = None
     text.linesIterator.foreach { line =>
       line.trim match {
         case ServiceTlsConfigStrategy.NginxSsl("certificate", value) =>
           cert = Option(value).map(_.trim.replaceAll("['\";]", ""))
         case ServiceTlsConfigStrategy.NginxSsl("certificate_key", value) =>
           key = Option(value).map(_.trim.replaceAll("['\";]", ""))
+        case ServiceTlsConfigStrategy.NginxSsl("ciphers", value) =>
+          cipher = Option(value).map(_.trim.replaceAll("[;]", ""))
         case ServiceTlsConfigStrategy.LighttpdSsl("pemfile", value) =>
           cert = Option(value).map(_.trim)
         case ServiceTlsConfigStrategy.LighttpdSsl("privkey", value) =>
           key = Option(value).map(_.trim)
+        case ServiceTlsConfigStrategy.LighttpdSsl("cipher-list", value) =>
+          cipher = Option(value).map(_.trim)
         case _ =>
       }
     }
-    (cert, key, redirect)
+    TlsConfigValues(cert, key, redirect, cipher)
   }
 }

@@ -66,13 +66,21 @@ class ADGTests extends munit.FunSuite {
       var finished = false
       var tagCount = 0
 
+      // Worker concurrency default is memory-bound: the surefire test fork runs
+      // at `-Xmx4G` (pom `test.argLine`; "keep forkCount * Xmx within the
+      // machine's RAM"), and this build slurps large embedded archive entries,
+      // so peak heap grows ~linearly with in-flight workers. 25 threads
+      // OOM'd at 4G; 6 threads passes deterministically (measured). Speed can
+      // be restored where the box allows via `TEST_THREAD_CNT`, and the corpus
+      // stays unchanged.
+      val defaultThreadCnt = 6
       Builder.buildDB(
         dest = resForBigTent,
         tempDir = None,
         args = Config(),
         threadCnt = (Option(System.getenv("TEST_THREAD_CNT")))
           .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
-          .getOrElse(25),
+          .getOrElse(defaultThreadCnt),
         maxRecords = 10000,
         tag = Some(TagInfo("foo", None)),
         fileListers = Vector(

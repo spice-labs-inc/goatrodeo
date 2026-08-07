@@ -34,9 +34,14 @@ import scala.util.Try
   *
   * Emits one CBOM JSON file per top-level input file (root Item) after the
   * Artifact Dependency Graph has been built. The emitter walks `contains` edges
-  * transitively, collects Items that carry cryptographic metadata, redacts
-  * private-key Items, and maps the remainder to CycloneDX 1.6 or 1.7
-  * `cryptographic-asset` components.
+  * transitively, collects Items that carry cryptographic metadata and maps them
+  * to CycloneDX 1.6 or 1.7 `cryptographic-asset` components.
+  *
+  * No redaction happens here by design: the private-key hard constraint is
+  * enforced at capture time (decoded key bytes are discarded and never enter
+  * ADG metadata), so every ADG field that maps to a valid CBOM field is
+  * included, including private-key marker flags such as
+  * `Certificates:DerivedFromPrivateKey` / `SSH:MaterialType`.
   */
 object CbomEmitter {
   private val logger: Logger = Logger(getClass())
@@ -114,7 +119,7 @@ object CbomEmitter {
       root: Item
   ): (Vector[Item], Boolean) = {
     val rootCollected =
-      if (isCryptoItem(root) && !isPrivateKey(root)) Vector(root) else Vector()
+      if (isCryptoItem(root)) Vector(root) else Vector()
 
     @tailrec
     def loop(
@@ -136,7 +141,7 @@ object CbomEmitter {
           storage.read(gitoid) match {
             case Some(item) =>
               val nextCollected =
-                if (isCryptoItem(item) && !isPrivateKey(item)) collected :+ item
+                if (isCryptoItem(item)) collected :+ item
                 else collected
               val children =
                 if (depth < MaxTraversalDepth)
@@ -172,26 +177,6 @@ object CbomEmitter {
           k.startsWith("TLSConfig:") ||
           k.startsWith("EmbeddedCertificates:")
       )
-    }
-  }
-
-  /** True when the Item is a private key (or secret key) that must be redacted.
-    */
-  private def isPrivateKey(item: Item): Boolean = {
-    item.bodyAsItemMetaData.exists { meta =>
-      val extra = meta.extra
-      val derivedFromPrivateKey = extra
-        .get("Certificates:DerivedFromPrivateKey")
-        .exists(_.exists(_.value == "true"))
-      val descriptionPrivate = extra
-        .get("Description")
-        .flatMap(_.headOption)
-        .map(_.value)
-        .exists(_.toLowerCase.contains("private key"))
-      val sshPrivateKey = extra
-        .get("SSH:MaterialType")
-        .exists(_.exists(_.value == "private-key"))
-      derivedFromPrivateKey || descriptionPrivate || sshPrivateKey
     }
   }
 

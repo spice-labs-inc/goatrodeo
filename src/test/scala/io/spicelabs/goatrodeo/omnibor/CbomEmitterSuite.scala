@@ -763,9 +763,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.19 private key redaction
+  // T3.19 private-key-marker Items are emitted faithfully (no redaction)
   // ----------------------------------------------------------------------
-  test("T3.19 private key Items are redacted from CBOM") {
+  test("T3.19 private-key-marker Items are emitted faithfully") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -808,8 +808,27 @@ class CbomEmitterSuite extends FunSuite {
       val json = writeAndRead(storage, root, dir)
 
       val components = getComponents(json)
-      assertEquals(components.length, 1)
-      assertEquals(getString(components.head, "name"), "cert")
+      assertEquals(components.length, 2)
+      val byName = components
+        .groupBy(getString(_, "name"))
+        .view
+        .mapValues(_.head)
+        .toMap
+      assertEquals(getString(byName("cert"), "type"), "cryptographic-asset")
+      assertEquals(
+        getString(
+          byName("key.pem"),
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "type"
+        ),
+        "public-key"
+      )
+      assert(
+        propertyMap(byName("key.pem"))
+          .contains("Certificates:DerivedFromPrivateKey"),
+        "private-key marker must surface as a property"
+      )
     } finally {
       cleanup(dir)
     }

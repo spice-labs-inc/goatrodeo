@@ -100,6 +100,8 @@ object CryptoDetector {
     detectPgpBinary(prefix, builder)
     detectDerPrefix(prefix, filename, fullDerOpt.getOrElse(prefix), builder)
     detectDerPkcs7(prefix, builder)
+    detectKeystoreByFilename(filename, builder)
+    detectKeyboxByFilename(filename, prefix, builder)
     builder.result()
   }
 
@@ -400,6 +402,49 @@ object CryptoDetector {
       val cf = CertificateFactory.getInstance("X.509", "BC")
       cf.generateCRL(new ByteArrayInputStream(bytes))
     }.isSuccess
+  }
+
+
+  /** Keystore name/extension fallback: when the content probe misses the magic
+    * (e.g. a keystore whose header is not at offset 0, or BKS), claim by the
+    * well-known JVM keystore names and extensions. Purely additive.
+    */
+  private def detectKeystoreByFilename(
+      filename: String,
+      builder: scala.collection.mutable.Builder[String, Set[String]]
+  ): Unit = {
+    val lower = filename.toLowerCase
+    val base = {
+      val slash = lower.lastIndexOf('/')
+      val name = if (slash >= 0) lower.substring(slash + 1) else lower
+      val dot = name.lastIndexOf('.')
+      if (dot >= 0) name.substring(0, dot) else name
+    }
+    val ext = filenameExtension(filename)
+    if (
+      ext == "jks" || ext == "bks" ||
+      base == "cacerts" || base == "jssecacerts" || base == "keystore"
+    ) {
+      builder += "application/x-java-keystore"
+    }
+    if (ext == "jceks") builder += "application/x-java-jce-keystore"
+    if (ext == "p12" || ext == "pfx") builder += "application/pkcs12"
+  }
+
+  /** GPG keybox detection: `.kbx` files or the `#KBX` magic become
+    * OpenPGP keys so they are claimed and inventoried.
+    */
+  private def detectKeyboxByFilename(
+      filename: String,
+      prefix: Array[Byte],
+      builder: scala.collection.mutable.Builder[String, Set[String]]
+  ): Unit = {
+    val keyboxMagic =
+      prefix.length >= 4 && prefix(0) == 0x23.toByte && prefix(1) == 0x4b.toByte &&
+        prefix(2) == 0x42.toByte && prefix(3) == 0x58.toByte
+    if (filename.toLowerCase.endsWith(".kbx") || keyboxMagic) {
+      builder += "application/pgp-keys"
+    }
   }
 
   private def filenameExtension(path: String): String = {
