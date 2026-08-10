@@ -665,7 +665,7 @@
       </activation>
       <properties>
         <test.forkCount>0.5C</test.forkCount>
-        <test.argLine>-Xmx4G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+<test.argLine>-Xmx8G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
       </properties>
     </profile>
   </profiles>
