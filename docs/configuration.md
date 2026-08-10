@@ -2,11 +2,22 @@
 
 Every value that affects a Goat Rodeo run lives in one strongly-typed record,
 `io.spicelabs.goatrodeo.util.Configuration`. It is built once at startup and passed to
-everything that needs it as a `using` parameter named `config`:
+everything that needs it as an anonymous `using` parameter:
 
 ```scala
-def buildDB(dest: File, tag: Option[TagInfo], …)(using config: Configuration): Unit
+def buildDB(dest: File, tag: Option[TagInfo], …)(using Configuration): Unit
 ```
+
+It is read through the global `config` accessor, defined once in
+`io.spicelabs.goatrodeo.util`:
+
+```scala
+inline def config(using configuration: Configuration): Configuration = configuration
+```
+
+Naming the parameter would let one file call it `config`, another `cfg`, and a third shadow
+it; leaving it anonymous means there is exactly one name for the configuration anywhere in
+the codebase. Allspice uses the same idiom.
 
 There are three ways to build one, and they produce the same value:
 
