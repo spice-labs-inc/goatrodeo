@@ -273,6 +273,34 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     }
   }
 
+  test("an array of tables crosses as tables, not as plain maps") {
+    // tomlj's contract lets a caller write toList().get(0).asInstanceOf[TomlTable],
+    // and every other accessor here wraps nested values to honour it. toList did
+    // not, which nothing could notice until a config file had an array of tables
+    // in it — Allspice's [[repositories]] is the first.
+    val table = TomlTables.fromMap(
+      Map(
+        "repositories" -> java.util.List.of(
+          java.util.Map.of("id", "one"),
+          java.util.Map.of("id", "two")
+        )
+      )
+    )
+
+    val entries = table.getArrayOrEmpty("repositories").toList()
+    assertEquals(entries.size(), 2)
+    entries.asScala.foreach { entry =>
+      assert(
+        entry.isInstanceOf[TomlTable],
+        s"expected a TomlTable, got ${entry.getClass.getName}"
+      )
+    }
+    assertEquals(
+      entries.get(0).asInstanceOf[TomlTable].getString("id"),
+      "one"
+    )
+  }
+
   private def withConfigFile[A](contents: String)(f: Path => A): A = {
     val path = Files.createTempFile("goatrodeo-config", ".toml")
     try {

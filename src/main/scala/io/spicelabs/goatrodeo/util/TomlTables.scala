@@ -158,8 +158,16 @@ object TomlTables {
 
     override def inputPositionOf(index: Int): TomlPosition = noPosition
 
+    /** The wrapped values, like every other accessor here.
+      *
+      * Returning the raw ones was a bug you could only hit with an array of
+      * tables — `[[repositories]]`, say — where a caller doing what tomlj's own
+      * contract allows, `toList().get(0).asInstanceOf[TomlTable]`, got a plain
+      * Map and a ClassCastException. Every other accessor wrapped; this one did
+      * not, and nothing had an array of tables to notice with.
+      */
     override def toList(): JList[Object] =
-      values.map(_.asInstanceOf[Object]).asJava
+      wrapped.map(_.asInstanceOf[Object]).asJava
 
     /** TOML arrays are homogeneous, so "contains X" is "every element is an X".
       * An empty array satisfies none of them, matching tomlj.
