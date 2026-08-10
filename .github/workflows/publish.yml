@@ -42,10 +42,24 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: "sbt"
+          cache: "maven"
 
-      - name: Set up SBT
-        uses: sbt/setup-sbt@v1
+      - name: Configure Maven settings.xml
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>x-access-token</username>
+                <password>${GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Derive and validate version
         id: version
@@ -62,14 +76,20 @@ jobs:
           echo "projectVersion=$raw_version" >> "$GITHUB_ENV"
           echo "version=$raw_version" >> "$GITHUB_OUTPUT"
 
+      - name: Set Maven project version
+        run: |
+          mvn -B versions:set \
+            -DnewVersion="${{ env.projectVersion }}" \
+            -DgenerateBackupPoms=false
+
       - name: Publish standard and fat JARs to GitHub Packages
         run: |
-          SBT_OPTS="-Xmx8G -Duser.timezone=GMT" sbt \
-            "set ThisBuild / version := \"${{ env.projectVersion }}\"" \
-            +publish
+          MAVEN_OPTS="-Xmx8G -Duser.timezone=GMT" \
+            mvn -B clean deploy \
+            -DskipTests \
+            -Dmaven.test.skip=true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISH_TARGET: github
 
       - name: Index and Upload ADG
         uses: spice-labs-inc/action-spice-labs-surveyor@v5
@@ -261,9 +281,9 @@ jobs:
             # Build detailed failure message
             MESSAGE="❌ Publishing failed:"
             if [ "$JARS_STATUS" != "success" ]; then
-              MESSAGE="$MESSAGE ❌ SBT JAR publishing failed."
+              MESSAGE="$MESSAGE ❌ Maven JAR publishing failed."
             else
-              MESSAGE="$MESSAGE ✅ SBT JAR publishing succeeded."
+              MESSAGE="$MESSAGE ✅ Maven JAR publishing succeeded."
             fi
 
             if [ "$CENTRAL_STATUS" != "success" ]; then

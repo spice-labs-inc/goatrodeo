@@ -477,6 +477,22 @@
             <exclude>META-INF/semanticdb/**</exclude>
           </excludes>
         </configuration>
+        <executions>
+          <execution>
+            <id>attach-javadoc-stub</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <!-- Maven Central requires a -javadoc.jar. This project is Scala,
+                   so the jar is a stub containing a README. -->
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.basedir}/src/main/javadoc-stub</classesDirectory>
+              <excludes combine.self="override"/>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
 
       <!-- Scala 3 compiler -->
@@ -550,6 +566,22 @@
         </configuration>
       </plugin>
 
+      <!-- Source and Javadoc jars for Maven Central (downloaded by the
+           publish-to-central job from GitHub Packages). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <!-- Fat jar (replaces sbt-assembly); strips signature files like the
            sbt assemblyMergeStrategy did. Note: sbt-assembly uses
            MergeStrategy.last for all other duplicate resources, whereas Shade

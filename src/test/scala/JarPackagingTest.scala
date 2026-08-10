@@ -51,4 +51,35 @@ class JarPackagingTest extends munit.FunSuite {
       jar.close()
     }
   }
+
+  test("sources jar is produced") {
+    val jarFile = new File(
+      s"target/goatrodeo_3-${hellogoat.BuildInfo.version}-sources.jar"
+    )
+    assert(
+      jarFile.exists(),
+      s"Sources jar not found at ${jarFile.getAbsolutePath}"
+    )
+  }
+
+  test("javadoc jar stub is produced") {
+    val jarFile = new File(
+      s"target/goatrodeo_3-${hellogoat.BuildInfo.version}-javadoc.jar"
+    )
+    assert(
+      jarFile.exists(),
+      s"Javadoc jar not found at ${jarFile.getAbsolutePath}"
+    )
+
+    val jar = new JarFile(jarFile)
+    try {
+      val entryNames = jar.entries().asScala.map(_.getName).toSet
+      assert(
+        entryNames.contains("README.txt"),
+        "Javadoc stub jar should contain README.txt"
+      )
+    } finally {
+      jar.close()
+    }
+  }
 }
