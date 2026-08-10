@@ -210,6 +210,10 @@ lazy val root = project
     // Config files. The same version Allspice uses, so a table parsed by one and
     // handed to the other cannot disagree about TOML semantics.
     libraryDependencies += "org.tomlj" % "tomlj" % "1.1.1",
+    // The naming, layering and precedence rules, shared with every other Spice
+    // component. Kept out of here deliberately: rules copied into three codebases
+    // are rules that will disagree, and these already have.
+    libraryDependencies += "io.spicelabs" % "spice-config" % "0.1.0-SNAPSHOT",
     libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
     libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",

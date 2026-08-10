@@ -66,7 +66,20 @@ object ConfigurationParser {
             file.toPath(),
             Configuration(runtime = runtime, configFile = Some(file))
           ) match {
-            case Right(fromFile) => parseWith(args, fromFile)
+            case Right(fromFile) =>
+              val withFlags = parseWith(args, fromFile)
+              // The file and the environment report their own disagreements as
+              // they are resolved; this is the last layer, and the only one that
+              // cannot report itself, because scopt folds flags straight into the
+              // configuration with nowhere to record where a value came from.
+              withFlags.foreach { full =>
+                full.differencesFrom(fromFile).foreach { (name, was, now) =>
+                  logger.info(
+                    s"$name = ${show(now)} (command line) overrides ${show(was)} ($file)"
+                  )
+                }
+              }
+              withFlags
             case Left(error) => {
               logger.error(f"Invalid config file ${file}: ${error}")
               None
@@ -75,6 +88,15 @@ object ConfigurationParser {
         }
       }
     }
+
+  /** Values as a person wrote them, not as Scala prints them. */
+  private def show(value: Any): String = value match {
+    case Some(v)         => show(v)
+    case None            => "unset"
+    case v: Vector[?]    => v.map(show).mkString("[", ", ", "]")
+    case f: java.io.File => f.toString
+    case other           => other.toString
+  }
 
   private def parseWith(
       args: Array[String],
@@ -91,7 +113,7 @@ object ConfigurationParser {
     OParser.sequence(
       programName("goatrodeo"),
       head("goatrodeo", hellogoat.BuildInfo.version),
-      opt[File]("block")
+      opt[File]("block-list")
         .text(
           "The gitoid block list. Do not process these gitoids. Used for common gitoids such as license files"
         )
@@ -178,7 +200,7 @@ object ConfigurationParser {
             Pattern.compile(p)
           })))
         ),
-      opt[Int]("maxrecords")
+      opt[Int]("max-records")
         .text(
           "The maximum number of records to process at once. Default 50,000"
         )
@@ -211,7 +233,7 @@ object ConfigurationParser {
           if (Set("1.6", "1.7").contains(v)) success
           else failure(s"--cbom-version must be 1.6 or 1.7, got $v")
         ),
-      opt[File]("tempdir")
+      opt[File]("temp-dir")
         .text("Where to temporarily store files... should be a RAM disk")
         .action((x, c) => c.copy(tempDir = Some(x))),
       opt[Int]('t', "threads")

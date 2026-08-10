@@ -171,6 +171,29 @@ case class Configuration(
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
 
+  /** The settings that differ between this configuration and another.
+    *
+    * Used to report what the command line changed. Deriving it by comparing two
+    * configurations, rather than recording an origin in each of two dozen flag
+    * actions, means a flag added later is covered without anyone remembering to
+    * cover it — the failure mode for hand-maintained lists here has always been
+    * that they quietly fall behind.
+    *
+    * `runtime` and `configFile` are skipped: they are how the run was started,
+    * not settings anybody wrote.
+    */
+  def differencesFrom(other: Configuration): Vector[(String, Any, Any)] = {
+    val ignored = Set("runtime", "configFile")
+    productElementNames.zipWithIndex
+      .filterNot((name, _) => ignored.contains(name))
+      .flatMap { (name, index) =>
+        val mine = productElement(index)
+        val theirs = other.productElement(index)
+        if (mine == theirs) None else Some((name, theirs, mine))
+      }
+      .toVector
+  }
+
   /** Build a list of file list builders from the configuration.
     *
     * Returns tuples of (base directory, function to get files). For `build`

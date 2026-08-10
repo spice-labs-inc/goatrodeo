@@ -2,8 +2,12 @@ package io.spicelabs.goatrodeo.util
 
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
+import io.spicelabs.config.ConfigurationException
+import io.spicelabs.config.Origin
+import io.spicelabs.config.Resolution
+import io.spicelabs.config.Resolver
+import io.spicelabs.config.Setting
 import org.tomlj.Toml
-import org.tomlj.TomlArray
 import org.tomlj.TomlTable
 
 import java.io.File
@@ -11,6 +15,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.Try
 
 /** Reads a [[Configuration]] from a TOML table.
@@ -28,12 +33,35 @@ import scala.util.Try
   * flags maintained inside Allspice drifted until it permitted flags Goat Rodeo
   * does not have.
   *
-  * Keys are the snake_case spelling of the corresponding command-line flag, so
-  * `--maxrecords` is `max_records` and `--fs-file-paths` is `fs_file_paths`.
+  * Keys are the snake_case spelling of the corresponding command-line flag, and
+  * the mapping is mechanical in both directions: `max_records` is
+  * `--max-records`, `fs_file_paths` is `--fs-file-paths`. The same key is
+  * `GOATRODEO_ANALYSIS_MAX_RECORDS` in the environment standalone, and
+  * `SPICE_ANALYSIS_MAX_RECORDS` when embedded — the same setting under the same
+  * name, differing only in whose program is running.
   */
 object ConfigurationToml {
 
-  /** Keys accepted at the top level of a Goat Rodeo config file. */
+  private val logger = com.typesafe.scalalogging.Logger(getClass())
+
+  /** The configuration group these settings belong to.
+    *
+    * Named for the job rather than for this component, and the same group
+    * `spice` and Allspice carry, so `[analysis] threads = 16` means one thing
+    * wherever it is written. A standalone Goat Rodeo config file therefore has
+    * an `[analysis]` table too, rather than bare keys — one shape to learn.
+    */
+  val Group: String = "analysis"
+
+  /** The environment-variable prefix when Goat Rodeo runs standalone.
+    *
+    * `GOATRODEO_ANALYSIS_THREADS` rather than `SPICE_ANALYSIS_THREADS`: the
+    * setting is the same, but a variable naming a program that is not running
+    * would be a lie, and it lets both be set on one machine without collision.
+    */
+  val EnvironmentPrefix: String = "GOATRODEO"
+
+  /** Keys accepted in the `[analysis]` table. */
   private val knownKeys: Set[String] = Set(
     "out",
     "build",
@@ -76,17 +104,48 @@ object ConfigurationToml {
 
   private case class Invalid(message: String) extends RuntimeException(message)
 
-  /** Read a whole Goat Rodeo config file. */
+  /** Read a whole Goat Rodeo config file, plus the environment.
+    *
+    * Standalone, this is where the ladder is applied: defaults, then the
+    * `[analysis]` table, then `GOATRODEO_ANALYSIS_*`. Command-line flags are
+    * applied on top by [[ConfigurationParser]], which is the only part that
+    * knows what a flag is.
+    */
   def fromFile(
       path: Path,
-      base: Configuration = Configuration()
+      base: Configuration = Configuration(),
+      environment: Map[String, String] = sys.env,
+      report: String => Unit = message => logger.info(message)
   ): Either[String, Configuration] = {
     if (!Files.exists(path)) Left(s"config file not found: $path")
     else {
       val result = Toml.parse(Files.readString(path))
       if (!result.errors().isEmpty())
         Left(result.errors().asScala.map(_.toString).mkString("; "))
-      else fromToml(result, base)
+      else {
+        val root = TomlTables.toPlainMap(result)
+        val loose = root.asScala
+          .collect {
+            case (key, value) if !value.isInstanceOf[java.util.Map[?, ?]] => key
+          }
+          .toSeq
+          .sorted
+        if (loose.nonEmpty)
+          Left(
+            s"settings belong in a table: move ${loose.mkString(", ")} under [$Group]"
+          )
+        else {
+          val resolved = new Resolver(
+            EnvironmentPrefix,
+            java.util.Set.of(Group),
+            message => report(message)
+          )
+            .withFile(path, root, java.util.List.of())
+            .withEnvironment(environment.asJava)
+            .resolve()
+          fromResolution(resolved, base, Group)
+        }
+      }
     }
   }
 
@@ -102,9 +161,40 @@ object ConfigurationToml {
       base: Configuration = Configuration(),
       label: String = "",
       nested: Boolean = false
+  ): Either[String, Configuration] =
+    fromResolution(
+      Resolution.of(
+        java.util.Map.of(Group, TomlTables.toPlainMap(table)),
+        Origin.embedded(if (label.isEmpty) Group else label)
+      ),
+      base,
+      label,
+      nested
+    )
+
+  /** Read a table nested inside another program's config file. */
+  def nestedFromToml(
+      table: TomlTable,
+      base: Configuration,
+      label: String
+  ): Either[String, Configuration] =
+    fromToml(table, base, label, nested = true)
+
+  /** Read settings whose value has already been decided.
+    *
+    * The one reader, whether the values came from this program's own file and
+    * environment or from a host that resolved them and passed them in. Both
+    * arrive as a [[Resolution]], so there is no "am I embedded?" branch in the
+    * reading itself — only in what is allowed to appear.
+    */
+  def fromResolution(
+      resolved: Resolution,
+      base: Configuration = Configuration(),
+      label: String = "",
+      nested: Boolean = false
   ): Either[String, Configuration] = {
     val prefix = if (label.isEmpty) "" else s"[$label] "
-    val keys = table.keySet().asScala.toSet
+    val keys = resolved.group(Group).keySet().asScala.toSet
     val unknown = keys.diff(knownKeys)
     val rejected =
       if (nested) keys.intersect(nestedOnlyRejected.keySet)
@@ -123,20 +213,17 @@ object ConfigurationToml {
           .mkString("; ")
       )
     else {
-      try Right(read(table, base))
-      catch { case Invalid(message) => Left(prefix + message) }
+      try Right(read(resolved, base))
+      catch {
+        case Invalid(message) => Left(prefix + message)
+        // A value that cannot be read names itself and the source it came from,
+        // which is more use than anything this layer could add.
+        case e: ConfigurationException => Left(e.getMessage)
+      }
     }
   }
 
-  /** Read a table nested inside another program's config file. */
-  def nestedFromToml(
-      table: TomlTable,
-      base: Configuration,
-      label: String
-  ): Either[String, Configuration] =
-    fromToml(table, base, label, nested = true)
-
-  private def read(table: TomlTable, base: Configuration): Configuration = {
+  private def read(table: Resolution, base: Configuration): Configuration = {
     var config = base
     str(table, "out").foreach(v => config = config.copy(out = Some(file(v))))
     strs(table, "build").foreach(vs =>
@@ -240,55 +327,20 @@ object ConfigurationToml {
     f
   }
 
-  private def valueOf(table: TomlTable, key: String): Option[Any] =
-    Option(table.get(key)).map(_.asInstanceOf[Any])
+  private def setting(table: Resolution, key: String): Option[Setting] =
+    table.setting(Group, key).toScala
 
-  private def str(table: TomlTable, key: String): Option[String] =
-    valueOf(table, key).map {
-      case s: String => s
-      case other =>
-        throw Invalid(s"$key must be a string, got ${typeName(other)}")
-    }
+  private def str(table: Resolution, key: String): Option[String] =
+    setting(table, key).map(_.asString)
 
-  private def strs(table: TomlTable, key: String): Option[Vector[String]] =
-    valueOf(table, key).map {
-      case a: TomlArray =>
-        a.toList().asScala.toVector.map {
-          case s: String => s
-          case other =>
-            throw Invalid(
-              s"$key must be an array of strings, got an array of ${typeName(other)}"
-            )
-        }
-      case other =>
-        throw Invalid(
-          s"$key must be an array of strings, got ${typeName(other)}"
-        )
-    }
+  private def strs(table: Resolution, key: String): Option[Vector[String]] =
+    setting(table, key).map(_.asStringList.asScala.toVector)
 
-  private def int(table: TomlTable, key: String): Option[Int] =
-    valueOf(table, key).map {
-      case l: java.lang.Long => l.intValue()
-      case other =>
-        throw Invalid(s"$key must be an integer, got ${typeName(other)}")
-    }
+  private def int(table: Resolution, key: String): Option[Int] =
+    setting(table, key).map(_.asLong.toInt)
 
-  private def bool(table: TomlTable, key: String): Option[Boolean] =
-    valueOf(table, key).map {
-      case b: java.lang.Boolean => b.booleanValue()
-      case other =>
-        throw Invalid(s"$key must be true or false, got ${typeName(other)}")
-    }
-
-  private def typeName(value: Any): String = value match {
-    case _: String            => "a string"
-    case _: java.lang.Long    => "an integer"
-    case _: java.lang.Double  => "a float"
-    case _: java.lang.Boolean => "a boolean"
-    case _: TomlArray         => "an array"
-    case _: TomlTable         => "a table"
-    case other                => other.getClass().getSimpleName()
-  }
+  private def bool(table: Resolution, key: String): Option[Boolean] =
+    setting(table, key).map(_.asBoolean)
 
   private def plural(n: Int, word: String): String =
     if (n == 1) word else s"${word}s"

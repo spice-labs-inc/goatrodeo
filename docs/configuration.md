@@ -44,11 +44,11 @@ Precedence, lowest to highest:
 | `fileList` | `Vector[File]` | `--file-list` | `withFileList` | empty |
 | `ingested` | `Option[File]` | `--ingested` | `withIngested` | none |
 | `ignore` | `Vector[File]` | `--ignore` | `withIgnore` | empty |
-| `blockList` | `Option[File]` | `--block` | `withBlockList` | none |
+| `blockList` | `Option[File]` | `--block-list` | `withBlockList` | none |
 | `exclude` | `Vector[(String, Try[Pattern])]` | `--exclude-pattern` | `withExcludePattern` | empty |
 | `threads` | `Int` | `-t`, `--threads` | `withThreads` | `4` |
-| `maxRecords` | `Int` | `--maxrecords` | `withMaxRecords` | `50000` |
-| `tempDir` | `Option[File]` | `--tempdir` | `withTempDir` | none |
+| `maxRecords` | `Int` | `--max-records` | `withMaxRecords` | `50000` |
+| `tempDir` | `Option[File]` | `--temp-dir` | `withTempDir` | none |
 | `useStaticMetadata` | `Boolean` | `--static-metadata` | `withStaticMetadata` | `false` |
 | `fsFilePaths` | `Boolean` | `--fs-file-paths` | `withFsFilePaths` | `false` |
 | `dumpRootDir` | `Option[File]` | `--dump-roots` | — | none |
@@ -90,10 +90,10 @@ of use, so a test can supply a different one without mutating global JVM state.
 
 ## The config file
 
-`--config <file>` reads a TOML file whose keys are the snake_case spelling of the
-corresponding flag — `--maxrecords` is `max_records`, `--fs-file-paths` is `fs_file_paths`:
+`--config <file>` reads a TOML file whose settings live in an `[analysis]` table:
 
 ```toml
+[analysis]
 out = "/srv/adg"
 build = ["/srv/artifacts"]
 threads = 16
@@ -101,10 +101,45 @@ max_records = 100000
 mime_filter = ["+application/java-archive"]
 ```
 
-Two rules are worth knowing:
+`analysis` is the *group* — named for the job rather than for this component, and the same
+group `spice` and Allspice carry, so `[analysis] threads = 16` means one thing wherever it is
+written. There is one shape to learn, and moving a setting between a Goat Rodeo config file
+and a `spice` one is a copy rather than a translation.
+
+The three names of a setting are related by a rule with no exceptions:
+
+| Form | Shape | Example |
+| --- | --- | --- |
+| Config key | `snake_case` in `[analysis]` | `max_records` |
+| Flag | its kebab-case form | `--max-records` |
+| Environment | `GOATRODEO_ANALYSIS_<KEY>` | `GOATRODEO_ANALYSIS_MAX_RECORDS` |
+
+Embedded in `spice`, the same setting is `SPICE_ANALYSIS_MAX_RECORDS`: the prefix names
+whichever program is running, and nothing else changes.
+
+Lowest to highest:
+
+    defaults  <  [analysis]  <  environment  <  command line
+
+and when one of those displaces another, it says so:
+
+```
+threads = 9 (GOATRODEO_ANALYSIS_THREADS) overrides 4 ([analysis] in /etc/goatrodeo.toml)
+threads = 12 (command line) overrides 9 (/etc/goatrodeo.toml)
+```
+
+Overriding a *default* is not reported: that is every setting on every run, and the noise
+would bury the cases where two deliberate choices conflict. The rules themselves —
+naming, layering, precedence, provenance — live in `spice-config`, shared with every
+component, because rules copied into three codebases are rules that will disagree.
+
+Three rules are worth knowing:
 
 - **An unknown key is an error.** A mistyped key that is silently ignored is how a config file
   becomes undebuggable: the value you wrote is simply not in force and nothing says so.
+- **A setting outside a table is an error.** Bare keys at the root are how this file used to be
+  written, and silently ignoring them would be the same failure by another route; the message
+  names the keys and says they belong under `[analysis]`.
 - **Paths must be absolute.** A config file may be read from a directory the process cannot
   see — a container mount, say — so a relative path in one has no dependable meaning. It also
   keeps the `spice` wrapper's guarantee that every path it must bind-mount is visible on the

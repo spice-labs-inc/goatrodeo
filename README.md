@@ -151,12 +151,12 @@ goatrodeo [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--maxrecords <n>` | Batch size (default: 50,000) |
-| `--tempdir <dir>` | Temp storage (RAM disk recommended) |
+| `--max-records <n>` | Batch size (default: 50,000) |
+| `--temp-dir <dir>` | Temp storage (RAM disk recommended) |
 | `--tag <name>` | Tag this run for later identification |
 | `--package-tags` | Create per-package tags for identified packages (Maven, Docker, etc.) |
 | `--package-tags-short-name` | Use short package names when `--package-tags` is enabled |
-| `--block <file>` | Skip known/common GitOIDs |
+| `--block-list <file>` | Skip known/common GitOIDs |
 
 ### Cryptographic Bill of Materials (CBOM)
 
@@ -173,12 +173,12 @@ For large artifact sets (10,000+ files):
 1. **Use a RAM disk** for temp files:
    ```bash
    sudo mount -t tmpfs -o size=25G tmpfs /mnt/ramdisk
-   goatrodeo -b /artifacts -o /output --tempdir /mnt/ramdisk
+   goatrodeo -b /artifacts -o /output --temp-dir /mnt/ramdisk
    ```
 
 2. **Match threads to CPU cores** (or fewer if memory-constrained)
 
-3. **Tune batch size** with `--maxrecords` based on available RAM
+3. **Tune batch size** with `--max-records` based on available RAM
 
 See [Performance Tuning Guide](info/goat_rodeo_operation.md#tuning-for-performance) for details.
 

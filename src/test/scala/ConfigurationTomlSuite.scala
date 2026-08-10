@@ -98,7 +98,9 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     val error =
       read("""threads = "many"""").left.getOrElse(fail("expected an error"))
     assert(error.contains("threads"), error)
-    assert(error.contains("integer"), error)
+    assert(error.contains("whole number"), error)
+    // and quotes the value it could not read
+    assert(error.contains("many"), error)
   }
 
   test("relative paths are rejected") {
@@ -155,7 +157,7 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   // ==================== precedence ====================
 
   test("the command line beats the config file") {
-    withConfigFile("threads = 4\nmax_records = 999999\n") { path =>
+    withConfigFile("[analysis]\nthreads = 4\nmax_records = 999999\n") { path =>
       val config = ConfigurationParser
         .parse(Array("--config", path.toString, "--threads", "9"))
         .getOrElse(fail("expected a parse"))
@@ -169,7 +171,7 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   }
 
   test("--config records the file it read") {
-    withConfigFile("threads = 4\n") { path =>
+    withConfigFile("[analysis]\nthreads = 4\n") { path =>
       val config = ConfigurationParser
         .parse(Array("--config", path.toString))
         .getOrElse(fail("expected a parse"))
@@ -180,10 +182,93 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   test(
     "a config file that does not parse fails the run rather than being ignored"
   ) {
-    withConfigFile("threads = \n") { path =>
+    withConfigFile("[analysis]\nthreads = \n") { path =>
       assertEquals(
         ConfigurationParser.parse(Array("--config", path.toString)),
         None
+      )
+    }
+  }
+
+  // ==================== the environment ====================
+
+  test("the environment supplies settings under the component's own prefix") {
+    withConfigFile("[analysis]\nthreads = 4\n") { path =>
+      val config = ConfigurationToml
+        .fromFile(
+          path,
+          Configuration(),
+          environment = Map("GOATRODEO_ANALYSIS_MAX_RECORDS" -> "12345")
+        )
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.maxRecords, 12345, "the environment supplies it")
+      assertEquals(config.threads, 4, "and the file still supplies the rest")
+    }
+  }
+
+  test("the environment beats the config file, and says so") {
+    val reported = scala.collection.mutable.ArrayBuffer[String]()
+    withConfigFile("[analysis]\nthreads = 4\n") { path =>
+      val config = ConfigurationToml
+        .fromFile(
+          path,
+          Configuration(),
+          environment = Map("GOATRODEO_ANALYSIS_THREADS" -> "9"),
+          report = reported.append(_)
+        )
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.threads, 9)
+      assertEquals(reported.size, 1, s"expected one report, got: $reported")
+      assert(
+        reported.head.contains("GOATRODEO_ANALYSIS_THREADS"),
+        reported.head
+      )
+      assert(reported.head.contains("overrides"), reported.head)
+    }
+  }
+
+  test("a variable that names no group is not a setting") {
+    // The wrapper's own variables share the namespace and must be left alone.
+    withConfigFile("[analysis]\nthreads = 4\n") { path =>
+      val config = ConfigurationToml
+        .fromFile(
+          path,
+          Configuration(),
+          environment =
+            Map("GOATRODEO_IMAGE" -> "something", "PATH" -> "/usr/bin")
+        )
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.threads, 4)
+    }
+  }
+
+  // ==================== the file's shape ====================
+
+  test("settings outside a table are refused, not ignored") {
+    // Bare keys at the root are how this file used to be written. Silently doing
+    // nothing with them is exactly the failure this schema exists to prevent, so
+    // the message says where they belong.
+    withConfigFile("threads = 4\n") { path =>
+      val error = ConfigurationToml
+        .fromFile(path, Configuration())
+        .left
+        .getOrElse(fail("expected an error"))
+      assert(error.contains("threads"), error)
+      assert(error.contains("[analysis]"), error)
+    }
+  }
+
+  test("the command line beats the file, and each difference is reported") {
+    withConfigFile("[analysis]\nthreads = 4\nmax_records = 999999\n") { path =>
+      val config = ConfigurationParser
+        .parse(Array("--config", path.toString, "--threads", "9"))
+        .getOrElse(fail("expected a parse"))
+      assertEquals(config.threads, 9)
+      assertEquals(config.maxRecords, 999999)
+      assertEquals(
+        config.differencesFrom(config.copy(threads = 4)).map(_._1),
+        Vector("threads"),
+        "and the difference the report is derived from is exactly that field"
       )
     }
   }
