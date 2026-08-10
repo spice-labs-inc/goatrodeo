@@ -129,9 +129,13 @@ threads = 12 (command line) overrides 9 (/etc/goatrodeo.toml)
 ```
 
 Overriding a *default* is not reported: that is every setting on every run, and the noise
-would bury the cases where two deliberate choices conflict. The rules themselves —
-naming, layering, precedence, provenance — live in `spice-config`, shared with every
-component, because rules copied into three codebases are rules that will disagree.
+would bury the cases where two deliberate choices conflict.
+
+The rules themselves — naming, layering, precedence, provenance — live in
+[`spice-config`](https://github.com/spice-labs-inc/spice-config), shared with every
+component, because rules copied into several codebases are rules that will disagree. The
+model as a whole is described in `spice`'s `docs/configuration.md`; this page covers what
+is particular to Goat Rodeo.
 
 Three rules are worth knowing:
 
