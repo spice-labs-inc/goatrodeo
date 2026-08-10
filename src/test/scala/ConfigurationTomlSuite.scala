@@ -301,6 +301,28 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     )
   }
 
+  test("text that names a number is read as one") {
+    // Every environment value is a string, and the program reading a setting
+    // out of a map cannot say "this one is a count" at the point it arrives.
+    // This adapter never sees a real TOML file, so a string saying `16` can
+    // only have come from somewhere that could not have written 16.
+    val table = TomlTables.fromMap(
+      Map(
+        "threads" -> "16",
+        "static_metadata" -> "true",
+        "tag" -> "42"
+      )
+    )
+
+    assertEquals(table.getLong("threads"), java.lang.Long.valueOf(16L))
+    assertEquals(table.getBoolean("static_metadata"), java.lang.Boolean.TRUE)
+    assertEquals(
+      table.getString("tag"),
+      "42",
+      "and a setting that wants text still gets the text"
+    )
+  }
+
   private def withConfigFile[A](contents: String)(f: Path => A): A = {
     val path = Files.createTempFile("goatrodeo-config", ".toml")
     try {

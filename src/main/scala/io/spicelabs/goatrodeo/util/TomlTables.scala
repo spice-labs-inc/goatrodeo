@@ -6,6 +6,7 @@ import org.tomlj.TomlTable
 
 import java.util.{List as JList, Map as JMap, Set as JSet}
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 /** Views a plain nested map as a [[TomlTable]].
   *
@@ -83,6 +84,44 @@ object TomlTables {
     case other       => other
   }
 
+  /** Text that names a number or a boolean, read as one *when one is asked for*.
+    *
+    * The environment has no types: every value in it is a string, and nothing
+    * can say "this one is a count" at the point it is read out of the
+    * environment. The caller can, though — it is asking for a `Long` — so the
+    * coercion happens per accessor rather than on the way in. Doing it on the
+    * way in turned `tag = "42"` into a number and made it unreadable as text.
+    *
+    * Safe here in a way it would not be for real TOML: this adapter never sees a
+    * TOML file, only maps handed over by a host program or a resolver, where a
+    * string saying `16` came from somewhere that could not have written 16.
+    */
+  private def asLong(value: Any): java.lang.Long | Null = value match {
+    case l: java.lang.Long => l
+    case s: String =>
+      Try(java.lang.Long.valueOf(s.trim)).toOption.getOrElse(null)
+    case _ => null
+  }
+
+  private def asDouble(value: Any): java.lang.Double | Null = value match {
+    case d: java.lang.Double => d
+    case l: java.lang.Long   => java.lang.Double.valueOf(l.doubleValue())
+    case s: String =>
+      Try(java.lang.Double.valueOf(s.trim)).toOption.getOrElse(null)
+    case _ => null
+  }
+
+  private def asBoolean(value: Any): java.lang.Boolean | Null = value match {
+    case b: java.lang.Boolean => b
+    case s: String =>
+      s.trim.toLowerCase match {
+        case "true"  => java.lang.Boolean.TRUE
+        case "false" => java.lang.Boolean.FALSE
+        case _       => null
+      }
+    case _ => null
+  }
+
   private case class MapTable(entries: Map[String, Any]) extends TomlTable {
 
     private lazy val wrapped: Map[String, Any] =
@@ -112,6 +151,24 @@ object TomlTables {
             case _                      => null
           }
       }
+
+    override def getLong(dottedKey: String | Null): java.lang.Long | Null =
+      asLong(get(JList.of(dottedKey)))
+
+    override def getLong(path: JList[String] | Null): java.lang.Long | Null =
+      asLong(get(path))
+
+    override def getDouble(dottedKey: String | Null): java.lang.Double | Null =
+      asDouble(get(JList.of(dottedKey)))
+
+    override def getDouble(path: JList[String] | Null): java.lang.Double | Null =
+      asDouble(get(path))
+
+    override def getBoolean(dottedKey: String | Null): java.lang.Boolean | Null =
+      asBoolean(get(JList.of(dottedKey)))
+
+    override def getBoolean(path: JList[String] | Null): java.lang.Boolean | Null =
+      asBoolean(get(path))
 
     override def inputPositionOf(path: JList[String] | Null): TomlPosition =
       noPosition
