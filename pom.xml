@@ -66,12 +66,13 @@
     <baharat.version>0.1.1</baharat.version>
     <annatto.version>0.1.0</annatto.version>
     <saffron.version>0.3.1</saffron.version>
-    <bouncycastle.version>1.80</bouncycastle.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
+    <!-- BC publishes quick-patch releases per artifact: bcprov-jdk18on has a
+         1.85.2 patch beyond the 1.85 release train used by the other modules. -->
+    <bouncycastle.prov.version>1.85.2</bouncycastle.prov.version>
     <scala-nameof.version>5.0.0</scala-nameof.version>
     <munit.version>0.7.29</munit.version>
     <scalacheck.version>1.18.1</scalacheck.version>
-    <jackson.version>2.18.1</jackson.version>
-    <json-schema-validator.version>1.5.4</json-schema-validator.version>
     <zstd-jni.version>1.5.6-9</zstd-jni.version>
 
     <!-- Test parallelism: independent test classes are distributed over several
@@ -95,8 +96,10 @@
     <!-- Per fork, so keep forkCount * Xmx within the machine's RAM. GC warnings
          go to a file because the G1 GCLocker warning is written to the native
          console stream, which corrupts surefire's IPC channel with a forked
-         JVM. -->
-    <test.argLine>-Xmx4G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+         JVM. 8G: the big-tent ADGTests build (11 GB corpus) OOMs in 4G under
+         full-suite load; memory-constrained machines lower this via
+         `-Dtest.argLine`/`-Dtest.forkCount`. -->
+    <test.argLine>-Xmx8G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
   </properties>
 
   <licenses>
@@ -277,7 +280,7 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk18on</artifactId>
-      <version>${bouncycastle.version}</version>
+      <version>${bouncycastle.prov.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -323,17 +326,41 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- JSON parsing/validation used by CBOM tests -->
+    <!-- CycloneDX CBOM JSON-Schema validation + JSON parsing used by CBOM
+         tests. The everit json-schema fork validates drafts 4/6/7 (incl.
+         subschemas combining allOf/anyOf/oneOf, which the CycloneDX schemas
+         use) against the org.json model — no Jackson. The spotbugs/guava
+         build-era transitive cruft has no references in the validator jar
+         (verified against its classes); guava is declared explicitly because
+         munit builds assertion messages with ImmutableList. -->
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
+      <groupId>com.github.erosb</groupId>
+      <artifactId>everit-json-schema</artifactId>
+      <version>1.14.6</version>
+      <scope>test</scope>
+      <exclusions>
+        <!-- spotbugs and the fork's accidental self-dependency are build-era
+             cruft with no references in the validator jar. -->
+        <exclusion>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.github.erosb</groupId>
+          <artifactId>everit-json-schema</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20250107</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.networknt</groupId>
-      <artifactId>json-schema-validator</artifactId>
-      <version>${json-schema-validator.version}</version>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>19.0</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -665,7 +692,7 @@
       </activation>
       <properties>
         <test.forkCount>0.5C</test.forkCount>
-        <test.argLine>-Xmx4G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+<test.argLine>-Xmx8G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
       </properties>
     </profile>
   </profiles>

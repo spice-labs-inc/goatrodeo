@@ -34,9 +34,14 @@ import scala.util.Try
   *
   * Emits one CBOM JSON file per top-level input file (root Item) after the
   * Artifact Dependency Graph has been built. The emitter walks `contains` edges
-  * transitively, collects Items that carry cryptographic metadata, redacts
-  * private-key Items, and maps the remainder to CycloneDX 1.6 or 1.7
-  * `cryptographic-asset` components.
+  * transitively, collects Items that carry cryptographic metadata and maps them
+  * to CycloneDX 1.6 or 1.7 `cryptographic-asset` components.
+  *
+  * No redaction happens here by design: the private-key hard constraint is
+  * enforced at capture time (decoded key bytes are discarded and never enter
+  * ADG metadata), so every ADG field that maps to a valid CBOM field is
+  * included, including private-key marker flags such as
+  * `Certificates:DerivedFromPrivateKey` / `SSH:MaterialType`.
   */
 object CbomEmitter {
   private val logger: Logger = Logger(getClass())
@@ -114,7 +119,7 @@ object CbomEmitter {
       root: Item
   ): (Vector[Item], Boolean) = {
     val rootCollected =
-      if (isCryptoItem(root) && !isPrivateKey(root)) Vector(root) else Vector()
+      if (isCryptoItem(root)) Vector(root) else Vector()
 
     @tailrec
     def loop(
@@ -136,7 +141,7 @@ object CbomEmitter {
           storage.read(gitoid) match {
             case Some(item) =>
               val nextCollected =
-                if (isCryptoItem(item) && !isPrivateKey(item)) collected :+ item
+                if (isCryptoItem(item)) collected :+ item
                 else collected
               val children =
                 if (depth < MaxTraversalDepth)
@@ -159,6 +164,11 @@ object CbomEmitter {
   }
 
   /** True when the Item carries cryptographic metadata from a known strategy.
+    *
+    * Includes the Phase A–G extended-capture prefixes (ServiceCrypto,
+    * Kerberos, JWT, JWK, EmbeddedKey, CryptoAlgorithms, CryptoDependency,
+    * MobileTls) so the emitter covers the same families as the captured ADG
+    * metadata can express.
     */
   private def isCryptoItem(item: Item): Boolean = {
     item.bodyAsItemMetaData.exists { meta =>
@@ -170,28 +180,16 @@ object CbomEmitter {
           k.startsWith("Usign:") ||
           k.startsWith("SSH:") ||
           k.startsWith("TLSConfig:") ||
-          k.startsWith("EmbeddedCertificates:")
+          k.startsWith("EmbeddedCertificates:") ||
+          k.startsWith("ServiceCrypto:") ||
+          k.startsWith("Kerberos:") ||
+          k.startsWith("JWT:") ||
+          k.startsWith("JWK:") ||
+          k.startsWith("EmbeddedKey:") ||
+          k.startsWith("CryptoAlgorithms:") ||
+          k.startsWith("CryptoDependency:") ||
+          k.startsWith("MobileTls:")
       )
-    }
-  }
-
-  /** True when the Item is a private key (or secret key) that must be redacted.
-    */
-  private def isPrivateKey(item: Item): Boolean = {
-    item.bodyAsItemMetaData.exists { meta =>
-      val extra = meta.extra
-      val derivedFromPrivateKey = extra
-        .get("Certificates:DerivedFromPrivateKey")
-        .exists(_.exists(_.value == "true"))
-      val descriptionPrivate = extra
-        .get("Description")
-        .flatMap(_.headOption)
-        .map(_.value)
-        .exists(_.toLowerCase.contains("private key"))
-      val sshPrivateKey = extra
-        .get("SSH:MaterialType")
-        .exists(_.exists(_.value == "private-key"))
-      derivedFromPrivateKey || descriptionPrivate || sshPrivateKey
     }
   }
 
@@ -315,6 +313,22 @@ object CbomEmitter {
   private val SignatureNames: Set[String] =
     Set("dsa", "ed25519", "ed448", "falcon", "slh-dsa", "ml-dsa", "with")
 
+  /** Canonicalize a signature-OID algorithm name to its gallery name. The ADG
+    * captures unknown signature OIDs verbatim (`<unknown-sig-oid-…>`); these
+    * are known to map to ML-DSA, so the emitter emits the canonical name.
+    */
+  private def canonicalSigName(name: String): String = {
+    if (name.startsWith("<") && name.endsWith(">")) {
+      name.drop(1).dropRight(1) match {
+        case "unknown-sig-oid-2.16.840.1.101.3.4.3.40" => "ml-dsa-65"
+        case "unknown-sig-oid-2.16.840.1.101.3.4.3.17" => "ml-dsa-44"
+        case "unknown-sig-oid-2.16.840.1.101.3.4.3.18" => "ml-dsa-65"
+        case "unknown-sig-oid-2.16.840.1.101.3.4.3.19" => "ml-dsa-87"
+        case other                                     => other
+      }
+    } else name
+  }
+
   /** Normalize an algorithm string for use in a stable bom-ref. */
   private def normalizeAlgName(name: String): String = {
     val sb = new StringBuilder
@@ -401,6 +415,13 @@ object CbomEmitter {
     */
   private def buildComponentsForItem(item: Item): List[JObject] = {
     val extra = metaExtra(item)
+
+    // Lockfile crypto dependencies → `library` components (not
+    // cryptographic-asset components keyed by the item gitoid).
+    if (hasCryptoDependency(extra)) {
+      return dependencyLibraryComponents(extra)
+    }
+
     val name = extra
       .get("Name")
       .flatMap(_.headOption)
@@ -432,6 +453,51 @@ object CbomEmitter {
     mainComponent.toList ++ algs.values.toList
   }
 
+  /** CycloneDX `library` components for a lockfile crypto dependency: one
+    * component per `CryptoDependency:name`, with `crypto-family` properties and
+    * a joined `algorithms` property. `bom-ref` is `dep-<name>` (schema-legal,
+    * distinct from item gitoids).
+    */
+  private def dependencyLibraryComponents(
+      extra: Map[String, Set[String]]
+  ): List[JObject] = {
+    val versions =
+      extra.getOrElse("CryptoDependency:version", Set()).toList.sorted
+    val families =
+      extra.getOrElse("CryptoDependency:algorithms", Set()).toList.sorted
+    val familyProps: List[JObject] = families.map(f =>
+      JObject("name" -> JString("crypto-family"), "value" -> JString(f))
+    )
+    val algoProp: List[JObject] =
+      if (families.isEmpty) Nil
+      else
+        List(
+          JObject(
+            "name" -> JString("algorithms"),
+            "value" -> JString(families.mkString(","))
+          )
+        )
+    val props = familyProps ++ algoProp
+    extra
+      .getOrElse("CryptoDependency:name", Set())
+      .toList
+      .sorted
+      .filter(_.nonEmpty)
+      .map { name =>
+        val ref =
+          "dep-" + name.toLowerCase.replace("/", "-").replace(" ", "-")
+        val fields: List[JField] =
+          List(
+            Some("type" -> JString("library")),
+            Some("bom-ref" -> JString(ref)),
+            Some("name" -> JString(name)),
+            versions.headOption.map(v => "version" -> JString(v))
+          ).flatten ++
+            (if (props.nonEmpty) List("properties" -> JArray(props)) else Nil)
+        JObject(fields)
+      }
+  }
+
   /** Extract metadata extra as a plain Map for easier lookups. */
   private def metaExtra(item: Item): Map[String, Set[String]] = {
     item.bodyAsItemMetaData
@@ -454,7 +520,15 @@ object CbomEmitter {
         k.startsWith("Usign:") ||
         k.startsWith("SSH:") ||
         k.startsWith("TLSConfig:") ||
-        k.startsWith("EmbeddedCertificates:")
+        k.startsWith("EmbeddedCertificates:") ||
+        k.startsWith("ServiceCrypto:") ||
+        k.startsWith("Kerberos:") ||
+        k.startsWith("JWT:") ||
+        k.startsWith("JWK:") ||
+        k.startsWith("EmbeddedKey:") ||
+        k.startsWith("CryptoAlgorithms:") ||
+        k.startsWith("CryptoDependency:") ||
+        k.startsWith("MobileTls:")
       ) {
         vs.map(v => JObject("name" -> JString(k), "value" -> JString(v))).toList
       } else {
@@ -481,8 +555,10 @@ object CbomEmitter {
         size: Option[Int] = None,
         curve: Option[String] = None
     ): Option[String] = {
+      val canonical = canonicalSigName(raw)
       val param = size.map(_.toString)
-      val spec = AlgorithmSpec(raw, primitiveFor(raw, context), param, curve)
+      val spec =
+        AlgorithmSpec(canonical, primitiveFor(canonical, context), param, curve)
       algorithmComponent(spec).map { case (ref, comp) =>
         algs += ref -> comp
         ref
@@ -579,6 +655,13 @@ object CbomEmitter {
     } else if (hasSSH(extra)) {
       val materialType =
         extra.get("SSH:MaterialType").flatMap(_.headOption).getOrElse("other")
+      // CycloneDX's relatedCryptoMaterialType enum has no
+      // `private-key-placeholder`; map it to the closest legal value. The
+      // placeholder distinction rides in the `SSH:MaterialType` property
+      // (emitted verbatim by propertiesFromExtra).
+      val emittedMaterialType =
+        if (materialType == "private-key-placeholder") "private-key"
+        else materialType
       val keyAlg =
         first(extra, "SSH:KeyAlgorithm").orElse(
           first(extra, "Certificates:KeyAlgorithm")
@@ -594,7 +677,11 @@ object CbomEmitter {
         if (
           materialType == "public-key" || materialType == "private-key" || materialType == "private-key-placeholder"
         ) {
-          buildRelatedCryptoMaterialProperties(extra, materialType, keyRef)
+          buildRelatedCryptoMaterialProperties(
+            extra,
+            emittedMaterialType,
+            keyRef
+          )
         } else {
           buildRelatedCryptoMaterialProperties(
             extra,
@@ -608,6 +695,102 @@ object CbomEmitter {
       (Some(buildRelatedCryptoMaterialProperties(extra, "other")), algs.toMap)
     } else if (hasEmbeddedCertificate(extra)) {
       (Some(buildRelatedCryptoMaterialProperties(extra, "other")), algs.toMap)
+    } else if (hasEmbeddedKey(extra)) {
+      // Embedded (inline/base64) key discovery: material type reflects
+      // `EmbeddedKey:kind`; the derived algorithm (SPKI-hash-only metadata)
+      // links as a pke asset. No key bytes ever reach the CBOM.
+      val materialType = first(extra, "EmbeddedKey:kind") match {
+        case Some("private-key") => "private-key"
+        case Some("public-key")  => "public-key"
+        case _                   => "other"
+      }
+      val keySize = first(extra, "EmbeddedKey:key_size")
+        .flatMap(s => Try(s.toInt).toOption)
+      val keyRef =
+        first(extra, "EmbeddedKey:key_algorithm").flatMap(
+          addAlg(_, "pke", keySize, None)
+        )
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, materialType, keyRef)),
+        algs.toMap
+      )
+    } else if (hasServiceCrypto(extra)) {
+      val refs = extra
+        .getOrElse("ServiceCrypto:algorithms", Set())
+        .toList
+        .sorted
+        .flatMap(addAlg(_, "other"))
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        algs.toMap
+      )
+    } else if (hasKerberos(extra)) {
+      val refs = extra
+        .getOrElse("Kerberos:algorithms", Set())
+        .toList
+        .sorted
+        .flatMap(addAlg(_, "other"))
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        algs.toMap
+      )
+    } else if (hasJwt(extra)) {
+      val refs = extra
+        .getOrElse("JWT:signature_algorithm", Set())
+        .toList
+        .sorted
+        .filter(_ != "none")
+        .flatMap(addAlg(_, "other"))
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        algs.toMap
+      )
+    } else if (hasJwk(extra)) {
+      // JWK inventory: `JWK:private_present` selects the material type
+      // (private-key / public-key); it always surfaces as a property too.
+      val privatePresent = extra
+        .getOrElse("JWK:private_present", Set())
+        .exists(_ == "true")
+      val materialType =
+        if (privatePresent) "private-key" else "public-key"
+      val jwkSize = first(extra, "JWK:size")
+        .flatMap(s => Try(s.toInt).toOption)
+      val ktyRef = first(extra, "JWK:kty")
+        .flatMap {
+          case "RSA" => Some("rsa")
+          case "EC"  => Some("ec")
+          case _     => None
+        }
+        .flatMap(addAlg(_, "pke", jwkSize, None))
+      (
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, materialType, ktyRef)
+        ),
+        algs.toMap
+      )
+    } else if (hasCryptoAlgorithms(extra)) {
+      // Binary footprint inventory → pure algorithm assets (deduped); no
+      // material component is emitted.
+      extra
+        .getOrElse("CryptoAlgorithms:algorithm", Set())
+        .toList
+        .sorted
+        .foreach(a => addAlg(a, "other"))
+      (None, algs.toMap)
+    } else if (hasCryptoDependency(extra)) {
+      // Lockfile crypto dependencies become `library` components (built in
+      // `buildComponentsForItem`); no material / algorithm assets here.
+      (None, algs.toMap)
+    } else if (hasMobileTls(extra)) {
+      val refs = extra
+        .getOrElse("MobileTls:algorithms", Set())
+        .toList
+        .sorted
+        .flatMap(addAlg(_, "other"))
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        algs.toMap
+      )
     } else {
       (None, algs.toMap)
     }
@@ -660,17 +843,41 @@ object CbomEmitter {
     extra.keys.exists(_.startsWith("EmbeddedCertificates:"))
   }
 
-  /** Build related-crypto-material properties for SSH keys, using the material
-    * type captured in `SSH:MaterialType` (public-key or private-key).
-    */
-  private def buildSSHProperties(
-      extra: Map[String, Set[String]],
-      keyRef: Option[String],
-      sigRef: Option[String]
-  ): JObject = {
-    val materialType =
-      extra.get("SSH:MaterialType").flatMap(_.headOption).getOrElse("other")
-    buildRelatedCryptoMaterialProperties(extra, materialType, keyRef, sigRef)
+  // Phase A–G extended-capture families (classification precedence:
+  // EmbeddedKey, ServiceCrypto, Kerberos, JWT, JWK, CryptoAlgorithms,
+  // CryptoDependency, MobileTls).
+  private def hasEmbeddedKey(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("EmbeddedKey:"))
+  }
+
+  private def hasServiceCrypto(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("ServiceCrypto:"))
+  }
+
+  private def hasKerberos(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("Kerberos:"))
+  }
+
+  private def hasJwt(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("JWT:"))
+  }
+
+  private def hasJwk(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("JWK:"))
+  }
+
+  private def hasCryptoAlgorithms(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("CryptoAlgorithms:"))
+  }
+
+  private def hasCryptoDependency(
+      extra: Map[String, Set[String]]
+  ): Boolean = {
+    extra.keys.exists(_.startsWith("CryptoDependency:"))
+  }
+
+  private def hasMobileTls(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("MobileTls:"))
   }
 
   private def buildCertificateProperties(

@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CipherSuiteResolver
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.OpenSSLConfigData
 import io.spicelabs.goatrodeo.util.OpenSSLConfigDetector
@@ -192,6 +193,31 @@ case class OpenSSLConfigState(
       meta = meta + (adHoc("options") -> TreeSet.from(
         data.options.map(StringOrPair(_))
       ))
+    }
+
+    // Phase A — cipher-suite decomposition: resolved constituent algorithms and
+    // per-suite entries, derived from both `CipherString` and `Ciphersuites`.
+    val cipherEntries =
+      data.cipherString.toVector.flatMap(CipherSuiteResolver.resolveCipherString) ++
+        data.cipherSuites.toVector.flatMap(CipherSuiteResolver.resolveCipherString)
+
+    if (cipherEntries.nonEmpty) {
+      val algorithms = TreeSet.from(
+        cipherEntries.flatMap(_.algorithms).map(StringOrPair(_))
+      )
+      if (algorithms.nonEmpty) {
+        meta = meta + (adHoc("algorithms") -> algorithms)
+      }
+      cipherEntries.zipWithIndex.foreach { case (entry, idx) =>
+        meta = meta + (adHoc(s"suite:$idx:name") -> TreeSet(StringOrPair(entry.name)))
+        if (entry.algorithms.nonEmpty) {
+          meta = meta + (
+            adHoc(s"suite:$idx:algorithms") -> TreeSet(
+              StringOrPair(entry.algorithms.mkString(","))
+            )
+          )
+        }
+      }
     }
 
     meta

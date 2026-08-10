@@ -245,11 +245,15 @@ object Certificates {
   ): Option[ClaimedContent] = {
     val mimes = artifact.mimeType
     val name = artifact.path()
-    if (mimes.contains(pemBundleMime)) parseBundle(artifact)
+    // BKS (Bouncy Castle) keystores share the FE ED FE ED magic with JKS/JCEKS
+    // and are sniffed as `application/x-java-keystore`, so the `.bks`
+    // extension must win over the generic java-keystore mime (same
+    // extension-over-mime disambiguation CryptoDetector uses for `.jceks`).
+    if (name.toLowerCase.endsWith(".bks")) parseKeystore(artifact, "BKS")
+    else if (mimes.contains(pemBundleMime)) parseBundle(artifact)
     else if (mimes.contains(jksMime)) parseKeystore(artifact, "JKS")
     else if (mimes.contains(jceksMime)) parseKeystore(artifact, "JCEKS")
     else if (mimes.contains(pkcs12Mime)) parseKeystore(artifact, "PKCS12")
-    else if (name.toLowerCase.endsWith(".bks")) parseKeystore(artifact, "BKS")
     else if (mimes.contains(crlMime)) parseCrl(artifact)
     else if (mimes.contains(sshCertMime)) parseSshCert(artifact)
     else if (mimes.contains(sshPubkeyMime)) parseSshPubkey(artifact)
@@ -1202,6 +1206,98 @@ object Certificates {
     }
   }.toOption.flatten
 
+  // ── X.509 extension depth (Phase F) ──────────────────────────────────
+
+  /** Decode the DER value of an X.509 extension (outer OCTET STRING unwrapped
+    * twice), pending on java.util may return null — wrapped in Option.
+    */
+  private[strategies] def extensionValue(
+      cert: X509Certificate,
+      oid: String
+  ): Option[org.bouncycastle.asn1.ASN1Primitive] =
+    Option(cert.getExtensionValue(oid))
+      .flatMap { raw =>
+        Try(org.bouncycastle.asn1.ASN1Primitive.fromByteArray(raw)).toOption
+      }
+      .flatMap { outer =>
+        Try {
+          val oct = outer.asInstanceOf[org.bouncycastle.asn1.ASN1OctetString]
+          org.bouncycastle.asn1.ASN1Primitive.fromByteArray(oct.getOctets)
+        }.toOption
+      }
+
+  private def generalNameUri(
+      enc: org.bouncycastle.asn1.ASN1Encodable
+  ): Option[String] = Try {
+    val gn = org.bouncycastle.asn1.x509.GeneralName.getInstance(enc)
+    if (gn.getTagNo == 6) Option(gn.getName).map(_.toString) else None
+  }.toOption.flatten
+
+  /** OCSP responder URIs from the Authority Information Access extension. */
+  private[strategies] def ocspUrls(cert: X509Certificate): Option[String] =
+    extensionValue(cert, "1.3.6.1.5.5.7.1.1").flatMap { p =>
+      Try {
+        val aia =
+          org.bouncycastle.asn1.x509.AuthorityInformationAccess.getInstance(p)
+        val urls = aia.getAccessDescriptions.toVector.flatMap { ad =>
+          if (
+            Option(ad.getAccessMethod)
+              .exists(_.getId == org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers.id_pkix_ocsp.getId)
+          ) {
+            generalNameUri(ad.getAccessLocation).toVector
+          } else Vector.empty
+        }
+        if (urls.isEmpty) None else Some(urls.mkString(","))
+      }.toOption.flatten
+    }
+
+  /** CRL distribution point URIs. */
+  private[strategies] def crlDistributionPoints(
+      cert: X509Certificate
+  ): Option[String] =
+    extensionValue(cert, "2.5.29.31").flatMap { p =>
+      Try {
+        val cdps = org.bouncycastle.asn1.x509.CRLDistPoint.getInstance(p)
+        val urls = cdps.getDistributionPoints.toVector.flatMap { dp =>
+          Option(dp.getDistributionPoint).flatMap { dpNameEnc =>
+            Try {
+              val dpn = org.bouncycastle.asn1.x509.DistributionPointName.getInstance(dpNameEnc)
+              Option(dpn.getName) match {
+                case Some(names) =>
+                  val gns = org.bouncycastle.asn1.x509.GeneralNames.getInstance(names)
+                  gns.getNames.toVector.flatMap(gn => generalNameUri(gn).toVector)
+                case None => Vector.empty
+              }
+            }.toOption
+          }.getOrElse(Vector.empty)
+        }
+        if (urls.isEmpty) None else Some(urls.mkString(","))
+      }.toOption.flatten
+    }
+
+  /** HEX subject key identifier (authority/subject key extension). */
+  private[strategies] def subjectKeyId(cert: X509Certificate): Option[String] =
+    extensionValue(cert, "2.5.29.14").flatMap { p =>
+      Try(
+        org.bouncycastle.asn1.x509.SubjectKeyIdentifier
+          .getInstance(p)
+          .getKeyIdentifier
+      ).toOption.map(Helpers.toHex)
+    }
+
+  /** Comma-joined certificate policy OIDs. */
+  private[strategies] def certificatePolicies(
+      cert: X509Certificate
+  ): Option[String] =
+    extensionValue(cert, "2.5.29.32").flatMap { p =>
+      Try {
+        val cp =
+          org.bouncycastle.asn1.x509.CertificatePolicies.getInstance(p)
+        val ids = cp.getPolicyInformation.toVector.map(_.getPolicyIdentifier.getId)
+        if (ids.isEmpty) None else Some(ids.mkString(","))
+      }.toOption.flatten
+    }
+
   /** RFC2253 DN with JDK #hex fallback decoded to text form. */
   private[strategies] def dnString(
       name: javax.security.auth.x500.X500Principal
@@ -1294,6 +1390,7 @@ object Certificates {
     "^Certificates:SshFingerprintSha256$",
     "^Certificates:SshCertSha256$",
     "^Certificates:SshCertCaFingerprint$",
+    "^Certificates:SubjectKeyIdentifier$",
     "^Certificates:KdfSalt$",
     "^Certificates:Iv$",
     "^Certificates:Cert:[0-9]+:(SpkiSha256|CertSha256|Serial|Fingerprint)$",
@@ -1873,6 +1970,18 @@ object Certificates {
     }
     ekuNames(c).foreach { v =>
       tm = tm + (adHoc("ExtendedKeyUsage") -> TreeSet(StringOrPair(v)))
+    }
+    ocspUrls(c).foreach { v =>
+      tm = tm + (adHoc("OcspUrl") -> TreeSet(StringOrPair(v)))
+    }
+    crlDistributionPoints(c).foreach { v =>
+      tm = tm + (adHoc("CrlDistributionPoints") -> TreeSet(StringOrPair(v)))
+    }
+    subjectKeyId(c).foreach { v =>
+      tm = tm + (adHoc("SubjectKeyIdentifier") -> TreeSet(StringOrPair(v)))
+    }
+    certificatePolicies(c).foreach { v =>
+      tm = tm + (adHoc("CertificatePolicies") -> TreeSet(StringOrPair(v)))
     }
     tm
   }

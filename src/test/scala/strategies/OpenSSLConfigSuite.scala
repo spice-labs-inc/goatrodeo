@@ -398,6 +398,68 @@ class OpenSSLConfigSuite extends FunSuite {
     assert(hasOpenSSL)
     assert(hasCerts)
   }
+
+  // ==================== Phase A — cipher-suite decomposition ====================
+
+  test("Phase A metadata contains resolved algorithms and per-suite entries") {
+    val text =
+      """[ssl_default]
+        |CipherString = ECDHE-RSA-AES128-GCM-SHA256:!aNULL
+        |Ciphersuites = TLS_AES_256_GCM_SHA384
+        |""".stripMargin
+    val artifact = configArtifact("openssl.cnf", text)
+    val state = OpenSSLConfigState(
+      Map("openssl.cnf" -> OpenSSLConfigParser.parseString(text).get),
+      Map.empty
+    )
+    val (meta, _) =
+      state.getMetadata(artifact, ItemTestHelper.testItem("x"), SingleMarker())
+
+    val algorithms = meta(adHoc("algorithms")).toVector.map(_.value).sorted
+    assertEquals(
+      algorithms,
+      Vector("aes-256-gcm", "ecdh", "rsa", "aes-128-gcm", "sha-256", "sha-384").sorted
+    )
+
+    assertEquals(
+      meta(adHoc("suite:0:name")).head.value,
+      "ECDHE-RSA-AES128-GCM-SHA256"
+    )
+    assertEquals(
+      meta(adHoc("suite:0:algorithms")).head.value,
+      "ecdh,rsa,aes-128-gcm,sha-256"
+    )
+    assertEquals(meta(adHoc("suite:1:name")).head.value, "!aNULL")
+    assert(
+      !meta.contains(adHoc("suite:1:algorithms")),
+      "excluded token resolves to no algorithms"
+    )
+    assertEquals(meta(adHoc("suite:2:name")).head.value, "TLS_AES_256_GCM_SHA384")
+    assertEquals(
+      meta(adHoc("suite:2:algorithms")).head.value,
+      "aes-256-gcm,sha-384"
+    )
+  }
+
+  test("Phase A decomposition metadata is deterministic across calls") {
+    val text =
+      """[ssl_default]
+        |CipherString = DEFAULT@SECLEVEL=2
+        |""".stripMargin
+    val artifact = configArtifact("openssl.cnf", text)
+    val state = OpenSSLConfigState(
+      Map("openssl.cnf" -> OpenSSLConfigParser.parseString(text).get),
+      Map.empty
+    )
+    val (m1, _) =
+      state.getMetadata(artifact, ItemTestHelper.testItem("x"), SingleMarker())
+    val (m2, _) =
+      state.getMetadata(artifact, ItemTestHelper.testItem("x"), SingleMarker())
+    assertEquals(m1, m2)
+    // `DEFAULT@SECLEVEL=2` is name-only; no algorithms are invented.
+    assertEquals(m1.get(adHoc("suite:0:name")).map(_.head.value), Some("DEFAULT@SECLEVEL=2"))
+    assert(!m1.contains(adHoc("algorithms")))
+  }
 }
 
 /** Helper for creating minimal Items in tests. */
