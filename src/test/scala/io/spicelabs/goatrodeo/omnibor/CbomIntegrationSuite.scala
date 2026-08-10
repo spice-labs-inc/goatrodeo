@@ -14,15 +14,13 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import munit.FunSuite
+import org.json4s.*
 
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import scala.jdk.CollectionConverters.*
 
 /** T4.2 — End-to-end integration test for CycloneDX CBOM emission.
   *
@@ -34,7 +32,12 @@ import scala.jdk.CollectionConverters.*
   */
 class CbomIntegrationSuite extends FunSuite {
 
-  private val mapper = new ObjectMapper()
+  private def text(jv: JValue, path: String*): String = {
+    path.foldLeft(jv: JValue)(_ \ _) match {
+      case JString(s) => s
+      case _          => ""
+    }
+  }
 
   private val certSource =
     new File(
@@ -65,24 +68,18 @@ class CbomIntegrationSuite extends FunSuite {
     }
   }
 
-  private def componentTypes(root: JsonNode): Set[String] = {
-    val components = root.path("components")
-    if (components.isMissingNode || !components.isArray) {
-      Set.empty
-    } else {
-      components
-        .elements()
-        .asScala
-        .toVector
-        .flatMap { comp =>
-          val cryptoProps = comp.path("cryptoProperties")
-          if (!cryptoProps.isMissingNode && cryptoProps.has("assetType")) {
-            Some(cryptoProps.get("assetType").asText())
-          } else {
-            None
+  private def componentTypes(root: JValue): Set[String] = {
+    (root \ "components") match {
+      case JArray(comps) =>
+        comps
+          .flatMap { comp =>
+            (comp \ "cryptoProperties" \ "assetType") match {
+              case JString(a) => Some(a)
+              case _          => None
+            }
           }
-        }
-        .toSet
+          .toSet
+      case _ => Set.empty
     }
   }
 
@@ -126,12 +123,14 @@ class CbomIntegrationSuite extends FunSuite {
       )
 
       val allTypes = cbomFiles.flatMap { file =>
-        val root = mapper.readTree(file)
+        val root = org.json4s.native.JsonMethods.parse(
+          Files.readString(file.toPath())
+        )
         assert(
-          root.has("bomFormat"),
+          (root \ "bomFormat") != JNothing,
           s"${file.getName} should be a CycloneDX BOM"
         )
-        assertEquals(root.get("bomFormat").asText(), "CycloneDX")
+        assertEquals(text(root, "bomFormat"), "CycloneDX")
         componentTypes(root)
       }.toSet
 
@@ -150,16 +149,12 @@ class CbomIntegrationSuite extends FunSuite {
 
       val allNames = cbomFiles
         .flatMap { file =>
-          val root = mapper.readTree(file)
-          val components = root.path("components")
-          if (components.isArray) {
-            components
-              .elements()
-              .asScala
-              .map(_.path("name").asText(""))
-              .toVector
-          } else {
-            Vector.empty
+          val root = org.json4s.native.JsonMethods.parse(
+            Files.readString(file.toPath())
+          )
+          (root \ "components") match {
+            case JArray(comps) => comps.map(c => text(c, "name"))
+            case _             => Vector.empty
           }
         }
         .mkString(" ")

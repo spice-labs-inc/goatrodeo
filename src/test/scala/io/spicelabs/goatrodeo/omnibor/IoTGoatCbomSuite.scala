@@ -14,15 +14,15 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import munit.FunSuite
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
+import scala.util.Try
 
 import java.io.File
 import java.nio.file.Files
 import scala.concurrent.duration.Duration
-import scala.jdk.CollectionConverters.*
 
 /** T4.5 — Discovery-driven CBOM regression test for the IoTGoat x86 firmware.
   *
@@ -51,8 +51,6 @@ import scala.jdk.CollectionConverters.*
   */
 class IoTGoatCbomSuite extends FunSuite {
 
-  private val mapper = new ObjectMapper()
-
   private val fixture = new File("test_data/IoTGoat-x86.img.gz")
 
   override val munitTimeout: Duration = Duration(5, "minutes")
@@ -67,25 +65,41 @@ class IoTGoatCbomSuite extends FunSuite {
     }
   }
 
-  private def allComponents(root: JsonNode): Vector[JsonNode] = {
-    val components = root.path("components")
-    if (components.isMissingNode || !components.isArray) {
-      Vector.empty
-    } else {
-      components.elements().asScala.toVector
+  private def text(jv: JValue, path: String*): String = {
+    path.foldLeft(jv: JValue)(_ \ _) match {
+      case JString(s) => s
+      case _          => ""
     }
   }
 
-  private def componentText(component: JsonNode): String = {
+  private def num(jv: JValue, path: String*): Int = {
+    path.foldLeft(jv: JValue)(_ \ _) match {
+      case JInt(n)    => n.toInt
+      case JLong(n)   => n.toInt
+      case JDouble(d) => d.toInt
+      case JString(s) => Try(s.toInt).getOrElse(0)
+      case _          => 0
+    }
+  }
+
+  private def allComponents(root: JValue): Vector[JValue] = {
+    (root \ "components") match {
+      case JArray(arr) => arr.toVector
+      case _           => Vector.empty
+    }
+  }
+
+  private def componentText(component: JValue): String = {
     val parts = Vector.newBuilder[String]
-    parts += component.path("name").asText("")
-    parts += component.path("bom-ref").asText("")
-    val props = component.path("properties")
-    if (!props.isMissingNode && props.isArray) {
-      props.elements().asScala.foreach { p =>
-        parts += p.path("name").asText("")
-        parts += p.path("value").asText("")
-      }
+    parts += text(component, "name")
+    parts += text(component, "bom-ref")
+    (component \ "properties") match {
+      case JArray(arr) =>
+        arr.foreach { p =>
+          parts += text(p, "name")
+          parts += text(p, "value")
+        }
+      case _ =>
     }
     parts.result().mkString(" ")
   }
@@ -115,7 +129,11 @@ class IoTGoatCbomSuite extends FunSuite {
       )
 
       val components =
-        cbomFiles.flatMap(f => allComponents(mapper.readTree(f))).toVector
+        cbomFiles
+          .flatMap(f =>
+            allComponents(parse(Files.readString(f.toPath())))
+          )
+          .toVector
       val componentTexts = components.map(componentText)
 
       assert(
@@ -161,7 +179,7 @@ class IoTGoatCbomSuite extends FunSuite {
 
       // Algorithmic metadata is promoted into structured CycloneDX fields.
       val algorithmComponents = components.filter { c =>
-        c.path("cryptoProperties").path("assetType").asText("") == "algorithm"
+        text(c, "cryptoProperties", "assetType") == "algorithm"
       }
       assert(
         algorithmComponents.nonEmpty,
@@ -169,24 +187,24 @@ class IoTGoatCbomSuite extends FunSuite {
       )
       assert(
         algorithmComponents.exists(
-          _.path("bom-ref").asText("").contains("ed25519")
+          text(_, "bom-ref").contains("ed25519")
         ),
         "CBOM should contain an ed25519 algorithm component for usign keys"
       )
       assert(
         algorithmComponents.exists(
-          _.path("bom-ref").asText("").contains("md5")
+          text(_, "bom-ref").contains("md5")
         ),
         "CBOM should contain an md5 algorithm component for password hashes"
       )
 
       val usignWithSize = components.exists { c =>
         val rcmp =
-          c.path("cryptoProperties").path("relatedCryptoMaterialProperties")
-        c.path("name").asText("").nonEmpty &&
-        rcmp.path("type").asText("").contains("public-key") &&
-        rcmp.path("algorithmRef").asText("").contains("ed25519") &&
-        rcmp.path("size").asInt(0) == 256
+          c \ "cryptoProperties" \ "relatedCryptoMaterialProperties"
+        text(c, "name").nonEmpty &&
+        text(rcmp, "type").contains("public-key") &&
+        text(rcmp, "algorithmRef").contains("ed25519") &&
+        num(rcmp, "size") == 256
       }
       assert(
         usignWithSize,
@@ -194,12 +212,13 @@ class IoTGoatCbomSuite extends FunSuite {
       )
 
       val shadowHasAlgRef = components.exists { c =>
-        c.path("name").asText("").contains("shadow") &&
-        c.path("cryptoProperties")
-          .path("relatedCryptoMaterialProperties")
-          .path("algorithmRef")
-          .asText("")
-          .contains("alg:hash")
+        text(c, "name").contains("shadow") &&
+        text(
+          c,
+          "cryptoProperties",
+          "relatedCryptoMaterialProperties",
+          "algorithmRef"
+        ).contains("alg:hash")
       }
       assert(
         shadowHasAlgRef,

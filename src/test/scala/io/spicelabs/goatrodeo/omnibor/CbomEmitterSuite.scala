@@ -14,17 +14,16 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
-import com.networknt.schema.JsonSchema
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SpecVersion
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
+import org.everit.json.schema.ValidationException
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 import scopt.OParser
 
 import java.io.File
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -33,17 +32,61 @@ import scala.util.Try
 
 class CbomEmitterSuite extends FunSuite {
 
-  private val schemaFactory =
-    JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7)
-  private lazy val schema16 = loadSchema("/cyclonedx/bom-1.6.schema.json")
-  private lazy val schema17 = loadSchema("/cyclonedx/bom-1.7.schema.json")
+  private lazy val schema16 = loadEveritSchema("bom-1.6.schema.json")
+  private lazy val schema17 = loadEveritSchema("bom-1.7.schema.json")
 
   private implicit val formats: Formats = DefaultFormats
 
-  private def loadSchema(resource: String): JsonSchema = {
-    val is = Option(getClass.getResourceAsStream(resource))
-    assert(is.isDefined, s"Schema resource not found: $resource")
-    schemaFactory.getSchema(is.get)
+  /** Read a CycloneDX schema resource as text. */
+  private def schemaResource(name: String): String = {
+    val is = Option(getClass.getResourceAsStream("/cyclonedx/" + name))
+    assert(is.isDefined, s"Schema resource not found: $name")
+    new String(is.get.readAllBytes(), StandardCharsets.UTF_8)
+  }
+
+  /** Build a JSON-Schema validator from the CycloneDX schema files, serving the
+    * external `$ref`s the bom schemas use (`spdx.schema.json`,
+    * `jsf-0.82.schema.json`, `cryptography-defs.schema.json`) from the test
+    * classpath via a `SchemaClient`, so the schema resolves without a network.
+    */
+  private def loadEveritSchema(name: String): org.everit.json.schema.Schema = {
+    val client = new org.everit.json.schema.loader.SchemaClient {
+      override def get(url: String): java.io.InputStream = {
+        val base = "http://cyclonedx.org/schema/"
+        val resource =
+          if (url.startsWith(base)) {
+            "/cyclonedx/" + url.stripPrefix(base)
+          } else {
+            "/cyclonedx/" + url.substring(url.lastIndexOf('/') + 1)
+          }
+        val is = getClass.getResourceAsStream(resource)
+        assert(is != null, s"external schema resource not found: $url")
+        is
+      }
+    }
+    org.everit.json.schema.loader.SchemaLoader
+      .builder()
+      .schemaJson(new org.json.JSONObject(schemaResource(name)))
+      .httpClient(client)
+      .build()
+      .load()
+      .build()
+  }
+
+  /** Validate CBOM JSON against a CycloneDX schema; returns the violation
+    * messages (empty = valid).
+    */
+  private def validate(
+      json: String,
+      schema: org.everit.json.schema.Schema
+  ): Set[String] = {
+    try {
+      schema.validate(new org.json.JSONObject(json))
+      Set.empty
+    } catch {
+      case e: ValidationException =>
+        e.getAllMessages().asScala.toSet
+    }
   }
 
   private def parseConfig(args: String*): Option[Config] = {
@@ -101,12 +144,6 @@ class CbomEmitterSuite extends FunSuite {
     val files = CbomEmitter.emitForStorage(storage, version, dir).get
     assertEquals(files.size, 1)
     parse(Files.readString(files.head.toPath()))
-  }
-
-  private def validate(json: String, schema: JsonSchema): Set[String] = {
-    val mapper = new com.fasterxml.jackson.databind.ObjectMapper()
-    val node = mapper.readTree(json)
-    schema.validate(node).asScala.toSet.map(_.getMessage)
   }
 
   private def getString(jv: JValue, path: String*): String = {

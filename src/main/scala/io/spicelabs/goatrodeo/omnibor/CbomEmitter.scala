@@ -167,8 +167,8 @@ object CbomEmitter {
     *
     * Includes the Phase A–G extended-capture prefixes (ServiceCrypto,
     * Kerberos, JWT, JWK, EmbeddedKey, CryptoAlgorithms, CryptoDependency,
-    * MobileTls) so the emitter covers the same families as pqc_report's Rust
-    * generator (`CRYPTO_PREFIXES`).
+    * MobileTls) so the emitter covers the same families as the captured ADG
+    * metadata can express.
     */
   private def isCryptoItem(item: Item): Boolean = {
     item.bodyAsItemMetaData.exists { meta =>
@@ -313,10 +313,9 @@ object CbomEmitter {
   private val SignatureNames: Set[String] =
     Set("dsa", "ed25519", "ed448", "falcon", "slh-dsa", "ml-dsa", "with")
 
-  /** Canonicalize a signature-OID algorithm name to its gallery name (port of
-    * `pqc_report`'s `canonical_sig_name`). The ADG captures unknown signature
-    * OIDs verbatim (`<unknown-sig-oid-…>`); the analyzer knows these map to
-    * ML-DSA, so both emitters emit the canonical name.
+  /** Canonicalize a signature-OID algorithm name to its gallery name. The ADG
+    * captures unknown signature OIDs verbatim (`<unknown-sig-oid-…>`); these
+    * are known to map to ML-DSA, so the emitter emits the canonical name.
     */
   private def canonicalSigName(name: String): String = {
     if (name.startsWith("<") && name.endsWith(">")) {
@@ -454,11 +453,10 @@ object CbomEmitter {
     mainComponent.toList ++ algs.values.toList
   }
 
-  /** CycloneDX `library` components for a lockfile crypto dependency (port of
-    * `pqc_report`'s `build_dependency_library`): one component per
-    * `CryptoDependency:name`, with `crypto-family` properties and a joined
-    * `algorithms` property. `bom-ref` is `dep-<name>` (schema-legal, distinct
-    * from item gitoids).
+  /** CycloneDX `library` components for a lockfile crypto dependency: one
+    * component per `CryptoDependency:name`, with `crypto-family` properties and
+    * a joined `algorithms` property. `bom-ref` is `dep-<name>` (schema-legal,
+    * distinct from item gitoids).
     */
   private def dependencyLibraryComponents(
       extra: Map[String, Set[String]]
@@ -772,7 +770,7 @@ object CbomEmitter {
       )
     } else if (hasCryptoAlgorithms(extra)) {
       // Binary footprint inventory → pure algorithm assets (deduped); no
-      // material component is emitted (matches pqc_report RuntimeAlgorithms).
+      // material component is emitted.
       extra
         .getOrElse("CryptoAlgorithms:algorithm", Set())
         .toList
@@ -845,9 +843,9 @@ object CbomEmitter {
     extra.keys.exists(_.startsWith("EmbeddedCertificates:"))
   }
 
-  // Phase A–G extended-capture families (ported from pqc_report's
-  // `classify_crypto` precedence: EmbeddedKey, ServiceCrypto, Kerberos, JWT,
-  // JWK, CryptoAlgorithms, CryptoDependency, MobileTls).
+  // Phase A–G extended-capture families (classification precedence:
+  // EmbeddedKey, ServiceCrypto, Kerberos, JWT, JWK, CryptoAlgorithms,
+  // CryptoDependency, MobileTls).
   private def hasEmbeddedKey(extra: Map[String, Set[String]]): Boolean = {
     extra.keys.exists(_.startsWith("EmbeddedKey:"))
   }

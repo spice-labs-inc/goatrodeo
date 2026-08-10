@@ -27,8 +27,8 @@ import scala.collection.immutable.TreeSet
   *
   * ## LLM-friendly summary
   *
-  * Ports the pqc_report Rust superset families into Goat Rodeo's own
-  * `CbomEmitter` and locks their emitted CBOM shape:
+  * Covers the extended-capture families in `CbomEmitter` and locks their
+  * emitted CBOM shape:
   *
   *   - ServiceCrypto/Kerberos/MobileTls → related-crypto-material `other` +
   *     algorithm refs
