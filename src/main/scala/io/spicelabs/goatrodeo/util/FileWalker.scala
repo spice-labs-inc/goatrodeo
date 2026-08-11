@@ -540,9 +540,9 @@ object FileWalker {
     * function.
     *
     * @param artifact
-    *   -- the artifact to potentially traverse into
+    * -- the artifact to potentially traverse into
     * @param function
-    *   -- the function that does "a thing" with the expanded artifacts
+    * -- the function that does "a thing" with the expanded artifacts
     *
     * @return
     *   if the thing is a container, then `Some(T)` where T is the value
@@ -553,38 +553,44 @@ object FileWalker {
   ): Option[T] = {
     if (notArchive(artifact)) None
     else {
-      // create temporary directory
-      val tempDir: Path = artifact.tempDir match {
+      val tempDirOpt: Option[Path] = artifact.tempDir match {
         case Some(p) =>
-          Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
-        case None => Files.createTempDirectory("goatrodeo_temp_dir")
+          Try(
+            Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
+          ).toOption
+        case None =>
+          Try(Files.createTempDirectory("goatrodeo_temp_dir")).toOption
       }
 
-      val oldTempDir = threadTempDir.get()
-      try {
-        threadTempDir.set(Some(tempDir))
-        tryToConstructArchiveStream(artifact, tempDir) match {
-          case None => None
-          case Some(artifacts -> wrapperName) =>
-            try {
+      tempDirOpt match {
+        case Some(tempDir) =>
+          val oldTempDir = threadTempDir.get()
+          try {
+            threadTempDir.set(Some(tempDir))
+            tryToConstructArchiveStream(artifact, tempDir) match {
+              case None => None
+              case Some(artifacts -> wrapperName) =>
+                try {
 
-              // call the function
-              Some(function(artifacts))
-            } catch {
-              case e: Exception =>
-                logger.error(
-                  f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
-                      .getMessage()}",
-                  e
-                )
-                None
+                  // call the function
+                  Some(function(artifacts))
+                } catch {
+                  case e: Exception =>
+                    logger.error(
+                      f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
+                          .getMessage()}",
+                      e
+                    )
+                    None
+                }
             }
-        }
-      } finally {
-        threadTempDir.set(oldTempDir)
-        // clean up
-        Helpers.deleteDirectory(tempDir)
+          } finally {
+            threadTempDir.set(oldTempDir)
+            // clean up
+            Helpers.deleteDirectory(tempDir)
+          }
 
+        case None => None
       }
     }
   }
@@ -602,20 +608,23 @@ object FileWalker {
     * @return
     *   the result of the function
     */
-  def withinTempDir[T](f: Path => T): T = {
-    val (del, dir) = threadTempDir.get() match {
-      case Some(p) => false -> p
+  def withinTempDir[T](f: Path => T): Option[T] = {
+    val (del, dirOpt) = threadTempDir.get() match {
+      case Some(p) => (false, Some(p))
       case _ =>
-        true -> Files.createTempDirectory("goatrodeo_temp_dir")
-
+        (true, Try(Files.createTempDirectory("goatrodeo_temp_dir")).toOption)
     }
 
-    try {
-      f(dir)
-    } finally {
-      if (del) {
-        Helpers.deleteDirectory(dir)
-      }
+    dirOpt match {
+      case Some(dir) =>
+        try {
+          Some(f(dir))
+        } finally {
+          if (del) {
+            Helpers.deleteDirectory(dir)
+          }
+        }
+      case None => None
     }
   }
 

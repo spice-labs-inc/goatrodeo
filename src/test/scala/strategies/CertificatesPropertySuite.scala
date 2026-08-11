@@ -214,7 +214,9 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     forAll(genCase) { c =>
       val (_, cert) = buildSelfSignedCert(c)
       val (parsed, purls) = driveThroughStrategy(cert)
-      val expectedSpkiHex = sha256Hex(Certificates.spkiBytesFromCert(parsed))
+      val expectedSpkiHex = sha256Hex(
+        Certificates.spkiBytesFromCert(parsed).getOrElse(Array.empty[Byte])
+      )
       val spkiPurl = purls.find(_.contains("spki-sha256")).get
       Prop.collect(c.displayName)(spkiPurl.contains(expectedSpkiHex))
     }
@@ -595,7 +597,9 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
   perCase("SPKI roundtrip") { c =>
     val (_, cert) = buildSelfSignedCert(c)
     val (parsed, purls) = driveThroughStrategy(cert)
-    val expectedSpkiHex = sha256Hex(Certificates.spkiBytesFromCert(parsed))
+    val expectedSpkiHex = sha256Hex(
+      Certificates.spkiBytesFromCert(parsed).getOrElse(Array.empty[Byte])
+    )
     val spkiPurl = purls.find(_.contains("spki-sha256")).get
     assert(
       spkiPurl.contains(expectedSpkiHex),

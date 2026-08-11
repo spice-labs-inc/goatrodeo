@@ -115,8 +115,14 @@ class MobileTlsSuite extends FunSuite {
       val m = meta(name, content)
       val all = m.values.toVector.flatMap(_.toVector.map(_.value))
       assert(all.nonEmpty, s"[$name] expected metadata")
-      assert(all.forall(_.length < 60), s"[$name] values must be short: ${all.mkString(",")}")
-      assert(!all.exists(v => b64ish.findFirstIn(v).isDefined), s"[$name] secret-looking value")
+      assert(
+        all.forall(_.length < 60),
+        s"[$name] values must be short: ${all.mkString(",")}"
+      )
+      assert(
+        !all.exists(v => b64ish.findFirstIn(v).isDefined),
+        s"[$name] secret-looking value"
+      )
       assert(!all.exists(_.contains("PRIVATE KEY")), s"[$name] key material")
     }
   }

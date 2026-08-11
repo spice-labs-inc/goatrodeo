@@ -190,9 +190,9 @@ object ArtifactWrapper {
   /** Given an input stream and a filename, get the mime type
     *
     * @param data
-    *   -- the input stream
+    * -- the input stream
     * @param fileName
-    *   -- the name of the file
+    * -- the name of the file
     */
   protected def mimeTypeFor(
       rawData: TikaInputStream,
@@ -204,7 +204,8 @@ object ArtifactWrapper {
 
       val metadata = new Metadata()
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
-      val detected = tika.getDetector.detect(data, metadata)
+      val detected = Try { tika.getDetector.detect(data, metadata) }.toOption
+        .getOrElse(MediaType.OCTET_STREAM)
       massageMimeType(fileName, rawData, detected)
     } catch {
       case e: Throwable =>
@@ -424,7 +425,9 @@ object ArtifactWrapper {
     *   if there is none
     */
   def extensionFromName(name: String): String = {
-    val base = FilenameUtils.getName(name)
+    val base = Try { FilenameUtils.getName(name) }.toOption
+      .flatMap(v => Option(v))
+      .getOrElse(name)
     val dot = base.indexOf('.')
     if (dot > 0 && dot < base.length - 1) base.substring(dot + 1)
     else ""
@@ -554,7 +557,7 @@ final case class ByteWrapper(
       } finally {
         file.delete()
       }
-    }
+    }.get
   }
 
   override def path(): String = fileName

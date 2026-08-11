@@ -186,9 +186,9 @@ class ServiceTlsConfigState(artifact: ArtifactWrapper)
       case _               => fileName
     }
 
-    val text = artifact.withStream { stream =>
+    val text = Try(artifact.withStream { stream =>
       new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
-    }
+    }).getOrElse("")
 
     val isUci = path.contains("/config/") || text.linesIterator.exists(
       _.trim.startsWith("config")

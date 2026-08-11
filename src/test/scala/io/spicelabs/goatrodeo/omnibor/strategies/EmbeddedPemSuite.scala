@@ -70,7 +70,9 @@ class EmbeddedPemSuite extends FunSuite {
   private def values(m: Map[String, TreeSet[StringOrPair]]): Vector[String] =
     m.values.toVector.flatMap(_.toVector.map(_.value))
 
-  test("T-D-01 kubeconfig certificate-authority-data yields a certificate item") {
+  test(
+    "T-D-01 kubeconfig certificate-authority-data yields a certificate item"
+  ) {
     val m = meta(
       "kubeconfig.yaml",
       "current-context: ctx\napiVersion: v1\nclusters:\n  - name: c\n    cluster:\n      certificate-authority-data: " +
@@ -92,13 +94,20 @@ class EmbeddedPemSuite extends FunSuite {
     assert(m.contains(certAdHoc("Version")))
     assertEquals(m(keyAdHoc("kind")).head.value, "certificate")
     assertEquals(m(keyAdHoc("source")).head.value, "kubeconfig.yaml")
-    assert(!values(m).exists(_.contains("BEGIN CERTIFICATE")), "PEM body must not be stored")
+    assert(
+      !values(m).exists(_.contains("BEGIN CERTIFICATE")),
+      "PEM body must not be stored"
+    )
   }
 
-  test("T-D-02 kubeconfig client-key-data yields a private-key envelope, zero key bytes") {
+  test(
+    "T-D-02 kubeconfig client-key-data yields a private-key envelope, zero key bytes"
+  ) {
     val m = meta(
       "kubeconfig.yaml",
-      "users:\n  - name: u\n    user:\n      client-key-data: " + b64(rsaKeyPem) + "\n"
+      "users:\n  - name: u\n    user:\n      client-key-data: " + b64(
+        rsaKeyPem
+      ) + "\n"
     )
     assertEquals(
       m(certAdHoc("DerivedFromPrivateKey")).head.value,
@@ -120,23 +129,34 @@ class EmbeddedPemSuite extends FunSuite {
       ),
       s"no base64/key blob may be emitted: ${all.mkString(",")}"
     )
-    assert(!all.exists(_.contains("PRIVATE KEY")), "private key material must not be emitted")
+    assert(
+      !all.exists(_.contains("PRIVATE KEY")),
+      "private key material must not be emitted"
+    )
   }
 
   test("T-D-03 inline PEM block inside YAML yields a certificate item") {
-    val yaml = "kind: Secret\napiVersion: v1\nstringData:\n  tls.crt: |-\n    " +
-      certPem.replace("\n", "\n    ") + "\n"
+    val yaml =
+      "kind: Secret\napiVersion: v1\nstringData:\n  tls.crt: |-\n    " +
+        certPem.replace("\n", "\n    ") + "\n"
     val m = meta("secret.yaml", yaml)
-    assert(m.contains(certAdHoc("SubjectDN")), "inline PEM must parse as a certificate")
+    assert(
+      m.contains(certAdHoc("SubjectDN")),
+      "inline PEM must parse as a certificate"
+    )
     assertEquals(m(keyAdHoc("kind")).head.value, "certificate")
   }
 
   test("T-D-04 oversized base64 blob is skipped without OOM") {
     val big = java.util.Base64.getEncoder
-      .encodeToString(Array.fill[Byte](EmbeddedPemStrategy.MaxDecodeBytes + 1)(0x41))
+      .encodeToString(
+        Array.fill[Byte](EmbeddedPemStrategy.MaxDecodeBytes + 1)(0x41)
+      )
     val m = meta(
       "kubeconfig.yaml",
-      "client-key-data: " + b64(rsaKeyPem) + " # real\ncertificate-authority-data: " + big + "\n"
+      "client-key-data: " + b64(
+        rsaKeyPem
+      ) + " # real\ncertificate-authority-data: " + big + "\n"
     )
     // The oversize blob alone must not produce a cert/private envelope; only the real key blob above may.
     assert(m.nonEmpty, "the in-budget blob should still be captured")
@@ -154,11 +174,14 @@ class EmbeddedPemSuite extends FunSuite {
   test("T-D-06 property: emitted values are short tags, never secrets") {
     val battery = Vector(
       "kubeconfig.yaml" ->
-        ("certificate-authority-data: " + b64(certPem) + "\nclient-key-data: " + b64(rsaKeyPem) + "\n"),
+        ("certificate-authority-data: " + b64(
+          certPem
+        ) + "\nclient-key-data: " + b64(rsaKeyPem) + "\n"),
       "terraform.tf" ->
         ("resource \"tls_private_key\" \"k\" {}\n  private_key_pem = <<EOT\n" + rsaKeyPem + "EOT\n"),
       "secret.yaml" ->
-        ("stringData:\n  tls.crt: |-\n    " + certPem.replace("\n", "\n    ") + "\n")
+        ("stringData:\n  tls.crt: |-\n    " + certPem
+          .replace("\n", "\n    ") + "\n")
     )
     val b64ish = """[A-Za-z0-9+/]{40,}=""".r
     battery.foreach { case (name, content) =>
@@ -173,14 +196,19 @@ class EmbeddedPemSuite extends FunSuite {
         !all.exists(v => b64ish.findFirstIn(v).isDefined),
         s"[$name] base64 secret-looking value: ${all.mkString(",")}"
       )
-      assert(!all.exists(_.contains("PRIVATE KEY")), s"[$name] private key material")
+      assert(
+        !all.exists(_.contains("PRIVATE KEY")),
+        s"[$name] private key material"
+      )
     }
   }
 
   test("T-D-07 certificate SPKI hash is the public key hash, not the secret") {
     val cf = CertificateFactory.getInstance("X.509")
     val cert = cf
-      .generateCertificate(new ByteArrayInputStream(certPem.getBytes(StandardCharsets.ISO_8859_1)))
+      .generateCertificate(
+        new ByteArrayInputStream(certPem.getBytes(StandardCharsets.ISO_8859_1))
+      )
       .asInstanceOf[java.security.cert.X509Certificate]
     val m = meta(
       "kubeconfig.yaml",
@@ -192,6 +220,9 @@ class EmbeddedPemSuite extends FunSuite {
       expectedSpki,
       "SpkiSha256 must hash the public SPKI (derived, not the secret)"
     )
-    assert(!values(m).contains(expectedSpki == ""), "never an empty placeholder")
+    assert(
+      !values(m).contains(expectedSpki == ""),
+      "never an empty placeholder"
+    )
   }
 }

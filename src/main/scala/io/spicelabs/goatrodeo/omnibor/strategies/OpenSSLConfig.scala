@@ -27,6 +27,7 @@ import java.nio.file.Paths
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Success
+import scala.util.Try
 
 /** A bundle of OpenSSL configuration files discovered at the same archive
   * layer.
@@ -198,8 +199,12 @@ case class OpenSSLConfigState(
     // Phase A — cipher-suite decomposition: resolved constituent algorithms and
     // per-suite entries, derived from both `CipherString` and `Ciphersuites`.
     val cipherEntries =
-      data.cipherString.toVector.flatMap(CipherSuiteResolver.resolveCipherString) ++
-        data.cipherSuites.toVector.flatMap(CipherSuiteResolver.resolveCipherString)
+      data.cipherString.toVector.flatMap(
+        CipherSuiteResolver.resolveCipherString
+      ) ++
+        data.cipherSuites.toVector.flatMap(
+          CipherSuiteResolver.resolveCipherString
+        )
 
     if (cipherEntries.nonEmpty) {
       val algorithms = TreeSet.from(
@@ -209,7 +214,9 @@ case class OpenSSLConfigState(
         meta = meta + (adHoc("algorithms") -> algorithms)
       }
       cipherEntries.zipWithIndex.foreach { case (entry, idx) =>
-        meta = meta + (adHoc(s"suite:$idx:name") -> TreeSet(StringOrPair(entry.name)))
+        meta = meta + (adHoc(s"suite:$idx:name") -> TreeSet(
+          StringOrPair(entry.name)
+        ))
         if (entry.algorithms.nonEmpty) {
           meta = meta + (
             adHoc(s"suite:$idx:algorithms") -> TreeSet(
@@ -329,12 +336,13 @@ object OpenSSLConfigToProcess {
   ): Option[String] = {
     val exact = knownPaths.find(_ == ref)
     exact.orElse {
-      val refFileName = Option(Paths.get(ref).getFileName)
+      val refFileName = Try(Paths.get(ref).getFileName).toOption
+        .flatMap(v => Option(v))
         .map(_.toString)
         .getOrElse(ref)
       val candidates = knownPaths
         .filter { path =>
-          Option(Paths.get(path).getFileName)
+          Try(Paths.get(path).getFileName).toOption
             .map(_.toString)
             .contains(refFileName)
         }

@@ -191,7 +191,7 @@ class FileWalkerTestSuite extends munit.FunSuite {
       Files.isDirectory(tempDir)
     }
 
-    assert(result)
+    assert(result.getOrElse(false))
   }
 
   test("withinTempDir - cleans up directory") {
@@ -212,7 +212,7 @@ class FileWalkerTestSuite extends munit.FunSuite {
       42
     }
 
-    assertEquals(result, 42)
+    assertEquals(result.getOrElse(0), 42)
   }
 
   // ==================== Edge Cases ====================

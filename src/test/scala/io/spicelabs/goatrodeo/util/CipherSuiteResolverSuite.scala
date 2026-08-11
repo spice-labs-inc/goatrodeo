@@ -69,8 +69,13 @@ class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
     val algs = CipherSuiteResolver.resolveToken("FOO-BAR")
     assertEquals(algs, None)
     val entries =
-      CipherSuiteResolver.resolveCipherString("FOO-BAR:ECDHE-RSA-AES256-GCM-SHA384")
-    assertEquals(entries.map(_.name), Vector("FOO-BAR", "ECDHE-RSA-AES256-GCM-SHA384"))
+      CipherSuiteResolver.resolveCipherString(
+        "FOO-BAR:ECDHE-RSA-AES256-GCM-SHA384"
+      )
+    assertEquals(
+      entries.map(_.name),
+      Vector("FOO-BAR", "ECDHE-RSA-AES256-GCM-SHA384")
+    )
     assertEquals(entries.head.algorithms, Vector.empty)
   }
 
@@ -79,13 +84,21 @@ class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
     val a = CipherSuiteResolver.resolveCipherString(s)
     val b = CipherSuiteResolver.resolveCipherString(s)
     assertEquals(a, b, "repeat calls must agree")
-    assertEquals(a(0).algorithms, Vector("ecdh", "rsa", "aes-128-gcm", "sha-256"))
+    assertEquals(
+      a(0).algorithms,
+      Vector("ecdh", "rsa", "aes-128-gcm", "sha-256")
+    )
     assertEquals(a(1).algorithms, Vector("aes-128-cbc", "sha-1"))
     // The entry for a repeated suite is kept once, per token position.
-    assertEquals(a.map(_.name), Vector("ECDHE-RSA-AES128-GCM-SHA256", "AES128-SHA", "AES128-SHA"))
+    assertEquals(
+      a.map(_.name),
+      Vector("ECDHE-RSA-AES128-GCM-SHA256", "AES128-SHA", "AES128-SHA")
+    )
   }
 
-  property("T-A-07 property: resolved algorithms are in the closed vocabulary") {
+  property(
+    "T-A-07 property: resolved algorithms are in the closed vocabulary"
+  ) {
     val tokenGen = Gen.oneOf(
       "ECDHE-RSA-AES128-GCM-SHA256",
       "ECDHE-ECDSA-AES256-GCM-SHA384",

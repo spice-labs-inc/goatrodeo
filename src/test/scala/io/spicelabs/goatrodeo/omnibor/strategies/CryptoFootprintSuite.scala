@@ -53,7 +53,12 @@ class CryptoFootprintSuite extends FunSuite {
     assert(algs.contains("aes-256-gcm"), s"aes-256-gcm missing: $algs")
     assert(algs.contains("sha-256"), s"sha-256 missing: $algs")
     assert(m(adHoc("classifier")).toVector.map(_.value).toSet == Set("evp"))
-    assert(m(adHoc("value")).toVector.map(_.value).toSet == Set("EVP_aes_256_gcm", "EVP_sha256"))
+    assert(
+      m(adHoc("value")).toVector.map(_.value).toSet == Set(
+        "EVP_aes_256_gcm",
+        "EVP_sha256"
+      )
+    )
     assert(m(adHoc("confidence")).toVector.map(_.value).toSet == Set("symbol"))
     assert(!m.contains(adHoc("unknown")), "all EVP needles resolve")
   }
@@ -70,14 +75,23 @@ class CryptoFootprintSuite extends FunSuite {
   }
 
   test("T-E-03 a bare substring like aes must not mint an asset") {
-    assert(!CryptoFootprintStrategy.isKnownNeedle("aes"), "bare 'aes' is not a signal")
+    assert(
+      !CryptoFootprintStrategy.isKnownNeedle("aes"),
+      "bare 'aes' is not a signal"
+    )
     assert(CryptoFootprintStrategy.scan("the aes cipher in libc").isEmpty)
-    assert(!CryptoFootprintStrategy.detects("some library text mentioning AES ciphers"))
+    assert(
+      !CryptoFootprintStrategy.detects(
+        "some library text mentioning AES ciphers"
+      )
+    )
     // A distinctive identifier still works.
     assert(CryptoFootprintStrategy.detects("EVP_sha256"))
   }
 
-  test("T-E-04 EmbeddedCertificates behavior is preserved for PEM-marker libs") {
+  test(
+    "T-E-04 EmbeddedCertificates behavior is preserved for PEM-marker libs"
+  ) {
     val markerLib = ByteWrapper(
       (
         "\u0000\u0000-----BEGIN CERTIFICATE-----\u0000MIIB\u0000-----END CERTIFICATE-----\u0000"
@@ -106,7 +120,8 @@ class CryptoFootprintSuite extends FunSuite {
   }
 
   test("T-E-05 scan is bounded: needles beyond the cap are not seen") {
-    val near = artifact("lib.so", "prefix" + ("A" * 1024) + "EVP_sha256" + "suffix")
+    val near =
+      artifact("lib.so", "prefix" + ("A" * 1024) + "EVP_sha256" + "suffix")
     assert(
       CryptoFootprintStrategy.contentOf(near).contains("EVP_sha256"),
       "in-cap needle is read"
@@ -121,10 +136,14 @@ class CryptoFootprintSuite extends FunSuite {
       "needle beyond the read bound must not be seen"
     )
     // Huge content scans without error.
-    val _ = CryptoFootprintStrategy.scan("B" * (CryptoFootprintStrategy.MaxReadBytes * 2))
+    val _ = CryptoFootprintStrategy.scan(
+      "B" * (CryptoFootprintStrategy.MaxReadBytes * 2)
+    )
   }
 
-  test("T-E-06 property: every emitted algorithm value is a known canonical name") {
+  test(
+    "T-E-06 property: every emitted algorithm value is a known canonical name"
+  ) {
     // The pattern table is total: Every algorithm the scanner can emit is in
     // knownAlgorithms and is lowercase-hyphenated.
     val battery = Vector(

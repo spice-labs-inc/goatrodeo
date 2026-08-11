@@ -62,7 +62,7 @@ object MaterializeSidecars {
     val w = wrap(fixture)
     Certificates.parseCrl(w).map { c =>
       val state = new CertificatesState(w)
-      Vector(state.purlForCrl(c.crl).toCanonical())
+      Vector(state.purlForCrl(c.crl).map(_.toCanonical()).getOrElse(""))
     }
   }
 

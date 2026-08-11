@@ -114,7 +114,10 @@ class ServiceCryptoSuite extends FunSuite {
       m.values.forall(!_.exists(_.value.contains("/etc/mosquitto/passwd"))),
       "psk_file path/content must never be echoed"
     )
-    assertEquals(m(sc("cert_file")).head.value, "/etc/mosquitto/certs/server.crt")
+    assertEquals(
+      m(sc("cert_file")).head.value,
+      "/etc/mosquitto/certs/server.crt"
+    )
   }
 
   test("T-B-04 WireGuard secrets are presence-only; base64 never emitted") {
@@ -169,7 +172,10 @@ class ServiceCryptoSuite extends FunSuite {
 
   test("T-B-07 unknown service config is not claimed") {
     assertEquals(ServiceCryptoStrategy.detectService("app.config"), None)
-    assertEquals(ServiceCryptoStrategy.detectService("etc/nginx/nginx.conf"), None)
+    assertEquals(
+      ServiceCryptoStrategy.detectService("etc/nginx/nginx.conf"),
+      None
+    )
     assertEquals(
       ServiceCryptoStrategy.detectService("etc/openvpn/server.conf"),
       Some("openvpn")
@@ -180,7 +186,9 @@ class ServiceCryptoSuite extends FunSuite {
     )
   }
 
-  test("T-B-08 property: emitted ServiceCrypto/Kerberos values carry no secrets") {
+  test(
+    "T-B-08 property: emitted ServiceCrypto/Kerberos values carry no secrets"
+  ) {
     val battery = Vector(
       "etc/wireguard/wg0.conf" -> """[Interface]
         |PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

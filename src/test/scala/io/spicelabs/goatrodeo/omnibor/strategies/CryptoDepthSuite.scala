@@ -29,8 +29,8 @@ import java.util.Base64
 import scala.collection.immutable.TreeSet
 
 /** Phase F — Detection depth: keystore name fallback, binary PGP keyrings,
-  * keybox detection, PKCS#8 DER envelopes, certificate extension depth, and
-  * the no-secret output property.
+  * keybox detection, PKCS#8 DER envelopes, certificate extension depth, and the
+  * no-secret output property.
   */
 class CryptoDepthSuite extends FunSuite {
 
@@ -38,7 +38,9 @@ class CryptoDepthSuite extends FunSuite {
   private val keyAdHoc = MKC.adHoc("EmbeddedKey")
 
   private def b64(s: String): String =
-    Base64.getEncoder.withoutPadding.encodeToString(s.getBytes(StandardCharsets.UTF_8))
+    Base64.getEncoder.withoutPadding.encodeToString(
+      s.getBytes(StandardCharsets.UTF_8)
+    )
 
   private def artifact(name: String, content: Array[Byte]): ByteWrapper =
     ByteWrapper(content, name, None)
@@ -54,8 +56,9 @@ class CryptoDepthSuite extends FunSuite {
     new EmbeddedPemState(a).invokeBuildMetadata(a).toMap
   }
 
-
-  /** Strip an ASCII-armor body (headers, blanks, checksum) from PEM/OpenPGP text. */
+  /** Strip an ASCII-armor body (headers, blanks, checksum) from PEM/OpenPGP
+    * text.
+    */
   private def armorBody(text: String): String = {
     val lines = text.split("\r?\n").toVector.map(_.trim)
     val afterBegin = lines.dropWhile(!_.startsWith("-----BEGIN")).drop(1)
@@ -63,26 +66,40 @@ class CryptoDepthSuite extends FunSuite {
       .dropWhile(l => l.isEmpty || !l.matches("[A-Za-z0-9+/]+(=*)?"))
       .takeWhile(!_.startsWith("-----END"))
       .filter(_.nonEmpty)
-    if (bodyLines.nonEmpty && bodyLines.last.startsWith("=")) bodyLines.init.mkString
+    if (bodyLines.nonEmpty && bodyLines.last.startsWith("="))
+      bodyLines.init.mkString
     else bodyLines.mkString
   }
 
   test("T-F-01 keystore name/extension fallback augments MIME") {
-    for (name <- Vector("conf/security/jssecacerts", "conf/security/cacerts", "keystore.jks", "x.bks")) {
-      val mimes = CryptoDetector.detectFromBytes(Array[Byte](0x00, 0x01, 0x02), name, None)
+    for (
+      name <- Vector(
+        "conf/security/jssecacerts",
+        "conf/security/cacerts",
+        "keystore.jks",
+        "x.bks"
+      )
+    ) {
+      val mimes = CryptoDetector.detectFromBytes(
+        Array[Byte](0x00, 0x01, 0x02),
+        name,
+        None
+      )
       assert(
         mimes.contains("application/x-java-keystore"),
         s"$name should be a keystore: $mimes"
       )
     }
     assert(
-      CryptoDetector.detectFromBytes(Array[Byte](0x00, 0x01, 0x02), "store.p12", None)
+      CryptoDetector
+        .detectFromBytes(Array[Byte](0x00, 0x01, 0x02), "store.p12", None)
         .contains("application/pkcs12"),
       "p12 extension adds pkcs12"
     )
     // A non-keystore name is NOT classified.
     assert(
-      !CryptoDetector.detectFromBytes(Array[Byte](0x00, 0x01, 0x02), "notes.txt", None)
+      !CryptoDetector
+        .detectFromBytes(Array[Byte](0x00, 0x01, 0x02), "notes.txt", None)
         .contains("application/x-java-keystore")
     )
   }
@@ -94,11 +111,23 @@ class CryptoDepthSuite extends FunSuite {
     )
     val binary = Base64.getDecoder.decode(armorBody(armored))
 
-    val mimes = CryptoDetector.detectFromBytes(binary.take(4096), "etc/pgp/key.gpg", Some(binary))
-    assert(mimes.contains("application/pgp-keys"), s"binary keyring MIME: $mimes")
+    val mimes = CryptoDetector.detectFromBytes(
+      binary.take(4096),
+      "etc/pgp/key.gpg",
+      Some(binary)
+    )
+    assert(
+      mimes.contains("application/pgp-keys"),
+      s"binary keyring MIME: $mimes"
+    )
 
-    val strategies = ToProcess.strategiesForArtifacts(Vector(artifact("etc/pgp/key.gpg", binary)), _ => (), false)
-    val certs = strategies.collectFirst { case c: Certificates => c }
+    val strategies = ToProcess.strategiesForArtifacts(
+      Vector(artifact("etc/pgp/key.gpg", binary)),
+      _ => (),
+      false
+    )
+    val certs = strategies
+      .collectFirst { case c: Certificates => c }
       .getOrElse(fail("binary .gpg must be claimed by Certificates"))
     val (els, state) = certs.getElementsToProcess()
     val item = io.spicelabs.goatrodeo.omnibor.Item(
@@ -109,17 +138,23 @@ class CryptoDepthSuite extends FunSuite {
     )
     val (m, _) = state.getMetadata(els.head._1, item, new SingleMarker())
     val map = m.toMap
-    assert(map.contains(certAdHoc("PgpKeyCount")), s"per-key metadata expected: ${map.keys}")
+    assert(
+      map.contains(certAdHoc("PgpKeyCount")),
+      s"per-key metadata expected: ${map.keys}"
+    )
   }
 
   test("T-F-03 GPG keybox is detected (magic + extension)") {
     val magic = Array[Byte](0x23, 0x4b, 0x42, 0x58, 0x66) // "#KBXf"
     assert(
-      CryptoDetector.detectFromBytes(magic, "pubring.kbx", None).contains("application/pgp-keys"),
+      CryptoDetector
+        .detectFromBytes(magic, "pubring.kbx", None)
+        .contains("application/pgp-keys"),
       "keybox magic detected"
     )
     assert(
-      CryptoDetector.detectFromBytes(Array[Byte](0x01, 0x02, 0x03), "a.kbx", None)
+      CryptoDetector
+        .detectFromBytes(Array[Byte](0x01, 0x02, 0x03), "a.kbx", None)
         .contains("application/pgp-keys"),
       ".kbx extension detected"
     )
@@ -127,7 +162,9 @@ class CryptoDepthSuite extends FunSuite {
 
   test("T-F-04 PKCS#8 DER private key → envelope-only, no bytes") {
     val pem = Files.readString(
-      Path.of("test_data/certificates/private-keys/synthetic/pkcs8-rsa-2048-unencrypted.pem"),
+      Path.of(
+        "test_data/certificates/private-keys/synthetic/pkcs8-rsa-2048-unencrypted.pem"
+      ),
       StandardCharsets.UTF_8
     )
     val der = Base64.getDecoder.decode(armorBody(pem))
@@ -135,7 +172,9 @@ class CryptoDepthSuite extends FunSuite {
     // The DER is embedded as a base64 data field (e.g. kubeconfig client-key-data
     // holding a DER private key); the decode path exercises parsePrivateKeyDer.
     val content =
-      "client-key-data: " + Base64.getEncoder.withoutPadding.encodeToString(der) + "\n"
+      "client-key-data: " + Base64.getEncoder.withoutPadding.encodeToString(
+        der
+      ) + "\n"
     val m = new EmbeddedPemState(artifact("kube-der.yaml", content))
       .invokeBuildMetadata(artifact("kube-der.yaml", content))
       .toMap
@@ -163,10 +202,12 @@ class CryptoDepthSuite extends FunSuite {
       Files.readAllBytes(Path.of(pemPath))
     )
     val strategies = ToProcess.strategiesForArtifacts(Vector(a), _ => (), false)
-    val certs = strategies.collectFirst { case c: Certificates => c }
+    val certs = strategies
+      .collectFirst { case c: Certificates => c }
       .getOrElse(fail(s"$pemPath must be claimed by Certificates"))
     val (els, state) = certs.getElementsToProcess()
-    val item = io.spicelabs.goatrodeo.omnibor.Item("x", TreeSet.empty, None, None)
+    val item =
+      io.spicelabs.goatrodeo.omnibor.Item("x", TreeSet.empty, None, None)
     val (m, _) = state.getMetadata(els.head._1, item, new SingleMarker())
     m.toMap
   }
@@ -209,7 +250,9 @@ class CryptoDepthSuite extends FunSuite {
       "kube.yaml" -> ("certificate-authority-data: " + b64(certPem) + "\n"),
       "kube2.yaml" -> ("client-key-data: " + b64(
         Files.readString(
-          Path.of("test_data/certificates/private-keys/synthetic/pkcs8-rsa-2048-unencrypted.pem"),
+          Path.of(
+            "test_data/certificates/private-keys/synthetic/pkcs8-rsa-2048-unencrypted.pem"
+          ),
           StandardCharsets.UTF_8
         )
       ) + "\n")

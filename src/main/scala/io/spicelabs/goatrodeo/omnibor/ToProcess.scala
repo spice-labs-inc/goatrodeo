@@ -313,28 +313,30 @@ trait ToProcess {
   def runStaticMetadataGather(
       mimeFilter: IncludeExclude
   ): Map[String, Vector[Augmentation]] = {
-    FileWalker.withinTempDir { tempDir =>
-      {
-        val augmentation: Seq[Map[String, Vector[Augmentation]]] = for {
-          (wrapper, _) <- getElementsToProcess()._1
-          it <- StaticMetadata
-            .runStaticMetadataGather(wrapper, tempDir, mimeFilter)
-            .toList
-          answer <- it.runForMillis(120L * 1000 * 60) // 120 minutes
+    FileWalker
+      .withinTempDir { tempDir =>
+        {
+          val augmentation: Seq[Map[String, Vector[Augmentation]]] = for {
+            (wrapper, _) <- getElementsToProcess()._1
+            it <- StaticMetadata
+              .runStaticMetadataGather(wrapper, tempDir, mimeFilter)
+              .toList
+            answer <- it.runForMillis(120L * 1000 * 60) // 120 minutes
 
-        } yield it.buildAugmentation()
+          } yield it.buildAugmentation()
 
-        augmentation.foldLeft(Map[String, Vector[Augmentation]]()) {
-          case (curr, next) =>
-            curr.foldLeft(next) { case (map, (k, v)) =>
-              map.get(k) match {
-                case None      => map + (k -> v)
-                case Some(vec) => map + (k -> (v ++ vec))
+          augmentation.foldLeft(Map[String, Vector[Augmentation]]()) {
+            case (curr, next) =>
+              curr.foldLeft(next) { case (map, (k, v)) =>
+                map.get(k) match {
+                  case None      => map + (k -> v)
+                  case Some(vec) => map + (k -> (v ++ vec))
+                }
               }
-            }
+          }
         }
       }
-    }
+      .getOrElse(Map.empty)
   }
 
   /** Recursively process
@@ -757,13 +759,13 @@ object ToProcess {
         UsignKeysStrategy.computeUsignKeyFiles,
         SSHKeysStrategy.computeSSHKeyFiles,
         ServiceTlsConfigStrategy.computeServiceTlsConfigFiles,
-      ServiceCryptoStrategy.computeServiceCryptoFiles,
-      CryptoTokenStrategy.computeCryptoTokenFiles,
-      EmbeddedPemStrategy.computeEmbeddedPemFiles,
-      EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
-      CryptoFootprintStrategy.computeCryptoFootprintFiles,
-      MobileTlsStrategy.computeMobileTlsFiles,
-      CryptoDependencyStrategy.computeCryptoDependencyFiles,
+        ServiceCryptoStrategy.computeServiceCryptoFiles,
+        CryptoTokenStrategy.computeCryptoTokenFiles,
+        EmbeddedPemStrategy.computeEmbeddedPemFiles,
+        EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
+        CryptoFootprintStrategy.computeCryptoFootprintFiles,
+        MobileTlsStrategy.computeMobileTlsFiles,
+        CryptoDependencyStrategy.computeCryptoDependencyFiles,
         JvmDistribution.computeJvmFiles,
         GradleLockfile.computeGradleLockfiles,
         OpenSSLConfigToProcess.computeOpenSSLConfigFiles,

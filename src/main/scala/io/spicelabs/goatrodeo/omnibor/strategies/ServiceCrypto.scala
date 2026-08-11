@@ -53,22 +53,29 @@ object ServiceCryptoStrategy {
 
   // ── Service detection ───────────────────────────────────────────────────
 
-  /** Return the service id when the file name/path matches a supported
-    * dialect, else None (no claim, no crash).
+  /** Return the service id when the file name/path matches a supported dialect,
+    * else None (no claim, no crash).
     */
   private[strategies] def detectService(path: String): Option[String] = {
     val fileName = path.split('/').lastOption.getOrElse(path)
     if (fileName.endsWith(".ovpn") || path.contains("openvpn/")) Some("openvpn")
-    else if (fileName == "ipsec.conf" || fileName == "strongswan.conf" || fileName == "swanctl.conf")
+    else if (
+      fileName == "ipsec.conf" || fileName == "strongswan.conf" || fileName == "swanctl.conf"
+    )
       Some("strongswan")
     else if (fileName == "mosquitto.conf") Some("mosquitto")
     else if (fileName == "haproxy.cfg") Some("haproxy")
     else if (fileName == "redis.conf") Some("redis")
-    else if (fileName == "postgresql.conf" || fileName == "postgresql.conf.sample")
+    else if (
+      fileName == "postgresql.conf" || fileName == "postgresql.conf.sample"
+    )
       Some("postgresql")
-    else if (fileName == "my.cnf" || fileName == "my.ini" || fileName == "mariadb.cnf")
+    else if (
+      fileName == "my.cnf" || fileName == "my.ini" || fileName == "mariadb.cnf"
+    )
       Some("mysql")
-    else if (fileName.startsWith("wg") && fileName.endsWith(".conf")) Some("wireguard")
+    else if (fileName.startsWith("wg") && fileName.endsWith(".conf"))
+      Some("wireguard")
     else if (fileName == "krb5.conf") Some("kerberos")
     else None
   }
@@ -78,9 +85,8 @@ object ServiceCryptoStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter(a =>
-      detectService(a.path()).isDefined
-    ).toVector
+    val mine =
+      byUUID.values.filter(a => detectService(a.path()).isDefined).toVector
 
     val uuids = mine.map(_.uuid).toSet
 
@@ -167,7 +173,9 @@ object ServiceCryptoStrategy {
   /** Decompose a strongSwan transform string (`aes256-sha256-modp2048`) into
     * its constituent algorithms, dropping unknown parts (no invention).
     */
-  private[strategies] def transformAlgorithms(transform: String): Vector[String] = {
+  private[strategies] def transformAlgorithms(
+      transform: String
+  ): Vector[String] = {
     transform
       .split('-')
       .toVector
@@ -178,9 +186,12 @@ object ServiceCryptoStrategy {
   }
 
   /** Union of standalone-algorithm and suite resolution for a cipher value. */
-  private[strategies] def algorithmsForCipherValue(value: String): Vector[String] = {
+  private[strategies] def algorithmsForCipherValue(
+      value: String
+  ): Vector[String] = {
     val standalone = CipherSuiteResolver.resolveAlgorithmList(value)
-    val suites = CipherSuiteResolver.resolveCipherString(value).flatMap(_.algorithms)
+    val suites =
+      CipherSuiteResolver.resolveCipherString(value).flatMap(_.algorithms)
     (standalone ++ suites).distinct
   }
 
@@ -206,7 +217,10 @@ object ServiceCryptoStrategy {
         enctypes.isEmpty
   }
 
-  private[strategies] def parseText(service: String, text: String): ParsedConfig =
+  private[strategies] def parseText(
+      service: String,
+      text: String
+  ): ParsedConfig =
     service match {
       case "openvpn"    => parseOpenVpn(text)
       case "strongswan" => parseStrongSwan(text)
@@ -227,15 +241,16 @@ object ServiceCryptoStrategy {
     var auth: Option[String] = None
     text.linesIterator.foreach { line =>
       line.trim match {
-        case DataCiphers(_, v)    => ciphers += Option(v).getOrElse("").trim
-        case OvpnCipher(v)        => ciphers += Option(v).getOrElse("").trim
-        case OvpnTlsCipher(v)     => ciphers += Option(v).getOrElse("").trim
-        case OvpnAuth(v)          => auth = Some(Option(v).getOrElse("").trim.toUpperCase)
-        case OvpnDh(_)            => ()
-        case OvpnPath("cert", v)  => cert = Some(Option(v).getOrElse("").trim)
-        case OvpnPath("key", v)   => key = Some(Option(v).getOrElse("").trim)
-        case OvpnPath("ca", _)    => ()
-        case _                    =>
+        case DataCiphers(_, v) => ciphers += Option(v).getOrElse("").trim
+        case OvpnCipher(v)     => ciphers += Option(v).getOrElse("").trim
+        case OvpnTlsCipher(v)  => ciphers += Option(v).getOrElse("").trim
+        case OvpnAuth(v) =>
+          auth = Some(Option(v).getOrElse("").trim.toUpperCase)
+        case OvpnDh(_)           => ()
+        case OvpnPath("cert", v) => cert = Some(Option(v).getOrElse("").trim)
+        case OvpnPath("key", v)  => key = Some(Option(v).getOrElse("").trim)
+        case OvpnPath("ca", _)   => ()
+        case _                   =>
       }
     }
     ParsedConfig(
@@ -251,7 +266,8 @@ object ServiceCryptoStrategy {
     text.linesIterator.foreach { line =>
       line.trim match {
         case IkeEsp(_, value) =>
-          val first = Option(value).getOrElse("").split(',').map(_.trim).find(_.nonEmpty)
+          val first =
+            Option(value).getOrElse("").split(',').map(_.trim).find(_.nonEmpty)
           first.foreach(proposals += _)
         case _ =>
       }
@@ -266,11 +282,12 @@ object ServiceCryptoStrategy {
     var key: Option[String] = None
     text.linesIterator.foreach { line =>
       line.trim match {
-        case MosTlsCiphers(v)          => cipher = Some(Option(v).getOrElse("").trim)
-        case MosPskFile(_)             => psk = true // presence only
-        case MosPaths("certfile", v)   => cert = Some(Option(v).getOrElse("").trim)
-        case MosPaths("keyfile", v)    => key = Some(Option(v).getOrElse("").trim)
-        case _                         =>
+        case MosTlsCiphers(v) => cipher = Some(Option(v).getOrElse("").trim)
+        case MosPskFile(_)    => psk = true // presence only
+        case MosPaths("certfile", v) =>
+          cert = Some(Option(v).getOrElse("").trim)
+        case MosPaths("keyfile", v) => key = Some(Option(v).getOrElse("").trim)
+        case _                      =>
       }
     }
     ParsedConfig(
@@ -286,10 +303,10 @@ object ServiceCryptoStrategy {
     var cert: Option[String] = None
     text.linesIterator.foreach { line =>
       line.trim match {
-        case HapCiphers(v)            => ciphers += Option(v).getOrElse("").trim
-        case HapCipherSuites(v)       => ciphers += Option(v).getOrElse("").trim
-        case HapBindCrt(v)            => cert = Some(Option(v).getOrElse("").trim)
-        case _                        =>
+        case HapCiphers(v)      => ciphers += Option(v).getOrElse("").trim
+        case HapCipherSuites(v) => ciphers += Option(v).getOrElse("").trim
+        case HapBindCrt(v)      => cert = Some(Option(v).getOrElse("").trim)
+        case _                  =>
       }
     }
     ParsedConfig(cipherValues = ciphers.result(), certFile = cert)
@@ -301,10 +318,10 @@ object ServiceCryptoStrategy {
     var key: Option[String] = None
     text.linesIterator.foreach { line =>
       line.trim match {
-        case RedisTlsCiphers(v)              => cipher = Some(Option(v).getOrElse("").trim)
-        case RedisPaths("cert", v)           => cert = Some(Option(v).getOrElse("").trim)
-        case RedisPaths("key", v)            => key = Some(Option(v).getOrElse("").trim)
-        case _                               =>
+        case RedisTlsCiphers(v) => cipher = Some(Option(v).getOrElse("").trim)
+        case RedisPaths("cert", v) => cert = Some(Option(v).getOrElse("").trim)
+        case RedisPaths("key", v)  => key = Some(Option(v).getOrElse("").trim)
+        case _                     =>
       }
     }
     ParsedConfig(
@@ -320,11 +337,11 @@ object ServiceCryptoStrategy {
     var key: Option[String] = None
     text.linesIterator.foreach { line =>
       line.trim match {
-        case PgSsl(_)                  => () // tls enabled/disabled flag
-        case PgMinProto(v)             => minProto = Some(Option(v).getOrElse("").trim)
-        case PgPaths("cert", v)        => cert = Some(Option(v).getOrElse("").trim)
-        case PgPaths("key", v)         => key = Some(Option(v).getOrElse("").trim)
-        case _                         =>
+        case PgSsl(_)           => () // tls enabled/disabled flag
+        case PgMinProto(v)      => minProto = Some(Option(v).getOrElse("").trim)
+        case PgPaths("cert", v) => cert = Some(Option(v).getOrElse("").trim)
+        case PgPaths("key", v)  => key = Some(Option(v).getOrElse("").trim)
+        case _                  =>
       }
     }
     ParsedConfig(
@@ -342,16 +359,17 @@ object ServiceCryptoStrategy {
     var inMysqld = false
     text.linesIterator.foreach { line =>
       val t = line.trim
-      if (t.startsWith("[") ) {
+      if (t.startsWith("[")) {
         inMysqld = t.startsWith("[mysqld]")
       } else if (inMysqld) {
         t match {
-          case MyCipher(v)          => cipher = Some(Option(v).getOrElse("").trim)
-          case MyTlsVersion(v)      => tlsVersion = Some(Option(v).getOrElse("").trim)
-          case MyPaths("cert", v)   => cert = Some(Option(v).getOrElse("").trim)
-          case MyPaths("key", v)    => key = Some(Option(v).getOrElse("").trim)
-          case MyPaths("ca", _)     => ()
-          case _                    =>
+          case MyCipher(v) => cipher = Some(Option(v).getOrElse("").trim)
+          case MyTlsVersion(v) =>
+            tlsVersion = Some(Option(v).getOrElse("").trim)
+          case MyPaths("cert", v) => cert = Some(Option(v).getOrElse("").trim)
+          case MyPaths("key", v)  => key = Some(Option(v).getOrElse("").trim)
+          case MyPaths("ca", _)   => ()
+          case _                  =>
         }
       }
     }
@@ -376,9 +394,9 @@ object ServiceCryptoStrategy {
     var psk = false
     text.linesIterator.foreach { line =>
       line.trim match {
-        case WgSecret("PrivateKey")    => priv = true
-        case WgSecret("PresharedKey")  => psk = true
-        case _                         =>
+        case WgSecret("PrivateKey")   => priv = true
+        case WgSecret("PresharedKey") => psk = true
+        case _                        =>
       }
     }
     ParsedConfig(privateKeyPresent = priv, pskPresent = psk)
@@ -389,9 +407,15 @@ object ServiceCryptoStrategy {
     text.linesIterator.foreach { line =>
       line.trim match {
         case KrbEnctypes(_, value) =>
-          Option(value).getOrElse("").split("\\s+").toVector.map(_.trim).filter(_.nonEmpty).foreach(
-            enctypes += _
-          )
+          Option(value)
+            .getOrElse("")
+            .split("\\s+")
+            .toVector
+            .map(_.trim)
+            .filter(_.nonEmpty)
+            .foreach(
+              enctypes += _
+            )
         case _ =>
       }
     }
@@ -481,12 +505,16 @@ class ServiceCryptoState(artifact: ArtifactWrapper)
       )
 
       val cipherAlgs =
-        parsed.cipherValues.flatMap(ServiceCryptoStrategy.algorithmsForCipherValue)
+        parsed.cipherValues.flatMap(
+          ServiceCryptoStrategy.algorithmsForCipherValue
+        )
       val transformAlgs = parsed.transforms.flatMap(
         ServiceCryptoStrategy.transformAlgorithms
       )
       val authAlgs =
-        parsed.authAlgorithm.flatMap(CipherSuiteResolver.resolveAlgorithmName).toVector
+        parsed.authAlgorithm
+          .flatMap(CipherSuiteResolver.resolveAlgorithmName)
+          .toVector
       val allAlgs = (cipherAlgs ++ transformAlgs ++ authAlgs).distinct.sorted
 
       if (parsed.cipherValues.nonEmpty) {
@@ -524,7 +552,8 @@ class ServiceCryptoState(artifact: ArtifactWrapper)
         tm = tm + (adHoc("psk_present") -> TreeSet(StringOrPair("true")))
       }
       if (parsed.privateKeyPresent) {
-        tm = tm + (adHoc("private_key_present") -> TreeSet(StringOrPair("true")))
+        tm =
+          tm + (adHoc("private_key_present") -> TreeSet(StringOrPair("true")))
       }
       if (parsed.enctypes.nonEmpty) {
         tm = tm + (krbAdHoc("enctypes") -> TreeSet.from(

@@ -251,7 +251,7 @@ class PurlConstructionTests extends FunSuite {
     val crl = buildCrlWithUnknownSigOid(pair)
 
     val state = new CertificatesState(dummyArtifact)
-    val purl = state.purlForCrl(crl)
+    val purl = state.purlForCrl(crl).get
     assertRoundTrips(purl, "CRL pURL with unknown sig OID")
   }
 
@@ -450,7 +450,7 @@ class PurlConstructionTests extends FunSuite {
     val pair = kp.generateKeyPair()
     val crl = buildCrlWithUnknownSigOid(pair)
     val state = new CertificatesState(dummyArtifact)
-    val purl = state.purlForCrl(crl)
+    val purl = state.purlForCrl(crl).get
     assertEquals(purl.`type`, "generic")
     assertEquals(purl.namespace, "x509")
     assertEquals(purl.name, "crl-sha256")

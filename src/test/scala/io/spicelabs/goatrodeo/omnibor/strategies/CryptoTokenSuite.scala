@@ -23,10 +23,10 @@ import scala.collection.immutable.TreeSet
 
 /** Phase C — JWT/JWK inventory.
   *
-  * Verifies JWT header algorithm extraction (including the `alg:none`
-  * security finding), JWK kty/crv/use/size and private-members presence, that
-  * token payloads/signatures and JWK key material are never echoed, tolerant
-  * handling of garbage, and an output-level no-secret property check.
+  * Verifies JWT header algorithm extraction (including the `alg:none` security
+  * finding), JWK kty/crv/use/size and private-members presence, that token
+  * payloads/signatures and JWK key material are never echoed, tolerant handling
+  * of garbage, and an output-level no-secret property check.
   */
 class CryptoTokenSuite extends FunSuite {
 
@@ -59,9 +59,13 @@ class CryptoTokenSuite extends FunSuite {
   private val rsaJwk =
     s"""{"kty":"RSA","use":"sig","n":"${b64url(rsaN)}","e":"AQAB"}"""
   private val privateJwk =
-    s"""{"kty":"EC","crv":"P-256","d":"${b64url("secretdvalidator")}","x":"eJw","y":"A-8"}"""
+    s"""{"kty":"EC","crv":"P-256","d":"${b64url(
+        "secretdvalidator"
+      )}","x":"eJw","y":"A-8"}"""
 
-  test("T-C-01 JWT alg:HS256 yields JWT:alg and canonical signature algorithm") {
+  test(
+    "T-C-01 JWT alg:HS256 yields JWT:alg and canonical signature algorithm"
+  ) {
     val m = meta("token.jwt", hs256)
     assertEquals(m(jwtAdHoc("alg")).head.value, "HS256")
     assertEquals(m(jwtAdHoc("signature_algorithm")).head.value, "hmac-sha-256")
@@ -79,10 +83,19 @@ class CryptoTokenSuite extends FunSuite {
   test("T-C-03 JWT token, payload and signature are never emitted") {
     val m = meta("token.jwt", hs256)
     val values = m.values.toVector.flatMap(_.toVector.map(_.value))
-    assert(!values.exists(v => hs256.contains(v) && v == hs256), "full token leaked")
+    assert(
+      !values.exists(v => hs256.contains(v) && v == hs256),
+      "full token leaked"
+    )
     assert(!values.exists(_.contains("1234")), "payload leaked")
-    assert(!values.exists(_.contains("SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")), "signature leaked")
-    assert(values.forall(v => v.length < 64), s"values should be short tags: $values")
+    assert(
+      !values.exists(_.contains("SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")),
+      "signature leaked"
+    )
+    assert(
+      values.forall(v => v.length < 64),
+      s"values should be short tags: $values"
+    )
   }
 
   test("T-C-04 public RSA JWK gives kty/use/size, never n/e") {
@@ -107,7 +120,10 @@ class CryptoTokenSuite extends FunSuite {
   test("T-C-06 garbage / truncated tokens are not claimed and never panic") {
     assert(!CryptoTokenStrategy.detects("eyJ123"), "short eyJ only")
     assert(!CryptoTokenStrategy.detects("not a jwt at all"), "plain text")
-    assert(!CryptoTokenStrategy.detects("eyJhbGciOiJ3cm9uZw"), "truncated header")
+    assert(
+      !CryptoTokenStrategy.detects("eyJhbGciOiJ3cm9uZw"),
+      "truncated header"
+    )
     assert(CryptoTokenStrategy.detects(hs256), "real token detected")
     assert(CryptoTokenStrategy.detects(rsaJwk), "real JWK detected")
     // Garbage must parse without throwing.
@@ -115,7 +131,9 @@ class CryptoTokenSuite extends FunSuite {
     assertEquals(m.algs, Vector.empty)
   }
 
-  test("T-C-07 property: emitted JWT/JWK values are short tags, never secrets") {
+  test(
+    "T-C-07 property: emitted JWT/JWK values are short tags, never secrets"
+  ) {
     val battery = Vector(
       "token.jwt" -> hs256,
       "token2.jwt" -> ("bearer " + noneToken),

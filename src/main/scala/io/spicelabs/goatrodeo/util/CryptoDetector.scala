@@ -35,11 +35,11 @@ object CryptoDetector {
 
   // Register the BC provider once. Idempotent — Security.addProvider
   // is a no-op if BC is already registered.
-  private val _bcInit: Unit = {
+  private val _bcInit: Unit = Try {
     if (Security.getProvider("BC") == null) {
       Security.addProvider(new BouncyCastleProvider())
     }
-  }
+  }.getOrElse(())
 
   // SSH wire-format first tokens (plain pubkey).
   private val sshPubkeyTokens: Set[String] = Set(
@@ -404,7 +404,6 @@ object CryptoDetector {
     }.isSuccess
   }
 
-
   /** Keystore name/extension fallback: when the content probe misses the magic
     * (e.g. a keystore whose header is not at offset 0, or BKS), claim by the
     * well-known JVM keystore names and extensions. Purely additive.
@@ -431,8 +430,8 @@ object CryptoDetector {
     if (ext == "p12" || ext == "pfx") builder += "application/pkcs12"
   }
 
-  /** GPG keybox detection: `.kbx` files or the `#KBX` magic become
-    * OpenPGP keys so they are claimed and inventoried.
+  /** GPG keybox detection: `.kbx` files or the `#KBX` magic become OpenPGP keys
+    * so they are claimed and inventoried.
     */
   private def detectKeyboxByFilename(
       filename: String,
@@ -440,7 +439,9 @@ object CryptoDetector {
       builder: scala.collection.mutable.Builder[String, Set[String]]
   ): Unit = {
     val keyboxMagic =
-      prefix.length >= 4 && prefix(0) == 0x23.toByte && prefix(1) == 0x4b.toByte &&
+      prefix.length >= 4 && prefix(0) == 0x23.toByte && prefix(
+        1
+      ) == 0x4b.toByte &&
         prefix(2) == 0x42.toByte && prefix(3) == 0x58.toByte
     if (filename.toLowerCase.endsWith(".kbx") || keyboxMagic) {
       builder += "application/pgp-keys"

@@ -36,13 +36,13 @@ import scala.util.Try
 
 /** Detects the *runtime* crypto algorithm footprint of binaries by scanning
   * string tables for crypto API/package identifiers (OpenSSL `EVP_*` symbols,
-  * Go `crypto/...` and `golang.org/x/crypto/...` package paths, Rust crate names,
-  * and .NET `System.Security.Cryptography.*` types).
+  * Go `crypto/...` and `golang.org/x/crypto/...` package paths, Rust crate
+  * names, and .NET `System.Security.Cryptography.*` types).
   *
   * Emits `CryptoAlgorithms:` keys: `classifier` (evp/golang/rust/dotnet),
-  * `value` (the matched identifier), `algorithm` (canonical name),
-  * `confidence` (symbol vs identifier), plus `unknown=true` when a matched
-  * identifier carries no canonical algorithm (e.g. crypto libraries).
+  * `value` (the matched identifier), `algorithm` (canonical name), `confidence`
+  * (symbol vs identifier), plus `unknown=true` when a matched identifier
+  * carries no canonical algorithm (e.g. crypto libraries).
   *
   * Registered after `EmbeddedCertificatesStrategy`, so crypto libraries with
   * embedded certificate delimiters keep their existing `EmbeddedCertificates:`
@@ -92,7 +92,12 @@ object CryptoFootprintStrategy {
     FootprintPattern("evp", "EVP_aes_256_gcm", Some("aes-256-gcm"), "symbol"),
     FootprintPattern("evp", "EVP_aes_128_ccm", Some("aes-128-ccm"), "symbol"),
     FootprintPattern("evp", "EVP_aes_256_ccm", Some("aes-256-ccm"), "symbol"),
-    FootprintPattern("evp", "EVP_chacha20_poly1305", Some("chacha20-poly1305"), "symbol"),
+    FootprintPattern(
+      "evp",
+      "EVP_chacha20_poly1305",
+      Some("chacha20-poly1305"),
+      "symbol"
+    ),
     FootprintPattern("evp", "EVP_rc4", Some("rc4"), "symbol"),
     FootprintPattern("evp", "EVP_des_ede3_cbc", Some("3des"), "symbol"),
     FootprintPattern("evp", "EVP_des_cbc", Some("des"), "symbol"),
@@ -111,20 +116,50 @@ object CryptoFootprintStrategy {
     FootprintPattern("golang", "crypto/ed25519", Some("ed25519"), "symbol"),
     FootprintPattern("golang", "crypto/hmac", Some("hmac"), "symbol"),
     FootprintPattern("golang", "crypto/tls", Some("tls"), "symbol"),
-    FootprintPattern("golang", "golang.org/x/crypto/curve25519", Some("curve25519"), "symbol"),
-    FootprintPattern("golang", "golang.org/x/crypto/ed25519", Some("ed25519"), "symbol"),
+    FootprintPattern(
+      "golang",
+      "golang.org/x/crypto/curve25519",
+      Some("curve25519"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "golang",
+      "golang.org/x/crypto/ed25519",
+      Some("ed25519"),
+      "symbol"
+    ),
     FootprintPattern(
       "golang",
       "golang.org/x/crypto/chacha20poly1305",
       Some("chacha20-poly1305"),
       "symbol"
     ),
-    FootprintPattern("golang", "golang.org/x/crypto/hkdf", Some("hkdf"), "symbol"),
-    FootprintPattern("golang", "golang.org/x/crypto/argon2", Some("argon2"), "symbol"),
-    FootprintPattern("golang", "golang.org/x/crypto/bcrypt", Some("bcrypt"), "symbol"),
+    FootprintPattern(
+      "golang",
+      "golang.org/x/crypto/hkdf",
+      Some("hkdf"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "golang",
+      "golang.org/x/crypto/argon2",
+      Some("argon2"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "golang",
+      "golang.org/x/crypto/bcrypt",
+      Some("bcrypt"),
+      "symbol"
+    ),
     // Rust crate identifiers
     FootprintPattern("rust", "aes-gcm", Some("aes-gcm"), "identifier"),
-    FootprintPattern("rust", "chacha20poly1305", Some("chacha20-poly1305"), "identifier"),
+    FootprintPattern(
+      "rust",
+      "chacha20poly1305",
+      Some("chacha20-poly1305"),
+      "identifier"
+    ),
     FootprintPattern("rust", " sha2 ", Some("sha-2"), "identifier"),
     FootprintPattern("rust", " sha3 ", Some("sha-3"), "identifier"),
     FootprintPattern("rust", "hkdf", Some("hkdf"), "identifier"),
@@ -137,7 +172,12 @@ object CryptoFootprintStrategy {
       Some("aes-gcm"),
       "symbol"
     ),
-    FootprintPattern("dotnet", "System.Security.Cryptography.Aes", Some("aes"), "symbol"),
+    FootprintPattern(
+      "dotnet",
+      "System.Security.Cryptography.Aes",
+      Some("aes"),
+      "symbol"
+    ),
     FootprintPattern(
       "dotnet",
       "System.Security.Cryptography.ECDsa",
@@ -198,12 +238,14 @@ object CryptoFootprintStrategy {
     scan(content).nonEmpty
 
   private def readBounded(a: ArtifactWrapper, limit: Int): String = {
-    val bytes = a.withStream { s =>
-      val buf = new Array[Byte](limit)
-      val n = s.read(buf, 0, limit)
-      if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
-    }
-    new String(bytes, StandardCharsets.ISO_8859_1)
+    Try {
+      val bytes = a.withStream { s =>
+        val buf = new Array[Byte](limit)
+        val n = s.read(buf, 0, limit)
+        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+      }
+      new String(bytes, StandardCharsets.ISO_8859_1)
+    }.getOrElse("")
   }
 
   private[strategies] def probeText(a: ArtifactWrapper): String =
@@ -242,7 +284,8 @@ object CryptoFootprintStrategy {
   }
 }
 
-class CryptoFootprintToProcess(val artifact: ArtifactWrapper) extends ToProcess {
+class CryptoFootprintToProcess(val artifact: ArtifactWrapper)
+    extends ToProcess {
   override def markSuccessfulCompletion(): Unit = artifact.finished()
   override def itemCnt: Int = 1
   override def main: String = artifact.path()

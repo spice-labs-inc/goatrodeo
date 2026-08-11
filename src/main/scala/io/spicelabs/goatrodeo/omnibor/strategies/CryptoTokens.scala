@@ -46,8 +46,8 @@ import scala.util.Try
   * size, and a private-members presence flag).
   *
   * Hard constraint: JWT payloads/signatures and JWK key material (`n`, `e`,
-  * `d`, `p`, `q`, `k`) are never echoed into metadata — only algorithm tags
-  * and a private-members presence flag are recorded.
+  * `d`, `p`, `q`, `k`) are never echoed into metadata — only algorithm tags and
+  * a private-members presence flag are recorded.
   */
 object CryptoTokenStrategy {
   private val logger = Logger(getClass())
@@ -59,7 +59,8 @@ object CryptoTokenStrategy {
   val MaxReadBytes: Int = 1024 * 1024
 
   // A JWT bears `eyJ...` (base64url of `{"`); a JWK JSON object carries "kty".
-  private val DetectRegex = "(?i)\\beyJ[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]*){1,2}\\b".r
+  private val DetectRegex =
+    "(?i)\\beyJ[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]*){1,2}\\b".r
   private val HeaderSegment = "\\A[^.]{1,262144}(?=\\.)".r
 
   // JOSE `alg` → canonical signature-algorithm category.
@@ -85,10 +86,11 @@ object CryptoTokenStrategy {
 
   // ── Base64url ────────────────────────────────────────────────────────────
 
-  private[strategies] def base64UrlDecode(s: String): Option[Array[Byte]] = Try {
-    val pad = (4 - (s.length % 4)) % 4
-    Base64.getUrlDecoder.decode(s + ("=" * pad))
-  }.toOption
+  private[strategies] def base64UrlDecode(s: String): Option[Array[Byte]] =
+    Try {
+      val pad = (4 - (s.length % 4)) % 4
+      Base64.getUrlDecoder.decode(s + ("=" * pad))
+    }.toOption
 
   // ── Content detection ────────────────────────────────────────────────────
 
@@ -101,18 +103,21 @@ object CryptoTokenStrategy {
   private[strategies] def jwtCandidate(text: String): Option[String] =
     DetectRegex.findFirstMatchIn(text).flatMap(m => Option(m.matched))
 
-  /** True when the bounded content contains a JWT or a JWK; used for claiming. */
+  /** True when the bounded content contains a JWT or a JWK; used for claiming.
+    */
   private[strategies] def detects(text: String): Boolean =
     jwtCandidate(text).isDefined || looksLikeJwk(text)
 
   /** Read up to `limit` bytes from an artifact as UTF-8/ISO-8859-1. */
   private def boundedText(a: ArtifactWrapper, limit: Int): String = {
-    val bytes = a.withStream { s =>
-      val buf = new Array[Byte](limit)
-      val n = s.read(buf, 0, limit)
-      if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
-    }
-    new String(bytes, StandardCharsets.ISO_8859_1)
+    Try {
+      val bytes = a.withStream { s =>
+        val buf = new Array[Byte](limit)
+        val n = s.read(buf, 0, limit)
+        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+      }
+      new String(bytes, StandardCharsets.ISO_8859_1)
+    }.getOrElse("")
   }
 
   private[strategies] def probeText(a: ArtifactWrapper): String =
@@ -134,13 +139,14 @@ object CryptoTokenStrategy {
           .flatMap(h => Option(h.matched))
       }
       header.flatMap(base64UrlDecode).foreach { raw =>
-        Try(parse(new String(raw, StandardCharsets.UTF_8))).toOption.foreach { jv =>
-          jv \ "alg" match {
-            case JString(alg) =>
-              val a = if (alg == "none") "none" else alg
-              algs += ((a, canonicalJoseAlg(a)))
-            case _ =>
-          }
+        Try(parse(new String(raw, StandardCharsets.UTF_8))).toOption.foreach {
+          jv =>
+            jv \ "alg" match {
+              case JString(alg) =>
+                val a = if (alg == "none") "none" else alg
+                algs += ((a, canonicalJoseAlg(a)))
+              case _ =>
+            }
         }
       }
     }
@@ -285,7 +291,8 @@ class CryptoTokenState(artifact: ArtifactWrapper)
     val jwt = CryptoTokenStrategy.parseJwts(text)
     val jwk = CryptoTokenStrategy.parseJwk(text)
 
-    if (jwt.algs.isEmpty && jwk.isEmpty) TreeMap.empty[String, TreeSet[StringOrPair]]
+    if (jwt.algs.isEmpty && jwk.isEmpty)
+      TreeMap.empty[String, TreeSet[StringOrPair]]
     else {
       var tm = TreeMap[String, TreeSet[StringOrPair]]()
       if (jwt.algs.nonEmpty) {
@@ -311,7 +318,8 @@ class CryptoTokenState(artifact: ArtifactWrapper)
           tm = tm + (jwkAdHoc("size") -> TreeSet(StringOrPair(s.toString)))
         )
         if (info.privatePresent) {
-          tm = tm + (jwkAdHoc("private_present") -> TreeSet(StringOrPair("true")))
+          tm =
+            tm + (jwkAdHoc("private_present") -> TreeSet(StringOrPair("true")))
         }
       }
       tm

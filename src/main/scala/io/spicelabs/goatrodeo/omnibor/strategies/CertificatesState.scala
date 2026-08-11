@@ -32,6 +32,8 @@ import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
 import java.security.KeyStore
 import java.security.cert.X509CRL
+import scala.collection.immutable.TreeMap
+import scala.util.Try
 import java.security.cert.X509Certificate
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -74,7 +76,7 @@ class CertificatesState(
       case Some(Keystore(None, _, _)) =>
         Vector.empty // encrypted → envelope-only; no pURLs
       case Some(Crl(crl)) =>
-        Vector(purlForCrl(crl))
+        purlForCrl(crl).toVector
       case Some(p: SshPubkey) =>
         Vector(purlForSshPubkey(p))
       case Some(c: SshCert) =>
@@ -221,7 +223,7 @@ class CertificatesState(
   }
 
   /** Build the single CRL pURL. */
-  private[strategies] def purlForCrl(crl: X509CRL): Purl = {
+  private[strategies] def purlForCrl(crl: X509CRL): Option[Purl] = Try {
     import Certificates.*
     val derBytes = crl.getEncoded
     val crlSha = sha256Hex(derBytes)
@@ -234,8 +236,7 @@ class CertificatesState(
       version = Some(crlSha),
       qualifiers = Seq("sig-alg" -> sigAlg)
     )
-
-  }
+  }.toOption
 
   override def getMetadata(
       artifact: ArtifactWrapper,
@@ -706,7 +707,7 @@ class CertificatesState(
   private def crlMetadata(
       artifact: ArtifactWrapper,
       crl: X509CRL
-  ): TreeMap[String, TreeSet[StringOrPair]] = {
+  ): TreeMap[String, TreeSet[StringOrPair]] = Try {
     import Certificates.*
     val adHoc = MKC.adHoc("Certificates")
     val derBytes = crl.getEncoded
@@ -732,9 +733,9 @@ class CertificatesState(
           )
         ) +?
         Some(adHoc("IssuerDN") -> TreeSet(StringOrPair(dnString(issuer)))) +?
-        Some(
+        Try { isoUtc(crl.getThisUpdate) }.toOption.map(date =>
           adHoc("ThisUpdate") -> TreeSet(
-            StringOrPair(isoUtc(crl.getThisUpdate))
+            StringOrPair(date)
           )
         ) +?
         Some(adHoc("SigAlgorithm") -> TreeSet(StringOrPair(sigAlg))) +?
@@ -760,7 +761,7 @@ class CertificatesState(
       tm = tm + (adHoc("RevokedTruncated") -> TreeSet(StringOrPair("true")))
     }
     tm
-  }
+  }.toOption.getOrElse(TreeMap.empty)
 
   /** Decode the CRL Number extension (OID 2.5.29.20). */
   private def crlNumber(crl: X509CRL): Option[String] = Try {
