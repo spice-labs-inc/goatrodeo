@@ -3,6 +3,7 @@ package io.spicelabs.goatrodeo.util
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.config.ConfigurationException
+import io.spicelabs.config.Logging
 import io.spicelabs.config.Origin
 import io.spicelabs.config.Resolution
 import io.spicelabs.config.Resolver
@@ -207,7 +208,7 @@ object ConfigurationToml {
   ): Either[String, (Configuration, Resolution)] = {
     val resolver = new Resolver(
       EnvironmentPrefix,
-      java.util.Set.of(Group),
+      java.util.Set.of(Group, Logging.GROUP),
       message => report(message)
     )
 
@@ -238,7 +239,20 @@ object ConfigurationToml {
 
     withFile.flatMap { resolver =>
       val resolved = resolver.withEnvironment(environment.asJava).resolve()
-      fromResolution(resolved, base, Group).map((_, resolved))
+      // `[logging]` is carried, not interpreted — but "carried" must not mean
+      // "unchecked". The resolver filters by group and accepts any key inside
+      // one, so without this a mistyped `levl` would travel all the way to the
+      // program that applies it and be dropped there in silence: the same
+      // failure the `[analysis]` schema exists to prevent, one table over.
+      val unknownLogging = Logging.unknownKeys(resolved).asScala.toSeq
+      if (unknownLogging.nonEmpty)
+        Left(
+          s"[${Logging.GROUP}] unknown ${plural(unknownLogging.size, "key")}: ${unknownLogging.mkString(", ")}"
+        )
+      else
+        fromResolution(resolved, base, Group)
+          .map(_.copy(logging = plainGroup(resolved, Logging.GROUP)))
+          .map((_, resolved))
     }
   }
 
@@ -321,6 +335,15 @@ object ConfigurationToml {
       }
     }
   }
+
+  /** A resolved group as a plain Scala map, for a group this program carries
+    * but does not interpret.
+    */
+  private def plainGroup(
+      resolved: Resolution,
+      group: String
+  ): Map[String, Any] =
+    resolved.group(group).asScala.toMap.map { case (k, v) => k -> (v: Any) }
 
   private def read(table: Resolution, base: Configuration): Configuration = {
     var config = base

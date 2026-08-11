@@ -420,6 +420,82 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     )
   }
 
+  // ==================== logging ====================
+
+  test(
+    "the logging group is read like any other, and is the same one everywhere"
+  ) {
+    withConfigFile(
+      "[analysis]\nthreads = 4\n\n[logging]\nlevel = \"debug\"\n"
+    ) { path =>
+      val config = ConfigurationToml
+        .fromFile(path, Configuration(), environment = Map.empty)
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.logging.get("level"), Some("debug"))
+      assertEquals(config.threads, 4, "and the analysis group is unaffected")
+    }
+  }
+
+  test("the environment supplies a log level, under this program's prefix") {
+    withConfigFile("[analysis]\nthreads = 4\n") { path =>
+      val config = ConfigurationToml
+        .fromFile(
+          path,
+          Configuration(),
+          environment = Map("GOATRODEO_LOGGING_LEVEL" -> "trace")
+        )
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.logging.get("level"), Some("trace"))
+    }
+  }
+
+  test("a log level from the environment needs no config file") {
+    // The variable is the whole point of the group for anyone running a
+    // container: asking for one noisy run should not mean writing a file.
+    val config = ConfigurationParser
+      .parse(
+        Array("--out", "/tmp/out"),
+        environment = Map("GOATRODEO_LOGGING_LEVEL" -> "debug")
+      )
+      .getOrElse(fail("expected a parse"))
+    assertEquals(config.logging.get("level"), Some("debug"))
+  }
+
+  test("a mistyped logging key is an error, not silence") {
+    // This group is carried rather than interpreted, so nothing downstream is
+    // in a position to complain about it: unchecked, `levl` would be dropped
+    // wherever the level is finally applied, and nothing would say so.
+    withConfigFile("[analysis]\nthreads = 4\n\n[logging]\nlevl = \"debug\"\n") {
+      path =>
+        val error = ConfigurationToml
+          .fromFile(path, Configuration(), environment = Map.empty)
+          .left
+          .getOrElse(fail("expected an error"))
+        assert(error.contains("levl"), error)
+        assert(error.contains("unknown key"), error)
+    }
+  }
+
+  test("a mistyped logging variable is an error too") {
+    assertEquals(
+      ConfigurationParser.parse(
+        Array("--out", "/tmp/out"),
+        environment = Map("GOATRODEO_LOGGING_LEVL" -> "debug")
+      ),
+      None
+    )
+  }
+
+  test("the command line beats the file for logging too") {
+    withConfigFile("[analysis]\nthreads = 4\n\n[logging]\nlevel = \"warn\"\n") {
+      path =>
+        val config = ConfigurationParser
+          .parse(Array("--config", path.toString, "--log-level", "debug"))
+          .getOrElse(fail("expected a parse"))
+        assertEquals(config.logging.get("level"), Some("debug"))
+    }
+  }
+
   private def withConfigFile[A](contents: String)(f: Path => A): A = {
     val path = Files.createTempFile("goatrodeo-config", ".toml")
     try {
