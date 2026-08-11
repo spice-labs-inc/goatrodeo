@@ -67,6 +67,7 @@ Precedence, lowest to highest:
 | `progressListener` | `Option[ProgressListener]` | — (not on the CLI) | `withProgressListener` | none |
 | `runtime` | `RuntimeEnvironment` | — (captured at startup) | — | the real process |
 | `configFile` | `Option[File]` | `--config` | — | none |
+| `logging` | `Map[String, Any]` | `--log-level`, `--log-file` | — | empty |
 
 ## Not settings
 
@@ -159,6 +160,23 @@ The rules themselves — naming, layering, precedence, provenance — live in
 component, because rules copied into several codebases are rules that will disagree. The
 model as a whole is described in `spice`'s `docs/configuration.md`; this page covers what
 is particular to Goat Rodeo.
+
+### The `[logging]` group
+
+How much a run says, and where:
+
+```toml
+[logging]
+level = "debug"      # error, warn, info, debug, trace
+file = "/tmp/gr.log" # in addition to the console, not instead of it
+```
+
+The same group, keys and precedence as every other Spice tool, so a level means one thing
+wherever it is set. Only this program's own loggers move: lifting Tika or the bytecode
+readers to `debug` alongside them would bury the output you asked for.
+
+Applied by `main`. Embedded through `GoatRodeoBuilder` the host owns logging and chose its
+levels deliberately, so nothing on that path touches them.
 
 Three rules are worth knowing:
 

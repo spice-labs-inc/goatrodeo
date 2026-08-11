@@ -327,6 +327,45 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     )
   }
 
+  // ==================== logging ====================
+
+  test(
+    "the logging group is read like any other, and is the same one everywhere"
+  ) {
+    withConfigFile(
+      "[analysis]\nthreads = 4\n\n[logging]\nlevel = \"debug\"\n"
+    ) { path =>
+      val config = ConfigurationToml
+        .fromFile(path, Configuration(), environment = Map.empty)
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.logging.get("level"), Some("debug"))
+      assertEquals(config.threads, 4, "and the analysis group is unaffected")
+    }
+  }
+
+  test("the environment supplies a log level, under this program's prefix") {
+    withConfigFile("[analysis]\nthreads = 4\n") { path =>
+      val config = ConfigurationToml
+        .fromFile(
+          path,
+          Configuration(),
+          environment = Map("GOATRODEO_LOGGING_LEVEL" -> "trace")
+        )
+        .getOrElse(fail("expected a configuration"))
+      assertEquals(config.logging.get("level"), Some("trace"))
+    }
+  }
+
+  test("the command line beats the file for logging too") {
+    withConfigFile("[analysis]\nthreads = 4\n\n[logging]\nlevel = \"warn\"\n") {
+      path =>
+        val config = ConfigurationParser
+          .parse(Array("--config", path.toString, "--log-level", "debug"))
+          .getOrElse(fail("expected a parse"))
+        assertEquals(config.logging.get("level"), Some("debug"))
+    }
+  }
+
   private def withConfigFile[A](contents: String)(f: Path => A): A = {
     val path = Files.createTempFile("goatrodeo-config", ".toml")
     try {

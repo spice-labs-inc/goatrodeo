@@ -166,6 +166,7 @@ case class Configuration(
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6",
     configFile: Option[File] = None,
+    logging: Map[String, Any] = Map(),
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
 
