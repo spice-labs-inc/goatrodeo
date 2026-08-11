@@ -130,6 +130,8 @@ inline def config(using configuration: Configuration): Configuration =
   *   (CBOM) files, one per top-level input
   * @param cbomVersion
   *   CycloneDX CBOM specification version to emit ("1.6" or "1.7")
+  * @param configFile
+  *   the TOML file this configuration was read from, when `--config` named one
   * @param runtime
   *   the ambient process state this run was started in
   */
@@ -163,8 +165,32 @@ case class Configuration(
     cutoff: Option[Instant] = None,
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6",
+    configFile: Option[File] = None,
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
+
+  /** The settings that differ between this configuration and another.
+    *
+    * Used to report what the command line changed. Deriving it by comparing two
+    * configurations, rather than recording an origin in each of two dozen flag
+    * actions, means a flag added later is covered without anyone remembering to
+    * cover it — the failure mode for hand-maintained lists here has always been
+    * that they quietly fall behind.
+    *
+    * `runtime` and `configFile` are skipped: they are how the run was started,
+    * not settings anybody wrote.
+    */
+  def differencesFrom(other: Configuration): Vector[(String, Any, Any)] = {
+    val ignored = Set("runtime", "configFile")
+    productElementNames.zipWithIndex
+      .filterNot((name, _) => ignored.contains(name))
+      .flatMap { (name, index) =>
+        val mine = productElement(index)
+        val theirs = other.productElement(index)
+        if (mine == theirs) None else Some((name, theirs, mine))
+      }
+      .toVector
+  }
 
   /** Build a list of file list builders from the configuration.
     *
