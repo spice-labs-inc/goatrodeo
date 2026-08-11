@@ -121,6 +121,20 @@
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <version>3.4.2</version>
+        <executions>
+          <execution>
+            <id>attach-javadoc-stub</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.basedir}/src/main/javadoc-stub</classesDirectory>
+              <excludes />
+            </configuration>
+          </execution>
+        </executions>
         <configuration>
           <excludes>
             <exclude>logback.xml</exclude>
@@ -181,11 +195,23 @@
           </excludes>
           <forkCount>${test.forkCount}</forkCount>
           <reuseForks>${test.reuseForks}</reuseForks>
-          <parallel>${test.parallel}</parallel>
-          <threadCount>${test.threadCount}</threadCount>
+          <runOrder>balanced</runOrder>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>${test.argLine}</argLine>
         </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
@@ -280,14 +306,15 @@
     <profile>
       <id>ci</id>
       <properties>
-        <test.parallel>none</test.parallel>
-        <test.forkCount>0</test.forkCount>
+        <test.forkCount>1</test.forkCount>
+        <test.argLine>-Xmx8G -Duser.timezone=GMT</test.argLine>
       </properties>
     </profile>
     <profile>
       <id>force-fork</id>
       <properties>
-        <test.forkCount>4</test.forkCount>
+        <test.forkCount>0.5C</test.forkCount>
+        <test.argLine>-Xmx8G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
       </properties>
     </profile>
   </profiles>
@@ -348,36 +375,44 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <version>2.18.1</version>
+      <groupId>com.github.erosb</groupId>
+      <artifactId>everit-json-schema</artifactId>
+      <version>1.14.6</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>
-          <artifactId>jackson-annotations</artifactId>
-          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>spotbugs</artifactId>
+          <groupId>com.github.spotbugs</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>jackson-core</artifactId>
-          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>everit-json-schema</artifactId>
+          <groupId>com.github.erosb</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>commons-validator</artifactId>
+          <groupId>commons-validator</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>handy-uri-templates</artifactId>
+          <groupId>com.damnhandy</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>re2j</artifactId>
+          <groupId>com.google.re2j</groupId>
         </exclusion>
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.networknt</groupId>
-      <artifactId>json-schema-validator</artifactId>
-      <version>1.5.4</version>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20250107</version>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>itu</artifactId>
-          <groupId>com.ethlo.time</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jackson-dataformat-yaml</artifactId>
-          <groupId>com.fasterxml.jackson.dataformat</groupId>
-        </exclusion>
-      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>19.0</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -399,16 +434,16 @@
   <properties>
     <json4s.version>4.0.7</json4s.version>
     <scopt.version>4.1.0</scopt.version>
-    <jackson.version>2.18.1</jackson.version>
+    <bouncycastle.prov.version>1.85.2</bouncycastle.prov.version>
     <zstd-jni.version>1.5.6-9</zstd-jni.version>
     <cilantro.version>0.1.17</cilantro.version>
     <munit.version>0.7.29</munit.version>
     <logback.version>1.5.15</logback.version>
     <tika.version>3.2.3</tika.version>
     <bcel.version>6.11.0</bcel.version>
-    <bouncycastle.version>1.80</bouncycastle.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
     <sbt.version>1.10.6</sbt.version>
-    <test.forkCount>4</test.forkCount>
+    <test.forkCount>0.5C</test.forkCount>
     <coordinates.version>1.1.0</coordinates.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <annatto.version>0.1.0</annatto.version>
@@ -416,7 +451,7 @@
     <baharat.version>0.1.1</baharat.version>
     <maven.compiler.release>17</maven.compiler.release>
     <scala-nameof.version>5.0.0</scala-nameof.version>
-    <test.argLine>-Xmx16G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
+    <test.argLine>-Xmx8G -Duser.timezone=GMT -Xlog:disable -Xlog:gc+alloc=warning:file=${project.build.directory}/gc-%p.log</test.argLine>
     <asm.version>9.8</asm.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <commons-io.version>2.18.0</commons-io.version>
@@ -424,11 +459,8 @@
     <scala-logging.version>3.9.4</scala-logging.version>
     <scala-parallel-collections.version>1.2.0</scala-parallel-collections.version>
     <test.reuseForks>true</test.reuseForks>
-    <test.threadCount>4</test.threadCount>
     <scala-xml.version>2.3.0</scala-xml.version>
     <saffron.version>0.3.1</saffron.version>
-    <json-schema-validator.version>1.5.4</json-schema-validator.version>
-    <test.parallel>none</test.parallel>
     <borer.version>1.14.1</borer.version>
     <packageurl.version>1.5.0</packageurl.version>
     <scalacheck.version>1.18.1</scalacheck.version>

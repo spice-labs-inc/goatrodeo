@@ -91,13 +91,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Index and Upload ADG
-        uses: spice-labs-inc/action-spice-labs-surveyor@v5
-        with:
-          spice_pass: "${{ secrets.SPICE_PASS }}"
-          input: "${{ github.workspace }}"
-          subject: "${{ github.event.repository.name }}"
-
   publish-to-central:
     name: Re-publish Goatrodeo to Maven Central
     runs-on: ubuntu-24.04
@@ -170,7 +163,10 @@ jobs:
           VERSION="${{ needs.publish-jars.outputs.version }}"
           REAL_POM="maven/target/external/goatrodeo_3-${VERSION}.pom"
           FAKE_POM="maven/pom.xml"
-          real_deps=$(awk '/<dependencies>/,/<\/dependencies>/' "$REAL_POM")
+          real_deps=$(
+            awk '/<dependencyManagement>/,/<\/dependencyManagement>/ {next}
+                 /<dependencies>/,/<\/dependencies>/' "$REAL_POM"
+          )
           awk -v repl="$real_deps" '
             /<!-- @REAL_DEPENDENCIES@ -->/ {print repl; next}
             {print}
@@ -247,13 +243,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Save a local copy of the built image under target/release/
           outputs: type=oci,dest=target/release/goatrodeo-image.tar
-
-      - name: Index and Upload ADG
-        uses: spice-labs-inc/action-spice-labs-surveyor@v5
-        with:
-          spice_pass: "${{ secrets.SPICE_PASS }}"
-          input: "${{ github.workspace }}"
-          subject: "${{ github.event.repository.name }}"
 
   notify:
     needs: [publish-jars, publish-to-central, docker-image]
