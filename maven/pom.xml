@@ -37,6 +37,8 @@
 
     <!-- @REAL_DEPENDENCIES@ -->
 
+    <!-- @REAL_PROPERTIES@ -->
+
     <build>
         <plugins>
 
