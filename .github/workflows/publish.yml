@@ -167,8 +167,12 @@ jobs:
             awk '/<dependencyManagement>/,/<\/dependencyManagement>/ {next}
                  /<dependencies>/,/<\/dependencies>/' "$REAL_POM"
           )
-          awk -v repl="$real_deps" '
-            /<!-- @REAL_DEPENDENCIES@ -->/ {print repl; next}
+          real_props=$(
+            awk '/<properties>/,/<\/properties>/' "$REAL_POM"
+          )
+          awk -v deps="$real_deps" -v props="$real_props" '
+            /<!-- @REAL_DEPENDENCIES@ -->/ {print deps; next}
+            /<!-- @REAL_PROPERTIES@ -->/ {print props; next}
             {print}
           ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
 
