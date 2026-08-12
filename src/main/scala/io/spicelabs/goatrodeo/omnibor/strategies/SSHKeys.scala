@@ -36,6 +36,7 @@ import java.security.MessageDigest
 import java.util.Base64
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** Detects SSH/Dropbear key files that are not already claimed by the
   * `Certificates` strategy via MIME type. This covers `authorized_keys`, empty
@@ -161,9 +162,9 @@ class SSHKeyState(artifact: ArtifactWrapper)
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val path = artifact.path()
     val fileName = path.split('/').lastOption.getOrElse(path)
-    val text = artifact.withStream { stream =>
+    val text = Try(artifact.withStream { stream =>
       new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
-    }
+    }).getOrElse("")
 
     val isPrivate = !path.endsWith(".pub") && !path.endsWith("authorized_keys")
     val isEmpty = text.trim.isEmpty

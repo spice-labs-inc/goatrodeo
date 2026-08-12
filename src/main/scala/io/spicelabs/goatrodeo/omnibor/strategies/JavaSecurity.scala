@@ -394,12 +394,13 @@ object JavaSecurityToProcess {
   ): Option[String] = {
     val exact = knownPaths.find(_ == ref)
     exact.orElse {
-      val refFileName = Option(Paths.get(ref).getFileName)
+      val refFileName = Try { Paths.get(ref).getFileName }.toOption
+        .flatMap(v => Option(v))
         .map(_.toString)
         .getOrElse(ref)
       val candidates = knownPaths
         .filter { path =>
-          Option(Paths.get(path).getFileName)
+          Try(Paths.get(path).getFileName).toOption
             .map(_.toString)
             .contains(refFileName)
         }

@@ -130,9 +130,7 @@ class IoTGoatCbomSuite extends FunSuite {
 
       val components =
         cbomFiles
-          .flatMap(f =>
-            allComponents(parse(Files.readString(f.toPath())))
-          )
+          .flatMap(f => allComponents(parse(Files.readString(f.toPath()))))
           .toVector
       val componentTexts = components.map(componentText)
 

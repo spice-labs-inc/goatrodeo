@@ -150,9 +150,9 @@ class UsignKeyState(artifact: ArtifactWrapper)
     val path = artifact.path()
     val keyId = path.split('/').lastOption.getOrElse(path)
 
-    val text = artifact.withStream { stream =>
+    val text = Try(artifact.withStream { stream =>
       new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
-    }
+    }).getOrElse("")
     val lines = text.linesIterator.toVector
     val comment = lines
       .find(_.startsWith("untrusted comment:"))

@@ -294,14 +294,14 @@ object Certificates {
   /** Parse a single X.509 cert (PEM or DER). */
   private[strategies] def parseSingleCert(
       artifact: ArtifactWrapper
-  ): Option[X509Certificate] = {
+  ): Option[X509Certificate] = Try {
     artifact.withStream { f =>
       val bytes = Helpers.slurpInput(f)
       tryParsePem(bytes).orElse(tryParseDer(bytes))
     }
-  }
+  }.toOption.flatten
 
-  private val converter: JcaX509CertificateConverter =
+  private lazy val converter: JcaX509CertificateConverter =
     new JcaX509CertificateConverter().setProvider("BC")
 
   private def tryParsePem(bytes: Array[Byte]): Option[X509Certificate] = Try {
@@ -455,7 +455,7 @@ object Certificates {
   /** Parse an OpenSSH plain public-key file. */
   private[strategies] def parseSshPubkey(
       artifact: ArtifactWrapper
-  ): Option[SshPubkey] = {
+  ): Option[SshPubkey] = Try {
     artifact.withStream { f =>
       val raw = new String(
         Helpers.slurpInput(f),
@@ -480,12 +480,12 @@ object Certificates {
           }
         }
     }
-  }
+  }.toOption.flatten
 
   /** Parse an OpenSSH CA-issued certificate file. */
   private[strategies] def parseSshCert(
       artifact: ArtifactWrapper
-  ): Option[SshCert] = {
+  ): Option[SshCert] = Try {
     artifact.withStream { f =>
       val raw = new String(
         Helpers.slurpInput(f),
@@ -500,7 +500,7 @@ object Certificates {
           }
         }
     }
-  }
+  }.toOption.flatten
 
   /** Decode the cert wire blob. Returns None for cert-type mismatch,
     * unsupported key algorithm, or short wire data instead of throwing.
@@ -1071,11 +1071,11 @@ object Certificates {
     */
   private[strategies] def spkiBytesFromCert(
       cert: X509Certificate
-  ): Array[Byte] = {
+  ): Option[Array[Byte]] = Try {
     val bcCert =
       org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
     bcCert.getSubjectPublicKeyInfo.getEncoded
-  }
+  }.toOption
 
   /** Extract the SPKI algorithm OID from a certificate. */
   private[strategies] def spkiAlgOidFromCert(cert: X509Certificate): String = {
@@ -1242,7 +1242,9 @@ object Certificates {
         val urls = aia.getAccessDescriptions.toVector.flatMap { ad =>
           if (
             Option(ad.getAccessMethod)
-              .exists(_.getId == org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers.id_pkix_ocsp.getId)
+              .exists(
+                _.getId == org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers.id_pkix_ocsp.getId
+              )
           ) {
             generalNameUri(ad.getAccessLocation).toVector
           } else Vector.empty
@@ -1259,17 +1261,23 @@ object Certificates {
       Try {
         val cdps = org.bouncycastle.asn1.x509.CRLDistPoint.getInstance(p)
         val urls = cdps.getDistributionPoints.toVector.flatMap { dp =>
-          Option(dp.getDistributionPoint).flatMap { dpNameEnc =>
-            Try {
-              val dpn = org.bouncycastle.asn1.x509.DistributionPointName.getInstance(dpNameEnc)
-              Option(dpn.getName) match {
-                case Some(names) =>
-                  val gns = org.bouncycastle.asn1.x509.GeneralNames.getInstance(names)
-                  gns.getNames.toVector.flatMap(gn => generalNameUri(gn).toVector)
-                case None => Vector.empty
-              }
-            }.toOption
-          }.getOrElse(Vector.empty)
+          Option(dp.getDistributionPoint)
+            .flatMap { dpNameEnc =>
+              Try {
+                val dpn = org.bouncycastle.asn1.x509.DistributionPointName
+                  .getInstance(dpNameEnc)
+                Option(dpn.getName) match {
+                  case Some(names) =>
+                    val gns =
+                      org.bouncycastle.asn1.x509.GeneralNames.getInstance(names)
+                    gns.getNames.toVector.flatMap(gn =>
+                      generalNameUri(gn).toVector
+                    )
+                  case None => Vector.empty
+                }
+              }.toOption
+            }
+            .getOrElse(Vector.empty)
         }
         if (urls.isEmpty) None else Some(urls.mkString(","))
       }.toOption.flatten
@@ -1293,7 +1301,8 @@ object Certificates {
       Try {
         val cp =
           org.bouncycastle.asn1.x509.CertificatePolicies.getInstance(p)
-        val ids = cp.getPolicyInformation.toVector.map(_.getPolicyIdentifier.getId)
+        val ids =
+          cp.getPolicyInformation.toVector.map(_.getPolicyIdentifier.getId)
         if (ids.isEmpty) None else Some(ids.mkString(","))
       }.toOption.flatten
     }
@@ -1433,7 +1442,7 @@ object Certificates {
   /** Parse a PEM-private-key MIME; disambiguates encrypted vs unencrypted. */
   private[strategies] def parsePemPrivateKey(
       artifact: ArtifactWrapper
-  ): Option[ClaimedContent] = {
+  ): Option[ClaimedContent] = Try {
     artifact.withStream { f =>
       val raw = Helpers.slurpInput(f)
       val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
@@ -1443,7 +1452,7 @@ object Certificates {
         parseUnencryptedPemBytes(raw)
       }
     }
-  }
+  }.toOption.flatten
 
   private def iteratorToVec[T](parser: java.util.Iterator[T]): Vector[T] = {
     val iterator = parser
@@ -1758,15 +1767,13 @@ object Certificates {
   /** Parse an OpenSSH-private-key MIME (openssh-key-v1 envelope). */
   private[strategies] def parseOpenSshPrivateKey(
       artifact: ArtifactWrapper
-  ): Option[ClaimedContent] = {
+  ): Option[ClaimedContent] = Try {
     artifact.withStream { f =>
       val raw = Helpers.slurpInput(f)
-      Try {
-        val envelope = decodeOpenSshArmor(raw)
-        envelope.flatMap(parseOpenSshV1Envelope)
-      }.toOption.flatten
+      val envelope = decodeOpenSshArmor(raw)
+      envelope.flatMap(parseOpenSshV1Envelope)
     }
-  }
+  }.toOption.flatten
 
   /** Strip PEM armor and base64-decode the inner body. */
   private def decodeOpenSshArmor(raw: Array[Byte]): Option[Array[Byte]] = {
@@ -1863,7 +1870,7 @@ object Certificates {
       c: X509Certificate
   ): Vector[Purl] = {
     val derBytes = c.getEncoded
-    val spkiBytes = spkiBytesFromCert(c)
+    val spkiBytes = spkiBytesFromCert(c).getOrElse(Array.empty[Byte])
     val certSha = sha256Hex(derBytes)
     val spkiSha = sha256Hex(spkiBytes)
     val (alg, qualMap) = keyAlgAndQualifier(
@@ -1914,7 +1921,7 @@ object Certificates {
       c: X509Certificate
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val derBytes = c.getEncoded
-    val spkiBytes = spkiBytesFromCert(c)
+    val spkiBytes = spkiBytesFromCert(c).getOrElse(Array.empty[Byte])
     val certSha = sha256Hex(derBytes)
     val spkiSha = sha256Hex(spkiBytes)
     val (alg, qualMap) = keyAlgAndQualifier(
@@ -1937,11 +1944,11 @@ object Certificates {
             StringOrPair(c.getSerialNumber.toString(16))
           )
         ) +?
-        Some(
-          adHoc("NotBefore") -> TreeSet(StringOrPair(isoUtc(c.getNotBefore)))
+        Try { isoUtc(c.getNotBefore) }.toOption.map(v =>
+          adHoc("NotBefore") -> TreeSet(StringOrPair(v))
         ) +?
-        Some(
-          adHoc("NotAfter") -> TreeSet(StringOrPair(isoUtc(c.getNotAfter)))
+        Try { isoUtc(c.getNotAfter) }.toOption.map(v =>
+          adHoc("NotAfter") -> TreeSet(StringOrPair(v))
         ) +?
         Some(adHoc("KeyAlgorithm") -> TreeSet(StringOrPair(alg))) +?
         Some(adHoc("SigAlgorithm") -> TreeSet(StringOrPair(sigAlg))) +?

@@ -71,14 +71,12 @@ class CbomIntegrationSuite extends FunSuite {
   private def componentTypes(root: JValue): Set[String] = {
     (root \ "components") match {
       case JArray(comps) =>
-        comps
-          .flatMap { comp =>
-            (comp \ "cryptoProperties" \ "assetType") match {
-              case JString(a) => Some(a)
-              case _          => None
-            }
+        comps.flatMap { comp =>
+          (comp \ "cryptoProperties" \ "assetType") match {
+            case JString(a) => Some(a)
+            case _          => None
           }
-          .toSet
+        }.toSet
       case _ => Set.empty
     }
   }

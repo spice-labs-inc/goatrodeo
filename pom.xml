@@ -64,7 +64,7 @@
     <cilantro.version>0.1.17</cilantro.version>
     <coordinates.version>1.1.0</coordinates.version>
     <baharat.version>0.1.1</baharat.version>
-    <annatto.version>0.1.0</annatto.version>
+    <annatto.version>0.2.0</annatto.version>
     <saffron.version>0.3.1</saffron.version>
     <bouncycastle.version>1.85</bouncycastle.version>
     <!-- BC publishes quick-patch releases per artifact: bcprov-jdk18on has a
@@ -691,6 +691,37 @@
           <argLine>${test.argLine}</argLine>
         </configuration>
       </plugin>
+
+      <!-- Format Scala sources via scalafmt (spotless-maven-plugin).
+           Invoke via:
+             mvn spotless:apply           (format sources)
+             mvn spotless:check           (fail if unformatted)
+
+           scalafix must be run manually via the CLI (no Maven plugin
+           published to Central).  After `mvn compile` (which generates
+           SemanticDB via -Ysemanticdb), run:
+             scalafix -rules RemoveUnused,OrganizeImports -settings .scalafix.conf
+      -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.43.0</version>
+        <configuration>
+          <scala>
+            <scalafmt>
+              <file>${project.basedir}/.scalafmt.conf</file>
+            </scalafmt>
+          </scala>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
     </plugins>
   </build>
 

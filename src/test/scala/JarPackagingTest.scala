@@ -20,9 +20,10 @@ import scala.jdk.CollectionConverters.*
   * the sbt `Compile / packageBin` task packages it.
   *
   * Requirement trace: build.sbt filters `logback.xml` out of the library jar
-  * with `Compile / packageBin / mappings ~= { _.filter(_._2 != "logback.xml") }`.
-  * The Maven build must produce a jar with the same contents so that consumers
-  * of the published library do not inherit an unwanted logging configuration.
+  * with `Compile / packageBin / mappings ~= { _.filter(_._2 != "logback.xml")
+  * }`. The Maven build must produce a jar with the same contents so that
+  * consumers of the published library do not inherit an unwanted logging
+  * configuration.
   *
   * Theory: after the `package` phase the standard jar exists at
   * `target/goatrodeo_3-${version}.jar`. Opening it and scanning entries lets us

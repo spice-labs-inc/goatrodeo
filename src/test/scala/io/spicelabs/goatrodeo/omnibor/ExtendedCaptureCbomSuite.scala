@@ -132,7 +132,8 @@ class ExtendedCaptureCbomSuite extends FunSuite {
   private def getString(jv: JValue, path: String*): String = {
     path.foldLeft(jv: JValue)(_ \ _) match {
       case JString(s) => s
-      case other => fail(s"Expected string at ${path.mkString("/")}, got $other")
+      case other =>
+        fail(s"Expected string at ${path.mkString("/")}, got $other")
     }
   }
 
@@ -210,7 +211,9 @@ class ExtendedCaptureCbomSuite extends FunSuite {
     } finally cleanup(dir)
   }
 
-  test("JWT → related-crypto-material other; `none` never becomes an algorithm") {
+  test(
+    "JWT → related-crypto-material other; `none` never becomes an algorithm"
+  ) {
     val id = "gitoid:blob:sha256:" + "c" * 64
     val item = makeItem(
       id,
@@ -349,7 +352,10 @@ class ExtendedCaptureCbomSuite extends FunSuite {
     )
     val (json, dir) = emitCbom(List(item))
     try {
-      assert(byBomRef(json, id).isEmpty, "footprint item must not emit a material")
+      assert(
+        byBomRef(json, id).isEmpty,
+        "footprint item must not emit a material"
+      )
       val compNames = components(json).flatMap(c => stringOpt(c, "name"))
       assert(
         compNames.contains("aes-128-gcm") && compNames.contains("sha-256"),
@@ -404,7 +410,10 @@ class ExtendedCaptureCbomSuite extends FunSuite {
         "relatedCryptoMaterialProperties",
         "algorithmRef"
       )
-      assert(byBomRef(json, algRef).isDefined, s"dangling mobiletls alg $algRef")
+      assert(
+        byBomRef(json, algRef).isDefined,
+        s"dangling mobiletls alg $algRef"
+      )
     } finally cleanup(dir)
   }
 

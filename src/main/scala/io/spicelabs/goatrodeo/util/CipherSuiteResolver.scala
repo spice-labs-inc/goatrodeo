@@ -20,9 +20,9 @@ import scala.collection.immutable.Vector
   *
   * OpenSSL configuration files and service TLS configs name suites as opaque
   * strings (`ECDHE-RSA-AES128-GCM-SHA256`, `TLS_AES_256_GCM_SHA384`). This
-  * resolver maps the well-known names (both OpenSSL spellings and TLS 1.3
-  * IANA spellings) to the algorithms they exercise, so downstream CBOM
-  * generation can turn a cipher string into cryptographic assets.
+  * resolver maps the well-known names (both OpenSSL spellings and TLS 1.3 IANA
+  * spellings) to the algorithms they exercise, so downstream CBOM generation
+  * can turn a cipher string into cryptographic assets.
   *
   * The mapping is a curated, static table over concrete suite names. Cipher
   * grammar tokens that are not concrete suites (`DEFAULT`, `HIGH`, `!aNULL`,
@@ -38,15 +38,60 @@ object CipherSuiteResolver {
 
   // Curated OpenSSL + TLS 1.3 cipher-suite names → constituent algorithms.
   private val KnownSuites: Map[String, Vector[String]] = Map(
-    "ECDHE-RSA-AES128-GCM-SHA256" -> Vector("ecdh", "rsa", "aes-128-gcm", "sha-256"),
-    "ECDHE-RSA-AES256-GCM-SHA384" -> Vector("ecdh", "rsa", "aes-256-gcm", "sha-384"),
-    "ECDHE-RSA-CHACHA20-POLY1305" -> Vector("ecdh", "rsa", "chacha20-poly1305", "sha-256"),
-    "ECDHE-ECDSA-AES128-GCM-SHA256" -> Vector("ecdh", "ecdsa", "aes-128-gcm", "sha-256"),
-    "ECDHE-ECDSA-AES256-GCM-SHA384" -> Vector("ecdh", "ecdsa", "aes-256-gcm", "sha-384"),
-    "ECDHE-ECDSA-CHACHA20-POLY1305" -> Vector("ecdh", "ecdsa", "chacha20-poly1305", "sha-256"),
-    "DHE-RSA-AES128-GCM-SHA256" -> Vector("dh", "rsa", "aes-128-gcm", "sha-256"),
-    "DHE-RSA-AES256-GCM-SHA384" -> Vector("dh", "rsa", "aes-256-gcm", "sha-384"),
-    "DHE-RSA-CHACHA20-POLY1305" -> Vector("dh", "rsa", "chacha20-poly1305", "sha-256"),
+    "ECDHE-RSA-AES128-GCM-SHA256" -> Vector(
+      "ecdh",
+      "rsa",
+      "aes-128-gcm",
+      "sha-256"
+    ),
+    "ECDHE-RSA-AES256-GCM-SHA384" -> Vector(
+      "ecdh",
+      "rsa",
+      "aes-256-gcm",
+      "sha-384"
+    ),
+    "ECDHE-RSA-CHACHA20-POLY1305" -> Vector(
+      "ecdh",
+      "rsa",
+      "chacha20-poly1305",
+      "sha-256"
+    ),
+    "ECDHE-ECDSA-AES128-GCM-SHA256" -> Vector(
+      "ecdh",
+      "ecdsa",
+      "aes-128-gcm",
+      "sha-256"
+    ),
+    "ECDHE-ECDSA-AES256-GCM-SHA384" -> Vector(
+      "ecdh",
+      "ecdsa",
+      "aes-256-gcm",
+      "sha-384"
+    ),
+    "ECDHE-ECDSA-CHACHA20-POLY1305" -> Vector(
+      "ecdh",
+      "ecdsa",
+      "chacha20-poly1305",
+      "sha-256"
+    ),
+    "DHE-RSA-AES128-GCM-SHA256" -> Vector(
+      "dh",
+      "rsa",
+      "aes-128-gcm",
+      "sha-256"
+    ),
+    "DHE-RSA-AES256-GCM-SHA384" -> Vector(
+      "dh",
+      "rsa",
+      "aes-256-gcm",
+      "sha-384"
+    ),
+    "DHE-RSA-CHACHA20-POLY1305" -> Vector(
+      "dh",
+      "rsa",
+      "chacha20-poly1305",
+      "sha-256"
+    ),
     "AES128-SHA" -> Vector("aes-128-cbc", "sha-1"),
     "AES128-SHA256" -> Vector("aes-128-cbc", "sha-256"),
     "AES128-GCM-SHA256" -> Vector("aes-128-gcm", "sha-256"),
@@ -59,9 +104,24 @@ object CipherSuiteResolver {
     "TLS_CHACHA20_POLY1305_SHA256" -> Vector("chacha20-poly1305", "sha-256"),
     "TLS_AES_128_CCM_SHA256" -> Vector("aes-128-ccm", "sha-256"),
     "TLS_AES_128_CCM_8_SHA256" -> Vector("aes-128-ccm-8", "sha-256"),
-    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256" -> Vector("ecdh", "rsa", "aes-128-gcm", "sha-256"),
-    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" -> Vector("ecdh", "rsa", "aes-256-gcm", "sha-384"),
-    "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256" -> Vector("ecdh", "ecdsa", "aes-128-gcm", "sha-256"),
+    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256" -> Vector(
+      "ecdh",
+      "rsa",
+      "aes-128-gcm",
+      "sha-256"
+    ),
+    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" -> Vector(
+      "ecdh",
+      "rsa",
+      "aes-256-gcm",
+      "sha-384"
+    ),
+    "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256" -> Vector(
+      "ecdh",
+      "ecdsa",
+      "aes-128-gcm",
+      "sha-256"
+    ),
     "TLS_AES_256_CCM_SHA256" -> Vector("aes-256-ccm", "sha-256"),
     "TLS_AES_256_CCM_8_SHA256" -> Vector("aes-256-ccm-8", "sha-256")
   )
@@ -70,8 +130,8 @@ object CipherSuiteResolver {
   def knownAlgorithms: Set[String] =
     KnownSuites.valuesIterator.flatten.toSet
 
-  /** Resolve a single cipher-suite token to its algorithms, if it is a
-    * concrete known suite.
+  /** Resolve a single cipher-suite token to its algorithms, if it is a concrete
+    * known suite.
     */
   def resolveToken(token: String): Option[Vector[String]] =
     KnownSuites.get(normalize(token))
@@ -123,8 +183,8 @@ object CipherSuiteResolver {
   def resolveAlgorithmName(name: String): Option[String] =
     KnownAlgorithmNames.get(name.trim.toUpperCase)
 
-  /** Resolve a list of standalone algorithm names (space/comma/colon
-    * separated) to their canonical forms, dropping unknown tokens.
+  /** Resolve a list of standalone algorithm names (space/comma/colon separated)
+    * to their canonical forms, dropping unknown tokens.
     */
   def resolveAlgorithmList(value: String): Vector[String] = {
     if (value == null) Vector.empty

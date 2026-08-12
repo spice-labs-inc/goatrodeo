@@ -165,10 +165,10 @@ object CbomEmitter {
 
   /** True when the Item carries cryptographic metadata from a known strategy.
     *
-    * Includes the Phase A–G extended-capture prefixes (ServiceCrypto,
-    * Kerberos, JWT, JWK, EmbeddedKey, CryptoAlgorithms, CryptoDependency,
-    * MobileTls) so the emitter covers the same families as the captured ADG
-    * metadata can express.
+    * Includes the Phase A–G extended-capture prefixes (ServiceCrypto, Kerberos,
+    * JWT, JWK, EmbeddedKey, CryptoAlgorithms, CryptoDependency, MobileTls) so
+    * the emitter covers the same families as the captured ADG metadata can
+    * express.
     */
   private def isCryptoItem(item: Item): Boolean = {
     item.bodyAsItemMetaData.exists { meta =>
@@ -721,7 +721,9 @@ object CbomEmitter {
         .sorted
         .flatMap(addAlg(_, "other"))
       (
-        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)
+        ),
         algs.toMap
       )
     } else if (hasKerberos(extra)) {
@@ -731,7 +733,9 @@ object CbomEmitter {
         .sorted
         .flatMap(addAlg(_, "other"))
       (
-        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)
+        ),
         algs.toMap
       )
     } else if (hasJwt(extra)) {
@@ -742,7 +746,9 @@ object CbomEmitter {
         .filter(_ != "none")
         .flatMap(addAlg(_, "other"))
       (
-        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)
+        ),
         algs.toMap
       )
     } else if (hasJwk(extra)) {
@@ -788,7 +794,9 @@ object CbomEmitter {
         .sorted
         .flatMap(addAlg(_, "other"))
       (
-        Some(buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)),
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)
+        ),
         algs.toMap
       )
     } else {

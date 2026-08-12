@@ -60,8 +60,14 @@ class CryptoDependencySuite extends FunSuite {
     assertEquals(names, Set("ring", "webpki"))
     val algorithms = m(adHoc("algorithms")).toVector.map(_.value).toSet
     assert(algorithms.contains("aead"), s"ring families missing: $algorithms")
-    assert(algorithms.contains("signature"), s"ring families missing: $algorithms")
-    assertEquals(m(adHoc("version")).toVector.map(_.value).toSet, Set("0.17.8", "0.22.4"))
+    assert(
+      algorithms.contains("signature"),
+      s"ring families missing: $algorithms"
+    )
+    assertEquals(
+      m(adHoc("version")).toVector.map(_.value).toSet,
+      Set("0.17.8", "0.22.4")
+    )
     assertEquals(m(adHoc("mapped")).head.value, "false")
     assertEquals(m(adHoc("ecosystem")).head.value, "cargo")
   }
@@ -80,7 +86,10 @@ class CryptoDependencySuite extends FunSuite {
         |}
         |""".stripMargin
     )
-    assertEquals(m(adHoc("name")).toVector.map(_.value).toVector, Vector("jsonwebtoken"))
+    assertEquals(
+      m(adHoc("name")).toVector.map(_.value).toVector,
+      Vector("jsonwebtoken")
+    )
     assertEquals(m(adHoc("version")).head.value, "9.0.2")
     val algorithms = m(adHoc("algorithms")).toVector.map(_.value).toSet
     assert(algorithms.contains("signature"))
@@ -113,7 +122,9 @@ class CryptoDependencySuite extends FunSuite {
     assert(algorithms.contains("key-agree"))
   }
 
-  test("T-G-05 recognized-but-unmapped crypto library is flagged mapped=false") {
+  test(
+    "T-G-05 recognized-but-unmapped crypto library is flagged mapped=false"
+  ) {
     val m = meta(
       "Cargo.lock",
       """[[package]]
@@ -157,12 +168,13 @@ class CryptoDependencySuite extends FunSuite {
     battery.foreach { case (name, content) =>
       val m = meta(name, content)
       assert(m.nonEmpty, s"[$name] expected metadata")
-      m.get(adHoc("algorithms")).foreach(_.toVector.foreach { p =>
-        assert(
-          CryptoDependencyStrategy.allowedFamilies.contains(p.value),
-          s"[$name] algorithm '${p.value}' must be canonical"
-        )
-      })
+      m.get(adHoc("algorithms"))
+        .foreach(_.toVector.foreach { p =>
+          assert(
+            CryptoDependencyStrategy.allowedFamilies.contains(p.value),
+            s"[$name] algorithm '${p.value}' must be canonical"
+          )
+        })
     }
   }
 }

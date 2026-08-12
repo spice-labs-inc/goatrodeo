@@ -121,7 +121,10 @@ class ExpiryPruneSuite extends munit.FunSuite {
     assertEquals(Config.parseExpiry("   "), None)
 
     val millis = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
-    assertEquals(Config.parseExpiry(millis.toString).map(_.toEpochMilli()), Some(millis))
+    assertEquals(
+      Config.parseExpiry(millis.toString).map(_.toEpochMilli()),
+      Some(millis)
+    )
 
     assertEquals(
       Config.parseExpiry("2026-01-01T00:00:00Z").map(_.toString),

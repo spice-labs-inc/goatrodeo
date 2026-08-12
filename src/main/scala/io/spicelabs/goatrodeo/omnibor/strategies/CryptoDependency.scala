@@ -40,13 +40,13 @@ import scala.util.Try
   *
   * Claims `Cargo.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`,
   * `go.sum`, and `requirements.txt` (excluding Gradle lockfiles, owned by the
-  * Gradle strategy) and emits `CryptoDependency:` metadata for every
-  * dependency that maps to a crypto library: `ecosystem`, `name`, `version`
-  * (a set), `algorithms` (canonical family set), and `mapped=false` for
-  * recognized crypto libraries with no canonical family.
+  * Gradle strategy) and emits `CryptoDependency:` metadata for every dependency
+  * that maps to a crypto library: `ecosystem`, `name`, `version` (a set),
+  * `algorithms` (canonical family set), and `mapped=false` for recognized
+  * crypto libraries with no canonical family.
   *
-  * Non-crypto dependencies are not emitted (precision). The family mapping is
-  * a curated table; no algorithm is invented for an unmapped library.
+  * Non-crypto dependencies are not emitted (precision). The family mapping is a
+  * curated table; no algorithm is invented for an unmapped library.
   */
 object CryptoDependencyStrategy {
   private val logger = Logger(getClass())
@@ -109,7 +109,8 @@ object CryptoDependencyStrategy {
   )
 
   /** Known crypto package name union (for totality checks). */
-  def knownCryptoPackages: Set[String] = FamilyTable.keySet ++ KnownCryptoUnmapped
+  def knownCryptoPackages: Set[String] =
+    FamilyTable.keySet ++ KnownCryptoUnmapped
 
   /** Closed enum of canonical algorithm families the table may emit. */
   def allowedFamilies: Set[String] = Set(
@@ -152,9 +153,11 @@ object CryptoDependencyStrategy {
         name = None
         version = None
       } else if (t.startsWith("name = ")) {
-        name = Some(t.stripPrefix("name = ").stripPrefix("\"").stripSuffix("\""))
+        name =
+          Some(t.stripPrefix("name = ").stripPrefix("\"").stripSuffix("\""))
       } else if (t.startsWith("version = ")) {
-        version = Some(t.stripPrefix("version = ").stripPrefix("\"").stripSuffix("\""))
+        version =
+          Some(t.stripPrefix("version = ").stripPrefix("\"").stripSuffix("\""))
       }
     }
     name.foreach(n => version.foreach(v => out += ((n, v))))
@@ -168,7 +171,9 @@ object CryptoDependencyStrategy {
           case ("dependencies", JObject(deps)) =>
             deps.flatMap {
               case (k, JObject(v)) =>
-                v.collectFirst { case ("version", JString(s)) => (k, s) }.toVector
+                v.collectFirst { case ("version", JString(s)) =>
+                  (k, s)
+                }.toVector
               case _ => Vector.empty
             }.toVector
           case ("packages", JObject(pkgs)) =>
@@ -184,7 +189,8 @@ object CryptoDependencyStrategy {
       case _ => Vector.empty
     }
 
-  /** Best-effort yarn v1 lockfile entries (`  "name@spec":` / `    version "x"`). */
+  /** Best-effort yarn v1 lockfile entries (` "name@spec":` / ` version "x"`).
+    */
   private def parseYarnLock(text: String): Vector[(String, String)] = {
     val nameSpec = """^\\s{2}\"?([^\":@]+)(?:@[^\":]*)?@?[^\":]*\"?\\s*:$""".r
     val versionRe = """^\\s{2,4}version \"?([^\"\\s]+)\"?""".r
@@ -214,7 +220,8 @@ object CryptoDependencyStrategy {
       val t = line.trim
       if (t.isEmpty || t.startsWith("#") || t.startsWith("-")) None
       else {
-        val marker = Array("==", ">=", "<=", "~=", "!=").find(e => t.contains(e))
+        val marker =
+          Array("==", ">=", "<=", "~=", "!=").find(e => t.contains(e))
         marker match {
           case Some(e) =>
             val idx = t.indexOf(e)
@@ -228,12 +235,14 @@ object CryptoDependencyStrategy {
   }
 
   private[strategies] def contentOf(a: ArtifactWrapper): String = {
-    val bytes = a.withStream { s =>
-      val buf = new Array[Byte](MaxReadBytes)
-      val n = s.read(buf, 0, MaxReadBytes)
-      if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
-    }
-    new String(bytes, StandardCharsets.ISO_8859_1)
+    Try {
+      val bytes = a.withStream { s =>
+        val buf = new Array[Byte](MaxReadBytes)
+        val n = s.read(buf, 0, MaxReadBytes)
+        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+      }
+      new String(bytes, StandardCharsets.ISO_8859_1)
+    }.getOrElse("")
   }
 
   /** Compute lockfiles to process at a layer (before GenericFile). */
@@ -241,9 +250,8 @@ object CryptoDependencyStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter(a =>
-      detectEcosystem(a.path()).isDefined
-    ).toVector
+    val mine =
+      byUUID.values.filter(a => detectEcosystem(a.path()).isDefined).toVector
     val uuids = mine.map(_.uuid).toSet
     (
       mine.map(a => new CryptoDependencyToProcess(a)).toVector,
@@ -254,7 +262,8 @@ object CryptoDependencyStrategy {
   }
 }
 
-class CryptoDependencyToProcess(val artifact: ArtifactWrapper) extends ToProcess {
+class CryptoDependencyToProcess(val artifact: ArtifactWrapper)
+    extends ToProcess {
   override def markSuccessfulCompletion(): Unit = artifact.finished()
   override def itemCnt: Int = 1
   override def main: String = artifact.path()
@@ -331,13 +340,19 @@ class CryptoDependencyState(artifact: ArtifactWrapper)
 
     if (cryptoDeps.isEmpty) TreeMap.empty[String, TreeSet[StringOrPair]]
     else {
-      val names = TreeSet.from(cryptoDeps.keys.toVector.sorted.map(StringOrPair(_)))
+      val names =
+        TreeSet.from(cryptoDeps.keys.toVector.sorted.map(StringOrPair(_)))
       val versions = TreeSet.from(
-        cryptoDeps.values.flatten.map(_._2).filter(_.nonEmpty).map(StringOrPair(_))
+        cryptoDeps.values.flatten
+          .map(_._2)
+          .filter(_.nonEmpty)
+          .map(StringOrPair(_))
       )
       val ecosystems = eco.toVector.map(StringOrPair(_))
       val allFamilies = cryptoDeps.keys.toVector
-        .flatMap(n => CryptoDependencyStrategy.FamilyTable.get(n).getOrElse(Vector.empty))
+        .flatMap(n =>
+          CryptoDependencyStrategy.FamilyTable.get(n).getOrElse(Vector.empty)
+        )
         .distinct
         .sorted
       val hasUnmapped = cryptoDeps.keys.exists(

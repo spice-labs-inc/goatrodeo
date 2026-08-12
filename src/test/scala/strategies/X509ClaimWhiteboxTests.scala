@@ -77,7 +77,8 @@ class X509ClaimWhiteboxTests extends FunSuite {
     val w =
       wrap("test_data/certificates/x509/canonical/letsencrypt-isrgrootx1.pem")
     val cert = Certificates.parseSingleCert(w).get
-    val spkiBytes = Certificates.spkiBytesFromCert(cert)
+    val spkiBytes =
+      Certificates.spkiBytesFromCert(cert).getOrElse(Array.empty[Byte])
     assertEquals(
       sha256Hex(spkiBytes),
       "0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a39dad301c5afc3"

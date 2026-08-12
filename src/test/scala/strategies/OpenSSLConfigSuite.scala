@@ -418,7 +418,14 @@ class OpenSSLConfigSuite extends FunSuite {
     val algorithms = meta(adHoc("algorithms")).toVector.map(_.value).sorted
     assertEquals(
       algorithms,
-      Vector("aes-256-gcm", "ecdh", "rsa", "aes-128-gcm", "sha-256", "sha-384").sorted
+      Vector(
+        "aes-256-gcm",
+        "ecdh",
+        "rsa",
+        "aes-128-gcm",
+        "sha-256",
+        "sha-384"
+      ).sorted
     )
 
     assertEquals(
@@ -434,7 +441,10 @@ class OpenSSLConfigSuite extends FunSuite {
       !meta.contains(adHoc("suite:1:algorithms")),
       "excluded token resolves to no algorithms"
     )
-    assertEquals(meta(adHoc("suite:2:name")).head.value, "TLS_AES_256_GCM_SHA384")
+    assertEquals(
+      meta(adHoc("suite:2:name")).head.value,
+      "TLS_AES_256_GCM_SHA384"
+    )
     assertEquals(
       meta(adHoc("suite:2:algorithms")).head.value,
       "aes-256-gcm,sha-384"
@@ -457,7 +467,10 @@ class OpenSSLConfigSuite extends FunSuite {
       state.getMetadata(artifact, ItemTestHelper.testItem("x"), SingleMarker())
     assertEquals(m1, m2)
     // `DEFAULT@SECLEVEL=2` is name-only; no algorithms are invented.
-    assertEquals(m1.get(adHoc("suite:0:name")).map(_.head.value), Some("DEFAULT@SECLEVEL=2"))
+    assertEquals(
+      m1.get(adHoc("suite:0:name")).map(_.head.value),
+      Some("DEFAULT@SECLEVEL=2")
+    )
     assert(!m1.contains(adHoc("algorithms")))
   }
 }

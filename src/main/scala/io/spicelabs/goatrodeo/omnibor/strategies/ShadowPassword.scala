@@ -33,6 +33,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** Detects Unix password hash files and emits metadata for each hash found.
   *
@@ -84,7 +85,7 @@ object ShadowPasswordStrategy {
     * `/etc/group` that only contain `x` or `*`) as cryptographic assets.
     */
   private def hasPasswordHash(artifact: ArtifactWrapper): Boolean = {
-    artifact.withStream { stream =>
+    Try(artifact.withStream { stream =>
       val text = new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
       text.split("\n").exists { line =>
         line.trim.split(":") match {
@@ -94,7 +95,7 @@ object ShadowPasswordStrategy {
           case _ => false
         }
       }
-    }
+    }).getOrElse(false)
   }
 
   /** Map a crypt(3) hash prefix to a human-readable algorithm name. */
@@ -256,9 +257,9 @@ class ShadowPasswordState(artifact: ArtifactWrapper)
       artifact: ArtifactWrapper,
       base: TreeMap[String, TreeSet[StringOrPair]]
   ): TreeMap[String, TreeSet[StringOrPair]] = {
-    val text = artifact.withStream { stream =>
+    val text = Try(artifact.withStream { stream =>
       new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
-    }
+    }).getOrElse("")
 
     text.split("\n").toVector.foldLeft(base) { (tm, line) =>
       line.trim.split(":") match {

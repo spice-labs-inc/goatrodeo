@@ -24,6 +24,7 @@ import org.json4s.native.JsonMethods.*
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** Markers for different Docker/OCI image component types.
   *
@@ -750,7 +751,9 @@ object DockerToProcess {
         manifest = manifestVec(0)
 
         // parse the manifest
-        manifestJson <- manifest.withStream(stream => parseOpt(stream))
+        manifestJson <- Try(
+          manifest.withStream(stream => parseOpt(stream))
+        ).toOption.flatten
 
         // get the elements of the manifest array
         manifestElements <- manifestJson match {
@@ -769,7 +772,9 @@ object DockerToProcess {
               _.startsWith(jsonMimeType)
             )
             if name.startsWith("blobs/sha256/")
-            json <- artifacts(0).withStream(stream => parseOpt(stream)).toList
+            json <- Try(
+              artifacts(0).withStream(stream => parseOpt(stream))
+            ).toOption.flatten.toList
             if DockerMetadataExtractor.isOciManifestBlob(json)
           } yield json
 
@@ -802,7 +807,9 @@ object DockerToProcess {
               List(a(0))
             case _ => Nil
           }
-          configJson <- configFile.withStream(stream => parseOpt(stream))
+          configJson <- Try(
+            configFile.withStream(stream => parseOpt(stream))
+          ).toOption.flatten
           // get the layers
 
         } yield {

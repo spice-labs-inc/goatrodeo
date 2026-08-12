@@ -61,8 +61,9 @@ import scala.util.Try
   * discovery source.
   *
   * Hard constraint: private keys are decoded ONLY to derive
-  * algorithm/size/public-SPKI and to set `Certificates:DerivedFromPrivateKey=true`;
-  * the decoded key bytes are then discarded and never appear in metadata.
+  * algorithm/size/public-SPKI and to set
+  * `Certificates:DerivedFromPrivateKey=true`; the decoded key bytes are then
+  * discarded and never appear in metadata.
   */
 object EmbeddedPemStrategy {
   private val logger = Logger(getClass())
@@ -93,8 +94,8 @@ object EmbeddedPemStrategy {
   )
   private val EllipticCurves: Map[String, Int] = Map(
     "1.2.840.10045.3.1.7" -> 256, // prime256v1
-    "1.3.132.0.34" -> 384,        // secp384r1
-    "1.3.132.0.35" -> 521         // secp521r1
+    "1.3.132.0.34" -> 384, // secp384r1
+    "1.3.132.0.35" -> 521 // secp521r1
   )
 
   // ── Base64 / PEM helpers ────────────────────────────────────────────────
@@ -113,7 +114,9 @@ object EmbeddedPemStrategy {
 
   // ── Inline PEM / base64 extraction ──────────────────────────────────────
 
-  private[strategies] def inlinePemBlobs(text: String): Vector[(String, Array[Byte])] = {
+  private[strategies] def inlinePemBlobs(
+      text: String
+  ): Vector[(String, Array[Byte])] = {
     PemBlockRe
       .findAllMatchIn(text)
       .toVector
@@ -124,7 +127,9 @@ object EmbeddedPemStrategy {
       }
   }
 
-  private[strategies] def base64DataValues(text: String): Vector[Array[Byte]] = {
+  private[strategies] def base64DataValues(
+      text: String
+  ): Vector[Array[Byte]] = {
     DataFieldRe
       .findAllMatchIn(text)
       .toVector
@@ -140,9 +145,13 @@ object EmbeddedPemStrategy {
 
   // ── Classification ──────────────────────────────────────────────────────
 
-  private[strategies] def parseCertificate(bytes: Array[Byte]): Option[X509Certificate] = Try {
-    val cf = CertificateFactory.getInstance("X.509").asInstanceOf[CertificateFactory]
-    cf.generateCertificate(new ByteArrayInputStream(bytes)).asInstanceOf[X509Certificate]
+  private[strategies] def parseCertificate(
+      bytes: Array[Byte]
+  ): Option[X509Certificate] = Try {
+    val cf =
+      CertificateFactory.getInstance("X.509").asInstanceOf[CertificateFactory]
+    cf.generateCertificate(new ByteArrayInputStream(bytes))
+      .asInstanceOf[X509Certificate]
   }.toOption
 
   // ── Private key metadata (bytes discarded after derivation) ─────────────
@@ -156,9 +165,13 @@ object EmbeddedPemStrategy {
   private def algorithmForOid(oid: String): String =
     KeyAlgorithmNames.getOrElse(oid, oid)
 
-  private def ecSize(algId: org.bouncycastle.asn1.x509.AlgorithmIdentifier): Option[Int] =
+  private def ecSize(
+      algId: org.bouncycastle.asn1.x509.AlgorithmIdentifier
+  ): Option[Int] =
     Option(algId.getParameters)
-      .collect { case oid: org.bouncycastle.asn1.ASN1ObjectIdentifier => oid.getId }
+      .collect { case oid: org.bouncycastle.asn1.ASN1ObjectIdentifier =>
+        oid.getId
+      }
       .flatMap(EllipticCurves.get)
 
   private def sizeFor(pri: PrivateKeyInfo): Option[Int] =
@@ -168,7 +181,7 @@ object EmbeddedPemStrategy {
           Option(pri.parsePrivateKey).flatMap { pk =>
             Try(RSAPrivateKey.getInstance(pk).getModulus.bitLength).toOption
           }
-        case "ec"  => ecSize(alg)
+        case "ec"      => ecSize(alg)
         case "ed25519" => Some(256)
         case "ed448"   => Some(448)
         case _         => None
@@ -182,17 +195,22 @@ object EmbeddedPemStrategy {
       pub <- Try(
         KeyFactory
           .getInstance("RSA")
-          .generatePublic(new RSAPublicKeySpec(rsa.getModulus, rsa.getPublicExponent))
+          .generatePublic(
+            new RSAPublicKeySpec(rsa.getModulus, rsa.getPublicExponent)
+          )
       ).toOption
     } yield sha256Hex(pub.getEncoded)
 
-  private[strategies] def parsePrivateKeyPem(pemText: String): Option[DerivedKey] = {
+  private[strategies] def parsePrivateKeyPem(
+      pemText: String
+  ): Option[DerivedKey] = {
     val parser = new PEMParser(new StringReader(pemText))
     try {
-      Option(parser.readObject()).flatMap {
+      Try(Option(parser.readObject())).toOption.flatten.flatMap {
         case kp: PEMKeyPair =>
           Option(kp.getPrivateKeyInfo).map { pri =>
-            val alg = algorithmForOid(pri.getPrivateKeyAlgorithm.getAlgorithm.getId)
+            val alg =
+              algorithmForOid(pri.getPrivateKeyAlgorithm.getAlgorithm.getId)
             val spki = Option(kp.getPublicKeyInfo)
               .flatMap(p => Try(p.getEncoded).toOption)
               .map(sha256Hex)
@@ -204,12 +222,15 @@ object EmbeddedPemStrategy {
             val spki = if (alg == "rsa") rsaSpki(pri) else None
             DerivedKey(alg, sizeFor(pri), spki)
           }
-        case _ => None // encrypted / unsupported envelopes carry no derived info
+        case _ =>
+          None // encrypted / unsupported envelopes carry no derived info
       }
     } finally parser.close()
   }
 
-  private[strategies] def parsePrivateKeyDer(bytes: Array[Byte]): Option[DerivedKey] =
+  private[strategies] def parsePrivateKeyDer(
+      bytes: Array[Byte]
+  ): Option[DerivedKey] =
     Try(
       PrivateKeyInfo.getInstance(
         org.bouncycastle.asn1.ASN1Primitive.fromByteArray(bytes)
@@ -233,7 +254,9 @@ object EmbeddedPemStrategy {
       .format(d.toInstant)
       .replaceAll("\\.\\d+Z$", "Z")
 
-  private def keyAlgAndSize(pub: java.security.PublicKey): (String, Option[Int], Option[String]) =
+  private def keyAlgAndSize(
+      pub: java.security.PublicKey
+  ): (String, Option[Int], Option[String]) =
     pub match {
       case rsa: RSAPublicKey =>
         ("rsa", Some(rsa.getModulus.bitLength), None)
@@ -253,17 +276,21 @@ object EmbeddedPemStrategy {
     import java.util.Base64
     val certAdHoc = MKC.adHoc("Certificates")
     val pub = Option(cert.getPublicKey)
-    val (alg, size, _) = pub.map(keyAlgAndSize).getOrElse(("unknown", None, None))
+    val (alg, size, _) =
+      pub.map(keyAlgAndSize).getOrElse(("unknown", None, None))
     val subject = cert.getSubjectX500Principal
     val issuer = cert.getIssuerX500Principal
-    val selfSigned = Try(cert.verify(pub.orNull, "BC")).isSuccess && subject == issuer
+    val selfSigned =
+      Try(cert.verify(pub.orNull, "BC")).isSuccess && subject == issuer
     var m = Map[String, TreeSet[StringOrPair]](
       certAdHoc("SubjectDN") -> TreeSet(StringOrPair(dn(subject))),
       certAdHoc("IssuerDN") -> TreeSet(StringOrPair(dn(issuer))),
       certAdHoc("Serial") -> TreeSet(
         StringOrPair(cert.getSerialNumber.toString(16))
       ),
-      certAdHoc("NotBefore") -> TreeSet(StringOrPair(isoUtc(cert.getNotBefore))),
+      certAdHoc("NotBefore") -> TreeSet(
+        StringOrPair(isoUtc(cert.getNotBefore))
+      ),
       certAdHoc("NotAfter") -> TreeSet(StringOrPair(isoUtc(cert.getNotAfter))),
       certAdHoc("KeyAlgorithm") -> TreeSet(StringOrPair(alg)),
       certAdHoc("SigAlgorithm") -> TreeSet(

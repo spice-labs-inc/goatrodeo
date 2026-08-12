@@ -745,7 +745,8 @@ case class MavenState(
       marker: MavenMarkers
   ): MavenState = marker match {
     case MavenMarkers.POM =>
-      val pomString = artifact.withStream(Helpers.slurpInputToString(_))
+      val pomString =
+        Try(artifact.withStream(Helpers.slurpInputToString(_))).getOrElse("")
       val parsedOpt = PomParser.parse(pomString)
       val xml = parsedOpt match {
         case Some(_) => scala.xml.NodeSeq.Empty // not used, but keep compat
@@ -797,7 +798,8 @@ case class MavenState(
       this
 
     case MavenMarkers.Metadata =>
-      val xmlContent = artifact.withStream(Helpers.slurpInputToString(_))
+      val xmlContent =
+        Try(artifact.withStream(Helpers.slurpInputToString(_))).getOrElse("")
       val parsed = parseMavenMetadata(xmlContent)
       this.copy(
         metadataXmlContent = Some(xmlContent),
@@ -985,7 +987,9 @@ case class MavenState(
         // name, multi-release flag, shade plugin detection, Jenkins detection,
         // and build date.
         if (lowerPath == "meta-inf/manifest.mf") {
-          val manifestStr = artifact.withStream(Helpers.slurpInputToString(_))
+          val manifestStr = Try(
+            artifact.withStream(Helpers.slurpInputToString(_))
+          ).getOrElse("")
           val map = Helpers.treeInfoFromManifest(manifestStr)
           acc.manifest = map
           acc.buildDate = buildDateFromManifest(map)
@@ -1073,7 +1077,8 @@ case class MavenState(
             "/pom.properties"
           )
         ) {
-          val content = artifact.withStream(Helpers.slurpInputToString(_))
+          val content = Try(artifact.withStream(Helpers.slurpInputToString(_)))
+            .getOrElse("")
           val parsed = parsePropertiesString(content).filter { case (_, v) =>
             v.length <= 1024
           }
@@ -1109,7 +1114,8 @@ case class MavenState(
           lowerPath
             .startsWith("meta-inf/maven/") && lowerPath.endsWith("/pom.xml")
         ) {
-          val content = artifact.withStream(Helpers.slurpInputToString(_))
+          val content = Try(artifact.withStream(Helpers.slurpInputToString(_)))
+            .getOrElse("")
           PomParser.parse(content).foreach { p =>
             acc.embeddedPoms = acc.embeddedPoms :+ (path, p)
           }
@@ -1125,15 +1131,19 @@ case class MavenState(
           acc.nestedJars = acc.nestedJars :+ path
         }
         if (lowerPath == "boot-inf/layers.idx") {
-          acc.layersIdx = artifact
-            .withStream(Helpers.slurpInputToString(_))
+          acc.layersIdx = Try(
+            artifact
+              .withStream(Helpers.slurpInputToString(_))
+          ).getOrElse("")
             .linesIterator
             .filter(_.nonEmpty)
             .toVector
         }
         if (lowerPath == "boot-inf/classpath.idx") {
-          acc.classpathIdx = artifact
-            .withStream(Helpers.slurpInputToString(_))
+          acc.classpathIdx = Try(
+            artifact
+              .withStream(Helpers.slurpInputToString(_))
+          ).getOrElse("")
             .linesIterator
             .filter(_.nonEmpty)
             .toVector
@@ -1157,7 +1167,9 @@ case class MavenState(
         // ---- EAR structure ----
         if (lowerPath == "meta-inf/application.xml") {
           acc.jarType = acc.jarType.orElse(Some("ear"))
-          val appXmlStr = artifact.withStream(Helpers.slurpInputToString(_))
+          val appXmlStr = Try(
+            artifact.withStream(Helpers.slurpInputToString(_))
+          ).getOrElse("")
           val modulePattern =
             "<(ejb|web-uri|alt-dd|connector|java|web)>([^<]+)</(ejb|web-uri|alt-dd|connector|java|web)>".r
           val extracted = modulePattern
@@ -1192,8 +1204,10 @@ case class MavenState(
         // ---- ServiceLoader providers ----
         if (lowerPath.startsWith("meta-inf/services/")) {
           val serviceName = path.substring("meta-inf/services/".length)
-          val impls = artifact
-            .withStream(Helpers.slurpInputToString(_))
+          val impls = Try(
+            artifact
+              .withStream(Helpers.slurpInputToString(_))
+          ).getOrElse("")
             .linesIterator
             .filter(_.nonEmpty)
             .toVector
@@ -1202,7 +1216,8 @@ case class MavenState(
 
         // ---- JPMS module-info.class ----
         if (lowerPath == "module-info.class") {
-          val bytes = artifact.withStream(Helpers.slurpInputNoClose)
+          val bytes = Try(artifact.withStream(Helpers.slurpInputNoClose))
+            .getOrElse(Array[Byte]())
           parseModuleInfoClass(bytes).foreach { info =>
             acc.automaticModuleName = Some(info.name)
             acc.moduleRequires = info.requires
@@ -1219,8 +1234,10 @@ case class MavenState(
             "meta-inf/native-image/"
           )
         ) {
-          val props = artifact
-            .withStream(Helpers.slurpInputToString(_))
+          val props = Try(
+            artifact
+              .withStream(Helpers.slurpInputToString(_))
+          ).getOrElse("")
             .linesIterator
             .filterNot(_.trim.startsWith("#"))
             .filter(_.contains("="))

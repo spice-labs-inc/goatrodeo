@@ -16,13 +16,14 @@ import scala.jdk.CollectionConverters.*
   * safe even if test classes are ever run concurrently within one JVM:
   *
   *   1. captures are serialised on a single lock, so two suites cannot save and
-  *      restore the root level in an interleaved order; and
-  *   2. only events emitted by the capturing thread are returned, so log records
-  *      from suites running in parallel cannot leak into a "nothing was logged"
+  *      restore the root level in an interleaved order; and 2. only events
+  *      emitted by the capturing thread are returned, so log records from
+  *      suites running in parallel cannot leak into a "nothing was logged"
   *      assertion.
   *
-  * Consequence for callers: assertions must be about logging done on the calling
-  * thread. A body that logs from worker threads it spawns will appear silent.
+  * Consequence for callers: assertions must be about logging done on the
+  * calling thread. A body that logs from worker threads it spawns will appear
+  * silent.
   */
 object LogCapture {
 
@@ -59,7 +60,8 @@ object LogCapture {
     val thread = Thread.currentThread().getName
     try {
       val result = body()
-      val mine = appender.list.asScala.toVector.filter(_.getThreadName == thread)
+      val mine =
+        appender.list.asScala.toVector.filter(_.getThreadName == thread)
       (result, mine)
     } finally {
       root.setLevel(priorLevel)

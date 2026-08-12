@@ -37,12 +37,12 @@ import scala.util.Try
 
 /** Detects mobile / JVM TLS policy configuration files:
   *
-  * - Android `network_security_config.xml` (cleartext permission, custom trust
-  *   anchors, trust-on-first-use).
-  * - Android `AndroidManifest.xml` (`android:usesCleartextTraffic`).
-  * - Apple `Info.plist` ATS (`NSAppTransportSecurity` / `NSAllowsArbitraryLoads`
-  *   / `NSExceptionDomains`).
-  * - JDK `crypto.policy` (`crypto.policy=unlimited`).
+  *   - Android `network_security_config.xml` (cleartext permission, custom
+  *     trust anchors, trust-on-first-use).
+  *   - Android `AndroidManifest.xml` (`android:usesCleartextTraffic`).
+  *   - Apple `Info.plist` ATS (`NSAppTransportSecurity` /
+  *     `NSAllowsArbitraryLoads` / `NSExceptionDomains`).
+  *   - JDK `crypto.policy` (`crypto.policy=unlimited`).
   *
   * Emits `MobileTls:` flags and `java.security:crypto_policy`. Policy files
   * carry no secrets; T-F-10 asserts no private-key/base64 material.
@@ -52,9 +52,12 @@ object MobileTlsStrategy {
 
   val MaxReadBytes: Int = 1024 * 1024
 
-  private[strategies] def detectTlsPolicyArtifact(path: String): Option[String] = {
+  private[strategies] def detectTlsPolicyArtifact(
+      path: String
+  ): Option[String] = {
     val fileName = path.split('/').lastOption.getOrElse(path)
-    if (fileName == "network_security_config.xml") Some("android-network-security-config")
+    if (fileName == "network_security_config.xml")
+      Some("android-network-security-config")
     else if (fileName == "AndroidManifest.xml") Some("android-manifest")
     else if (fileName == "Info.plist") Some("apple-ats")
     else if (fileName == "crypto.policy") Some("jvm-crypto-policy")
@@ -65,24 +68,28 @@ object MobileTlsStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter(a =>
-      detectTlsPolicyArtifact(a.path()).isDefined
-    ).toVector
+    val mine = byUUID.values
+      .filter(a => detectTlsPolicyArtifact(a.path()).isDefined)
+      .toVector
 
     val uuids = mine.map(_.uuid).toSet
-    (mine.map(a => new MobileTlsToProcess(a)).toVector,
+    (
+      mine.map(a => new MobileTlsToProcess(a)).toVector,
       byUUID.filter { case (u, _) => !uuids.contains(u) },
       byName.filter { case (_, as) => !as.exists(a => uuids.contains(a.uuid)) },
-      "MobileTls")
+      "MobileTls"
+    )
   }
 
   private[strategies] def contentOf(a: ArtifactWrapper): String = {
-    val bytes = a.withStream { s =>
-      val buf = new Array[Byte](MaxReadBytes)
-      val n = s.read(buf, 0, MaxReadBytes)
-      if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
-    }
-    new String(bytes, StandardCharsets.ISO_8859_1)
+    Try {
+      val bytes = a.withStream { s =>
+        val buf = new Array[Byte](MaxReadBytes)
+        val n = s.read(buf, 0, MaxReadBytes)
+        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+      }
+      new String(bytes, StandardCharsets.ISO_8859_1)
+    }.getOrElse("")
   }
 }
 
@@ -147,7 +154,9 @@ class MobileTlsState(artifact: ArtifactWrapper)
       store: Storage
   ): MobileTlsState = this
 
-  private def parseNetworkSecurity(text: String): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
+  private def parseNetworkSecurity(
+      text: String
+  ): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
     if (!text.contains("<network-security-config")) None
     else {
       var tm = TreeMap[String, TreeSet[StringOrPair]](
@@ -155,19 +164,24 @@ class MobileTlsState(artifact: ArtifactWrapper)
       )
       val clear = """cleartextTrafficPermitted\s*=\s*"(true|false)"""".r
       clear.findFirstMatchIn(text).foreach { m =>
-        tm = tm + (mtAdHoc("cleartext_allowed") -> TreeSet(StringOrPair(Option(m.group(1)).getOrElse(""))))
+        tm = tm + (mtAdHoc("cleartext_allowed") -> TreeSet(
+          StringOrPair(Option(m.group(1)).getOrElse(""))
+        ))
       }
       if (text.contains("<trust-anchors")) {
         tm = tm + (mtAdHoc("custom_ca") -> TreeSet(StringOrPair("true")))
       }
       if (text.contains("trust-on-first-use")) {
-        tm = tm + (mtAdHoc("trust_on_first_use") -> TreeSet(StringOrPair("true")))
+        tm =
+          tm + (mtAdHoc("trust_on_first_use") -> TreeSet(StringOrPair("true")))
       }
       Some(tm)
     }
   }
 
-  private def parseManifest(text: String): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
+  private def parseManifest(
+      text: String
+  ): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
     if (!text.contains("<manifest")) None
     else {
       var tm = TreeMap[String, TreeSet[StringOrPair]](
@@ -175,32 +189,41 @@ class MobileTlsState(artifact: ArtifactWrapper)
       )
       val clear = """android:usesCleartextTraffic\s*=\s*"(true|false)"""".r
       clear.findFirstMatchIn(text).foreach { m =>
-        tm = tm + (mtAdHoc("manifest_cleartext") -> TreeSet(StringOrPair(Option(m.group(1)).getOrElse(""))))
+        tm = tm + (mtAdHoc("manifest_cleartext") -> TreeSet(
+          StringOrPair(Option(m.group(1)).getOrElse(""))
+        ))
       }
       Some(tm)
     }
   }
 
-  private def parseInfoPlist(text: String): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
+  private def parseInfoPlist(
+      text: String
+  ): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
     if (!text.contains("NSAppTransportSecurity")) None
     else {
       var tm = TreeMap[String, TreeSet[StringOrPair]](
         mtAdHoc("FileType") -> TreeSet(StringOrPair("apple-ats"))
       )
       if (text.contains("NSAllowsArbitraryLoads")) {
-        tm = tm + (mtAdHoc("ats_arbitrary_loads") -> TreeSet(StringOrPair("true")))
+        tm =
+          tm + (mtAdHoc("ats_arbitrary_loads") -> TreeSet(StringOrPair("true")))
       }
       if (text.contains("NSExceptionDomains")) {
         tm = tm + (mtAdHoc("ats_exceptions") -> TreeSet(StringOrPair("true")))
       }
       if (text.contains("NSAllowsLocalNetworking")) {
-        tm = tm + (mtAdHoc("ats_local_networking") -> TreeSet(StringOrPair("true")))
+        tm = tm + (mtAdHoc("ats_local_networking") -> TreeSet(
+          StringOrPair("true")
+        ))
       }
       Some(tm)
     }
   }
 
-  private def parseCryptoPolicy(text: String): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
+  private def parseCryptoPolicy(
+      text: String
+  ): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
     val policy = "^\\s*crypto\\.policy\\s*=\\s*(.+)\\s*$".r
     text.linesIterator
       .collectFirst { case policy(v) => Option(v).getOrElse("").trim }
@@ -218,11 +241,14 @@ class MobileTlsState(artifact: ArtifactWrapper)
     val kind = MobileTlsStrategy.detectTlsPolicyArtifact(path)
     val text = Try(MobileTlsStrategy.contentOf(artifact)).getOrElse("")
     kind match {
-      case Some("android-network-security-config") => parseNetworkSecurity(text).getOrElse(TreeMap.empty)
-      case Some("android-manifest")                => parseManifest(text).getOrElse(TreeMap.empty)
-      case Some("apple-ats")                       => parseInfoPlist(text).getOrElse(TreeMap.empty)
-      case Some("jvm-crypto-policy")               => parseCryptoPolicy(text).getOrElse(TreeMap.empty)
-      case _                                       => TreeMap.empty
+      case Some("android-network-security-config") =>
+        parseNetworkSecurity(text).getOrElse(TreeMap.empty)
+      case Some("android-manifest") =>
+        parseManifest(text).getOrElse(TreeMap.empty)
+      case Some("apple-ats") => parseInfoPlist(text).getOrElse(TreeMap.empty)
+      case Some("jvm-crypto-policy") =>
+        parseCryptoPolicy(text).getOrElse(TreeMap.empty)
+      case _ => TreeMap.empty
     }
   }
 
