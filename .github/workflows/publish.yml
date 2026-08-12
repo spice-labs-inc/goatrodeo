@@ -168,7 +168,8 @@ jobs:
                  /<dependencies>/,/<\/dependencies>/' "$REAL_POM"
           )
           real_props=$(
-            awk '/<properties>/,/<\/properties>/' "$REAL_POM"
+            awk '/<profiles>/,/<\/profiles>/ {next}
+                 /<properties>/,/<\/properties>/' "$REAL_POM"
           )
           awk -v deps="$real_deps" -v props="$real_props" '
             /<!-- @REAL_DEPENDENCIES@ -->/ {print deps; next}
