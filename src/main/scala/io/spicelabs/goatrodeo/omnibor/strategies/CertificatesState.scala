@@ -32,8 +32,6 @@ import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
 import java.security.KeyStore
 import java.security.cert.X509CRL
-import scala.collection.immutable.TreeMap
-import scala.util.Try
 import java.security.cert.X509Certificate
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet

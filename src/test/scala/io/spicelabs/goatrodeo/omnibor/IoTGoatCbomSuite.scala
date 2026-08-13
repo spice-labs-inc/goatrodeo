@@ -18,11 +18,11 @@ import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import munit.FunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
-import scala.util.Try
 
 import java.io.File
 import java.nio.file.Files
 import scala.concurrent.duration.Duration
+import scala.util.Try
 
 /** T4.5 — Discovery-driven CBOM regression test for the IoTGoat x86 firmware.
   *

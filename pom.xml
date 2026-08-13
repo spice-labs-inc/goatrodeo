@@ -360,7 +360,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>19.0</version>
+      <version>33.6.0-jre</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -648,6 +648,28 @@
             <goals>
               <goal>run</goal>
             </goals>
+          </execution>
+          <execution>
+            <id>inject-logback-into-fat-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <!-- The shade plugin shades the main jar, which excludes
+                   logback.xml (consumers of the library jar provide their
+                   own logging config). The standalone fat jar must carry
+                   logback.xml so logback does not fall back to DEBUG. -->
+              <target>
+                <zip
+                  destfile="${project.build.directory}/goatrodeo_3-${project.version}-fat.jar"
+                  update="true">
+                  <zipfileset
+                    file="${project.basedir}/src/main/resources/logback.xml"
+                    fullpath="logback.xml"/>
+                </zip>
+              </target>
+            </configuration>
           </execution>
           <execution>
             <id>stage-fat-jar-for-tests</id>
