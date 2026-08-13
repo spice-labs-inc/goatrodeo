@@ -21,7 +21,6 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
@@ -540,9 +539,9 @@ object FileWalker {
     * function.
     *
     * @param artifact
-    * -- the artifact to potentially traverse into
+    *   -- the artifact to potentially traverse into
     * @param function
-    * -- the function that does "a thing" with the expanded artifacts
+    *   -- the function that does "a thing" with the expanded artifacts
     *
     * @return
     *   if the thing is a container, then `Some(T)` where T is the value

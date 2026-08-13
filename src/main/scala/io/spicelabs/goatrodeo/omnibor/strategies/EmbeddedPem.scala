@@ -28,7 +28,6 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.pkcs.RSAPrivateKey
@@ -44,8 +43,8 @@ import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
-import java.time.format.DateTimeFormatter
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Base64
 import javax.security.auth.x500.X500Principal
 import scala.collection.immutable.TreeMap
@@ -273,7 +272,6 @@ object EmbeddedPemStrategy {
   private[strategies] def certificateMetadata(
       cert: X509Certificate
   ): Map[String, TreeSet[StringOrPair]] = {
-    import java.util.Base64
     val certAdHoc = MKC.adHoc("Certificates")
     val pub = Option(cert.getPublicKey)
     val (alg, size, _) =

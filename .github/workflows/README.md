@@ -2,7 +2,7 @@
 
 This folder contains GitHub Actions workflows.
 
-**`build_test.yml` uses Maven to run a build & test job**
+**`build_test.yml` uses sbt to run a build & test job**
 - This automatically triggers on the following events:
     1. Push to any branch (`**`)
     2. Pull requests to the `main` branch

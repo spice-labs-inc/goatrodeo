@@ -16,30 +16,38 @@ import java.io.File
 import java.nio.file.Files
 import scala.jdk.CollectionConverters.*
 
-/** Tests that the Maven build emits SemanticDB files just like the sbt build
-  * does when `semanticdbEnabled := true`.
+/** Tests that the build emits SemanticDB files when `semanticdbEnabled :=
+  * true`.
   *
   * Requirement trace: build.sbt sets `semanticdbEnabled := true` and
-  * `semanticdbVersion := scalafixSemanticdb.revision`. The Maven build must
-  * produce equivalent `.semanticdb` artifacts so that scalafix and other
-  * SemanticDB consumers can operate on this project.
+  * `semanticdbVersion := scalafixSemanticdb.revision`. The build must produce
+  * equivalent `.semanticdb` artifacts so that scalafix and other SemanticDB
+  * consumers can operate on this project.
   *
   * Theory: compiling a non-empty Scala source tree with `-Ysemanticdb` places
-  * at least one `.semanticdb` file under `target/classes/META-INF/semanticdb`.
-  * This test scans that directory and asserts it is non-empty, guarding against
-  * a future regression where the compiler flag is accidentally removed.
+  * at least one `.semanticdb` file under the SemanticDB target root. sbt writes
+  * to `target/scala-3.8.3/meta/META-INF/semanticdb` (the default
+  * `semanticdbTargetRoot`); the alternative Maven build writes to
+  * `target/classes/META-INF/semanticdb`. This test scans whichever root exists
+  * and asserts it is non-empty, guarding against a future regression where the
+  * compiler flag is accidentally removed.
   */
 class SemanticDBTest extends munit.FunSuite {
 
-  test("SemanticDB files are generated under target/classes") {
-    val semanticDbRoot = new File("target/classes/META-INF/semanticdb")
+  test("SemanticDB files are generated") {
+    val semanticDbRoot = List(
+      // sbt layout
+      new File("target/scala-3.8.3/meta/META-INF/semanticdb"),
+      // Maven layout
+      new File("target/classes/META-INF/semanticdb")
+    ).find(_.isDirectory)
     assert(
-      semanticDbRoot.isDirectory,
-      s"Expected SemanticDB root ${semanticDbRoot.getAbsolutePath} to exist"
+      semanticDbRoot.isDefined,
+      "Expected a SemanticDB root under either target/scala-3.8.3/meta/... or target/classes/..."
     )
 
     val files = Files
-      .walk(semanticDbRoot.toPath)
+      .walk(semanticDbRoot.get.toPath)
       .iterator()
       .asScala
       .filter(Files.isRegularFile(_))
@@ -48,7 +56,7 @@ class SemanticDBTest extends munit.FunSuite {
 
     assert(
       files.nonEmpty,
-      s"No .semanticdb files found under ${semanticDbRoot.getAbsolutePath}"
+      s"No .semanticdb files found under ${semanticDbRoot.get.getAbsolutePath}"
     )
   }
 }

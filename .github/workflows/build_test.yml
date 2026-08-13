@@ -41,22 +41,10 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: 'maven'
-    - name: Configure Maven settings.xml
-      run: |
-        mkdir -p ~/.m2
-        cat > ~/.m2/settings.xml <<EOF
-        <settings>
-          <servers>
-            <server>
-              <id>github</id>
-              <username>x-access-token</username>
-              <password>${GITHUB_TOKEN}</password>
-            </server>
-          </servers>
-        </settings>
-        EOF
+        cache: 'sbt'
+    - name: Set up sbt
+      uses: sbt/setup-sbt@v1
+    - name: Run tests
+      run: SBT_OPTS="-Xmx8G -Duser.timezone=GMT" TEST_THREAD_CNT="4" sbt test
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Run tests
-      run: TEST_THREAD_CNT="4" MAVEN_OPTS="-Xmx8G -Duser.timezone=GMT" mvn -B clean verify

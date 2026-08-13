@@ -190,9 +190,9 @@ object ArtifactWrapper {
   /** Given an input stream and a filename, get the mime type
     *
     * @param data
-    * -- the input stream
+    *   -- the input stream
     * @param fileName
-    * -- the name of the file
+    *   -- the name of the file
     */
   protected def mimeTypeFor(
       rawData: TikaInputStream,

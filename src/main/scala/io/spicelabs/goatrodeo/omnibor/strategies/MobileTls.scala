@@ -28,7 +28,6 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Helpers
 
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeMap

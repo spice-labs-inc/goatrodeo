@@ -60,9 +60,14 @@ if command -v git >/dev/null && git rev-parse --git-dir >/dev/null 2>&1; then
     echo "Running git lfs pull ..."
     git lfs pull
   else
-    echo "WARNING: git lfs not installed; LFS fixtures will be pointer files." >&2
-    echo "         Install git-lfs and re-run, or see README.md." >&2
+    echo "ERROR: git-lfs is not installed. The LFS fixtures would remain" >&2
+    echo "       pointer files and the test suite would produce false" >&2
+    echo "       results. Install git-lfs (https://git-lfs.com) and re-run." >&2
+    exit 1
   fi
+else
+  echo "ERROR: not inside a git working tree; cannot pull LFS fixtures." >&2
+  exit 1
 fi
 
 echo "Test data ready."

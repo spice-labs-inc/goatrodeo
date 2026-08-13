@@ -80,19 +80,19 @@ java -jar goatrodeo-fat.jar -b /path/to/artifacts -o /path/to/output
 git clone https://github.com/spice-labs-inc/goatrodeo.git
 cd goatrodeo
 sbt assembly
-java -jar target/scala-3.7.4/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
+java -jar target/scala-3.8.3/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
 ```
 
 > **Requirements:** Java 21+, Git LFS
 
-You can also build with Maven:
+A Maven build (`pom.xml`) is also kept in the tree as an alternative:
 
 ```bash
 mvn -DskipTests package
 java -jar target/scala-3.8.3/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
 ```
 
-See [docs/maven-build.md](docs/maven-build.md) for test tuning, publishing, and
+See [docs/maven-build.md](docs/maven-build.md) for Maven test tuning, publishing, and
 troubleshooting.
 
 ### Option 4: As a Library
@@ -236,22 +236,19 @@ git clone https://github.com/spice-labs-inc/goatrodeo.git
 
 # Run tests
 cd goatrodeo
-mvn clean verify  # independent test classes run in parallel forked JVMs
-sbt test          # the sbt build is still supported
+sbt test  # downloads test fixtures and runs `git lfs pull`; fails if git-lfs is missing
+          # (set TEST_THREAD_CNT to run single-JVM, as CI does; TEST_FORK to force forks)
 
 # Submit a PR against the `next` branch
 ```
 
-`mvn test` spreads test classes over forked JVMs — one per two cores, 4 GB heap
-each. Tune that for your machine, or disable it when investigating a
-test-isolation problem:
+With `TEST_THREAD_CNT` unset, `sbt test` forks a JVM and runs independent test
+classes in parallel — one per two cores. Tune or disable that for your machine:
 
 ```bash
-mvn test -Dtest.forkCount=1C  # one fork per core, needs more RAM
-mvn test -Dtest.forkCount=1   # one JVM, strictly serial
+TEST_THREAD_CNT=1 sbt test    # single-JVM serial run (what CI does)
+TEST_FORK=1 sbt test          # force forked JVMs even with TEST_THREAD_CNT set
 ```
-
-Setting `TEST_THREAD_CNT` (as CI does) selects a single-JVM serial run.
 
 ---
 
