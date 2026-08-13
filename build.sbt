@@ -184,6 +184,9 @@ resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/pub
 // pick up local Maven generated artifacts
 resolvers += Resolver.mavenLocal
 
+// Import the Spice Labs BOM for canonical dependency versions
+lazy val Import = config("import")
+
 Test / logBuffered := false
 
 lazy val root = project
@@ -193,11 +196,13 @@ lazy val root = project
     JavaAppPackaging,
     AssemblyPlugin
   )
+  .configs(Import)
   .settings(
     name := projectName,
     scalaVersion := scala3Version,
     semanticdbEnabled := true, // enable SemanticDB,
     semanticdbVersion := scalafixSemanticdb.revision,
+    libraryDependencies += "io.spicelabs" % "spice-bom" % "1.0.6" % Import intransitive(),
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
     libraryDependencies += "org.ow2.asm" % "asm" % "9.8",
     libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
