@@ -145,6 +145,17 @@
       <name>GitHub Package Registry</name>
       <url>https://maven.pkg.github.com/spice-labs-inc/goatrodeo</url>
     </repository>
+    <!-- spice-config carries the naming, layering and precedence rules every Spice
+         component shares. Each GitHub Packages URL serves only its own repo's
+         artifacts, so it cannot be resolved from the entry above. Consumed as a
+         SNAPSHOT, republished whenever its main moves. -->
+    <repository>
+      <id>github-spice-config</id>
+      <name>GitHub Packages (spice-labs-inc/spice-config)</name>
+      <url>https://maven.pkg.github.com/spice-labs-inc/spice-config</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>true</enabled></snapshots>
+    </repository>
   </repositories>
 
   <distributionManagement>
