@@ -141,30 +141,45 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     assert(threadsSeen.values().asScala.forall(_.isVirtual))
   }
 
-  // T-A-05 — the worker target adapts on measured mimeType throughput: with
-  // a sustained fast corpus, the target grows above its start (observed via
-  // the progress callback's worker count). The slow-side collapse policy is
-  // pinned deterministically by `AdaptiveParallelismSuite.T-AP-04` with
-  // synthetic traces; real files cannot be made deterministically slow
-  // without a computation seam, which the design deliberately does not have.
-  test("T-A-05 worker target grows under sustained fast completions") {
+  // T-A-05 — the adaptive wiring: measured per-file completion times flow
+  // into the controller, the controller's target moves, and the coordinator
+  // spawns up to it. To make this deterministic on noisy CI machines, the
+  // injected controller's policy is unconditionally "grow": with the
+  // smallest legal window (windowSize 1 clamps to 2) and confirmation 1,
+  // every closed window grows the target, and with
+  // collapseThreshold/growthThreshold at Double.MaxValue the growth
+  // predicate (ema < threshold × floor) is mathematically true for ANY
+  // measured times while collapse can never fire. So the target must reach
+  // its max (4) within the first few completions and stay there, regardless
+  // of GC pauses or JIT warmup. The timing-sensitive growth/collapse policy
+  // itself is pinned deterministically by
+  // `AdaptiveParallelismSuite.T-AP-04/05/06` with synthetic traces; this
+  // test only needs real timings to flow, not to be shaped.
+  test("T-A-05 worker target reaches max under an always-grow policy") {
     val seen = ConcurrentLinkedQueue[(Long, Int)]()
     val files = (0 until 500).map(bw).toVector
+    val alwaysGrow = AdaptiveParallelism(
+      min = 1,
+      max = 4,
+      start = 2,
+      windowSize = 1,
+      collapseConfirmationWindows = 1,
+      growthConfirmationWindows = 1,
+      collapseThreshold = Double.MaxValue,
+      growthThreshold = Double.MaxValue
+    )
     val res = AdaptiveMimeBuilder.computeMimeTypes(
       files,
       Config(),
       logger,
       progressEvery = 1,
-      progress = Some((c, w) => seen.add((c, w)))
+      progress = Some((c, w) => seen.add((c, w))),
+      controller = Some(alwaysGrow)
     )
     assertEquals(res.total, 500L)
     assertEquals(res.completed, 500L)
-
     val maxWorkers = seen.asScala.map(_._2).max
-    assert(
-      maxWorkers >= 3,
-      s"target should grow past start 2, saw max $maxWorkers"
-    )
+    assertEquals(maxWorkers, 4)
   }
 
   // T-A-06 — progress is an Option callback (no null in the API). The Some
