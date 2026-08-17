@@ -2,6 +2,7 @@ package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
+import io.spicelabs.goatrodeo.util.AdaptiveMimeBuilder
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.FileWalker
@@ -872,7 +873,8 @@ object ToProcess {
       tempDir: Option[File],
       count: AtomicInteger,
       fsFilePaths: Boolean,
-      dead_? : AtomicBoolean
+      dead_? : AtomicBoolean,
+      args: Config
   ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
@@ -913,16 +915,12 @@ object ToProcess {
 
         logger.info(f"Found all files, count ${allFiles.length}%,d")
 
-        val mimeCnt = AtomicInteger(0)
-        allFiles.par.foreach(file => {
-          val cnt = mimeCnt.addAndGet(1)
-          if (cnt % 100000 == 0) {
-            logger.info(f"Mime builder count ${cnt}%,d")
-          }
-          file.mimeType
-        })
-
-        logger.info("Computed mime type for all files")
+        val mimeResult =
+          AdaptiveMimeBuilder.computeMimeTypes(allFiles, args, logger)
+        logger.info(
+          f"MIME pass complete: ${mimeResult.total}%,d total, " +
+            f"${mimeResult.completed}%,d completed"
+        )
 
         strategiesForArtifacts(
           allFiles,

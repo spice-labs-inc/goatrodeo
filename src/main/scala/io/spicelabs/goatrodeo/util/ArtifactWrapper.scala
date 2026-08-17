@@ -97,9 +97,9 @@ sealed trait ArtifactWrapper {
             ArtifactWrapper.mimeTypeFor(stream, this.path())
           })
       }
-    }.toOption.getOrElse(set("application/octet-stream"))
+    }.toOption.getOrElse(Set("application/octet-stream"))
     Try { ArtifactWrapper.augmentMimeTypes(this, base) }.toOption
-      .getOrElse(set("application/octet-stream"))
+      .getOrElse(base)
   }
 
   def isRealFile(): Boolean = false

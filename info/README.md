@@ -116,6 +116,12 @@ How Goat Rodeo detects and refines MIME types:
 - Post-processing refinements
 - Custom MIME type detection
 
+### [Adaptive MIME Precompute](mime_precompute_adaptive.md)
+How the precompute pass scales its workers to the storage device:
+- Bounded virtual-thread worker set with throughput-driven concurrency
+- Never-raise failure accounting (`total == completed + failed`)
+- Tuning, known properties, and the claims → tests table
+
 ---
 
 ## Security Use Cases
@@ -224,6 +230,7 @@ How Goat Rodeo manages system resources:
 | [hidden_reapers.md](hidden_reapers.md) | Finding hidden vulnerabilities |
 | [metadata_tags.md](metadata_tags.md) | Standard metadata field definitions |
 | [mime_types.md](mime_types.md) | MIME type detection and handling |
+| [mime_precompute_adaptive.md](mime_precompute_adaptive.md) | Adaptive MIME precompute pass |
 | [resource_handling.md](resource_handling.md) | Temp files, streams, and resource cleanup |
 
 ---

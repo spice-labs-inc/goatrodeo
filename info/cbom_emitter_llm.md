@@ -56,7 +56,7 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 
 ## Tests
 
-`CbomEmitterSuite` (17 tests):
+`CbomEmitterSuite` (31 tests):
 - `T3.1` / `T3.17` — CLI parsing and validation.
 - `T3.2` — empty CBOM.
 - `T3.3` / `T3.13` — certificate component mapping.
@@ -73,6 +73,44 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 - `T3.18` — output directory auto-creation.
 - `T3.19` — private key redaction.
 - `T3.20` — size limit / truncation.
+- `T3.21`/`T3.22` — symlink rejection / atomic writes.
+- `T3.23`–`T3.28` — algorithm refs (keys, CRLs, EC curves, password hashes, usign).
+- `T3.29` — new hash names classify `hash`; 1.6/1.7 schema-valid.
+- `T3.30` — `parameterSetIdentifier` correctness.
+- `T3.31` — PasswordHash argon2id/nt-hash/apr1 → hash assets.
+- `T3.32` — ServiceCrypto blake2b/sha3 → hash assets.
+- `T3.33` — golden byte-identity across 15 pre-existing metadata families.
+- `T3.34` — hostile JWT `alg` never mints a hash asset.
+
+`CryptoAlgorithmsSuite` (6 tests) — registry totality/classification/
+parameter/regression/hygiene/collision (R-T-01..06).
+
+## Algorithm classification (Phase H)
+
+Algorithm assets are classified and parameterized by the shared registry
+`CryptoAlgorithms` (`src/main/scala/io/spicelabs/goatrodeo/omnibor/CryptoAlgorithms.scala`),
+the single source of truth for algorithm vocabulary, primitive
+classification, and `parameterSetIdentifier` extraction (ADR:
+`adrs/adr_2026_08_14_crypto_algorithm_registry.md`).
+
+- New hash names classify as primitive `hash`: `sha3-224`, `sha3-384`,
+  `sha512-224`, `sha512-256`, `blake3`, `shake128`, `shake256`, `sm3`,
+  `streebog`, `sha-3`, `md4`, `mdc2`, `blake2b-256`, `blake2b-512`,
+  `blake2s-256`, `tiger192`, `haval`, `double-sha`, `nt-hash`, `apr1`.
+  — `CryptoAlgorithmsSuite.R-T-02`
+- `parameterSetIdentifier`: explicit table (`sha512-224→224`,
+  `blake2b-512→512`, `sha3-256→256`, `sha3-512→512`); omitted for
+  `argon2*`, `shake*`, `blake3`, `sm3`, `md4`, etc.; legacy
+  first-digit-run fallback otherwise. — `CryptoAlgorithmsSuite.R-T-03`,
+  `CbomEmitterSuite.T3.30`
+- Producer totality: every canonical name any discovery strategy emits is in
+  `canonicalVocabulary`. — `CryptoAlgorithmsSuite.R-T-01`,
+  `ServiceCryptoSuite.T-B-11`
+- Regression: pre-phase names keep old behavior except approved deltas
+  C1–C6 (ADR). — `CryptoAlgorithmsSuite.R-T-04`, `CbomEmitterSuite.T3.33`
+  (byte-identical golden snapshots, CycloneDX 1.6/1.7)
+- JWT `alg` uses the `signature` context (attacker-controlled; never
+  free-text classification). — `CbomEmitterSuite.T3.34`
 
 ## Schema validation
 

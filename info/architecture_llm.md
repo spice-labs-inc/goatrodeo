@@ -43,7 +43,9 @@ src/main/scala/io/spicelabs/goatrodeo/
 │       ├── OpenSSLConfig.scala      # OpenSSL .cnf capture
 │       ├── JavaSecurity.scala       # Java java.security capture
 │       └── Generic.scala   # Fallback for unknown types
-│   └── CbomEmitter.scala   # CycloneDX CBOM post-processor
+│   ├── CbomEmitter.scala   # CycloneDX CBOM post-processor
+│   └── CryptoAlgorithms.scala # Shared algorithm-name registry (vocabulary,
+│                              # primitive classification, parameter rules)
 ├── util/                   # Utilities
 │   ├── Helpers.scala       # Hash functions, I/O utilities
 │   ├── ArtifactWrapper.scala # File abstraction

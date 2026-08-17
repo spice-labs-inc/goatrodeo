@@ -102,7 +102,8 @@ object Builder {
         tempDir,
         runningCnt,
         fsFilePaths = fsFilePaths,
-        dead_? = dead_?
+        dead_? = dead_?,
+        args = args
       )
 
     // The count of all the files found
