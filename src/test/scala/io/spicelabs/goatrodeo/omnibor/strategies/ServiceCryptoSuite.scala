@@ -216,4 +216,90 @@ class ServiceCryptoSuite extends FunSuite {
       )
     }
   }
+
+  // Phase H — strongSwan sha3/blake2b transforms (R6).
+  //
+  // T-B-09: the five new transform parts resolve to canonical names through
+  // the production `transformAlgorithms` path (battery over all five).
+  test("T-B-09 strongSwan sha3/blake2b transforms decompose") {
+    val battery: Map[String, String] = Map(
+      "aes256-sha3_256-modp2048" -> "sha3-256",
+      "aes256-sha3_384-ecp256" -> "sha3-384",
+      "aes256-sha3_512-ecp521" -> "sha3-512",
+      "aes256-blake2b256-x25519" -> "blake2b-256",
+      "aes256-blake2b512-x25519" -> "blake2b-512"
+    )
+    battery.foreach { case (transform, expected) =>
+      val algs = ServiceCryptoStrategy.transformAlgorithms(transform)
+      assert(
+        algs.contains(expected),
+        s"[$transform] expected '$expected', got: ${algs.mkString(",")}"
+      )
+      val m = meta("etc/ipsec.conf", s"esp = $transform\n")
+      val emitted =
+        m(MKC.adHoc("ServiceCrypto")("algorithms")).toVector.map(_.value).toSet
+      assert(
+        emitted.contains(expected),
+        s"[$transform] metadata algorithms missing '$expected': $emitted"
+      )
+    }
+  }
+
+  // T-B-10: unknown transform parts still contribute nothing and never crash.
+  test("T-B-10 unknown strongSwan transform parts are still dropped") {
+    val algs = ServiceCryptoStrategy.transformAlgorithms(
+      "aes256-foobar12-blake2b512"
+    )
+    assert(!algs.contains("foobar12"), "unknown part must be dropped")
+    assert(algs.contains("blake2b-512"))
+    assertEquals(
+      ServiceCryptoStrategy.transformAlgorithms("foo-bar-baz"),
+      Vector.empty
+    )
+  }
+
+  // T-B-11: totality property — every canonical name the transform table can
+  // emit is in the shared registry vocabulary.
+  test("T-B-11 TransformParts values are in the registry vocabulary") {
+    import io.spicelabs.goatrodeo.omnibor.CryptoAlgorithms
+    val values =
+      Vector(
+        "aes128",
+        "aes192",
+        "aes256",
+        "aes128gcm16",
+        "aes256gcm16",
+        "aes128ccm16",
+        "aes256ccm16",
+        "chacha20poly1305",
+        "sha1",
+        "sha256",
+        "sha384",
+        "sha512",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "blake2b256",
+        "blake2b512",
+        "prfsha1",
+        "prfsha256",
+        "prfsha384",
+        "modp1536",
+        "modp2048",
+        "modp3072",
+        "modp4096",
+        "modp6144",
+        "ecp256",
+        "ecp384",
+        "ecp521",
+        "x25519",
+        "x448"
+      ).map(ServiceCryptoStrategy.transformAlgorithms).flatten.toSet
+    values.foreach { v =>
+      assert(
+        CryptoAlgorithms.canonicalVocabulary.contains(v),
+        s"transform output '$v' must be in the registry vocabulary"
+      )
+    }
+  }
 }

@@ -177,6 +177,11 @@ object CipherSuiteResolver {
     "SHA512" -> "sha-512"
   )
 
+  /** The closed vocabulary of canonical names the standalone-name table can
+    * emit.
+    */
+  def standaloneAlgorithms: Set[String] = KnownAlgorithmNames.values.toSet
+
   /** Resolve a standalone algorithm name (not a suite) to its canonical
     * lowercase form, or `None` when unknown.
     */

@@ -114,10 +114,14 @@ object ShadowPasswordStrategy {
     * Supported prefixes:
     *   - `$1$` MD5 (no cost)
     *   - `$2a$`, `$2b$`, `$2y$` bcrypt (cost is the decimal rounds field)
+    *   - `$3$` NT hash (Windows cross-over; no salt, hash value never parsed)
     *   - `$5$` SHA-256 (no cost)
     *   - `$6$` SHA-512 (no cost)
-    *   - `$y$` yescrypt (params string, e.g. `j9s`)
     *   - `$7$` scrypt (`N=2^N,r,p` as params)
+    *   - `$y$` yescrypt (params string, e.g. `j9s`)
+    *   - `$argon2id$` Argon2id (`v=…` version field is parsed but not emitted;
+    *     `m=…,t=…,p=…` as params)
+    *   - `$apr1$` Apache md5-crypt
     */
   def hashDetails(hash: String): HashDetails = {
     if (
@@ -133,22 +137,32 @@ object ShadowPasswordStrategy {
     ) {
       val cost = extractField(hash, 2)
       HashDetails("bcrypt", cost = cost, salt = extractSalt(hash, 2))
+    } else if (hash.startsWith("$3$")) {
+      HashDetails("nt-hash")
     } else if (hash.startsWith("$5$")) {
       HashDetails("sha256", salt = extractSalt(hash, 1))
     } else if (hash.startsWith("$6$")) {
       HashDetails("sha512", salt = extractSalt(hash, 1))
-    } else if (hash.startsWith("$y$")) {
-      HashDetails(
-        "yescrypt",
-        params = extractField(hash, 2),
-        salt = extractSalt(hash, 2)
-      )
     } else if (hash.startsWith("$7$")) {
       HashDetails(
         "scrypt",
         params = extractField(hash, 2),
         salt = extractSalt(hash, 2)
       )
+    } else if (hash.startsWith("$y$")) {
+      HashDetails(
+        "yescrypt",
+        params = extractField(hash, 2),
+        salt = extractSalt(hash, 2)
+      )
+    } else if (hash.startsWith("$argon2id$")) {
+      HashDetails(
+        "argon2id",
+        params = extractField(hash, 3),
+        salt = extractSalt(hash, 2)
+      )
+    } else if (hash.startsWith("$apr1$")) {
+      HashDetails("apr1", salt = extractSalt(hash, 1))
     } else {
       HashDetails("other")
     }

@@ -490,4 +490,63 @@ class PgpStrategyParserTests extends FunSuite {
       "brainpoolp256r1"
     )
   }
+
+  // Phase H — PGP S2K hash tags (R3, corrected per RFC 9580).
+  //
+  // P-T-01 pins the map over the RFC 9580 §9.5 assigned tags plus the legacy
+  // RFC 4880 §9.4 names (4 double-width SHA, 5 MD2, 6 TIGER/192, 7
+  // HAVAL-5-160); reserved tags must stay unmapped (no invention).
+  test("P-T-01 pgpHashAlgNameMap is total over assigned tags, else unmapped") {
+    val expected = Map(
+      1 -> "md5",
+      2 -> "sha1",
+      3 -> "ripemd160",
+      4 -> "double-sha",
+      5 -> "md2",
+      6 -> "tiger192",
+      7 -> "haval",
+      8 -> "sha256",
+      9 -> "sha384",
+      10 -> "sha512",
+      11 -> "sha224",
+      12 -> "sha3-256",
+      14 -> "sha3-512"
+    )
+    assertEquals(Certificates.pgpHashAlgNameMap, expected)
+    Vector(13, 15, 0, 16, 100).foreach { tag =>
+      assert(
+        Certificates.pgpHashAlgNameMap.get(tag).isEmpty,
+        s"reserved/unassigned tag $tag must stay unmapped (no invention)"
+      )
+    }
+  }
+
+  // P-T-02: BC's HashAlgorithmTags constants resolve through the exact
+  // production expression (`s2k.getHashAlgorithm` → map lookup, the same
+  // expression Certificates.scala uses for the S2K KDF-PRF). The legacy
+  // tags double-sha/tiger/haval have real wire values (4/6/7), so a BC S2K
+  // object carries them as-is; SHA3-224/384 have no wire value (RFC 9580
+  // Reserved) and must stay unmapped.
+  test("P-T-02 BC S2K hash tags resolve to canonical names") {
+    import org.bouncycastle.bcpg.HashAlgorithmTags
+    import org.bouncycastle.bcpg.S2K
+    Vector(
+      HashAlgorithmTags.DOUBLE_SHA -> "double-sha",
+      HashAlgorithmTags.TIGER_192 -> "tiger192",
+      HashAlgorithmTags.HAVAL_5_160 -> "haval"
+    ).foreach { case (tag, canonical) =>
+      val s2k = new S2K(tag, Array[Byte](1, 2, 3, 4, 5, 6, 7, 8))
+      assertEquals(
+        Certificates.pgpHashAlgNameMap.get(s2k.getHashAlgorithm),
+        Some(canonical),
+        s"BC hash tag $tag must resolve to '$canonical'"
+      )
+    }
+    // The tag constants themselves must match the RFC 4880 wire numbers the
+    // map is keyed by (guard against a BC rename swapping numeric values).
+    assertEquals(HashAlgorithmTags.DOUBLE_SHA, 4)
+    assertEquals(HashAlgorithmTags.MD2, 5)
+    assertEquals(HashAlgorithmTags.TIGER_192, 6)
+    assertEquals(HashAlgorithmTags.HAVAL_5_160, 7)
+  }
 }
