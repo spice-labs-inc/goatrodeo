@@ -10,7 +10,7 @@ import java.time.Instant
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class ExpiryPruneSuite extends munit.FunSuite {
+class CutoffPruneSuite extends munit.FunSuite {
 
   private val cutoff = Instant.parse("2026-01-01T00:00:00Z")
   private val old = Instant.parse("2025-06-01T00:00:00Z")

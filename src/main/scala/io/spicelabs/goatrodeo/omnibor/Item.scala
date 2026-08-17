@@ -347,8 +347,8 @@ object Item {
   protected val logger: Logger = Logger(getClass())
 
   /** `ItemMetaData.extra` key under which an internal file's modification time
-    * (epoch milliseconds) is recorded. Populated only when an expiry cutoff is
-    * configured, and consumed by the expiry filter in the graph writer.
+    * (epoch milliseconds) is recorded. Populated only when an cutoff cutoff is
+    * configured, and consumed by the cutoff filter in the graph writer.
     */
   val FileModifiedKey = "file_modified_epoch_millis"
 
