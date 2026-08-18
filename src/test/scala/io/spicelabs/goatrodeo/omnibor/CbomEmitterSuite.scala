@@ -1946,4 +1946,150 @@ class CbomEmitterSuite extends FunSuite {
       cleanup(dir)
     }
   }
+
+  // ----------------------------------------------------------------------
+  // T3.35..T3.37 SWHID identifiers on artifact-backed components
+  // ----------------------------------------------------------------------
+
+  private val SwhidRootId =
+    "gitoid:blob:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+  /** An artifact-backed cert item; `sha1Alias` controls the `alias:from`
+    * `gitoid:blob:sha1:` edge.
+    */
+  private def swhidCert(
+      certId: String,
+      sha1Alias: Option[String]
+  ): Item = {
+    val aliasEdges: Vector[(String, String)] = sha1Alias.toVector.map(
+      EdgeType.aliasFrom -> _
+    )
+    makeItem(
+      id = certId,
+      connections = TreeSet(
+        (EdgeType.containedBy -> SwhidRootId) +: aliasEdges*
+      ),
+      fileNames = TreeSet("cert.pem"),
+      mimeTypes = TreeSet("application/x-pem-file"),
+      extra = TreeMap(
+        "Name" -> TreeSet(StringOrPair("cert")),
+        "Certificates:SubjectDN" -> TreeSet(StringOrPair("CN=test"))
+      )
+    )
+  }
+
+  // T3.35 — the component's bom-ref is the sha256 GitOID, and the SWHID
+  // (`swh:1:cnt:<sha1>`) is emitted as the `swhid:core` property derived
+  // from the item's `alias:from` `gitoid:blob:sha1:<hex>` edge. THEORY: the
+  // SWHID content identifier is the same sha1 bytes with a different prefix,
+  // so no extra hashing is needed — the pass only translates the identifier
+  // the Item already carries. Output must stay valid against CycloneDX 1.6
+  // and 1.7.
+  test("T3.35 artifact-backed component carries its SWHID") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val sha1hex = "4b71d999259c4f7b593a13df83c4f5d3bbf760a0"
+      val certId =
+        "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      val cert = swhidCert(certId, Some(s"gitoid:blob:sha1:${sha1hex}"))
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          assertEquals(getString(comp, "bom-ref"), certId)
+          assertEquals(
+            propertyMap(comp).get("swhid:core"),
+            Some(s"swh:1:cnt:${sha1hex}")
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.36 — an item with no `gitoid:blob:sha1:` alias emits no `swhid:core`
+  // property and stays schema-valid. THEORY: the property must be optional;
+  // items built before the alias was captured (or without it) must not gain
+  // a fabricated identifier.
+  test("T3.36 no SWHID property without a sha1 alias") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val certId =
+        "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      val cert = swhidCert(certId, None)
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.37 — malformed sha1 aliases (non-hex, wrong length, uppercase) are
+  // ignored rather than emitted as bogus SWHIDs. THEORY: alias values come
+  // from a trusted internal pass, but the emitter must not mint an invalid
+  // `swh:1:cnt:` identifier if a bad value ever arrives.
+  test("T3.37 malformed sha1 aliases are ignored") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val certId =
+        "gitoid:blob:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      val badAliases = Vector(
+        "gitoid:blob:sha1:not-a-hex",
+        "gitoid:blob:sha1:4B71D999259C4F7B593A13DF83C4F5D3BBF760A0",
+        "gitoid:blob:sha1:abc123"
+      )
+      val cert = makeItem(
+        id = certId,
+        connections = TreeSet(
+          (EdgeType.containedBy -> SwhidRootId) +:
+            badAliases.map(EdgeType.aliasFrom -> _)*
+        ),
+        fileNames = TreeSet("cert.pem"),
+        mimeTypes = TreeSet("application/x-pem-file"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("cert")),
+          "Certificates:SubjectDN" -> TreeSet(StringOrPair("CN=test"))
+        )
+      )
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
 }

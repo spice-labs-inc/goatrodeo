@@ -358,6 +358,27 @@ object CbomEmitter {
     Some(ref -> component)
   }
 
+  /** SWHID core identifier (`swh:1:cnt:<sha1>`) derived from the item's
+    * `alias:from` `gitoid:blob:sha1:<hex>` edge, when present and well-formed.
+    * The SWHID content identifier is the same sha1 bytes with a different
+    * prefix, so no extra hashing is needed — the alias the Item already
+    * carries is translated. Malformed aliases (non-hex, wrong length,
+    * uppercase) yield `None` rather than a bogus identifier.
+    */
+  private def swhidFor(item: Item): Option[String] = {
+    val prefix = "gitoid:blob:sha1:"
+    val hex = item.connections
+      .collect { case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
+        value.stripPrefix(prefix)
+      }
+      .find(h =>
+        h.length == 40 && h.forall(c =>
+          (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+        )
+      )
+    hex.map(h => s"swh:1:cnt:${h}")
+  }
+
   /** Map a single Item to a list of CycloneDX components: the main item plus
     * any algorithm assets referenced by it.
     */
@@ -390,10 +411,14 @@ object CbomEmitter {
         .map(d => "description" -> JString(d))
     ).flatten
 
-    val props = propertiesFromExtra(extra)
+    val extraProps = propertiesFromExtra(extra)
+    val swhidProp = swhidFor(item).map(s =>
+      JObject("name" -> JString("swhid:core"), "value" -> JString(s))
+    )
+    val allProps = extraProps.arr ++ swhidProp.toList
     val withProps =
-      if (props.arr.isEmpty) JObject(baseFields)
-      else JObject(baseFields :+ ("properties" -> props))
+      if (allProps.isEmpty) JObject(baseFields)
+      else JObject(baseFields :+ ("properties" -> JArray(allProps)))
 
     val (mainOpt, algs) = cryptoPropertiesFor(item, extra)
     val mainComponent =

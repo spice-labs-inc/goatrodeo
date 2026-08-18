@@ -84,3 +84,13 @@ Claims in `info/cbom_emitter.md` "Algorithm classification" and
 | PGP S2K hash map is total over RFC 9580 assigned + legacy RFC 4880 tags; reserved tags unmapped. | `PgpStrategyParserTests.P-T-01`, `PgpStrategyParserTests.P-T-02` |
 | `/etc/shadow` argon2id/NT/apr1 envelopes parse with correct params/salt and no hash-value emission. | `ShadowPasswordSuite.S-T-01`, `ShadowPasswordSuite.S-T-02`, `ShadowPasswordSuite.S-T-03`, `ShadowPasswordSuite.S-T-04` |
 | strongSwan `sha3_*`/`blake2b*` transforms decompose; unknown parts still dropped. | `ServiceCryptoSuite.T-B-09`, `ServiceCryptoSuite.T-B-10` |
+
+## Phase I — SWHID Identifiers (2026-08-18)
+
+Claims in `info/cbom_emitter.md` "OmniBOR and SWHID identifiers":
+
+| Claim | Verified By |
+|-------|-------------|
+| Artifact-backed components keep `bom-ref` = `gitoid:blob:sha256` and gain `swhid:core` = `swh:1:cnt:<sha1>` from the `alias:from` sha1 edge; output validates against CycloneDX 1.6 and 1.7. | `CbomEmitterSuite.T3.35` |
+| Items without a `gitoid:blob:sha1:` alias emit no SWHID property and stay schema-valid. | `CbomEmitterSuite.T3.36` |
+| Malformed aliases (non-hex, wrong length, uppercase) are ignored — no bogus SWHID is minted. | `CbomEmitterSuite.T3.37` |

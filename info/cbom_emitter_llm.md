@@ -56,7 +56,7 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 
 ## Tests
 
-`CbomEmitterSuite` (31 tests):
+`CbomEmitterSuite` (34 tests):
 - `T3.1` / `T3.17` — CLI parsing and validation.
 - `T3.2` — empty CBOM.
 - `T3.3` / `T3.13` — certificate component mapping.
@@ -81,6 +81,12 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 - `T3.32` — ServiceCrypto blake2b/sha3 → hash assets.
 - `T3.33` — golden byte-identity across 15 pre-existing metadata families.
 - `T3.34` — hostile JWT `alg` never mints a hash asset.
+- `T3.35` — artifact-backed component carries its `swhid:core`
+  (`swh:1:cnt:<sha1>`, derived from the `alias:from` `gitoid:blob:sha1:`
+  edge); 1.6/1.7 schema-valid.
+- `T3.36` — no SWHID property without a sha1 alias; still schema-valid.
+- `T3.37` — malformed sha1 aliases (non-hex, wrong length, uppercase) are
+  ignored.
 
 `CryptoAlgorithmsSuite` (6 tests) — registry totality/classification/
 parameter/regression/hygiene/collision (R-T-01..06).

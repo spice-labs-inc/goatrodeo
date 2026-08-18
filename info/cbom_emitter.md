@@ -94,9 +94,13 @@ Pre-existing behavior is preserved: classification and parameter extraction for 
 
 JWT `alg` values are attacker-controlled; they are emitted with the `signature` context, never via free-text classification, so a crafted `alg` such as `md4` cannot mint a `hash` asset. — verified by `CbomEmitterSuite.T3.34`.
 
+## OmniBOR and SWHID identifiers
+
+Every artifact-backed cryptographic-asset component is keyed by the artifact's OmniBOR identifier: `bom-ref` is the `gitoid:blob:sha256:<hex>` of the Item. Additionally, when the Item carries the `alias:from` edge `gitoid:blob:sha1:<hex>`, the component gains a `swhid:core` property with the Software Heritage content identifier `swh:1:cnt:<hex>` (the same sha1 bytes with the SWHID prefix — no re-hashing). Malformed aliases are ignored rather than emitted as bogus identifiers, and items without the alias emit no SWHID property. — verified by `CbomEmitterSuite.T3.35`, `CbomEmitterSuite.T3.36`, `CbomEmitterSuite.T3.37`.
+
 ## Verification
 
-- `CbomEmitterSuite` (31 tests) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private key redaction, size limits, the opt-out behavior, expanded hash classification/parameters (T3.29–T3.32), golden byte-identity (T3.33), and the hostile-JWT guard (T3.34).
+- `CbomEmitterSuite` (34 tests) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private key redaction, size limits, the opt-out behavior, expanded hash classification/parameters (T3.29–T3.32), golden byte-identity (T3.33), the hostile-JWT guard (T3.34), and SWHID identifier emission (T3.35–T3.37).
 - `CryptoAlgorithmsSuite` (6 tests) pins the shared registry: producer-vocabulary totality (R-T-01), new-name classification (R-T-02), parameter rules (R-T-03), behavior regression (R-T-04), canonical-form hygiene (R-T-05), and substring-collision safety (R-T-06).
 
 ## Related
