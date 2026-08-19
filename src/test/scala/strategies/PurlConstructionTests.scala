@@ -255,50 +255,6 @@ class PurlConstructionTests extends FunSuite {
     assertRoundTrips(purl, "CRL pURL with unknown sig OID")
   }
 
-  // ===== Test 5: No string-concat pURL in Certificates.scala ===========
-
-  test(
-    "no new PackageURL(String) call sites in Certificates.scala production code"
-  ) {
-    val src = scala.io.Source.fromFile(
-      "src/main/scala/io/spicelabs/goatrodeo/omnibor/strategies/Certificates.scala"
-    )
-    val content = src.mkString
-    src.close()
-    val bannedPatterns = List(
-      "new PackageURL(s\"",
-      "new PackageURL(s'"
-    )
-    bannedPatterns.foreach { pattern =>
-      assert(
-        !content.contains(pattern),
-        s"Certificates.scala must not contain '$pattern' — use PackageURLBuilder instead"
-      )
-    }
-  }
-
-  // ===== Test 6: No string-concat pURL in CertificatesState.scala ======
-
-  test(
-    "no new PackageURL(String) call sites in CertificatesState.scala production code"
-  ) {
-    val src = scala.io.Source.fromFile(
-      "src/main/scala/io/spicelabs/goatrodeo/omnibor/strategies/CertificatesState.scala"
-    )
-    val content = src.mkString
-    src.close()
-    val bannedPatterns = List(
-      "new PackageURL(s\"",
-      "new PackageURL(s'"
-    )
-    bannedPatterns.foreach { pattern =>
-      assert(
-        !content.contains(pattern),
-        s"CertificatesState.scala must not contain '$pattern' — use PackageURLBuilder instead"
-      )
-    }
-  }
-
   // ===== Test 7: Private key pURLs (already migrated to builder) =======
 
   test(

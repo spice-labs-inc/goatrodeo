@@ -63,3 +63,34 @@ The following documents already include their own `Verified by` sections and are
 - `docs/adr/0002-openssl-config-strategy.md`
 - `docs/adr/0004-java-security-strategy.md`
 - `docs/adr/0005-cbom-output-format.md`
+
+## Phase H — Expanded Hashing Coverage (2026-08-14)
+
+Claims in `info/cbom_emitter.md` "Algorithm classification" and
+`info/adrs/adr_2026_08_14_crypto_algorithm_registry.md`:
+
+| Claim | Verified By |
+|-------|-------------|
+| All new hash-family names classify as primitive `hash`. | `CryptoAlgorithmsSuite.R-T-02` |
+| New hash assets validate against CycloneDX 1.6 and 1.7 schemas. | `CbomEmitterSuite.T3.29`, `CbomEmitterSuite.T3.31`, `CbomEmitterSuite.T3.32` |
+| `parameterSetIdentifier` uses the explicit table (`sha512-224 → "224"`, `blake2b-512 → "512"`, `sha3-256 → "256"`). | `CryptoAlgorithmsSuite.R-T-03`, `CbomEmitterSuite.T3.30`, `CbomEmitterSuite.T3.32` |
+| `argon2id` carries no `parameterSetIdentifier`. | `CryptoAlgorithmsSuite.R-T-03`, `CbomEmitterSuite.T3.30` |
+| Every producer-emitted canonical name is in the registry vocabulary. | `CryptoAlgorithmsSuite.R-T-01`, `ServiceCryptoSuite.T-B-11`, `ShadowPasswordSuite.S-T-05` |
+| Pre-phase classification/parameter behavior unchanged except approved deltas. | `CryptoAlgorithmsSuite.R-T-04` |
+| CBOM output for pre-existing fixture families is byte-identical (1.6/1.7). | `CbomEmitterSuite.T3.33` |
+| Attacker-controlled JWT `alg` cannot mint a hash asset. | `CbomEmitterSuite.T3.34` |
+| Binary footprint recognizes EVP/Go/.NET md5/md4/sha3/blake2/shake/whirlpool symbols with canonical names and exact emission sets. | `CryptoFootprintSuite.T-E-07`, `CryptoFootprintSuite.T-E-08`, `CryptoFootprintSuite.T-E-09`, `CryptoFootprintSuite.T-E-10` |
+| Only the two approved needle overlaps exist (`EVP_sha512 ⊂ EVP_sha512_224/256`). | `CryptoFootprintSuite.R-T-07` |
+| PGP S2K hash map is total over RFC 9580 assigned + legacy RFC 4880 tags; reserved tags unmapped. | `PgpStrategyParserTests.P-T-01`, `PgpStrategyParserTests.P-T-02` |
+| `/etc/shadow` argon2id/NT/apr1 envelopes parse with correct params/salt and no hash-value emission. | `ShadowPasswordSuite.S-T-01`, `ShadowPasswordSuite.S-T-02`, `ShadowPasswordSuite.S-T-03`, `ShadowPasswordSuite.S-T-04` |
+| strongSwan `sha3_*`/`blake2b*` transforms decompose; unknown parts still dropped. | `ServiceCryptoSuite.T-B-09`, `ServiceCryptoSuite.T-B-10` |
+
+## Phase I — SWHID Identifiers (2026-08-18)
+
+Claims in `info/cbom_emitter.md` "OmniBOR and SWHID identifiers":
+
+| Claim | Verified By |
+|-------|-------------|
+| Artifact-backed components keep `bom-ref` = `gitoid:blob:sha256` and gain `swhid:core` = `swh:1:cnt:<sha1>` from the `alias:from` sha1 edge; output validates against CycloneDX 1.6 and 1.7. | `CbomEmitterSuite.T3.35` |
+| Items without a `gitoid:blob:sha1:` alias emit no SWHID property and stay schema-valid. | `CbomEmitterSuite.T3.36` |
+| Malformed aliases (non-hex, wrong length, uppercase) are ignored — no bogus SWHID is minted. | `CbomEmitterSuite.T3.37` |

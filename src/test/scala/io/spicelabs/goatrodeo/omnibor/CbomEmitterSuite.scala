@@ -1445,4 +1445,651 @@ class CbomEmitterSuite extends FunSuite {
       cleanup(outputDir)
     }
   }
+
+  // ----------------------------------------------------------------------
+  // Phase H — expanded hashing coverage (T3.29 .. T3.34)
+  // ----------------------------------------------------------------------
+
+  /** Build a crypto Item of the `CryptoAlgorithms:` family. */
+  private def algoItem(id: String, algs: String*): Item =
+    makeItem(
+      id = id,
+      connections = TreeSet(
+        EdgeType.containedBy ->
+          "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      ),
+      fileNames = TreeSet("binary.so"),
+      mimeTypes = TreeSet("application/x-sharedlib"),
+      extra = TreeMap(
+        "Name" -> TreeSet(StringOrPair("binary")),
+        "CryptoAlgorithms:algorithm" -> TreeSet.from(
+          algs.map(StringOrPair(_))
+        )
+      )
+    )
+
+  test("T3.29 new hash names classify as hash and validate in 1.6 and 1.7") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val item = algoItem(
+        "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sm3",
+        "blake3",
+        "sha3-384"
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> item.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, item)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          Vector("sm3", "blake3", "sha3-384").foreach { n =>
+            val alg = findComponentByRef(json, s"alg:hash:$n").get
+            assertEquals(
+              getString(
+                alg,
+                "cryptoProperties",
+                "algorithmProperties",
+                "primitive"
+              ),
+              "hash"
+            )
+          }
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  test("T3.30 parameterSetIdentifier correctness for new hash names") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val item = algoItem(
+        "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sha512-224",
+        "blake2b-512",
+        "sha3-256",
+        "argon2id"
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> item.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, item)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val alg224 = findComponentByRef(json, "alg:hash:sha512-224").get
+          assertEquals(
+            getString(
+              alg224,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
+            "224"
+          )
+          val alg512 = findComponentByRef(json, "alg:hash:blake2b-512").get
+          assertEquals(
+            getString(
+              alg512,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
+            "512"
+          )
+          val alg3 = findComponentByRef(json, "alg:hash:sha3-256").get
+          assertEquals(
+            getString(
+              alg3,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
+            "256"
+          )
+          val argon2 = findComponentByRef(json, "alg:hash:argon2id").get
+          assertEquals(
+            argon2 \ "cryptoProperties" \ "algorithmProperties" \ "parameterSetIdentifier",
+            JNothing
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  test("T3.31 PasswordHash argon2id/nt-hash/apr1 flow into hash assets") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val shadow = makeItem(
+        id =
+          "gitoid:blob:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("etc/shadow"),
+        mimeTypes = TreeSet("text/plain"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("shadow")),
+          "PasswordHash:Algorithm" -> TreeSet(
+            StringOrPair("argon2id"),
+            StringOrPair("nt-hash"),
+            StringOrPair("apr1")
+          ),
+          "PasswordHash:Params" -> TreeSet(
+            StringOrPair("m=65536,t=3,p=4")
+          ),
+          "PasswordHash:Salt" -> TreeSet(StringOrPair("Jh7M.9rR"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> shadow.identifier),
+        fileNames = TreeSet("root.tar")
+      )
+      storeItem(storage, shadow)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          Vector("argon2id", "nt-hash", "apr1").foreach { n =>
+            val alg = findComponentByRef(json, s"alg:hash:$n").get
+            assertEquals(
+              getString(
+                alg,
+                "cryptoProperties",
+                "algorithmProperties",
+                "primitive"
+              ),
+              "hash"
+            )
+          }
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  test("T3.32 ServiceCrypto blake2b/sha3 algorithms classify as hash assets") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val svc = makeItem(
+        id =
+          "gitoid:blob:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("etc/ipsec.conf"),
+        mimeTypes = TreeSet("text/plain"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("ipsec.conf")),
+          "ServiceCrypto:service" -> TreeSet(StringOrPair("strongswan")),
+          "ServiceCrypto:algorithms" -> TreeSet(
+            StringOrPair("blake2b-512"),
+            StringOrPair("sha3-256")
+          )
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> svc.identifier),
+        fileNames = TreeSet("root.tar")
+      )
+      storeItem(storage, svc)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val alg512 = findComponentByRef(json, "alg:hash:blake2b-512").get
+          assertEquals(
+            getString(
+              alg512,
+              "cryptoProperties",
+              "algorithmProperties",
+              "primitive"
+            ),
+            "hash"
+          )
+          assertEquals(
+            getString(
+              alg512,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
+            "512"
+          )
+          val alg3 = findComponentByRef(json, "alg:hash:sha3-256").get
+          assertEquals(
+            getString(
+              alg3,
+              "cryptoProperties",
+              "algorithmProperties",
+              "primitive"
+            ),
+            "hash"
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.33 golden byte-identity for pre-existing fixtures
+  // ----------------------------------------------------------------------
+
+  private val GoldenRootId =
+    "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+  private def goldenChild(
+      id: String,
+      name: String,
+      extra: (String, Set[String])*
+  ): Item =
+    makeItem(
+      id = id,
+      connections = TreeSet(EdgeType.containedBy -> GoldenRootId),
+      fileNames = TreeSet(name),
+      mimeTypes = TreeSet("application/octet-stream"),
+      extra = TreeMap.from(
+        (("Name" -> Set(name)) +: extra.toVector).map { case (k, vs) =>
+          k -> TreeSet.from(vs.map(StringOrPair(_)))
+        }
+      )
+    )
+
+  /** Fixed battery of pre-existing metadata families. Deliberately excludes the
+    * approved §13 deltas (JWT context, sha3-256/512 and argon2 parameters,
+    * `sha-3`, `EVP_sha512_224/256` dual emission) so the golden files pin
+    * byte-identical output for everything else.
+    */
+  private def goldenStorage(): Storage = {
+    val storage = MemStorage(None)
+    val root = makeItem(
+      id = GoldenRootId,
+      connections = TreeSet(
+        EdgeType.contains ->
+          "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000001"
+      ),
+      fileNames = TreeSet("root")
+    )
+    storeItem(storage, root)
+
+    val children = Vector(
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000001",
+        "cert.pem",
+        "Certificates:SubjectDN" -> Set("CN=test"),
+        "Certificates:IssuerDN" -> Set("CN=issuer"),
+        "Certificates:NotBefore" -> Set("2024-01-01T00:00:00Z"),
+        "Certificates:NotAfter" -> Set("2025-01-01T00:00:00Z"),
+        "Certificates:KeyAlgorithm" -> Set("RSA"),
+        "Certificates:SigAlgorithm" -> Set("SHA256withRSA"),
+        "Certificates:KeySize" -> Set("2048")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000002",
+        "openssl.cnf",
+        "openssl.cnf:cipher_string" -> Set("ECDHE-RSA-AES256-GCM-SHA384"),
+        "openssl.cnf:min_protocol" -> Set("TLSv1.2"),
+        "openssl.cnf:max_protocol" -> Set("TLSv1.3")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000003",
+        "java.security",
+        "java.security:disabled_algorithms" -> Set(
+          "MD2, MD5, RSA keySize < 2048"
+        )
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000004",
+        "etc/shadow",
+        "PasswordHash:Algorithm" -> Set("md5", "bcrypt"),
+        "PasswordHash:Salt" -> Set("salt123")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000005",
+        "usign.key",
+        "Usign:KeyAlgorithm" -> Set("ed25519"),
+        "Usign:KeySize" -> Set("256")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000006",
+        "id_ed25519.pub",
+        "SSH:MaterialType" -> Set("public-key"),
+        "SSH:KeyAlgorithm" -> Set("ssh-ed25519"),
+        "SSH:KeySize" -> Set("256")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000007",
+        "nginx.conf",
+        "TLSConfig:algorithms" -> Set("aes-128-gcm")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000008",
+        "libmbedtls.so",
+        "EmbeddedCertificates:count" -> Set("1"),
+        "Certificates:SubjectDN" -> Set("CN=embedded")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000009",
+        "inline.key",
+        "EmbeddedKey:kind" -> Set("public-key"),
+        "EmbeddedKey:key_algorithm" -> Set("rsa"),
+        "EmbeddedKey:key_size" -> Set("2048")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000010",
+        "ipsec.conf",
+        "ServiceCrypto:service" -> Set("strongswan"),
+        "ServiceCrypto:algorithms" -> Set("aes-128-gcm", "chacha20-poly1305")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000011",
+        "krb5.conf",
+        "Kerberos:algorithms" -> Set("aes256-cts-hmac-sha1-96")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000012",
+        "jwk.json",
+        "JWK:kty" -> Set("RSA"),
+        "JWK:use" -> Set("sig"),
+        "JWK:size" -> Set("2048")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000013",
+        "binary.so",
+        "CryptoAlgorithms:algorithm" -> Set(
+          "aes-256-gcm",
+          "sha-256",
+          "curve25519"
+        ),
+        "CryptoAlgorithms:classifier" -> Set("evp"),
+        "CryptoAlgorithms:confidence" -> Set("symbol")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000014",
+        "Cargo.lock",
+        "CryptoDependency:name" -> Set("ring"),
+        "CryptoDependency:version" -> Set("0.17.14"),
+        "CryptoDependency:algorithms" -> Set("aead", "signature")
+      ),
+      goldenChild(
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000015",
+        "network_security_config.xml",
+        "MobileTls:algorithms" -> Set("aes-256-gcm")
+      )
+    )
+    children.foreach(storeItem(storage, _))
+    storage
+  }
+
+  /** Normalize the two build-dependent fields (emission timestamp, tool version
+    * from BuildInfo) so goldens stay stable across builds.
+    */
+  private def normalizeTimestamp(jsonStr: String): String = {
+    val noTs =
+      jsonStr.replaceAll(
+        "\"timestamp\"\\s*:\\s*\"[^\"]*\"",
+        "\"timestamp\":\"<fixed>\""
+      )
+    noTs.replaceAll(
+      "\"name\":\"goatrodeo\",\"version\":\"[^\"]*\"",
+      "\"name\":\"goatrodeo\",\"version\":\"<fixed>\""
+    )
+  }
+
+  private def goldenResourcePath(version: String): String =
+    s"/cbom-golden/cbom-golden-$version.json"
+
+  test("T3.33 pre-existing fixture families are byte-identical (golden)") {
+    val dir = tempDir()
+    try {
+      val storage = goldenStorage()
+      val capture = sys.env.get("CAPTURE_CBOM_GOLDEN").contains("1")
+      Vector("1.6", "1.7").foreach { version =>
+        val files = CbomEmitter.emitForStorage(storage, version, dir).get
+        assertEquals(files.length, 1)
+        val normalized =
+          normalizeTimestamp(Files.readString(files.head.toPath()))
+        val resource = goldenResourcePath(version)
+        if (capture) {
+          val out = new File(s"src/test/resources$resource")
+          out.getParentFile().mkdirs()
+          Files.writeString(out.toPath(), normalized)
+          println(s"CAPTURED $resource")
+        } else {
+          val is = Option(getClass.getResourceAsStream(resource))
+          assert(is.isDefined, s"golden resource missing: $resource")
+          val expected =
+            new String(is.get.readAllBytes(), StandardCharsets.UTF_8)
+          assertEquals(
+            normalized,
+            expected,
+            s"CBOM $version output diverged from the pre-phase golden"
+          )
+        }
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.34 hostile JWT alg must not mint a hash asset
+  // ----------------------------------------------------------------------
+  test("T3.34 crafted JWT alg never mints a hash asset") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val jwt = makeItem(
+        id =
+          "gitoid:blob:sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("token.txt"),
+        mimeTypes = TreeSet("text/plain"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("jwt")),
+          "JWT:alg" -> TreeSet(StringOrPair("md4")),
+          "JWT:signature_algorithm" -> TreeSet(StringOrPair("md4"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> jwt.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, jwt)
+
+      val json = writeAndRead(storage, root, dir)
+      assert(
+        findComponentByRef(json, "alg:hash:md4").isEmpty,
+        "attacker-controlled JWT alg must not mint a hash asset"
+      )
+      val sig = findComponentByRef(json, "alg:signature:md4")
+      assert(sig.isDefined, "JWT alg is emitted with the signature context")
+      assertEquals(
+        getString(
+          sig.get,
+          "cryptoProperties",
+          "algorithmProperties",
+          "primitive"
+        ),
+        "signature"
+      )
+      assert(validate(compact(render(json)), schema16).isEmpty)
+      assert(validate(compact(render(json)), schema17).isEmpty)
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // T3.35..T3.37 SWHID identifiers on artifact-backed components
+  // ----------------------------------------------------------------------
+
+  private val SwhidRootId =
+    "gitoid:blob:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+  /** An artifact-backed cert item; `sha1Alias` controls the `alias:from`
+    * `gitoid:blob:sha1:` edge.
+    */
+  private def swhidCert(
+      certId: String,
+      sha1Alias: Option[String]
+  ): Item = {
+    val aliasEdges: Vector[(String, String)] = sha1Alias.toVector.map(
+      EdgeType.aliasFrom -> _
+    )
+    makeItem(
+      id = certId,
+      connections = TreeSet(
+        (EdgeType.containedBy -> SwhidRootId) +: aliasEdges*
+      ),
+      fileNames = TreeSet("cert.pem"),
+      mimeTypes = TreeSet("application/x-pem-file"),
+      extra = TreeMap(
+        "Name" -> TreeSet(StringOrPair("cert")),
+        "Certificates:SubjectDN" -> TreeSet(StringOrPair("CN=test"))
+      )
+    )
+  }
+
+  // T3.35 — the component's bom-ref is the sha256 GitOID, and the SWHID
+  // (`swh:1:cnt:<sha1>`) is emitted as the `swhid:core` property derived
+  // from the item's `alias:from` `gitoid:blob:sha1:<hex>` edge. THEORY: the
+  // SWHID content identifier is the same sha1 bytes with a different prefix,
+  // so no extra hashing is needed — the pass only translates the identifier
+  // the Item already carries. Output must stay valid against CycloneDX 1.6
+  // and 1.7.
+  test("T3.35 artifact-backed component carries its SWHID") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val sha1hex = "4b71d999259c4f7b593a13df83c4f5d3bbf760a0"
+      val certId =
+        "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      val cert = swhidCert(certId, Some(s"gitoid:blob:sha1:${sha1hex}"))
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          assertEquals(getString(comp, "bom-ref"), certId)
+          assertEquals(
+            propertyMap(comp).get("swhid:core"),
+            Some(s"swh:1:cnt:${sha1hex}")
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.36 — an item with no `gitoid:blob:sha1:` alias emits no `swhid:core`
+  // property and stays schema-valid. THEORY: the property must be optional;
+  // items built before the alias was captured (or without it) must not gain
+  // a fabricated identifier.
+  test("T3.36 no SWHID property without a sha1 alias") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val certId =
+        "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      val cert = swhidCert(certId, None)
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.37 — malformed sha1 aliases (non-hex, wrong length, uppercase) are
+  // ignored rather than emitted as bogus SWHIDs. THEORY: alias values come
+  // from a trusted internal pass, but the emitter must not mint an invalid
+  // `swh:1:cnt:` identifier if a bad value ever arrives.
+  test("T3.37 malformed sha1 aliases are ignored") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val certId =
+        "gitoid:blob:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      val badAliases = Vector(
+        "gitoid:blob:sha1:not-a-hex",
+        "gitoid:blob:sha1:4B71D999259C4F7B593A13DF83C4F5D3BBF760A0",
+        "gitoid:blob:sha1:abc123"
+      )
+      val cert = makeItem(
+        id = certId,
+        connections = TreeSet(
+          (EdgeType.containedBy -> SwhidRootId) +:
+            badAliases.map(EdgeType.aliasFrom -> _)*
+        ),
+        fileNames = TreeSet("cert.pem"),
+        mimeTypes = TreeSet("application/x-pem-file"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("cert")),
+          "Certificates:SubjectDN" -> TreeSet(StringOrPair("CN=test"))
+        )
+      )
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
 }

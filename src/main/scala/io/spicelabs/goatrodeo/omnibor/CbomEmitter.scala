@@ -277,41 +277,11 @@ object CbomEmitter {
       curve: Option[String] = None
   )
 
-  private val HashNames: Set[String] = Set(
-    "md5",
-    "sha1",
-    "sha224",
-    "sha256",
-    "sha384",
-    "sha512",
-    "sha3-256",
-    "sha3-512",
-    "blake2b",
-    "blake2s",
-    "whirlpool",
-    "ripemd160",
-    "bcrypt",
-    "scrypt",
-    "yescrypt",
-    "argon2",
-    "argon2d",
-    "argon2i",
-    "argon2id"
-  )
-
-  private val BlockCipherNames: Set[String] =
-    Set("aes", "des", "3des", "camellia", "aria", "seed", "blowfish", "twofish")
-
-  private val StreamCipherNames: Set[String] = Set("chacha", "salsa", "rc4")
-
-  private val KdfNames: Set[String] =
-    Set("pbkdf", "hkdf", "kdf", "scrypt", "argon2")
-
-  private val KeyAgreeNames: Set[String] =
-    Set("dh", "ecdh", "x25519", "x448", "ml-kem", "kyber", "kem")
-
-  private val SignatureNames: Set[String] =
-    Set("dsa", "ed25519", "ed448", "falcon", "slh-dsa", "ml-dsa", "with")
+  /** Heuristic primitive classification from an algorithm name. Delegates to
+    * the shared registry (see `CryptoAlgorithms`).
+    */
+  private def inferPrimitive(alg: String): String =
+    CryptoAlgorithms.inferPrimitive(alg)
 
   /** Canonicalize a signature-OID algorithm name to its gallery name. The ADG
     * captures unknown signature OIDs verbatim (`<unknown-sig-oid-…>`); these
@@ -344,20 +314,6 @@ object CbomEmitter {
   private def algorithmRef(spec: AlgorithmSpec): String =
     s"alg:${spec.primitive}:${normalizeAlgName(spec.name)}"
 
-  /** Heuristic primitive classification from an algorithm name. */
-  private def inferPrimitive(alg: String): String = {
-    val lower = alg.toLowerCase
-    if (HashNames.exists(lower.contains(_))) "hash"
-    else if (lower.contains("hmac")) "mac"
-    else if (BlockCipherNames.exists(lower.contains(_))) "block-cipher"
-    else if (StreamCipherNames.exists(lower.contains(_))) "stream-cipher"
-    else if (KdfNames.exists(lower.contains(_))) "kdf"
-    else if (KeyAgreeNames.exists(lower.contains(_))) "key-agree"
-    else if (SignatureNames.exists(lower.contains(_))) "signature"
-    else if (lower.contains("rsa")) "pke"
-    else "other"
-  }
-
   /** Choose the CycloneDX primitive based on the usage context. */
   private def primitiveFor(alg: String, context: String): String =
     context match {
@@ -369,19 +325,11 @@ object CbomEmitter {
     }
 
   /** Extract a numeric parameter (key length, digest length, etc.) from an
-    * algorithm name when no explicit size or curve is available.
+    * algorithm name when no explicit size or curve is available. Delegates to
+    * the shared registry's parameter rule.
     */
-  private def parameterFromName(name: String): Option[String] = {
-    val lower = name.toLowerCase
-    if (
-      lower.contains("ed25519") || lower.contains("ed448") ||
-      lower.contains("x25519") || lower.contains("x448")
-    ) {
-      None
-    } else {
-      """(\d+)""".r.findFirstIn(lower)
-    }
-  }
+  private def parameterFromName(name: String): Option[String] =
+    CryptoAlgorithms.parameterFor(name)
 
   /** Build an `algorithm` cryptographic-asset component for an algorithm spec.
     */
@@ -408,6 +356,27 @@ object CbomEmitter {
       )
     )
     Some(ref -> component)
+  }
+
+  /** SWHID core identifier (`swh:1:cnt:<sha1>`) derived from the item's
+    * `alias:from` `gitoid:blob:sha1:<hex>` edge, when present and well-formed.
+    * The SWHID content identifier is the same sha1 bytes with a different
+    * prefix, so no extra hashing is needed — the alias the Item already
+    * carries is translated. Malformed aliases (non-hex, wrong length,
+    * uppercase) yield `None` rather than a bogus identifier.
+    */
+  private def swhidFor(item: Item): Option[String] = {
+    val prefix = "gitoid:blob:sha1:"
+    val hex = item.connections
+      .collect { case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
+        value.stripPrefix(prefix)
+      }
+      .find(h =>
+        h.length == 40 && h.forall(c =>
+          (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+        )
+      )
+    hex.map(h => s"swh:1:cnt:${h}")
   }
 
   /** Map a single Item to a list of CycloneDX components: the main item plus
@@ -442,10 +411,14 @@ object CbomEmitter {
         .map(d => "description" -> JString(d))
     ).flatten
 
-    val props = propertiesFromExtra(extra)
+    val extraProps = propertiesFromExtra(extra)
+    val swhidProp = swhidFor(item).map(s =>
+      JObject("name" -> JString("swhid:core"), "value" -> JString(s))
+    )
+    val allProps = extraProps.arr ++ swhidProp.toList
     val withProps =
-      if (props.arr.isEmpty) JObject(baseFields)
-      else JObject(baseFields :+ ("properties" -> props))
+      if (allProps.isEmpty) JObject(baseFields)
+      else JObject(baseFields :+ ("properties" -> JArray(allProps)))
 
     val (mainOpt, algs) = cryptoPropertiesFor(item, extra)
     val mainComponent =
@@ -739,12 +712,15 @@ object CbomEmitter {
         algs.toMap
       )
     } else if (hasJwt(extra)) {
+      // JWT `alg` headers are attacker-controlled; the values are signature
+      // algorithms, so they are emitted with the `signature` context rather
+      // than free-text substring classification (red-team finding; §13 C4).
       val refs = extra
         .getOrElse("JWT:signature_algorithm", Set())
         .toList
         .sorted
         .filter(_ != "none")
-        .flatMap(addAlg(_, "other"))
+        .flatMap(addAlg(_, "signature"))
       (
         Some(
           buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)

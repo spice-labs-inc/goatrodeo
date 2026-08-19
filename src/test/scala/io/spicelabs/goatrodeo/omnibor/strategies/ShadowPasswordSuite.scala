@@ -62,4 +62,98 @@ class ShadowPasswordSuite extends FunSuite {
     assertEquals(d.algorithm, "scrypt")
     assertEquals(d.params, Some("10"))
   }
+
+  // Phase H — new hash envelopes (R5).
+  //
+  // S-T-01: argon2id — params = the `m=…,t=…,p=…` field; the `v=19` version
+  // field is parsed but never emitted; salt is the penultimate field.
+  test("S-T-01 hashDetails extracts argon2id params and salt") {
+    val d = ShadowPasswordStrategy.hashDetails(
+      "$argon2id$v=19$m=65536,t=3,p=4$Jh7M.9rR$qJ9pRfF7"
+    )
+    assertEquals(d.algorithm, "argon2id")
+    assertEquals(d.params, Some("m=65536,t=3,p=4"))
+    assertEquals(d.salt, Some("Jh7M.9rR"))
+    assertEquals(d.cost, None)
+  }
+
+  // S-T-02: NT hash — `$3$$<hex>` has an empty second field and no salt;
+  // all extracted fields must be None and the hash value itself never
+  // appears in the details.
+  test("S-T-02 hashDetails parses NT hashes with no salt and no crash") {
+    val d =
+      ShadowPasswordStrategy.hashDetails("$3$$8846f7eaee8fb117ad06bdd830b7586c")
+    assertEquals(d.algorithm, "nt-hash")
+    assertEquals(d.salt, None)
+    assertEquals(d.cost, None)
+    assertEquals(d.params, None)
+    // Empty/truncated NT hashes still classify, never crash.
+    assertEquals(ShadowPasswordStrategy.hashAlgorithm("$3$$"), "nt-hash")
+    assertEquals(ShadowPasswordStrategy.hashAlgorithm("$3$"), "nt-hash")
+  }
+
+  // S-T-03: Apache md5-crypt — salt is the field after the id.
+  test("S-T-03 hashDetails extracts apr1 salt") {
+    val d = ShadowPasswordStrategy.hashDetails("$apr1$Jh7M.9rR$qJ9pRfF7N3E0iG")
+    assertEquals(d.algorithm, "apr1")
+    assertEquals(d.salt, Some("Jh7M.9rR"))
+    assertEquals(d.cost, None)
+    assertEquals(d.params, None)
+    // Empty salt tolerated.
+    val empty = ShadowPasswordStrategy.hashDetails("$apr1$$hashvalue")
+    assertEquals(empty.algorithm, "apr1")
+    assertEquals(empty.salt, None)
+  }
+
+  // S-T-04: negative pinning — argon2i/argon2d stay "other" (deferred);
+  // locked sentinels unchanged.
+  test(
+    "S-T-04 unknown argon2 variants stay other; locked sentinels unchanged"
+  ) {
+    assertEquals(
+      ShadowPasswordStrategy.hashAlgorithm(
+        "$argon2i$v=19$m=4096,t=3,p=1$salt$hash"
+      ),
+      "other"
+    )
+    assertEquals(
+      ShadowPasswordStrategy.hashAlgorithm(
+        "$argon2d$v=19$m=4096,t=3,p=1$salt$hash"
+      ),
+      "other"
+    )
+    Vector("*", "!", "!!", "x", "").foreach { sentinel =>
+      assertEquals(ShadowPasswordStrategy.hashAlgorithm(sentinel), "locked")
+    }
+  }
+
+  // S-T-05: property over the prefix table — every supported prefix yields a
+  // registry-known algorithm name; control values `locked`/`other` excluded.
+  test("S-T-05 property: supported prefixes yield registry-known names") {
+    import io.spicelabs.goatrodeo.omnibor.CryptoAlgorithms
+    val supported = Vector(
+      "$1$salt$hash",
+      "$2a$10$salt",
+      "$2b$10$salt",
+      "$2y$10$salt",
+      "$3$$hash",
+      "$5$salt$hash",
+      "$6$salt$hash",
+      "$7$10$hash",
+      "$y$j9s$salt$hash",
+      "$argon2id$v=19$m=65536,t=3,p=4$salt$hash",
+      "$apr1$salt$hash"
+    )
+    supported.foreach { h =>
+      val alg = ShadowPasswordStrategy.hashAlgorithm(h)
+      assert(
+        alg != "locked" && alg != "other",
+        s"[$h] must be a recognized family, got '$alg'"
+      )
+      assert(
+        CryptoAlgorithms.canonicalVocabulary.contains(alg),
+        s"[$h] algorithm '$alg' must be in the registry vocabulary"
+      )
+    }
+  }
 }

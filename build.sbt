@@ -172,7 +172,7 @@ ThisBuild / scalacOptions ++=
     "-Wunused:imports",
     "-feature",
     "-release",
-    "17",
+    "21",
     "-Yexplicit-nulls"
   )
 
@@ -202,7 +202,7 @@ lazy val root = project
     scalaVersion := scala3Version,
     semanticdbEnabled := true, // enable SemanticDB,
     semanticdbVersion := scalafixSemanticdb.revision,
-    libraryDependencies += "io.spicelabs" % "spice-bom" % "1.0.6" % Import intransitive(),
+    libraryDependencies += "io.spicelabs" % "spice-bom" % "1.0.6" % Import intransitive (),
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
     libraryDependencies += "org.ow2.asm" % "asm" % "9.8",
     libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",

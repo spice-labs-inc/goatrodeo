@@ -912,11 +912,20 @@ object Certificates {
     13 -> "camellia-256"
   )
 
-  /** PGP HashAlgorithmTag → canonical hash name. */
+  /** PGP HashAlgorithmTag → canonical hash name. RFC 9580 §9.5 assigned tags
+    * (1,2,3,8..12,14) plus the legacy RFC 4880 §9.4 names (4 double-width SHA,
+    * 5 MD2, 6 TIGER/192, 7 HAVAL-5-160) for inventorying legacy key material.
+    * Tags 13/15 are Reserved per RFC 9580 and are deliberately unmapped (no
+    * invention).
+    */
   private[strategies] val pgpHashAlgNameMap: Map[Int, String] = Map(
     1 -> "md5",
     2 -> "sha1",
     3 -> "ripemd160",
+    4 -> "double-sha",
+    5 -> "md2",
+    6 -> "tiger192",
+    7 -> "haval",
     8 -> "sha256",
     9 -> "sha384",
     10 -> "sha512",

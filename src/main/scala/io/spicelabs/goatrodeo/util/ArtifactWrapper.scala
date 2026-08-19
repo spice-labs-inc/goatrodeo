@@ -89,14 +89,17 @@ sealed trait ArtifactWrapper {
   def lastModified: Option[Instant] = None
 
   private lazy val _mimeType: Set[String] = {
-    val base = ExtensionMimeDetector.detect(this) match {
-      case Some(mime) => Set(mime)
-      case None =>
-        Set(Using.resource(getTikaInputStream()) { stream =>
-          ArtifactWrapper.mimeTypeFor(stream, this.path())
-        })
-    }
-    ArtifactWrapper.augmentMimeTypes(this, base)
+    val base = Try {
+      ExtensionMimeDetector.detect(this) match {
+        case Some(mime) => Set(mime)
+        case None =>
+          Set(Using.resource(getTikaInputStream()) { stream =>
+            ArtifactWrapper.mimeTypeFor(stream, this.path())
+          })
+      }
+    }.toOption.getOrElse(Set("application/octet-stream"))
+    Try { ArtifactWrapper.augmentMimeTypes(this, base) }.toOption
+      .getOrElse(base)
   }
 
   def isRealFile(): Boolean = false

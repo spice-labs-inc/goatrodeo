@@ -80,9 +80,28 @@ This covers plaintext PEM private keys, OpenSSH private keys, PGP secret keys, a
 
 Emitted CBOMs are validated against the official CycloneDX 1.6 and 1.7 JSON schemas using a JSON schema validator in the test suite. — verified by `CbomEmitterSuite.T3.2`, `CbomEmitterSuite.T3.3`, `CbomEmitterSuite.T3.6`, and `CbomEmitterSuite.T3.15`.
 
+## Algorithm classification
+
+Algorithm assets (`cryptoProperties.assetType: algorithm`) are classified and parameterized by the shared registry `CryptoAlgorithms` (`src/main/scala/io/spicelabs/goatrodeo/omnibor/CryptoAlgorithms.scala`) — the single source of truth for algorithm vocabulary, primitive classification, and `parameterSetIdentifier` extraction. See `adrs/adr_2026_08_14_crypto_algorithm_registry.md`.
+
+The registry's hash family includes `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `sha3-224`, `sha3-256`, `sha3-384`, `sha3-512`, `sha512-224`, `sha512-256`, `blake2b`, `blake2s`, `blake2b-256`, `blake2b-512`, `blake2s-256`, `blake3`, `shake128`, `shake256`, `whirlpool`, `ripemd160`, `sm3`, `streebog`, `sha-3`, `md4`, `mdc2`, `tiger192`, `haval`, `double-sha`, `bcrypt`, `scrypt`, `yescrypt`, `argon2`, `argon2d`, `argon2i`, `argon2id`, `nt-hash`, and `apr1` — all classify as primitive `hash`. — verified by `CryptoAlgorithmsSuite.R-T-02`.
+
+`parameterSetIdentifier` uses an explicit per-name table (`sha512-224 → "224"`, `blake2b-512 → "512"`, `sha3-256 → "256"`, `sha3-512 → "512"`) and omits the parameter entirely for names whose digits are version/family digits (`argon2*`, `shake*`, `blake3`, `sm3`, `md4`, …). — verified by `CryptoAlgorithmsSuite.R-T-03`, `CbomEmitterSuite.T3.30`.
+
+Every canonical name a discovery strategy can emit is a member of the registry vocabulary (`CryptoAlgorithms.canonicalVocabulary`); no strategy can emit a name the classifier never registered. — verified by `CryptoAlgorithmsSuite.R-T-01`, `ServiceCryptoSuite.T-B-11`.
+
+Pre-existing behavior is preserved: classification and parameter extraction for all pre-phase names is unchanged except the explicitly approved deltas (ADR Consequences). — verified by `CryptoAlgorithmsSuite.R-T-04`, `CbomEmitterSuite.T3.33` (byte-identical golden snapshots for 15 metadata families, CycloneDX 1.6 and 1.7).
+
+JWT `alg` values are attacker-controlled; they are emitted with the `signature` context, never via free-text classification, so a crafted `alg` such as `md4` cannot mint a `hash` asset. — verified by `CbomEmitterSuite.T3.34`.
+
+## OmniBOR and SWHID identifiers
+
+Every artifact-backed cryptographic-asset component is keyed by the artifact's OmniBOR identifier: `bom-ref` is the `gitoid:blob:sha256:<hex>` of the Item. Additionally, when the Item carries the `alias:from` edge `gitoid:blob:sha1:<hex>`, the component gains a `swhid:core` property with the Software Heritage content identifier `swh:1:cnt:<hex>` (the same sha1 bytes with the SWHID prefix — no re-hashing). Malformed aliases are ignored rather than emitted as bogus identifiers, and items without the alias emit no SWHID property. — verified by `CbomEmitterSuite.T3.35`, `CbomEmitterSuite.T3.36`, `CbomEmitterSuite.T3.37`.
+
 ## Verification
 
-- `CbomEmitterSuite` (17 tests) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private key redaction, size limits, and the opt-out behavior when `--emit-cbom-dir` is omitted.
+- `CbomEmitterSuite` (34 tests) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private key redaction, size limits, the opt-out behavior, expanded hash classification/parameters (T3.29–T3.32), golden byte-identity (T3.33), the hostile-JWT guard (T3.34), and SWHID identifier emission (T3.35–T3.37).
+- `CryptoAlgorithmsSuite` (6 tests) pins the shared registry: producer-vocabulary totality (R-T-01), new-name classification (R-T-02), parameter rules (R-T-03), behavior regression (R-T-04), canonical-form hygiene (R-T-05), and substring-collision safety (R-T-06).
 
 ## Related
 

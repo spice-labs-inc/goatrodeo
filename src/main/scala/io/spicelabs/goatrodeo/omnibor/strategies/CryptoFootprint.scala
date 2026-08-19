@@ -84,8 +84,21 @@ object CryptoFootprintStrategy {
     FootprintPattern("evp", "EVP_sha256", Some("sha-256"), "symbol"),
     FootprintPattern("evp", "EVP_sha384", Some("sha-384"), "symbol"),
     FootprintPattern("evp", "EVP_sha512", Some("sha-512"), "symbol"),
+    FootprintPattern("evp", "EVP_sha3_224", Some("sha3-224"), "symbol"),
     FootprintPattern("evp", "EVP_sha3_256", Some("sha3-256"), "symbol"),
+    FootprintPattern("evp", "EVP_sha3_384", Some("sha3-384"), "symbol"),
     FootprintPattern("evp", "EVP_sha3_512", Some("sha3-512"), "symbol"),
+    FootprintPattern("evp", "EVP_sha512_224", Some("sha512-224"), "symbol"),
+    FootprintPattern("evp", "EVP_sha512_256", Some("sha512-256"), "symbol"),
+    FootprintPattern("evp", "EVP_md5", Some("md5"), "symbol"),
+    FootprintPattern("evp", "EVP_md4", Some("md4"), "symbol"),
+    FootprintPattern("evp", "EVP_mdc2", Some("mdc2"), "symbol"),
+    FootprintPattern("evp", "EVP_sm3", Some("sm3"), "symbol"),
+    FootprintPattern("evp", "EVP_blake2b512", Some("blake2b-512"), "symbol"),
+    FootprintPattern("evp", "EVP_blake2s256", Some("blake2s-256"), "symbol"),
+    FootprintPattern("evp", "EVP_shake128", Some("shake128"), "symbol"),
+    FootprintPattern("evp", "EVP_shake256", Some("shake256"), "symbol"),
+    FootprintPattern("evp", "EVP_whirlpool", Some("whirlpool"), "symbol"),
     FootprintPattern("evp", "EVP_aes_128_cbc", Some("aes-128-cbc"), "symbol"),
     FootprintPattern("evp", "EVP_aes_256_cbc", Some("aes-256-cbc"), "symbol"),
     FootprintPattern("evp", "EVP_aes_128_gcm", Some("aes-128-gcm"), "symbol"),
@@ -107,6 +120,7 @@ object CryptoFootprintStrategy {
     FootprintPattern("evp", "EVP_dh", Some("dh"), "symbol"),
     FootprintPattern("evp", "EVP_ripemd160", Some("ripemd160"), "symbol"),
     // Go standard library package paths
+    FootprintPattern("golang", "crypto/md5", Some("md5"), "symbol"),
     FootprintPattern("golang", "crypto/sha1", Some("sha-1"), "symbol"),
     FootprintPattern("golang", "crypto/sha256", Some("sha-256"), "symbol"),
     FootprintPattern("golang", "crypto/sha512", Some("sha-512"), "symbol"),
@@ -138,6 +152,12 @@ object CryptoFootprintStrategy {
       "golang",
       "golang.org/x/crypto/hkdf",
       Some("hkdf"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "golang",
+      "golang.org/x/crypto/sha3",
+      Some("sha-3"),
       "symbol"
     ),
     FootprintPattern(
@@ -200,6 +220,36 @@ object CryptoFootprintStrategy {
       "dotnet",
       "System.Security.Cryptography.SHA256",
       Some("sha-256"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "dotnet",
+      "System.Security.Cryptography.SHA384",
+      Some("sha-384"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "dotnet",
+      "System.Security.Cryptography.SHA512",
+      Some("sha-512"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "dotnet",
+      "System.Security.Cryptography.SHA3_256",
+      Some("sha3-256"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "dotnet",
+      "System.Security.Cryptography.SHA3_384",
+      Some("sha3-384"),
+      "symbol"
+    ),
+    FootprintPattern(
+      "dotnet",
+      "System.Security.Cryptography.SHA3_512",
+      Some("sha3-512"),
       "symbol"
     )
   )
