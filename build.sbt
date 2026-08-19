@@ -179,7 +179,8 @@ def machineRamBytes: Long = {
 Test / javaOptions ++= Seq(
   {
     val half = machineRamBytes / 2
-    val heap = math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
+    val heap =
+      math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
     s"-Xmx${heap}"
   }
 )

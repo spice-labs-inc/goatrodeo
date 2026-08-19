@@ -77,8 +77,8 @@ object JavaArchiveDetector {
     "application/x-zip-compressed"
   )
 
-  /** Applicability rule: a JAR is a zip; text/XML/class files can never be
-    * one. Binaries with unknown mimes stay probed (the zip check is cheap).
+  /** Applicability rule: a JAR is a zip; text/XML/class files can never be one.
+    * Binaries with unknown mimes stay probed (the zip check is cheap).
     */
   private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
     ArtifactWrapper.noneOf(

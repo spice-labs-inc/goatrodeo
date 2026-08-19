@@ -361,15 +361,16 @@ object CbomEmitter {
   /** SWHID core identifier (`swh:1:cnt:<sha1>`) derived from the item's
     * `alias:from` `gitoid:blob:sha1:<hex>` edge, when present and well-formed.
     * The SWHID content identifier is the same sha1 bytes with a different
-    * prefix, so no extra hashing is needed — the alias the Item already
-    * carries is translated. Malformed aliases (non-hex, wrong length,
-    * uppercase) yield `None` rather than a bogus identifier.
+    * prefix, so no extra hashing is needed — the alias the Item already carries
+    * is translated. Malformed aliases (non-hex, wrong length, uppercase) yield
+    * `None` rather than a bogus identifier.
     */
   private def swhidFor(item: Item): Option[String] = {
     val prefix = "gitoid:blob:sha1:"
     val hex = item.connections
-      .collect { case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
-        value.stripPrefix(prefix)
+      .collect {
+        case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
+          value.stripPrefix(prefix)
       }
       .find(h =>
         h.length == 40 && h.forall(c =>

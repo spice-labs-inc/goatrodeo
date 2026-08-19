@@ -73,7 +73,8 @@ class ADGTests extends munit.FunSuite {
       // still pins an explicit count.
       val defaultThreadCnt = {
         val cores = Runtime.getRuntime().availableProcessors()
-        val heapG = math.max(1L, Runtime.getRuntime().maxMemory() / (1024L * 1024 * 1024))
+        val heapG =
+          math.max(1L, Runtime.getRuntime().maxMemory() / (1024L * 1024 * 1024))
         val byHeap = math.max(4, (heapG * 4).toInt) // heapG / 0.25G per worker
         math.min(cores, byHeap)
       }

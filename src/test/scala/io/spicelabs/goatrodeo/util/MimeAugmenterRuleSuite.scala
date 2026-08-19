@@ -18,26 +18,24 @@ import munit.FunSuite
 
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipFile
-
 import scala.jdk.CollectionConverters.*
 
 /** Tests for the per-augmenter MIME applicability rules.
   *
   * WHAT: every registered MIME augmenter carries its own `mimeRule`, a
-  * block-shaped predicate over the artifact's Tika MIME set, so a new
-  * augmenter can be added without understanding any global skip logic.
+  * block-shaped predicate over the artifact's Tika MIME set, so a new augmenter
+  * can be added without understanding any global skip logic.
   *
   * WHY: the augmenter chain costs ~700–1,350µs per non-terminal artifact
-  * (measured), which on 50M-artifact builds halves throughput. The rules
-  * remove provably-impossible work (class files, XML, media) per augmenter.
+  * (measured), which on 50M-artifact builds halves throughput. The rules remove
+  * provably-impossible work (class files, XML, media) per augmenter.
   *
   * THEORY: rules are BLOCK-shaped by design — they only skip MIMEs that
   * provably cannot match, so every unknown/degenerate MIME (inner package
-  * fragments from debs/rpms/nupkgs, future ecosystems) keeps being probed.
-  * A wrong rule can only cost performance, never a false negative. These
-  * tests pin both directions: blocked families are skipped, and everything
-  * else — including binary PEM carriers and octet-stream fragments — still
-  * detects.
+  * fragments from debs/rpms/nupkgs, future ecosystems) keeps being probed. A
+  * wrong rule can only cost performance, never a false negative. These tests
+  * pin both directions: blocked families are skipped, and everything else —
+  * including binary PEM carriers and octet-stream fragments — still detects.
   *
   * LLM note: R-x = test id.
   */
@@ -48,7 +46,9 @@ class MimeAugmenterRuleSuite extends FunSuite {
 
   private def realClassFile(): Array[Byte] = {
     val jar = new ZipFile(
-      new java.io.File("test_data/download/adg_tests/repo_ea/aop-common-1.3.2.jar")
+      new java.io.File(
+        "test_data/download/adg_tests/repo_ea/aop-common-1.3.2.jar"
+      )
     )
     try {
       val entry = jar.entries().asScala.find(_.getName.endsWith(".class")).get
@@ -69,7 +69,9 @@ class MimeAugmenterRuleSuite extends FunSuite {
     assert(!DotnetDetector.mimeRule(Set("application/xml")))
     assert(!DotnetDetector.mimeRule(Set("text/plain")))
     assert(!DotnetDetector.mimeRule(Set("application/java-vm")))
-    assert(DotnetDetector.mimeRule(Set("application/x-msdownload; format=pe32")))
+    assert(
+      DotnetDetector.mimeRule(Set("application/x-msdownload; format=pe32"))
+    )
     assert(DotnetDetector.mimeRule(Set("application/octet-stream")))
 
     assert(!SaffronDetector.mimeRule(Set("application/java-vm")))
@@ -100,7 +102,9 @@ class MimeAugmenterRuleSuite extends FunSuite {
   // in configs) but not by the binary-only/text-config detectors.
   test("R-3 XML keeps crypto detection, skips binary/text-config augmenters") {
     val pemInXml = ByteWrapper(
-      bytes("<config>\n-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n</config>"),
+      bytes(
+        "<config>\n-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n</config>"
+      ),
       "pom.xml",
       None
     )
@@ -111,14 +115,20 @@ class MimeAugmenterRuleSuite extends FunSuite {
       "settings.xml",
       None
     )
-    assert(!javaSecInXml.mimeType.contains(JavaSecurityDetector.JavaSecurityMimeType))
+    assert(
+      !javaSecInXml.mimeType.contains(JavaSecurityDetector.JavaSecurityMimeType)
+    )
 
     val opensslInXml = ByteWrapper(
       bytes("<x>openssl_conf = default_conf</x>"),
       "config.xml",
       None
     )
-    assert(!opensslInXml.mimeType.contains(OpenSSLConfigDetector.OpenSSLConfigMimeType))
+    assert(
+      !opensslInXml.mimeType.contains(
+        OpenSSLConfigDetector.OpenSSLConfigMimeType
+      )
+    )
   }
 
   // R-4 — degenerate octet-stream fragments are still probed by every
@@ -137,7 +147,9 @@ class MimeAugmenterRuleSuite extends FunSuite {
   // binaries.
   test("R-5 binary PEM carrier still detected") {
     val markerLib = ByteWrapper(
-      bytes("\u0000\u0000-----BEGIN CERTIFICATE-----\u0000MIIB\u0000-----END CERTIFICATE-----\u0000"),
+      bytes(
+        "\u0000\u0000-----BEGIN CERTIFICATE-----\u0000MIIB\u0000-----END CERTIFICATE-----\u0000"
+      ),
       "usr/lib/libmbedtls.so.2.14.1",
       None
     )

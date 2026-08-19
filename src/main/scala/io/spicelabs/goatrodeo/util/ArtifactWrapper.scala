@@ -223,10 +223,11 @@ object ArtifactWrapper {
     }
   }
 
-  private val mimeTypeAugmenters
-      : AtomicReference[
-        Vector[(Set[String] => Boolean, (ArtifactWrapper, Set[String]) => Set[String])]
-      ] =
+  private val mimeTypeAugmenters: AtomicReference[
+    Vector[
+      (Set[String] => Boolean, (ArtifactWrapper, Set[String]) => Set[String])
+    ]
+  ] =
     AtomicReference(Vector())
 
   /** MIME gate helper for per-augmenter applicability rules: true when the MIME
@@ -240,9 +241,7 @@ object ArtifactWrapper {
     */
   def noneOf(blocked: String*)(mimes: Set[String]): Boolean = {
     !mimes.exists(m =>
-      blocked.exists(b =>
-        if (b.endsWith("/")) m.startsWith(b) else m == b
-      )
+      blocked.exists(b => if (b.endsWith("/")) m.startsWith(b) else m == b)
     )
   }
 
@@ -270,8 +269,8 @@ object ArtifactWrapper {
     )
 
   /** Augment the mime type with other mime types. Each registered augmenter
-    * carries its own applicability rule (see [[addMimeTypeAugmenter]]) so a
-    * new augmenter can be added without understanding any global skip logic.
+    * carries its own applicability rule (see [[addMimeTypeAugmenter]]) so a new
+    * augmenter can be added without understanding any global skip logic.
     */
   def augmentMimeTypes(
       artifact: ArtifactWrapper,
@@ -279,9 +278,8 @@ object ArtifactWrapper {
   ): Set[String] = {
     if (augmentationCannotApply(mimes)) mimes
     else
-      mimeTypeAugmenters.get().foldLeft(mimes) {
-        case (cur, (rule, theFn)) =>
-          if (rule(cur)) theFn(artifact, cur) else cur
+      mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, (rule, theFn)) =>
+        if (rule(cur)) theFn(artifact, cur) else cur
       }
   }
 
@@ -295,9 +293,15 @@ object ArtifactWrapper {
   }
 
   // constructor
-  addMimeTypeAugmenter(DotnetDetector.mimeRule)(DotnetDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(SaffronDetector.mimeRule)(SaffronDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(CryptoDetector.mimeRule)(CryptoDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(DotnetDetector.mimeRule)(
+    DotnetDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(SaffronDetector.mimeRule)(
+    SaffronDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(CryptoDetector.mimeRule)(
+    CryptoDetector.mimeTypeAugmenter
+  )
   addMimeTypeAugmenter(OpenSSLConfigDetector.mimeRule)(
     OpenSSLConfigDetector.mimeTypeAugmenter
   )
