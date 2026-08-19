@@ -42,6 +42,30 @@ downstream filtering chooses what to act on.
 +
 [`...is always a superset of input (additive)`](../src/test/scala/strategies/CertificatesStubTests.scala).
 
+### Per-augmenter applicability rules
+
+Every registered augmenter carries its own block-shaped MIME rule
+(`addMimeTypeAugmenter(rule)(fn)` in `ArtifactWrapper`; `noneOf` helper), so a
+new augmenter is added without touching any global skip logic. Rules only
+block MIMEs that provably cannot match — unknown or degenerate MIMEs (inner
+package fragments, future ecosystems) are always probed, so a wrong rule can
+only cost performance, never a false negative.
+
+| Augmenter | Blocked MIMEs |
+|-----------|---------------|
+| `CryptoDetector` | `application/java-vm` |
+| `CryptoContentDetector` | `application/java-vm` |
+| `OpenSSLConfigDetector` | media (`image/`·`audio/`·`video/`), class mimes, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` |
+| `JavaSecurityDetector` | same as OpenSSLConfigDetector |
+| `JavaArchiveDetector` | `text/*`, `application/xml`, `application/java-vm` |
+| `DotnetDetector` | `text/*`, `application/xml`, `application/java-vm` |
+| `SaffronDetector` | `application/java-vm` only (text families stay probed: Tika mislabels `.vhd` as `text/x-vhdl` and Saffron exists to re-check those) |
+
+Verified by `MimeAugmenterRuleSuite` (R-1 rule table, R-2 class files
+augment nothing, R-3 XML keeps crypto detection while skipping
+binary/text-config augmenters, R-4 degenerate fragments stay probed, R-5
+binary PEM carriers still detected).
+
 ### Detection signature inventory
 
 The detector recognizes the following content patterns. Most match

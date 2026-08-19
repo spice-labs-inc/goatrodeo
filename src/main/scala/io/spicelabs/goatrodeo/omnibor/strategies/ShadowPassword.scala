@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -56,7 +57,8 @@ object ShadowPasswordStrategy {
           path.endsWith("etc/gshadow") ||
           path.endsWith("etc/passwd") ||
           path.endsWith("etc/group")
-      isPasswordFile && hasPasswordHash(artifact)
+      isPasswordFile &&
+      artifact.mimeType.contains(CryptoContentDetector.ShadowPasswordMime)
     }.toVector
 
     val uuids = mine.map(_.uuid).toSet
@@ -84,17 +86,25 @@ object ShadowPasswordStrategy {
     * hash. This avoids emitting placeholder files (e.g. `/etc/passwd` and
     * `/etc/group` that only contain `x` or `*`) as cryptographic assets.
     */
+  /** True when the text contains at least one non-empty, non-locked password
+    * hash; used for claiming (via the MIME-augmentation pass) and by tests.
+    */
+  private[goatrodeo] def containsHash(text: String): Boolean = {
+    text.split("\n").exists { line =>
+      line.trim.split(":") match {
+        case Array(_, hash, _*)
+            if hash.nonEmpty && hashAlgorithm(hash) != "locked" =>
+          true
+        case _ => false
+      }
+    }
+  }
+
   private def hasPasswordHash(artifact: ArtifactWrapper): Boolean = {
     Try(artifact.withStream { stream =>
-      val text = new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
-      text.split("\n").exists { line =>
-        line.trim.split(":") match {
-          case Array(_, hash, _*)
-              if hash.nonEmpty && hashAlgorithm(hash) != "locked" =>
-            true
-          case _ => false
-        }
-      }
+      containsHash(
+        new String(Helpers.slurpInput(stream), StandardCharsets.UTF_8)
+      )
     }).getOrElse(false)
   }
 

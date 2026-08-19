@@ -174,6 +174,9 @@ sealed trait ArtifactWrapper {
     * however, files are on a POSIX filesystem so having a handle to the file
     * (e.g., `FileInputStream`), the FileInputStream will live for the duration
     * of the reference.
+    *
+    * This is a *VERY* expensive call. Do not use it casually. Use it *ONLY* if
+    * `withStream` will not suffice
     */
   def withFile[T](func: File => T): T
 }
@@ -220,9 +223,27 @@ object ArtifactWrapper {
     }
   }
 
-  private val mimeTypeAugmenters
-      : AtomicReference[Vector[(ArtifactWrapper, Set[String]) => Set[String]]] =
+  private val mimeTypeAugmenters: AtomicReference[
+    Vector[
+      (Set[String] => Boolean, (ArtifactWrapper, Set[String]) => Set[String])
+    ]
+  ] =
     AtomicReference(Vector())
+
+  /** MIME gate helper for per-augmenter applicability rules: true when the MIME
+    * set contains none of the blocked names. A name ending in `/` matches as a
+    * prefix (e.g. `"text/"`); any other name matches exactly.
+    *
+    * Rules are deliberately block-shaped: blocking only MIMEs that provably
+    * cannot match the augmenter keeps every unknown/degenerate MIME (inner
+    * package fragments, future ecosystems) probed, so a wrong rule can only
+    * cost performance, never a false negative.
+    */
+  def noneOf(blocked: String*)(mimes: Set[String]): Boolean = {
+    !mimes.exists(m =>
+      blocked.exists(b => if (b.endsWith("/")) m.startsWith(b) else m == b)
+    )
+  }
 
   /** MIME types that are confidently terminal for the purpose of augmentation:
     * none of the registered augmenters (.NET PE, VM disk image, crypto
@@ -247,7 +268,9 @@ object ArtifactWrapper {
         m.startsWith("video/") || terminalBinaryMimeTypes.contains(m)
     )
 
-  /** Augment the mime type with other mime types
+  /** Augment the mime type with other mime types. Each registered augmenter
+    * carries its own applicability rule (see [[addMimeTypeAugmenter]]) so a new
+    * augmenter can be added without understanding any global skip logic.
     */
   def augmentMimeTypes(
       artifact: ArtifactWrapper,
@@ -255,24 +278,42 @@ object ArtifactWrapper {
   ): Set[String] = {
     if (augmentationCannotApply(mimes)) mimes
     else
-      mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, theFn) =>
-        theFn(artifact, cur)
+      mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, (rule, theFn)) =>
+        if (rule(cur)) theFn(artifact, cur) else cur
       }
   }
 
+  /** Register a MIME augmenter with its own applicability rule: the augmenter
+    * only runs when `rule(currentMimes)` is true.
+    */
   def addMimeTypeAugmenter(
-      theFn: (ArtifactWrapper, Set[String]) => Set[String]
-  ): Unit = {
-    mimeTypeAugmenters.getAndUpdate(v => v :+ theFn)
+      rule: Set[String] => Boolean
+  )(theFn: (ArtifactWrapper, Set[String]) => Set[String]): Unit = {
+    mimeTypeAugmenters.getAndUpdate(v => v :+ (rule -> theFn))
   }
 
   // constructor
-  addMimeTypeAugmenter(DotnetDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(SaffronDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(CryptoDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(OpenSSLConfigDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(JavaSecurityDetector.mimeTypeAugmenter)
-  addMimeTypeAugmenter(JavaArchiveDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(DotnetDetector.mimeRule)(
+    DotnetDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(SaffronDetector.mimeRule)(
+    SaffronDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(CryptoDetector.mimeRule)(
+    CryptoDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(OpenSSLConfigDetector.mimeRule)(
+    OpenSSLConfigDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(JavaSecurityDetector.mimeRule)(
+    JavaSecurityDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(JavaArchiveDetector.mimeRule)(
+    JavaArchiveDetector.mimeTypeAugmenter
+  )
+  addMimeTypeAugmenter(CryptoContentDetector.mimeRule)(
+    CryptoContentDetector.mimeTypeAugmenter
+  )
 
   private def massageMimeType(
       fileName: String,

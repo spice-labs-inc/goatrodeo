@@ -28,6 +28,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CipherSuiteResolver
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -51,6 +52,10 @@ object ServiceTlsConfigStrategy {
     "etc/httpd/"
   )
 
+  /** Cheap path gate for the MIME-augmentation pass (no file read). */
+  private[goatrodeo] def isTlsConfigPath(path: String): Boolean =
+    TlsConfigPathPatterns.exists(path.contains)
+
   private[strategies] val UciOption =
     "\\s*option\\s+(\\w+)\\s+['\"]([^'\"]+)['\"]".r
   private[strategies] val UciBool =
@@ -64,9 +69,9 @@ object ServiceTlsConfigStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter { artifact =>
-      isTlsConfigArtifact(artifact)
-    }.toVector
+    val mine = byUUID.values
+      .filter(_.mimeType.contains(CryptoContentDetector.TlsConfigMime))
+      .toVector
 
     val uuids = mine.map(_.uuid).toSet
 
@@ -99,7 +104,7 @@ object ServiceTlsConfigStrategy {
     }.getOrElse(false)
   }
 
-  private def containsTlsConfiguration(text: String): Boolean = {
+  private[goatrodeo] def containsTlsConfiguration(text: String): Boolean = {
     text.linesIterator.exists { line =>
       line.trim match {
         case UciOption("cert", _) | UciOption("key", _) => true

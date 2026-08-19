@@ -216,25 +216,42 @@ object Certificates {
   /** Classify each candidate artifact by MIME priority, parse, and emit
     * `ToProcess` instances.
     */
+  /** True when the artifact's MIME set (computed during the MIME pass)
+    * indicates a certificate-family artifact. The parse itself is deferred to
+    * processing — no file reads during strategy selection.
+    */
+  private[strategies] def isCertificateCandidate(
+      mimes: Set[String]
+  ): Boolean = {
+    mimes.contains(pemBundleMime) || mimes.contains(jksMime) ||
+    mimes.contains(jceksMime) || mimes.contains(pkcs12Mime) ||
+    mimes.contains(crlMime) || mimes.contains(sshCertMime) ||
+    mimes.contains(sshPubkeyMime) ||
+    mimes.contains(pemEncryptedPrivateKeyMime) ||
+    mimes.contains(opensshPrivateKeyMime) || mimes.contains(
+      pemPrivateKeyMime
+    ) ||
+    mimes.contains(pgpKeysMime) || isSingleCertCandidate(mimes)
+  }
+
   def computeCertificateFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val claimed: Iterable[(ArtifactWrapper, ClaimedContent)] = for {
+    val claimed: Iterable[ArtifactWrapper] = for {
       (_, wrapper) <- byUUID
-      content <- classifyAndParse(wrapper)
-    } yield wrapper -> content
+      if isCertificateCandidate(wrapper.mimeType)
+    } yield wrapper
 
-    val claimedUuids: Set[String] = claimed.map(_._1.uuid).toSet
+    val claimedUuids: Set[String] = claimed.map(_.uuid).toSet
     val revisedByUUID = byUUID.filterNot { case (uuid, _) =>
       claimedUuids.contains(uuid)
     }
     val revisedByName = byName.filter { case (_, artifacts) =>
       !artifacts.exists(a => claimedUuids.contains(a.uuid))
     }
-    val toProcess: Vector[ToProcess] = claimed.map { case (artifact, content) =>
-      new Certificates(artifact, content)
-    }.toVector
+    val toProcess: Vector[ToProcess] =
+      claimed.map(artifact => new Certificates(artifact)).toVector
 
     (toProcess, revisedByUUID, revisedByName, "Certificates")
   }
@@ -367,7 +384,13 @@ object Certificates {
     collected.filter(_.nonEmpty).map(Bundle(_))
   }
 
-  /** Parse a keystore. Tries null password only. */
+  /** Parse a keystore. Tries null password only.
+    *
+    * Provider selection: BouncyCastle implements PKCS12 and BKS but has no JKS
+    * or JCEKS implementation at all, so those formats load through the JDK's
+    * SUN/SunJCE providers. Every provider/keystore operation is guarded for
+    * both exceptions and null returns.
+    */
   private[strategies] def parseKeystore(
       artifact: ArtifactWrapper,
       format: String
@@ -379,22 +402,33 @@ object Certificates {
       case "bks"    => "bks"
       case other    => other.toLowerCase
     }
-    val outcome: Try[KeyStore] = Try {
-      artifact.withStream { f =>
-
-        val ks = KeyStore.getInstance(format, "BC")
-        ks.load(f, null)
-        ks
-      }
+    val provider: Option[String] = canonicalFormat match {
+      case "jks"    => Some("SUN")
+      case "jceks"  => Some("SunJCE")
+      case "pkcs12" => Some("BC")
+      case "bks"    => Some("BC")
+      case _        => None
     }
-    outcome match {
-      case scala.util.Success(ks) if canonicalFormat == "bks" =>
+    val ks = Try {
+      artifact.withStream { f =>
+        val store = provider match {
+          case Some(p) => KeyStore.getInstance(canonicalFormat, p)
+          case None    => KeyStore.getInstance(canonicalFormat)
+        }
+        store.load(f, null)
+        store
+      }
+    }.toOption.flatMap(v => Option(v))
+
+    ks match {
+      case Some(_) if canonicalFormat == "bks" =>
         // BC's BKS accepts null password even when generated with a real one; always envelope-only.
         Some(Keystore(None, canonicalFormat, 0))
-      case scala.util.Success(ks) =>
-        val count = Try(ks.size()).getOrElse(0)
-        Some(Keystore(Some(ks), canonicalFormat, count))
-      case scala.util.Failure(_) =>
+      case Some(store) =>
+        val count =
+          Try { store.size() }.toOption.flatMap(v => Option(v)).getOrElse(0)
+        Some(Keystore(Some(store), canonicalFormat, count))
+      case None =>
         Some(Keystore(None, canonicalFormat, 0))
     }
   }
@@ -2010,14 +2044,12 @@ object Certificates {
 
 /** A single artifact claimed by the Certificates strategy.
   * @param artifact
-  *   the file the strategy claimed
-  * @param claim
-  *   the parsed cryptographic content
+  *   the file the strategy claimed; parsed lazily during processing
   */
-class Certificates(
-    artifact: ArtifactWrapper,
-    claim: Certificates.ClaimedContent
-) extends ToProcess {
+class Certificates(artifact: ArtifactWrapper) extends ToProcess {
+
+  private lazy val claim: Option[Certificates.ClaimedContent] =
+    Certificates.classifyAndParse(artifact)
 
   override def markSuccessfulCompletion(): Unit = artifact.finished()
 
@@ -2030,6 +2062,5 @@ class Certificates(
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) =
-    Vector(artifact -> SingleMarker()) ->
-      new CertificatesState(artifact, Some(claim))
+    Vector(artifact -> SingleMarker()) -> new CertificatesState(artifact, claim)
 }

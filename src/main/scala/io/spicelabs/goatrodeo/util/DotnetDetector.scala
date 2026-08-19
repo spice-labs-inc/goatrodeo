@@ -48,6 +48,16 @@ object DotnetDetector {
     }
   }
 
+  /** Applicability rule: .NET assemblies are PE32 binaries; text/XML/class
+    * files can never be one.
+    */
+  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
+    ArtifactWrapper.noneOf(
+      "text/",
+      "application/xml",
+      "application/java-vm"
+    )(mimes)
+
   def mimeTypeAugmenter(
       artifact: ArtifactWrapper,
       currentMimes: Set[String]

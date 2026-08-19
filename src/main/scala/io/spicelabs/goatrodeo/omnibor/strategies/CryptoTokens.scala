@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import org.json4s.*
 import org.json4s.native.JsonMethods.parse
@@ -102,9 +103,10 @@ object CryptoTokenStrategy {
   private[strategies] def jwtCandidate(text: String): Option[String] =
     DetectRegex.findFirstMatchIn(text).flatMap(m => Option(m.matched))
 
-  /** True when the bounded content contains a JWT or a JWK; used for claiming.
+  /** True when the bounded content contains a JWT or a JWK; used for claiming
+    * (via the MIME-augmentation pass) and by tests.
     */
-  private[strategies] def detects(text: String): Boolean =
+  private[goatrodeo] def detects(text: String): Boolean =
     jwtCandidate(text).isDefined || looksLikeJwk(text)
 
   /** Read up to `limit` bytes from an artifact as UTF-8/ISO-8859-1. */
@@ -200,9 +202,9 @@ object CryptoTokenStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter { a =>
-      Try(detects(probeText(a))).getOrElse(false)
-    }.toVector
+    val mine = byUUID.values
+      .filter(_.mimeType.contains(CryptoContentDetector.CryptoTokensMime))
+      .toVector
 
     val uuids = mine.map(_.uuid).toSet
 

@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
@@ -138,7 +139,7 @@ object EmbeddedPemStrategy {
       }
   }
 
-  private[strategies] def detects(text: String): Boolean =
+  private[goatrodeo] def detects(text: String): Boolean =
     inlinePemBlobs(text).nonEmpty || base64DataValues(text).nonEmpty ||
       text.contains("-----BEGIN ")
 
@@ -235,10 +236,11 @@ object EmbeddedPemStrategy {
         org.bouncycastle.asn1.ASN1Primitive.fromByteArray(bytes)
       )
     ).toOption.flatMap { pri =>
-      Option(pri.getPrivateKeyAlgorithm).map { algInfo =>
-        val alg = algorithmForOid(algInfo.getAlgorithm.getId)
-        val spki = if (alg == "rsa") rsaSpki(pri) else None
-        DerivedKey(alg, sizeFor(pri), spki)
+      Try(pri.getPrivateKeyAlgorithm).toOption.flatMap(v => Option(v)).map {
+        algInfo =>
+          val alg = algorithmForOid(algInfo.getAlgorithm.getId)
+          val spki = if (alg == "rsa") rsaSpki(pri) else None
+          DerivedKey(alg, sizeFor(pri), spki)
       }
     }
 
@@ -323,12 +325,9 @@ object EmbeddedPemStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter { a =>
-      // Text configs only: binaries with embedded PEM delimiters remain the
-      // EmbeddedCertificates domain.
-      !a.mimeType.exists(CryptoFootprintStrategy.BinaryMimes.contains) &&
-      Try(detects(probeText(a))).getOrElse(false)
-    }.toVector
+    val mine = byUUID.values
+      .filter(_.mimeType.contains(CryptoContentDetector.EmbeddedPemMime))
+      .toVector
 
     val uuids = mine.map(_.uuid).toSet
 

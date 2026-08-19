@@ -698,6 +698,11 @@ object ToProcess {
       BaharatStrategy.computeBaharatFiles,
       DotnetFile.computeDotnetFiles,
       AnnattoStrategy.computeAnnattoFiles,
+      // EmbeddedCertificates must run before Certificates: it claims
+      // binary-mime artifacts in library paths (embedded-cert heuristics,
+      // no reads), so a PEM-marker shared library keeps its embedded-cert
+      // metadata instead of falling to the cert parser.
+      EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
       Certificates.computeCertificateFiles,
       ShadowPasswordStrategy.computeShadowPasswordFiles,
       UsignKeysStrategy.computeUsignKeyFiles,
@@ -706,7 +711,6 @@ object ToProcess {
       ServiceCryptoStrategy.computeServiceCryptoFiles,
       CryptoTokenStrategy.computeCryptoTokenFiles,
       EmbeddedPemStrategy.computeEmbeddedPemFiles,
-      EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
       CryptoFootprintStrategy.computeCryptoFootprintFiles,
       MobileTlsStrategy.computeMobileTlsFiles,
       CryptoDependencyStrategy.computeCryptoDependencyFiles,
@@ -755,6 +759,11 @@ object ToProcess {
         BaharatStrategy.computeBaharatFiles,
         DotnetFile.computeDotnetFiles,
         AnnattoStrategy.computeAnnattoFiles,
+        // EmbeddedCertificates must run before Certificates: it claims
+        // binary-mime artifacts in library paths (embedded-cert heuristics,
+        // no reads), so a PEM-marker shared library keeps its embedded-cert
+        // metadata instead of falling to the cert parser.
+        EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
         Certificates.computeCertificateFiles,
         ShadowPasswordStrategy.computeShadowPasswordFiles,
         UsignKeysStrategy.computeUsignKeyFiles,
@@ -763,7 +772,6 @@ object ToProcess {
         ServiceCryptoStrategy.computeServiceCryptoFiles,
         CryptoTokenStrategy.computeCryptoTokenFiles,
         EmbeddedPemStrategy.computeEmbeddedPemFiles,
-        EmbeddedCertificatesStrategy.computeEmbeddedCertificateFiles,
         CryptoFootprintStrategy.computeCryptoFootprintFiles,
         MobileTlsStrategy.computeMobileTlsFiles,
         CryptoDependencyStrategy.computeCryptoDependencyFiles,

@@ -31,6 +31,15 @@ object SaffronDetector {
         .getOrElse(Set.empty[String])
     })
   }
+
+  /** Applicability rule: only class files are provably impossible. Text
+    * families stay probed deliberately — Tika mislabels real disk images as
+    * text (e.g. a `.vhd` as `text/x-vhdl`) and this augmenter exists to
+    * re-check exactly those.
+    */
+  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
+    ArtifactWrapper.noneOf("application/java-vm")(mimes)
+
   def mimeTypeAugmenter(
       artifact: ArtifactWrapper,
       currentMimes: Set[String]

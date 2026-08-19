@@ -123,6 +123,20 @@ object OpenSSLConfigDetector {
   }
 
   /** Augmenter entry point used by `ArtifactWrapper`. Purely additive. */
+  /** Applicability rule: OpenSSL configs are text-ish files; media, class
+    * files, archives, and XML can never be one. Unknown mimes stay probed.
+    */
+  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
+    ArtifactWrapper.noneOf(
+      "image/",
+      "audio/",
+      "video/",
+      "application/java-vm",
+      "application/java-archive",
+      "application/vnd.android.package-archive",
+      "application/xml"
+    )(mimes)
+
   def mimeTypeAugmenter(
       artifact: ArtifactWrapper,
       currentMimes: Set[String]

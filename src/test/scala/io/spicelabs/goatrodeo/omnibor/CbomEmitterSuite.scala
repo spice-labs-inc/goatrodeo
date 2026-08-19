@@ -14,6 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+import _root_.strategies.CertificatesPipelineRunner
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Helpers
 import munit.FunSuite
@@ -2086,6 +2087,241 @@ class CbomEmitterSuite extends FunSuite {
           val json = writeAndRead(storage, root, dir, version)
           val comp = findComponentByRef(json, certId).get
           assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.38 — keys detected inside a keystore become algorithm assets: every
+  // `Certificates:Entry:<alias>:KeyAlgorithm` (plus KeySize/Curve) emitted by
+  // the certificates strategy is registered as an `alg:` component and the
+  // keystore component references it. THEORY: detecting keys is only useful
+  // if the CBOM represents them; keystores previously emitted a `key`-typed
+  // component with no algorithmRef at all.
+  test("T3.38 keystore-detected keys emit algorithm assets") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val ksId =
+        "gitoid:blob:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      val ks = makeItem(
+        id = ksId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("store.jks"),
+        mimeTypes = TreeSet("application/x-java-keystore"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("store.jks")),
+          "Certificates:KeystoreType" -> TreeSet(StringOrPair("jks")),
+          "Certificates:EntryCount" -> TreeSet(StringOrPair("1")),
+          "Certificates:KeyEntryCount" -> TreeSet(StringOrPair("1")),
+          "Certificates:Entry:mykey:Chain:0:SubjectDN" -> TreeSet(
+            StringOrPair("CN=x")
+          ),
+          "Certificates:Entry:mykey:KeyAlgorithm" -> TreeSet(
+            StringOrPair("rsa")
+          ),
+          "Certificates:Entry:mykey:KeySize" -> TreeSet(StringOrPair("2048"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> ks.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, ks)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val alg = findComponentByRef(json, "alg:pke:rsa")
+          assert(
+            alg.isDefined,
+            "detected keystore key must emit an algorithm asset"
+          )
+          assertEquals(
+            getString(
+              alg.get,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
+            "2048"
+          )
+          val comp = findComponentByRef(json, ksId).get
+          assertEquals(
+            getString(
+              comp,
+              "cryptoProperties",
+              "relatedCryptoMaterialProperties",
+              "type"
+            ),
+            "key"
+          )
+          assertEquals(
+            getString(
+              comp,
+              "cryptoProperties",
+              "relatedCryptoMaterialProperties",
+              "algorithmRef"
+            ),
+            "alg:pke:rsa"
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.39 — trusted-cert entries are certificates, not keys: their per-cert
+  // `Entry:<alias>:KeyAlgorithm` metadata must NOT mint a key algorithm
+  // asset. THEORY: key detection discriminates on the presence of `Chain:`
+  // metadata, which only key entries carry.
+  test("T3.39 trusted-cert entries never mint key assets") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val ksId =
+        "gitoid:blob:sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      val ks = makeItem(
+        id = ksId,
+        connections = TreeSet(EdgeType.containedBy -> rootId),
+        fileNames = TreeSet("trust.jks"),
+        mimeTypes = TreeSet("application/x-java-keystore"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("trust.jks")),
+          "Certificates:KeystoreType" -> TreeSet(StringOrPair("jks")),
+          "Certificates:EntryCount" -> TreeSet(StringOrPair("1")),
+          "Certificates:KeyEntryCount" -> TreeSet(StringOrPair("0")),
+          "Certificates:Entry:trust1:KeyAlgorithm" -> TreeSet(
+            StringOrPair("rsa")
+          ),
+          "Certificates:Entry:trust1:KeySize" -> TreeSet(StringOrPair("2048"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> ks.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, ks)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          assert(
+            findComponentByRef(json, "alg:pke:rsa").isEmpty,
+            "trusted-cert entries must not mint key algorithm assets"
+          )
+          val comp = findComponentByRef(json, ksId).get
+          assertEquals(
+            getString(
+              comp,
+              "cryptoProperties",
+              "relatedCryptoMaterialProperties",
+              "type"
+            ),
+            "key"
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.40 — end-to-end: a real JKS v1 corpus file runs the full pipeline
+  // (MIME detection → Certificates strategy → Item metadata) and the emitted
+  // CBOM contains the keystore component with its detected key as an
+  // algorithm asset. THEORY: T3.38 pins the CBOM mapping with synthetic
+  // metadata and K-C-* pins the parser with the corpus; this test proves the
+  // two halves join — real file bytes in, keystore key in the CBOM out.
+  test("T3.40 real JKS v1 corpus file flows into the CBOM") {
+    val dir = tempDir()
+    try {
+      val fixture =
+        new File(
+          "test_data/certificates/keystores/synthetic/jks-v1/jks-v1-01-rsa-key-single.jks"
+        )
+      assert(fixture.exists(), s"corpus fixture missing: ${fixture.getPath}")
+      val items = CertificatesPipelineRunner.runGoatRodeoOnSingleFile(fixture)
+      assertEquals(items.size, 1)
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      // the pipeline item is top-level (no containedBy), so wrap it under a
+      // synthetic root or the emitter would treat it as a second root
+      val ksItem = items.head
+        .copy(connections =
+          items.head.connections + (EdgeType.containedBy -> rootId)
+        )
+
+      val storage = MemStorage(None)
+      storeItem(storage, ksItem)
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(EdgeType.contains -> ksItem.identifier),
+        fileNames = TreeSet("root")
+      )
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, ksItem.identifier).get
+          assertEquals(
+            propertyMap(comp).get("Certificates:KeystoreType"),
+            Some("jks")
+          )
+          assertEquals(
+            propertyMap(comp).get("Certificates:KeyEntryCount"),
+            Some("1")
+          )
+          assertEquals(
+            getString(
+              comp,
+              "cryptoProperties",
+              "relatedCryptoMaterialProperties",
+              "type"
+            ),
+            "key"
+          )
+          assertEquals(
+            getString(
+              comp,
+              "cryptoProperties",
+              "relatedCryptoMaterialProperties",
+              "algorithmRef"
+            ),
+            "alg:pke:rsa"
+          )
+          val alg = findComponentByRef(json, "alg:pke:rsa")
+          assert(
+            alg.isDefined,
+            "detected keystore key must emit an algorithm asset"
+          )
+          assertEquals(
+            getString(
+              alg.get,
+              "cryptoProperties",
+              "algorithmProperties",
+              "primitive"
+            ),
+            "pke"
+          )
+          assertEquals(
+            getString(
+              alg.get,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
+            "2048"
+          )
           assert(validate(compact(render(json)), schema).isEmpty)
       }
     } finally {
