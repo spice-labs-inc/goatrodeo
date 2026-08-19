@@ -78,6 +78,12 @@ object CryptoContentDetector {
     }.getOrElse("")
   }
 
+  /** Applicability rule: class files can never match any content detector, but
+    * binaries (footprint/embedded PEM) and unknown fragments stay probed.
+    */
+  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
+    ArtifactWrapper.noneOf("application/java-vm")(mimes)
+
   def mimeTypeAugmenter(
       artifact: ArtifactWrapper,
       currentMimes: Set[String]

@@ -65,6 +65,13 @@ object CryptoDetector {
   )
 
   /** Augments the MIME type set for the given artifact. Purely additive. */
+  /** Applicability rule: class files can never carry PEM/SSH/PGP/DER material,
+    * but everything else — including binaries with embedded PEM blocks — is
+    * probed.
+    */
+  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
+    ArtifactWrapper.noneOf("application/java-vm")(mimes)
+
   def mimeTypeAugmenter(
       artifact: ArtifactWrapper,
       currentMimes: Set[String]

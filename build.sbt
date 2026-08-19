@@ -165,6 +165,25 @@ if (System.getenv("TEST_THREAD_CNT") == null) {
 // CI is detected by TEST_THREAD_CNT being set in build_test.yml.
 Test / testForkedParallel := System.getenv("TEST_THREAD_CNT") == null
 
+// Align the forked test JVM with the machine it runs on: 50% of physical RAM,
+// floored at 1G and capped at 32G. Large machines get a heap that supports
+// many in-flight workers; small machines get a proportionally small heap.
+def machineRamBytes: Long = {
+  val bean = java.lang.management.ManagementFactory.getOperatingSystemMXBean
+  bean match {
+    case c: com.sun.management.OperatingSystemMXBean => c.getTotalMemorySize()
+    case _                                           => 4L * 1024 * 1024 * 1024
+  }
+}
+
+Test / javaOptions ++= Seq(
+  {
+    val half = machineRamBytes / 2
+    val heap = math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
+    s"-Xmx${heap}"
+  }
+)
+
 ThisBuild / scalacOptions ++=
   Seq(
     "-deprecation",
