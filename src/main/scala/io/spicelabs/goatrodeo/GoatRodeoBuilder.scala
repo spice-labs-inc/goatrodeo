@@ -272,23 +272,23 @@ class GoatRodeoBuilder {
     }
   }
 
-  /** Refuse to analyze internal files modified after `expiry`. Any archive
+  /** Refuse to analyze internal files modified after `cutoff`. Any archive
     * entry whose modification time is after this instant is dropped from the
     * ADG, along with everything that transitively contains it or is built from
     * it (they must be at least as new), so no dangling references remain.
     * Entries with no/unknown modification time are always kept.
     *
-    * @param expiry
+    * @param cutoff
     *   the cutoff instant
     * @return
     *   this builder
     */
-  def withExpiry(expiry: Instant): GoatRodeoBuilder = {
-    config = config.copy(expiry = Some(expiry))
+  def withCutoff(cutoff: Instant): GoatRodeoBuilder = {
+    config = config.copy(cutoff = Some(cutoff))
     this
   }
 
-  /** String form of [[withExpiry]] parsing a flexible date (e.g. "2026-01-01",
+  /** String form of [[withCutoff]] parsing a flexible date (e.g. "2026-01-01",
     * "today").
     *
     * @param d
@@ -296,10 +296,10 @@ class GoatRodeoBuilder {
     * @return
     *   Right(this builder) if parsed successfully, Left(errorMessage) otherwise
     */
-  def withExpiry(d: String): Either[String, GoatRodeoBuilder] = {
+  def withCutoff(d: String): Either[String, GoatRodeoBuilder] = {
     io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
       case Right(date) =>
-        config = config.copy(expiry = Some(date.toInstant()))
+        config = config.copy(cutoff = Some(date.toInstant()))
         Right(this)
       case Left(error) =>
         Left(error)

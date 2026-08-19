@@ -371,7 +371,7 @@ trait ToProcess {
               Item.itemFrom(
                 artifact,
                 parentId,
-                recordModified = args.expiry.isDefined
+                recordModified = args.cutoff.isDefined
               )
 
             // in blocklist do nothing

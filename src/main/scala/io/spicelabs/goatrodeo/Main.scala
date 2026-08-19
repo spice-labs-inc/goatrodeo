@@ -213,9 +213,9 @@ object Howdy {
       blockList = params.blockList,
       finishedFile = onFileFinish,
       done = onRunFinish,
-      // Fall back to the goatrodeo.expiry system property when no explicit expiry was set.
+      // Fall back to the goatrodeo.expiry system property when no explicit cutoff was set.
       args =
-        params.copy(expiry = params.expiry.orElse(Config.expiryFromProperty)),
+        params.copy(cutoff = params.cutoff.orElse(Config.expiryFromProperty)),
       preWriteDB = preWriteDB,
       fsFilePaths = params.fsFilePaths
     )

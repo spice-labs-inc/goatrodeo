@@ -113,7 +113,7 @@ case class Config(
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
     progressListener: Option[ProgressListener] = None,
-    expiry: Option[Instant] = None,
+    cutoff: Option[Instant] = None,
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6"
 ) {
@@ -150,8 +150,8 @@ case class Config(
 object Config {
   private val logger = Logger(getClass())
 
-  /** System property supplying the expiry cutoff when it is not set explicitly
-    * (via `--expiry` or `withExpiry`). This lets an in-JVM caller — or
+  /** System property supplying the cutoff cutoff when it is not set explicitly
+    * (via `--cutoff` or `withCutoff`). This lets an in-JVM caller — or
     * `-Dgoatrodeo.expiry=…` on the command line — enable the file-modification
     * cutoff without depending on the builder API: an older build that does not
     * read this property simply ignores it and runs normally. Accepts epoch
@@ -218,15 +218,15 @@ object Config {
           "Tag all top level artifacts (files) with the current date and the text of the tag"
         )
         .action((x, c) => c.copy(tag = Some(x))),
-      opt[String]("expiry")
+      opt[String]("cutoff")
         .text(
           "Refuse to analyze internal files modified after this date/time (e.g. 2026-01-01); dependents are dropped too"
         )
         .action((x, c) =>
           DateParser.parse(x) match {
-            case Right(date) => c.copy(expiry = Some(date.toInstant()))
+            case Right(date) => c.copy(cutoff = Some(date.toInstant()))
             case Left(error) =>
-              logger.error(f"Invalid --expiry value: ${error}")
+              logger.error(f"Invalid --cutoff value: ${error}")
               c
           }
         ),

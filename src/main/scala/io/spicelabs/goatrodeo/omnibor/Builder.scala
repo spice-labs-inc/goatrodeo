@@ -497,7 +497,7 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                writeGoatRodeoFiles(lf, args.expiry)
+                writeGoatRodeoFiles(lf, args.cutoff)
               case _ => logger.error("Didn't write"); None
             }
 
@@ -519,7 +519,7 @@ object Builder {
 
   }
 
-  /** Enforce an expiry cutoff on the fully-assembled graph: drop every node
+  /** Enforce an cutoff cutoff on the fully-assembled graph: drop every node
     * whose recorded file-modification time is after `cutoff`, plus every node
     * that transitively contains it or is built from it (they must be at least
     * as new), then strip any resulting dangling edges so no references to
@@ -574,7 +574,7 @@ object Builder {
         else i.copy(connections = kept)
       }
       logger.info(
-        f"Expiry ${cutoff}: removed ${removed.size}%,d nodes (${pastCutoff.size}%,d modified after cutoff, ${removed.size - pastCutoff.size}%,d dependents)"
+        f"Cutoff ${cutoff}: removed ${removed.size}%,d nodes (${pastCutoff.size}%,d modified after cutoff, ${removed.size - pastCutoff.size}%,d dependents)"
       )
       cleaned
     }
@@ -582,7 +582,7 @@ object Builder {
 
   def writeGoatRodeoFiles(
       store: ListFileNames & Storage,
-      expiry: Option[Instant] = None
+      cutoff: Option[Instant] = None
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
@@ -620,7 +620,7 @@ object Builder {
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
 
-        val finalItems = expiry match {
+        val finalItems = cutoff match {
           case Some(cutoff) => pruneExpired(sorted, cutoff)
           case None         => sorted
         }

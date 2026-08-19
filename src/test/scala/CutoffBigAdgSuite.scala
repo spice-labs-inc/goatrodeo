@@ -14,7 +14,7 @@ import java.time.Instant
 import scala.collection.mutable
 import scala.util.Try
 
-/** Re-runs the big (~1GB) ADG build twice — once with a far-future expiry
+/** Re-runs the big (~1GB) ADG build twice — once with a far-future cutoff
   * (nothing pruned) and once with a real cutoff that drops the newest slice of
   * internal files — then checks that the pruned ADG is smaller (fewer nodes)
   * and that every edge still resolves to a real node.
@@ -23,9 +23,9 @@ import scala.util.Try
   * `GOATRODEO_BIG_EXPIRY=1` and the `test_data/download/adg_tests` corpus is
   * present.
   *
-  * GOATRODEO_BIG_EXPIRY=1 sbt "testOnly ExpiryBigAdgSuite"
+  * GOATRODEO_BIG_EXPIRY=1 sbt "testOnly CutoffBigAdgSuite"
   */
-class ExpiryBigAdgSuite extends munit.FunSuite {
+class CutoffBigAdgSuite extends munit.FunSuite {
 
   // Two full builds; give it room.
   override val munitTimeout = scala.concurrent.duration.Duration(2, "hours")
@@ -35,10 +35,10 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
       .flatMap(s => Try(Integer.parseInt(s.trim())).toOption)
       .getOrElse(25)
 
-  /** The exact same build ADGTests performs, into `dest`, with the given expiry
+  /** The exact same build ADGTests performs, into `dest`, with the given cutoff
     * cutoff.
     */
-  private def build(dest: File, expiry: Instant, source: File): Boolean = {
+  private def build(dest: File, cutoff: Instant, source: File): Boolean = {
     if (dest.exists()) Helpers.deleteDirectory(dest.toPath())
     dest.mkdirs()
 
@@ -46,7 +46,7 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
     Builder.buildDB(
       dest = dest,
       tempDir = None,
-      args = Config(expiry = Some(expiry)),
+      args = Config(cutoff = Some(cutoff)),
       threadCnt = threadCnt,
       maxRecords = 10000,
       tag = Some(TagInfo("foo", None)),
@@ -150,10 +150,10 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
     (count, sample.toVector)
   }
 
-  test("big ADG shrinks under an expiry cutoff and stays edge-coherent") {
+  test("big ADG shrinks under an cutoff cutoff and stays edge-coherent") {
     assume(
       System.getenv("GOATRODEO_BIG_EXPIRY") == "1",
-      "Set GOATRODEO_BIG_EXPIRY=1 to run the heavy two-build expiry check"
+      "Set GOATRODEO_BIG_EXPIRY=1 to run the heavy two-build cutoff check"
     )
     val source = File("test_data/download/adg_tests")
     assume(
@@ -169,7 +169,7 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
 
     // --- Step 1: FULL build. Far-future cutoff prunes nothing but records mod-times. ---
     val farFuture = Instant.parse("3000-01-01T00:00:00Z")
-    println(s"[expiry] FULL build -> ${fullDir} (threadCnt=$threadCnt)")
+    println(s"[cutoff] FULL build -> ${fullDir} (threadCnt=$threadCnt)")
     assert(
       build(fullDir, farFuture, source),
       "FULL build should finish successfully"
@@ -189,15 +189,15 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
     val cutoff = Instant.ofEpochMilli(cutoffMillis)
     val pastCutoff = mtimes.count(_ > cutoffMillis)
     println(
-      f"[expiry] recorded mtimes: ${mtimes.size}%,d dated nodes, " +
+      f"[cutoff] recorded mtimes: ${mtimes.size}%,d dated nodes, " +
         f"range ${Instant.ofEpochMilli(sorted.head)}..${Instant.ofEpochMilli(sorted.last)}"
     )
     println(
-      f"[expiry] chosen cutoff (75th pct) = $cutoff -> $pastCutoff%,d dated nodes past cutoff"
+      f"[cutoff] chosen cutoff (75th pct) = $cutoff -> $pastCutoff%,d dated nodes past cutoff"
     )
 
     // --- Step 3: PRUNED build with the real cutoff. ---
-    println(s"[expiry] PRUNED build -> ${prunedDir}")
+    println(s"[cutoff] PRUNED build -> ${prunedDir}")
     assert(
       build(prunedDir, cutoff, source),
       "PRUNED build should finish successfully"
@@ -211,10 +211,10 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
     val nodePct = 100.0 * (fullNodes - prunedNodes) / fullNodes
     val bytePct = 100.0 * (fullBytes - prunedBytes) / fullBytes
     println(
-      f"[expiry] nodes: full=$fullNodes%,d  pruned=$prunedNodes%,d  (-$nodePct%.1f%%)"
+      f"[cutoff] nodes: full=$fullNodes%,d  pruned=$prunedNodes%,d  (-$nodePct%.1f%%)"
     )
     println(
-      f"[expiry] bytes: full=$fullBytes%,d  pruned=$prunedBytes%,d  (-$bytePct%.1f%%)"
+      f"[cutoff] bytes: full=$fullBytes%,d  pruned=$prunedBytes%,d  (-$bytePct%.1f%%)"
     )
 
     assert(
@@ -229,7 +229,7 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
     // --- Step 5: verify edge coherence in both clusters. ---
     val fullIds = nodeIds(fullDir)
     val (fullDangling, fullSample) = danglingEdges(fullDir, fullIds)
-    println(f"[expiry] FULL dangling edges: $fullDangling%,d")
+    println(f"[cutoff] FULL dangling edges: $fullDangling%,d")
     fullSample.foreach { case (s, e, t) =>
       println(s"           full dangling: $s -[$e]-> $t")
     }
@@ -240,13 +240,13 @@ class ExpiryBigAdgSuite extends munit.FunSuite {
 
     val prunedIds = nodeIds(prunedDir)
     val (prunedDangling, prunedSample) = danglingEdges(prunedDir, prunedIds)
-    println(f"[expiry] PRUNED dangling edges: $prunedDangling%,d")
+    println(f"[cutoff] PRUNED dangling edges: $prunedDangling%,d")
     prunedSample.foreach { case (s, e, t) =>
       println(s"           pruned dangling: $s -[$e]-> $t")
     }
     assert(
       prunedDangling == 0L,
-      s"PRUNED cluster should have no dangling edges after expiry, found $prunedDangling"
+      s"PRUNED cluster should have no dangling edges after cutoff, found $prunedDangling"
     )
   }
 }
