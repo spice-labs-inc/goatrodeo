@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 
 import java.nio.charset.StandardCharsets
@@ -284,7 +285,7 @@ object CryptoFootprintStrategy {
     hits.result()
   }
 
-  private[strategies] def detects(content: String): Boolean =
+  private[goatrodeo] def detects(content: String): Boolean =
     scan(content).nonEmpty
 
   private def readBounded(a: ArtifactWrapper, limit: Int): String = {
@@ -311,10 +312,9 @@ object CryptoFootprintStrategy {
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
-    val mine = byUUID.values.filter { a =>
-      a.mimeType.exists(BinaryMimes.contains) &&
-      Try(detects(probeText(a))).getOrElse(false)
-    }.toVector
+    val mine = byUUID.values
+      .filter(_.mimeType.contains(CryptoContentDetector.CryptoFootprintMime))
+      .toVector
 
     val uuids = mine.map(_.uuid).toSet
 

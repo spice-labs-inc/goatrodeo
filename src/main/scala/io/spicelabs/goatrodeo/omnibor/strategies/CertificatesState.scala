@@ -660,24 +660,37 @@ class CertificatesState(
         // Encrypted / failed null-password load → envelope-only
         tm = tm + (adHoc("KeystoreEncrypted") -> TreeSet(StringOrPair("true")))
       case Some(ks) =>
-        val aliases = Try(ks.aliases().asScala.toList).getOrElse(Nil)
+        val aliases = Try { ks.aliases().asScala.toList }.toOption
+          .flatMap(v => Option(v))
+          .getOrElse(Nil)
         var certCount = 0
         var keyEntryCount = 0
         aliases.foreach { alias =>
           val perEntryPrefix = s"Entry:${urlEncodeAlias(alias)}:"
           val perEntryAdHoc: String => String =
             sub => MKC.adHoc("Certificates")(s"$perEntryPrefix$sub")
-          if (Try(ks.isCertificateEntry(alias)).getOrElse(false)) {
+          if (
+            Try { ks.isCertificateEntry(alias) }.toOption
+              .flatMap(v => Option(v))
+              .getOrElse(false)
+          ) {
             certCount += 1
-            ks.getCertificate(alias) match {
-              case x: X509Certificate =>
+            Try { ks.getCertificate(alias) }.toOption.flatMap(v =>
+              Option(v)
+            ) match {
+              case Some(x: X509Certificate) =>
                 tm = tm ++ perCertMetadata(perEntryAdHoc, x)
               case _ => ()
             }
-          } else if (Try(ks.isKeyEntry(alias)).getOrElse(false)) {
+          } else if (
+            Try { ks.isKeyEntry(alias) }.toOption
+              .flatMap(v => Option(v))
+              .getOrElse(false)
+          ) {
             keyEntryCount += 1
             // only the chain, not the key material
-            val chain = Option(ks.getCertificateChain(alias))
+            val chain = Try { ks.getCertificateChain(alias) }.toOption
+              .flatMap(v => Option(v))
               .map(_.toIndexedSeq)
               .getOrElse(IndexedSeq.empty)
             chain.zipWithIndex.foreach {
@@ -688,6 +701,27 @@ class CertificatesState(
               case _ => ()
             }
             certCount += chain.length
+            // Detect the key itself from the entry's public key (the chain
+            // head certificate) — never the protected private key, which is
+            // unreadable without the key password. Each operation is guarded
+            // for exceptions and nulls.
+            chain.headOption.foreach {
+              case head: X509Certificate =>
+                val pub =
+                  Try { head.getPublicKey }.toOption.flatMap(v => Option(v))
+                val (alg, qualMap) = keyAlgAndQualifier(pub, head)
+                tm = tm +
+                  (perEntryAdHoc("KeyAlgorithm") -> TreeSet(StringOrPair(alg)))
+                qualMap.get("size").foreach { v =>
+                  tm = tm +
+                    (perEntryAdHoc("KeySize") -> TreeSet(StringOrPair(v)))
+                }
+                qualMap.get("curve").foreach { v =>
+                  tm = tm +
+                    (perEntryAdHoc("Curve") -> TreeSet(StringOrPair(v)))
+                }
+              case _ => ()
+            }
           }
         }
         tm = tm +

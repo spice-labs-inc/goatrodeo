@@ -27,8 +27,8 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Helpers
 
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeMap
@@ -85,13 +85,23 @@ object EmbeddedCertificatesStrategy {
     "CertificateFactory"
   )
 
-  /** Compute binary files that contain embedded certificate material. */
+  /** Cap for the marker scan performed during processing (16 MiB). PEM blocks
+    * beyond this window are not detected and the metadata notes the truncation.
+    */
+  private[strategies] val MaxEmbeddedCertScanBytes: Int = 16 * 1024 * 1024
+
+  /** Compute binary files that may contain embedded certificate material.
+    * Claims purely by path/MIME heuristics — no file reads during selection;
+    * the (capped) marker scan happens during processing. Binaries already
+    * claimed by the crypto-footprint scanner (via its MIME) are left to it.
+    */
   def computeEmbeddedCertificateFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val mine = byUUID.values.filter { artifact =>
-      isBinaryArtifact(artifact) && hasEmbeddedCertificateMarkers(artifact)
+      isBinaryArtifact(artifact) &&
+      !artifact.mimeType.contains(CryptoContentDetector.CryptoFootprintMime)
     }.toVector
 
     val uuids = mine.map(_.uuid).toSet
@@ -120,18 +130,29 @@ object EmbeddedCertificatesStrategy {
     (binaryMime && inLibDir) || knownCryptoLib
   }
 
-  private def hasEmbeddedCertificateMarkers(
+  /** Capped marker scan: returns `(markersFound, capExceeded)`. */
+  private[strategies] def scanMarkers(
       artifact: ArtifactWrapper
-  ): Boolean = {
+  ): (Boolean, Boolean) = {
     Try {
       artifact.withStream { stream =>
-        val prefix = new String(
-          Helpers.slurpInput(stream),
+        val buf = new Array[Byte](MaxEmbeddedCertScanBytes + 1)
+        var total = 0
+        var n = stream.read(buf, total, buf.length - total)
+        while (n > 0 && total + n <= MaxEmbeddedCertScanBytes) {
+          total += n
+          n = stream.read(buf, total, buf.length - total)
+        }
+        val capExceeded = n > 0
+        val text = new String(
+          buf,
+          0,
+          total,
           StandardCharsets.ISO_8859_1
         )
-        PemMarkers.exists(prefix.contains)
+        (PemMarkers.exists(text.contains), capExceeded)
       }
-    }.getOrElse(false)
+    }.getOrElse((false, false))
   }
 }
 
@@ -201,15 +222,28 @@ class EmbeddedCertificateState(artifact: ArtifactWrapper)
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val path = artifact.path()
     val fileName = path.split('/').lastOption.getOrElse(path)
-    TreeMap[String, TreeSet[StringOrPair]](
-      MKC.NAME -> TreeSet(StringOrPair(fileName)),
-      MKC.DESCRIPTION -> TreeSet(
-        StringOrPair("Shared library containing embedded certificate material")
-      ),
-      adHoc("FilePath") -> TreeSet(StringOrPair("/" + path)),
-      adHoc("Marker") -> TreeSet(
-        StringOrPair("PEM certificate delimiters")
-      )
-    )
+    val (markersFound, capExceeded) =
+      EmbeddedCertificatesStrategy.scanMarkers(artifact)
+    val markerFields: Vector[(String, String)] =
+      if (markersFound)
+        Vector(adHoc("Marker") -> "PEM certificate delimiters")
+      else Vector(adHoc("NoPemMarkers") -> "true")
+    val capFields: Vector[(String, String)] =
+      if (capExceeded) Vector(adHoc("ScanCapExceeded") -> "true")
+      else Vector()
+    val fields: Vector[(String, TreeSet[StringOrPair])] =
+      Vector(
+        MKC.NAME -> TreeSet(StringOrPair(fileName)),
+        MKC.DESCRIPTION -> TreeSet(
+          StringOrPair(
+            "Shared library containing embedded certificate material"
+          )
+        ),
+        adHoc("FilePath") -> TreeSet(StringOrPair("/" + path))
+      ) ++
+        (markerFields ++ capFields).map { case (k, v) =>
+          k -> TreeSet(StringOrPair(v))
+        }
+    TreeMap.from(fields)
   }
 }

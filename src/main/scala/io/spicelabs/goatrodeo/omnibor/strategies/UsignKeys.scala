@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -49,7 +50,8 @@ object UsignKeysStrategy {
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val mine = byUUID.values.filter { artifact =>
       val path = artifact.path()
-      path.contains("/etc/opkg/keys/") || isUsignKeyFile(artifact)
+      path.contains("/etc/opkg/keys/") ||
+      artifact.mimeType.contains(CryptoContentDetector.UsignKeyMime)
     }.toVector
 
     val uuids = mine.map(_.uuid).toSet
@@ -69,16 +71,19 @@ object UsignKeysStrategy {
     )
   }
 
+  /** True when the content looks like a usign/signify public key; used for
+    * claiming (via the MIME-augmentation pass) and by tests.
+    */
+  private[goatrodeo] def detects(text: String): Boolean = {
+    text.contains("untrusted comment:") &&
+    text.linesIterator.exists(_.startsWith("RW"))
+  }
+
   /** True if the artifact looks like a usign/signify public key by content. */
   private def isUsignKeyFile(artifact: ArtifactWrapper): Boolean = {
     Try {
       artifact.withStream { stream =>
-        val prefix = new String(
-          stream.readNBytes(64),
-          StandardCharsets.UTF_8
-        )
-        prefix.contains("untrusted comment:") &&
-        prefix.linesIterator.exists(_.startsWith("RW"))
+        detects(new String(stream.readNBytes(64), StandardCharsets.UTF_8))
       }
     }.getOrElse(false)
   }

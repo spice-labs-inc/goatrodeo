@@ -16,6 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
@@ -27,6 +28,7 @@ import org.json4s.native.JsonMethods.render
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** A dependency entry extracted from a Gradle lockfile.
   *
@@ -108,7 +110,7 @@ object GradleLockfile {
   /** Determine the Gradle configuration name from a legacy lockfile filename.
     * e.g. `compileClasspath.lockfile` → `compileClasspath`
     */
-  private def configFromFilename(name: String): Option[String] = {
+  private[goatrodeo] def configFromFilename(name: String): Option[String] = {
     if (name.endsWith(".lockfile")) {
       Some(name.stripSuffix(".lockfile"))
     } else {
@@ -118,33 +120,26 @@ object GradleLockfile {
 
   /** Compute files to process for Gradle lockfile strategy. Claims files named
     * `gradle.lockfile`, `buildscript-gradle.lockfile`, and legacy files in
-    * `dependency-locks` ending with `.lockfile`.
+    * `dependency-locks` ending with `.lockfile` — selected by MIME (detected
+    * during the MIME augmentation pass), no file reads here.
     */
   def computeGradleLockfiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
 
-    val candidates = for {
-      (_, wrapper) <- byUUID
-      name = wrapper.filenameWithNoPath
-      path = wrapper.path()
-      if name == "gradle.lockfile" ||
-        name == "buildscript-gradle.lockfile" ||
-        (name.endsWith(".lockfile") && path.contains("dependency-locks"))
-      content <- scala.util
-        .Try(
-          wrapper.withStream(Helpers.slurpInputToString(_))
-        )
-        .toOption
-      cfg =
-        if (name == "gradle.lockfile" || name == "buildscript-gradle.lockfile")
-          None
-        else configFromFilename(name)
-      deps = parseLockfile(content, cfg)
-    } yield (wrapper, deps)
+    val candidates = byUUID.values.filter { wrapper =>
+      val name = wrapper.filenameWithNoPath
+      val path = wrapper.path()
+      val nameMatches =
+        name == "gradle.lockfile" ||
+          name == "buildscript-gradle.lockfile" ||
+          (name.endsWith(".lockfile") && path.contains("dependency-locks"))
+      nameMatches &&
+      wrapper.mimeType.contains(CryptoContentDetector.GradleLockfileMime)
+    }.toVector
 
-    val uuids: Set[String] = candidates.map(_._1.uuid).toSet
+    val uuids: Set[String] = candidates.map(_.uuid).toSet
 
     val revisedByUUID = byUUID.filter { case (name, _) =>
       !uuids.contains(name)
@@ -154,9 +149,7 @@ object GradleLockfile {
     }
 
     (
-      candidates.map { case (wrapper, deps) =>
-        GradleLockfile(wrapper, deps)
-      }.toVector,
+      candidates.map(wrapper => new GradleLockfile(wrapper)).toVector,
       revisedByUUID,
       revisedByName,
       "Gradle"
@@ -168,13 +161,21 @@ object GradleLockfile {
   *
   * @param artifact
   *   the lockfile artifact wrapper
-  * @param dependencies
-  *   parsed dependencies from the lockfile
   */
-class GradleLockfile(
-    val artifact: ArtifactWrapper,
-    val dependencies: Vector[GradleDependency]
-) extends ToProcess {
+class GradleLockfile(val artifact: ArtifactWrapper) extends ToProcess {
+
+  private lazy val dependencies: Vector[GradleDependency] = {
+    val name = artifact.filenameWithNoPath
+    val cfg =
+      if (name == "gradle.lockfile" || name == "buildscript-gradle.lockfile")
+        None
+      else GradleLockfile.configFromFilename(name)
+    Try(artifact.withStream(Helpers.slurpInputToString(_))).toOption
+      .flatMap(content =>
+        Try(GradleLockfile.parseLockfile(content, cfg)).toOption
+      )
+      .getOrElse(Vector.empty)
+  }
 
   def markSuccessfulCompletion(): Unit = {
     artifact.finished()

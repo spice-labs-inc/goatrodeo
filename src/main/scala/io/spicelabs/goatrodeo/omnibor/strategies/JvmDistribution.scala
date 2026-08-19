@@ -16,6 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
@@ -157,26 +158,20 @@ object JvmDistribution {
   }
 
   /** Compute files to process for JVM distributions. Claims files named
-    * `release` that contain JAVA_VERSION or JAVA_RUNTIME_VERSION.
+    * `release` selected by MIME (detected during the MIME augmentation pass);
+    * the release file is parsed lazily during processing, not here.
     */
   def computeJvmFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
 
-    val candidates = for {
-      (_, wrapper) <- byUUID
-      if wrapper.filenameWithNoPath == "release"
-      content <- Try(
-        wrapper.withStream(Helpers.slurpInputToString(_))
-      ).toOption
-      if content.contains("JAVA_VERSION") || content.contains(
-        "JAVA_RUNTIME_VERSION"
-      )
-      data = parseReleaseFile(content)
-    } yield (wrapper, data)
+    val candidates = byUUID.values.filter { wrapper =>
+      wrapper.filenameWithNoPath == "release" &&
+      wrapper.mimeType.contains(CryptoContentDetector.JvmReleaseMime)
+    }.toVector
 
-    val uuids: Set[String] = candidates.map(_._1.uuid).toSet
+    val uuids: Set[String] = candidates.map(_.uuid).toSet
 
     val revisedByUUID = byUUID.filter { case (name, _) =>
       !uuids.contains(name)
@@ -186,9 +181,7 @@ object JvmDistribution {
     }
 
     (
-      candidates.map { case (wrapper, data) =>
-        new JvmDistribution(wrapper, data)
-      }.toVector,
+      candidates.map(wrapper => new JvmDistribution(wrapper)).toVector,
       revisedByUUID,
       revisedByName,
       "JvmDistribution"
@@ -196,10 +189,13 @@ object JvmDistribution {
   }
 }
 
-class JvmDistribution(
-    val artifact: ArtifactWrapper,
-    val releaseData: JvmReleaseData
-) extends ToProcess {
+class JvmDistribution(val artifact: ArtifactWrapper) extends ToProcess {
+
+  private lazy val releaseData: JvmReleaseData = {
+    Try(artifact.withStream(Helpers.slurpInputToString(_))).toOption
+      .map(JvmDistribution.parseReleaseFile)
+      .getOrElse(JvmDistribution.parseReleaseFile(""))
+  }
 
   def markSuccessfulCompletion(): Unit = {
     artifact.finished()

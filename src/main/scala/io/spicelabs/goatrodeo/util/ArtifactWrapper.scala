@@ -174,6 +174,9 @@ sealed trait ArtifactWrapper {
     * however, files are on a POSIX filesystem so having a handle to the file
     * (e.g., `FileInputStream`), the FileInputStream will live for the duration
     * of the reference.
+    *
+    * This is a *VERY* expensive call. Do not use it casually. Use it *ONLY* if
+    * `withStream` will not suffice
     */
   def withFile[T](func: File => T): T
 }
@@ -273,6 +276,7 @@ object ArtifactWrapper {
   addMimeTypeAugmenter(OpenSSLConfigDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(JavaSecurityDetector.mimeTypeAugmenter)
   addMimeTypeAugmenter(JavaArchiveDetector.mimeTypeAugmenter)
+  addMimeTypeAugmenter(CryptoContentDetector.mimeTypeAugmenter)
 
   private def massageMimeType(
       fileName: String,

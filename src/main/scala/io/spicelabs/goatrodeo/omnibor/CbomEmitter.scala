@@ -361,15 +361,16 @@ object CbomEmitter {
   /** SWHID core identifier (`swh:1:cnt:<sha1>`) derived from the item's
     * `alias:from` `gitoid:blob:sha1:<hex>` edge, when present and well-formed.
     * The SWHID content identifier is the same sha1 bytes with a different
-    * prefix, so no extra hashing is needed — the alias the Item already
-    * carries is translated. Malformed aliases (non-hex, wrong length,
-    * uppercase) yield `None` rather than a bogus identifier.
+    * prefix, so no extra hashing is needed — the alias the Item already carries
+    * is translated. Malformed aliases (non-hex, wrong length, uppercase) yield
+    * `None` rather than a bogus identifier.
     */
   private def swhidFor(item: Item): Option[String] = {
     val prefix = "gitoid:blob:sha1:"
     val hex = item.connections
-      .collect { case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
-        value.stripPrefix(prefix)
+      .collect {
+        case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
+          value.stripPrefix(prefix)
       }
       .find(h =>
         h.length == 40 && h.forall(c =>
@@ -576,7 +577,42 @@ object CbomEmitter {
     } else if (hasJavaSecurity(extra)) {
       (Some(buildRelatedCryptoMaterialProperties(extra, "other")), algs.toMap)
     } else if (hasKeystore(extra)) {
-      (Some(buildRelatedCryptoMaterialProperties(extra, "key")), algs.toMap)
+      // Keys detected by the certificates strategy appear as
+      // `Certificates:Entry:<alias>:KeyAlgorithm[/KeySize/Curve]`. Only
+      // entries that carry a certificate chain (`Chain:0:` metadata) are key
+      // entries — trusted-cert entries also emit KeyAlgorithm via their
+      // per-cert metadata and must not mint key assets.
+      val keyAliases = extra.collect {
+        case (k, _)
+            if k.startsWith("Certificates:Entry:") &&
+              k.contains(":Chain:0:") =>
+          k.stripPrefix("Certificates:Entry:").takeWhile(_ != ':')
+      }.toSet
+      val entryKeys = extra
+        .collect {
+          case (k, vs)
+              if k.startsWith("Certificates:Entry:") &&
+                k.endsWith(":KeyAlgorithm") =>
+            k.stripPrefix("Certificates:Entry:")
+              .stripSuffix(":KeyAlgorithm") -> vs
+        }
+        .filter { case (alias, _) => keyAliases.contains(alias) }
+        .toList
+        .sortBy(_._1)
+      val refs = entryKeys.flatMap { case (alias, algs) =>
+        algs.toList.sorted.flatMap { raw =>
+          val size = first(extra, s"Certificates:Entry:${alias}:KeySize")
+            .flatMap(s => Try(s.toInt).toOption)
+          val curve = first(extra, s"Certificates:Entry:${alias}:Curve")
+          addAlg(raw, "pke", size, curve)
+        }
+      }
+      (
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "key", refs.headOption)
+        ),
+        algs.toMap
+      )
     } else if (hasCrl(extra)) {
       val sigRef =
         first(extra, "Certificates:SigAlgorithm").flatMap(
