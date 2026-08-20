@@ -46,12 +46,63 @@ object ConfigurationParser {
 
   /** Parse a command line into a [[Configuration]], seeded with the ambient
     * process state the run started in.
+    *
+    * When `--config` names a file, it is read first and the command line
+    * applied on top, so precedence runs defaults < config file < command line.
+    * That is done by parsing twice: once to discover `--config`, then again
+    * seeded with what the file said. Parsing is pure and cheap, and this keeps
+    * the flag definitions the single description of what the command line
+    * means.
     */
   def parse(
       args: Array[String],
       runtime: RuntimeEnvironment = RuntimeEnvironment.default
   ): Option[Configuration] =
-    OParser.parse(parser, args, Configuration(runtime = runtime))
+    parseWith(args, Configuration(runtime = runtime)).flatMap { discovered =>
+      discovered.configFile match {
+        case None => Some(discovered)
+        case Some(file) => {
+          ConfigurationToml.fromFile(
+            file.toPath(),
+            Configuration(runtime = runtime, configFile = Some(file))
+          ) match {
+            case Right(fromFile) =>
+              val withFlags = parseWith(args, fromFile)
+              // The file and the environment report their own disagreements as
+              // they are resolved; this is the last layer, and the only one that
+              // cannot report itself, because scopt folds flags straight into the
+              // configuration with nowhere to record where a value came from.
+              withFlags.foreach { full =>
+                full.differencesFrom(fromFile).foreach { (name, was, now) =>
+                  logger.info(
+                    s"$name = ${show(now)} (command line) overrides ${show(was)} ($file)"
+                  )
+                }
+              }
+              withFlags
+            case Left(error) => {
+              logger.error(f"Invalid config file ${file}: ${error}")
+              None
+            }
+          }
+        }
+      }
+    }
+
+  /** Values as a person wrote them, not as Scala prints them. */
+  private def show(value: Any): String = value match {
+    case Some(v)         => show(v)
+    case None            => "unset"
+    case v: Vector[?]    => v.map(show).mkString("[", ", ", "]")
+    case f: java.io.File => f.toString
+    case other           => other.toString
+  }
+
+  private def parseWith(
+      args: Array[String],
+      base: Configuration
+  ): Option[Configuration] =
+    OParser.parse(parser, args, base)
 
   /** Render the usage text. */
   def usage: String = OParser.usage(parser)
@@ -62,7 +113,7 @@ object ConfigurationParser {
     OParser.sequence(
       programName("goatrodeo"),
       head("goatrodeo", hellogoat.BuildInfo.version),
-      opt[File]("block")
+      opt[File]("block-list")
         .text(
           "The gitoid block list. Do not process these gitoids. Used for common gitoids such as license files"
         )
@@ -157,7 +208,7 @@ object ConfigurationParser {
             Pattern.compile(p)
           })))
         ),
-      opt[Int]("maxrecords")
+      opt[Int]("max-records")
         .text(
           "The maximum number of records to process at once. Default 50,000"
         )
@@ -173,6 +224,11 @@ object ConfigurationParser {
       opt[File]("dump-json")
         .text("Make a directory and dump the ADG as JSON in to directory")
         .action((x, c) => c.copy(emitJsonDir = Some(x))),
+      opt[File]("config")
+        .text(
+          "Read settings from this TOML file. Anything also given on the command line wins."
+        )
+        .action((x, c) => c.copy(configFile = Some(x))),
       opt[File]("emit-cbom-dir")
         .text(
           "Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input into this directory"
@@ -185,7 +241,7 @@ object ConfigurationParser {
           if (Set("1.6", "1.7").contains(v)) success
           else failure(s"--cbom-version must be 1.6 or 1.7, got $v")
         ),
-      opt[File]("tempdir")
+      opt[File]("temp-dir")
         .text("Where to temporarily store files... should be a RAM disk")
         .action((x, c) => c.copy(tempDir = Some(x))),
       opt[Int]('t', "threads")
