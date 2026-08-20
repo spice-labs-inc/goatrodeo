@@ -42,7 +42,10 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scala.version>3.8.3</scala.version>
-    <maven.compiler.release>17</maven.compiler.release>
+    <!-- Kept in step with build.sbt's `-release`. #301 raised that to 21 to use virtual
+         threads (Thread.ofVirtual in AdaptiveMimeBuilder); this build stayed at 17 and so
+         stopped compiling, which nothing noticed because CI runs sbt. -->
+    <maven.compiler.release>21</maven.compiler.release>
     <!-- The sbt version used by the sibling build.sbt build; surfaced in BuildInfo for parity -->
     <sbt.version>1.10.6</sbt.version>
 
@@ -510,7 +513,10 @@
             <arg>-Yexplicit-nulls</arg>
             <arg>-no-indent</arg>
             <arg>-release</arg>
-            <arg>17</arg>
+            <!-- The same number javac gets, so the two compilers cannot drift apart:
+                 this one governs the Scala sources, which is where Thread.ofVirtual is
+                 actually used. -->
+            <arg>${maven.compiler.release}</arg>
             <!-- Enable SemanticDB output to match build.sbt's semanticdbEnabled -->
             <arg>-Ysemanticdb</arg>
           </args>
