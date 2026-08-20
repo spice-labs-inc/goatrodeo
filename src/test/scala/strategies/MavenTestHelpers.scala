@@ -5,7 +5,7 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -51,6 +51,11 @@ import java.util.zip.ZipOutputStream
   * Never use `Files.createTempDirectory` directly — always use `withTempDir`.
   */
 object MavenTestHelpers {
+
+  /** The default configuration for these tests; calls needing different
+    * settings pass an explicit `(using ...)`.
+    */
+  private given Configuration = Configuration()
 
   /** Minimal ZIP header bytes (PK\x03\x04 + local file header fields). Used for
     * creating files that Tika recognizes as `application/java-archive` without
@@ -223,7 +228,7 @@ object MavenTestHelpers {
     */
   def processBundles(bundles: Vector[ToProcess]): MemStorage = {
     val store = MemStorage(None)
-    ToProcess.buildGraphForToProcess(bundles, store, args = Config())
+    ToProcess.buildGraphForToProcess(bundles, store)
     store
   }
 

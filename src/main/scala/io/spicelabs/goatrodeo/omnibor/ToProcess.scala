@@ -4,7 +4,8 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.AdaptiveMimeBuilder
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
@@ -356,11 +357,10 @@ trait ToProcess {
       store: Storage,
       parentScope: ParentScope,
       tag: Option[TagPass],
-      args: Config,
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
       atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
-  ): Seq[GitOID] = {
+  )(using Configuration): Seq[GitOID] = {
     if (keepRunning()) {
 
       val (elements, initialState) = getElementsToProcess()
@@ -371,7 +371,7 @@ trait ToProcess {
               Item.itemFrom(
                 artifact,
                 parentId,
-                recordModified = args.cutoff.isDefined
+                recordModified = config.cutoff.isDefined
               )
 
             // in blocklist do nothing
@@ -451,11 +451,11 @@ trait ToProcess {
               }
 
               // update per-package tags
-              val itemScope3WithPackageTag = if (args.packageTags) {
+              val itemScope3WithPackageTag = if (config.packageTags) {
                 state3.maybePackageTag(marker) match {
                   case Some(info) =>
                     // Resolve short vs full name
-                    val resolvedName = if (args.packageTagsShortName) {
+                    val resolvedName = if (config.packageTagsShortName) {
                       // Extract portion after last : or /
                       info.name.split("[:/]").last
                     } else {
@@ -653,7 +653,6 @@ trait ToProcess {
                         store,
                         thisParentScope,
                         None,
-                        args = args,
                         blockList,
                         keepRunning,
                         atEnd
@@ -881,9 +880,8 @@ object ToProcess {
       tempDir: Option[File],
       count: AtomicInteger,
       fsFilePaths: Boolean,
-      dead_? : AtomicBoolean,
-      args: Config
-  ): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
+      dead_? : AtomicBoolean
+  )(using Configuration): (ConcurrentLinkedQueue[ToProcess], AtomicBoolean) = {
     val stillWorking = AtomicBoolean(true)
     val queue = ConcurrentLinkedQueue[ToProcess]()
 
@@ -924,7 +922,7 @@ object ToProcess {
         logger.info(f"Found all files, count ${allFiles.length}%,d")
 
         val mimeResult =
-          AdaptiveMimeBuilder.computeMimeTypes(allFiles, args, logger)
+          AdaptiveMimeBuilder.computeMimeTypes(allFiles, config, logger)
         logger.info(
           f"MIME pass complete: ${mimeResult.total}%,d total, " +
             f"${mimeResult.completed}%,d completed"
@@ -977,20 +975,18 @@ object ToProcess {
   def buildGraphForToProcess(
       toProcess: Vector[ToProcess],
       store: Storage = MemStorage(None),
-      args: Config,
       purlOut: String => Unit = _ => (),
       block: Set[GitOID] = Set()
-  ): Storage = {
+  )(using Configuration): Storage = {
 
     for { individual <- toProcess } {
-      val augmentation = if (args.useStaticMetadata) {
-        individual.runStaticMetadataGather(args.mimeFilter)
+      val augmentation = if (config.useStaticMetadata) {
+        individual.runStaticMetadataGather(config.mimeFilter)
       } else Map()
 
       individual.process(
         None,
         store,
-        args = args,
         parentScope =
           ParentScope.forAndWith(individual.main, None, augmentation),
         tag = None,
@@ -1017,16 +1013,15 @@ object ToProcess {
     */
   def buildGraphFromArtifactWrapper(
       artifact: ArtifactWrapper,
-      args: Config,
       store: Storage = MemStorage(None),
       purlOut: String => Unit = _ => (),
       block: Set[GitOID] = Set()
-  ): Storage = {
+  )(using Configuration): Storage = {
 
     // generate the strategy
     val toProcess = strategiesForArtifacts(Vector(artifact), _ => (), false)
 
-    buildGraphForToProcess(toProcess, store, args, purlOut, block)
+    buildGraphForToProcess(toProcess, store, purlOut, block)
 
   }
 }

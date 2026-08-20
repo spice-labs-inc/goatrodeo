@@ -17,7 +17,7 @@ package strategies
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
@@ -45,6 +45,11 @@ import java.io.File
   */
 object CertificatesPipelineRunner {
 
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
+
   /** Run the pipeline on `file` and return the **strategy-produced** Items in
     * the resulting store.
     *
@@ -61,7 +66,7 @@ object CertificatesPipelineRunner {
   def runGoatRodeoOnSingleFile(file: File): Vector[Item] = {
     val artifact = FileWrapper(file, file.getName, None)
     val store =
-      ToProcess.buildGraphFromArtifactWrapper(artifact, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(artifact)
     val allItems = store
       .keys()
       .toVector

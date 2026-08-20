@@ -15,7 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 
 import java.util.Date
 
@@ -24,7 +24,8 @@ import java.util.Date
   * These tests verify:
   *   - PackageTagInfo case class with Option types
   *   - json4s serialization omits None fields
-  *   - Config CLI options for --package-tags and --package-tags-short-name
+  *   - Configuration CLI options for --package-tags and
+  * --package-tags-short-name
   *   - GoatRodeoBuilder API methods
   *
   * Requirement Traceability:
@@ -124,21 +125,21 @@ class PackageTagInfoSuite extends munit.FunSuite {
     assert(json.contains("Z"), s"ISO date should end with Z: $json")
   }
 
-  // ==================== Config Tests ====================
+  // ==================== Configuration Tests ====================
 
-  test("Config.packageTags defaults false") {
+  test("Configuration.packageTags defaults false") {
     // RED: Field doesn't exist
     // Theory: Boolean should default to false for backward compatibility
     // Requirement: R1
-    val config = Config()
+    val config = Configuration()
     assertEquals(config.packageTags, false)
   }
 
-  test("Config.packageTagsShortName defaults false") {
+  test("Configuration.packageTagsShortName defaults false") {
     // RED: Field doesn't exist
     // Theory: Boolean should default to false
     // Requirement: R2
-    val config = Config()
+    val config = Configuration()
     assertEquals(config.packageTagsShortName, false)
   }
 

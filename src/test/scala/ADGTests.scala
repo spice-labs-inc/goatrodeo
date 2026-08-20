@@ -4,7 +4,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 
@@ -20,6 +20,11 @@ class ADGTests extends munit.FunSuite {
   // alongside other test classes.
   override val munitTimeout = scala.concurrent.duration.Duration(1, "hour")
 
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
+
   test("Questionable archives do not cause exceptions") {
     val source = File("test_data/download/adg_tests/repo_ea")
 
@@ -34,7 +39,7 @@ class ADGTests extends munit.FunSuite {
       } {
         val bad = File(source, toTry)
         val badWrapper = FileWrapper(bad, toTry, None)
-        ToProcess.buildGraphFromArtifactWrapper(badWrapper, Config())
+        ToProcess.buildGraphFromArtifactWrapper(badWrapper)
       }
 
     }
@@ -78,14 +83,18 @@ class ADGTests extends munit.FunSuite {
         val byHeap = math.max(4, (heapG * 4).toInt) // heapG / 0.25G per worker
         math.min(cores, byHeap)
       }
-      Builder.buildDB(
-        dest = resForBigTent,
+      val config = Configuration(
         tempDir = None,
-        args = Config(),
-        threadCnt = (Option(System.getenv("TEST_THREAD_CNT")))
+        threads = (Option(System.getenv("TEST_THREAD_CNT")))
           .flatMap(s => Try { Integer.parseInt(s.trim()) }.toOption)
           .getOrElse(defaultThreadCnt),
         maxRecords = 10000,
+        blockList = None,
+        fsFilePaths = true
+      )
+
+      Builder.buildDB(
+        dest = resForBigTent,
         tag = Some(TagInfo("foo", None)),
         fileListers = Vector(
           (
@@ -96,8 +105,6 @@ class ADGTests extends munit.FunSuite {
         ),
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
-        blockList = None,
-        fsFilePaths = true,
         finishedFile = f => {
           sync.synchronized { captured = captured :+ f }; ()
         },
@@ -160,7 +167,7 @@ class ADGTests extends munit.FunSuite {
             case None => assert(false, "Failed to read tags"); true
           }
         })
-      )
+      )(using config)
 
       assert(tagCount > 8000, s"Expecting lots of tags, got ${tagCount}")
       assert(captured.size > 5, "We should have built files")
