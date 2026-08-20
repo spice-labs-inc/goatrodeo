@@ -74,6 +74,11 @@
     <munit.version>0.7.29</munit.version>
     <scalacheck.version>1.18.1</scalacheck.version>
     <zstd-jni.version>1.5.6-9</zstd-jni.version>
+    <!-- Must equal the `version` in .scalafmt.conf. Spotless bundles one scalafmt build and
+         refuses any other exactly, so omitting this does not mean "whatever the config asks
+         for": it means the plugin's own default silently becomes the requirement, and the
+         check dies before it formats anything. -->
+    <scalafmt.version>3.7.15</scalafmt.version>
 
     <!-- Test parallelism: independent test classes are distributed over several
          forked JVMs, restoring what sbt's default `Test / parallelExecution`
@@ -732,6 +737,7 @@
         <configuration>
           <scala>
             <scalafmt>
+              <version>${scalafmt.version}</version>
               <file>${project.basedir}/.scalafmt.conf</file>
             </scalafmt>
           </scala>
