@@ -145,13 +145,17 @@ object ConfigurationToml {
         else {
           val resolved = new Resolver(
             EnvironmentPrefix,
-            java.util.Set.of(Group),
+            java.util.Set.of(Group, io.spicelabs.config.Logging.GROUP),
             message => report(message)
           )
             .withFile(path, root, java.util.List.of())
             .withEnvironment(environment.asJava)
             .resolve()
-          fromResolution(resolved, base, Group)
+          fromResolution(resolved, base, Group).map(
+            _.copy(logging =
+              plainGroup(resolved, io.spicelabs.config.Logging.GROUP)
+            )
+          )
         }
       }
     }
@@ -225,6 +229,15 @@ object ConfigurationToml {
       }
     }
   }
+
+  /** A resolved group as a plain Scala map, for a group this program carries
+    * but does not interpret.
+    */
+  private def plainGroup(
+      resolved: Resolution,
+      group: String
+  ): Map[String, Any] =
+    resolved.group(group).asScala.toMap.map { case (k, v) => k -> (v: Any) }
 
   private def read(table: Resolution, base: Configuration): Configuration = {
     var config = base

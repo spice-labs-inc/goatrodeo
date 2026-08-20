@@ -208,6 +208,12 @@ object ConfigurationParser {
             Pattern.compile(p)
           })))
         ),
+      opt[String]("log-level")
+        .text("error, warn, info, debug or trace (default: info)")
+        .action((x, c) => c.copy(logging = c.logging + ("level" -> x))),
+      opt[String]("log-file")
+        .text("Also write log output to this file")
+        .action((x, c) => c.copy(logging = c.logging + ("file" -> x))),
       opt[Int]("max-records")
         .text(
           "The maximum number of records to process at once. Default 50,000"
