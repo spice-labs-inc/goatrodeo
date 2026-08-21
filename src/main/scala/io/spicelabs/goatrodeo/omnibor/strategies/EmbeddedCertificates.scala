@@ -94,8 +94,8 @@ object EmbeddedCertificatesStrategy {
     * Claims purely by path/MIME heuristics — no file reads during selection;
     * the (capped) marker scan happens during processing. Binaries already
     * claimed by the crypto-footprint scanner (via its MIME) are left to it —
-    * except libraries named for known crypto stacks (mbedtls, libssl, …),
-    * whose embedded-certificate metadata is richer than a footprint hit.
+    * except libraries named for known crypto stacks (mbedtls, libssl, …), whose
+    * embedded-certificate metadata is richer than a footprint hit.
     */
   def computeEmbeddedCertificateFiles(
       byUUID: ByUUID,

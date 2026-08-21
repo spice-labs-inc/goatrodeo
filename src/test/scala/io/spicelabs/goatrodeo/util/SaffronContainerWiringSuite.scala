@@ -20,15 +20,15 @@ import java.io.File
 
 /** Tests for the Saffron binary-container wiring.
   *
-  * WHAT: `SaffronDetector` now probes Saffron's `ContainerDetector` (the
-  * "OT images" support: ELF, u-boot FIT, DTB, Linux kernel, RPi firmware,
-  * Android boot, compressed-single, WIM, DMG) during the MIME pass and emits a
+  * WHAT: `SaffronDetector` now probes Saffron's `ContainerDetector` (the "OT
+  * images" support: ELF, u-boot FIT, DTB, Linux kernel, RPi firmware, Android
+  * boot, compressed-single, WIM, DMG) during the MIME pass and emits a
   * dedicated MIME per format; `FileWalker` mounts containers through
   * `BinaryContainerMount` and walks their entries like a filesystem.
   *
-  * WHY: the readers existed in the Saffron library but were never connected,
-  * so firmware binaries (ArduPilot's `arducopter` ELF, PX4 images) stayed
-  * opaque — no inner content was ever inspected.
+  * WHY: the readers existed in the Saffron library but were never connected, so
+  * firmware binaries (ArduPilot's `arducopter` ELF, PX4 images) stayed opaque —
+  * no inner content was ever inspected.
   *
   * THEORY: an ELF is the simplest reproducible container (any Linux host has
   * `/bin/ls`), so the tests use it as the canary: the MIME pass must tag it,

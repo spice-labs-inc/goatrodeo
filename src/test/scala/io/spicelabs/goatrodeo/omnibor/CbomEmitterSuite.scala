@@ -2050,8 +2050,10 @@ class CbomEmitterSuite extends FunSuite {
           val pm = propertyMap(comp)
           assert(pm.contains("swhid:core"), "swhid:core must be present")
           assert(pm.contains("omnibor:core"), "omnibor:core must be present")
-          val swhidPath = pm.get("goatrodeo:swhid-path").get.split("\\|:\\|").toList
-          val omniPath = pm.get("goatrodeo:omnibor-path").get.split("\\|:\\|").toList
+          val swhidPath =
+            pm.get("goatrodeo:swhid-path").get.split("\\|:\\|").toList
+          val omniPath =
+            pm.get("goatrodeo:omnibor-path").get.split("\\|:\\|").toList
           assertEquals(pm.get("swhid:core").get, swhidPath.last)
           assertEquals(pm.get("omnibor:core").get, omniPath.last)
           assert(validate(compact(render(json)), schema).isEmpty)
@@ -2384,13 +2386,22 @@ class CbomEmitterSuite extends FunSuite {
     try {
       val fixture =
         new File("test_data/carved-certs/elf-rsa1024-cert")
-      assert(fixture.exists(), "carved corpus fixtures required — run gen_carved_elf_corpus.sh")
+      assert(
+        fixture.exists(),
+        "carved corpus fixtures required — run gen_carved_elf_corpus.sh"
+      )
       val items = CertificatesPipelineRunner.runGoatRodeoOnSingleFile(fixture)
       assert(items.nonEmpty, "pipeline should produce items for the ELF")
-      val carved = items.filter(_.identifier != "gitoid:blob:sha256:" + ("0" * 64))
-      assert(carved.exists { i =>
-        i.bodyAsItemMetaData.exists(_.extra.keys.exists(_.startsWith("Certificates:Cert:0:")))
-      }, "a carved-certificate item must exist")
+      val carved =
+        items.filter(_.identifier != "gitoid:blob:sha256:" + ("0" * 64))
+      assert(
+        carved.exists { i =>
+          i.bodyAsItemMetaData.exists(
+            _.extra.keys.exists(_.startsWith("Certificates:Cert:0:"))
+          )
+        },
+        "a carved-certificate item must exist"
+      )
 
       val rootId =
         "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
@@ -2415,16 +2426,29 @@ class CbomEmitterSuite extends FunSuite {
           val certs = getComponents(json).filter { c =>
             (c \ "cryptoProperties" \ "assetType") == JString("certificate")
           }
-          assert(certs.nonEmpty, "carved cert must emit a certificate component")
+          assert(
+            certs.nonEmpty,
+            "carved cert must emit a certificate component"
+          )
           val cert1024 = certs.find { c =>
-            propertyMap(c).get("Certificates:Cert:0:KeySize").contains("1024") ||
+            propertyMap(c)
+              .get("Certificates:Cert:0:KeySize")
+              .contains("1024") ||
             propertyMap(c).get("Certificates:KeySize").contains("1024")
           }
-          assert(cert1024.isDefined, s"no certificate component with KeySize 1024: ${certs.map(propertyMap)}")
+          assert(
+            cert1024.isDefined,
+            s"no certificate component with KeySize 1024: ${certs.map(propertyMap)}"
+          )
           val alg = findComponentByRef(json, "alg:pke:rsa")
           assert(alg.isDefined, "carved cert must emit an rsa algorithm asset")
           assertEquals(
-            getString(alg.get, "cryptoProperties", "algorithmProperties", "parameterSetIdentifier"),
+            getString(
+              alg.get,
+              "cryptoProperties",
+              "algorithmProperties",
+              "parameterSetIdentifier"
+            ),
             "1024"
           )
           assert(validate(compact(render(json)), schema).isEmpty)
@@ -2523,7 +2547,9 @@ class CbomEmitterSuite extends FunSuite {
       val items = CertificatesPipelineRunner.runGoatRodeoOnSingleFile(fixture)
       val hasKeySize = (k: String) =>
         items.exists { i =>
-          i.bodyAsItemMetaData.exists(_.extra.get(k).exists(_.map(_.value).toSet.contains("1024")))
+          i.bodyAsItemMetaData.exists(
+            _.extra.get(k).exists(_.map(_.value).toSet.contains("1024"))
+          )
         }
       assert(
         hasKeySize("Certificates:KeySize") ||

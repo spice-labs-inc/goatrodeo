@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Scratch/output cruft moved out of the project root
+/tmp
+
 # Surefire's `runOrder=balanced` timing cache, written to the project root
 .surefire-*
 

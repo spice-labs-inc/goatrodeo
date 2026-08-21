@@ -33,8 +33,8 @@ import scala.collection.immutable.TreeSet
 /** Tests for the [[CarvedCertificatesStrategy]] — carved DER cert emission.
   *
   * WHAT: binary artifacts tagged with the carved-cert MIME are claimed and,
-  * during processing, scanned (16 MiB cap) for embedded DER X.509 certs;
-  * each parsed cert emits the existing per-cert metadata block
+  * during processing, scanned (16 MiB cap) for embedded DER X.509 certs; each
+  * parsed cert emits the existing per-cert metadata block
   * (`Certificates:Cert:<idx>:*`), so KeySize (including 1024) flows to the
   * CBOM.
   *
@@ -42,8 +42,8 @@ import scala.collection.immutable.TreeSet
   * into an ELF must appear as a certificate component with KeySize 1024.
   *
   * THEORY: fixtures are docker-built ELFs with openssl-verified certs; the
-  * carve scanner is a pure byte function, so unit tests drive it with
-  * synthetic batteries (truncated DER, lying lengths, duplicates, caps).
+  * carve scanner is a pure byte function, so unit tests drive it with synthetic
+  * batteries (truncated DER, lying lengths, duplicates, caps).
   *
   * LLM note: C-x = test id.
   */
@@ -67,7 +67,9 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
     )
   )
 
-  private def metadataFor(name: String): TreeMap[String, TreeSet[StringOrPair]] = {
+  private def metadataFor(
+      name: String
+  ): TreeMap[String, TreeSet[StringOrPair]] = {
     val wrapper = FileWrapper(fixture(name), name, None)
     val state = new CarvedCertificatesState(wrapper)
     val (md, _) = state.getMetadata(wrapper, testItem("x"), SingleMarker())
@@ -83,7 +85,10 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
   // C-1 — the carve scanner parses only real certs, dedupes, and honours caps.
   test("C-1 carveCertificates parses, dedupes, and caps") {
     val f = fixture("elf-two-certs")
-    assert(f.exists(), "carved corpus fixtures required — run gen_carved_elf_corpus.sh")
+    assert(
+      f.exists(),
+      "carved corpus fixtures required — run gen_carved_elf_corpus.sh"
+    )
     val bytes = java.nio.file.Files.readAllBytes(f.toPath())
     val (certs, cap) = CarvedCertAugmenter.carveCertificates(
       bytes,
@@ -92,8 +97,18 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
     )
     assertEquals(certs.length, 2)
     assert(!cap)
-    assert(certs.map(_.getSubjectX500Principal.getName).toSet.contains("CN=carved-rsa1024"))
-    assert(certs.map(_.getSubjectX500Principal.getName).toSet.contains("CN=carved-rsa2048"))
+    assert(
+      certs
+        .map(_.getSubjectX500Principal.getName)
+        .toSet
+        .contains("CN=carved-rsa1024")
+    )
+    assert(
+      certs
+        .map(_.getSubjectX500Principal.getName)
+        .toSet
+        .contains("CN=carved-rsa2048")
+    )
     // dedupe: same bytes twice yields one cert
     val doubled = bytes ++ bytes
     val (certs2, _) = CarvedCertAugmenter.carveCertificates(
@@ -140,7 +155,9 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
   test("C-4 two-cert fixture emits both key sizes") {
     val md = metadataFor("elf-two-certs")
     assertEquals(mdString(md, "Certificates:CarvedCertCount"), Some("2"))
-    val sizes = (0 until 2).flatMap(i => mdString(md, s"Certificates:Cert:$i:KeySize")).toSet
+    val sizes = (0 until 2)
+      .flatMap(i => mdString(md, s"Certificates:Cert:$i:KeySize"))
+      .toSet
     assertEquals(sizes, Set("1024", "2048"))
   }
 
@@ -160,7 +177,8 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
     b.mimeType
     val byUUID: Map[String, io.spicelabs.goatrodeo.util.ArtifactWrapper] =
       Map(a.uuid -> a, b.uuid -> b)
-    val byName: Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
+    val byName
+        : Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
       Map(a.path() -> Vector(a), b.path() -> Vector(b))
     val (claimed, _, _, name) =
       CarvedCertificatesStrategy.computeCarvedCertificateFiles(byUUID, byName)

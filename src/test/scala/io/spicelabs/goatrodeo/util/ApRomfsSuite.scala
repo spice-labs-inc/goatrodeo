@@ -21,19 +21,18 @@ import java.io.File
 /** Tests for the ArduPilot `AP_ROMFS` embedded file store reader.
   *
   * WHAT: `ApRomfs.read` parses the generated `embedded_file` table out of an
-  * ArduPilot firmware ELF and decompresses each ROMFS file; `FileWalker`
-  * treats the ROMFS as an archive.
+  * ArduPilot firmware ELF and decompresses each ROMFS file; `FileWalker` treats
+  * the ROMFS as an archive.
   *
   * WHY: ArduPilot firmware embeds its ROMFS (including TLS trust-store
-  * certificates) as compressed structs — not a self-describing container —
-  * so nothing could reach the certs. The corpus fixture
-  * `test_data/firmware-images/ardupilot/arducopter` is a Surveyor-OT-Demo
-  * build carrying `etc/ssl/certs/root-ca.crt` (RSA-1024).
+  * certificates) as compressed structs — not a self-describing container — so
+  * nothing could reach the certs. The corpus fixture
+  * `test_data/firmware-images/ardupilot/arducopter` is a Surveyor-OT-Demo build
+  * carrying `etc/ssl/certs/root-ca.crt` (RSA-1024).
   *
   * THEORY: the AP_ROMFS struct layout is fixed by ArduPilot (raw-DEFLATE
   * contents; pointer width from the ELF class). Anchoring on a known ROMFS
-  * filename locates the table; decompressing each `contents` yields the
-  * files.
+  * filename locates the table; decompressing each `contents` yields the files.
   *
   * LLM note: AR-x = test id.
   */
@@ -52,8 +51,12 @@ class ApRomfsSuite extends FunSuite {
     val signer = byName.get("etc/ssl/certs/update-signer.crt")
     assert(rootCa.isDefined, "root-ca.crt should be present in ROMFS")
     assert(signer.isDefined, "update-signer.crt should be present in ROMFS")
-    assert(new String(rootCa.get, "UTF-8").contains("-----BEGIN CERTIFICATE-----"))
-    assert(new String(signer.get, "UTF-8").contains("-----BEGIN CERTIFICATE-----"))
+    assert(
+      new String(rootCa.get, "UTF-8").contains("-----BEGIN CERTIFICATE-----")
+    )
+    assert(
+      new String(signer.get, "UTF-8").contains("-----BEGIN CERTIFICATE-----")
+    )
   }
 
   test("AR-2 FileWalker treats the firmware as an archive") {
@@ -62,7 +65,10 @@ class ApRomfsSuite extends FunSuite {
     val result = FileWalker.withinArchiveStream(w) { artifacts =>
       artifacts.map(_.path())
     }
-    assert(result.isDefined, "arducopter should be walkable as an AP_ROMFS archive")
+    assert(
+      result.isDefined,
+      "arducopter should be walkable as an AP_ROMFS archive"
+    )
     val paths = result.get
     assert(
       paths.contains("etc/ssl/certs/root-ca.crt"),

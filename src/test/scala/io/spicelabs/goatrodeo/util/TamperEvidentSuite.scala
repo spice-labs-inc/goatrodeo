@@ -14,6 +14,9 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.LoggerContext
+import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import io.spicelabs.goatrodeo.omnibor.CbomEmitter
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
@@ -21,13 +24,9 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import munit.FunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
-
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.LoggerContext
 
 import java.io.File
 import java.nio.file.Files
@@ -36,13 +35,14 @@ import scala.collection.immutable.TreeSet
 
 /** Tests for the tamper-evident logging feature.
   *
-  * Covers: the hash-chain appender (verifiability, tamper detection,
-  * truncation detection, chain-head exposure), the CBOM filename format, the
-  * `.grc` `info` additions, and the run-level checksum file.
+  * Covers: the hash-chain appender (verifiability, tamper detection, truncation
+  * detection, chain-head exposure), the CBOM filename format, the `.grc` `info`
+  * additions, and the run-level checksum file.
   */
 class TamperEvidentSuite extends FunSuite {
 
-  private def tempDir(): File = Files.createTempDirectory("tamper-test").toFile()
+  private def tempDir(): File =
+    Files.createTempDirectory("tamper-test").toFile()
 
   private def cleanup(dir: File): Unit = {
     if (dir != null && dir.exists()) {
@@ -123,8 +123,8 @@ class TamperEvidentSuite extends FunSuite {
     ok
   }
 
-  /** Install a ChainAppender on an isolated logger and return the appender +
-    * a function that logs a message through it.
+  /** Install a ChainAppender on an isolated logger and return the appender + a
+    * function that logs a message through it.
     */
   private def chainedLogger(
       file: File
@@ -152,7 +152,8 @@ class TamperEvidentSuite extends FunSuite {
       val (_, log) = chainedLogger(file)
       val msgs = Vector("alpha", "beta", "gamma")
       msgs.foreach(log)
-      val lines = Files.readAllLines(file.toPath()).toArray(new Array[String](0))
+      val lines =
+        Files.readAllLines(file.toPath()).toArray(new Array[String](0))
       assertEquals(lines.length, msgs.length)
       assert(verifyChain(lines.toSeq))
     } finally {
@@ -169,8 +170,12 @@ class TamperEvidentSuite extends FunSuite {
       val file = new File(dir, "run.log")
       val (_, log) = chainedLogger(file)
       Vector("alpha", "beta", "gamma").foreach(log)
-      val lines = Files.readAllLines(file.toPath()).toArray(new Array[String](0))
-      val tampered = lines.toVector.updated(1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa betaX")
+      val lines =
+        Files.readAllLines(file.toPath()).toArray(new Array[String](0))
+      val tampered = lines.toVector.updated(
+        1,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa betaX"
+      )
       assert(!verifyChain(tampered))
     } finally {
       cleanup(dir)
@@ -194,7 +199,8 @@ class TamperEvidentSuite extends FunSuite {
         file.toPath(),
         all.dropRight(1).mkString("", "\n", "\n")
       )
-      val remaining = Files.readAllLines(file.toPath()).toArray(new Array[String](0))
+      val remaining =
+        Files.readAllLines(file.toPath()).toArray(new Array[String](0))
       assert(verifyChain(remaining.toSeq))
       val last = remaining.last
       val lastDigest = last.substring(0, last.indexOf(' '))
@@ -213,7 +219,8 @@ class TamperEvidentSuite extends FunSuite {
       val file = new File(dir, "run.log")
       val (appender, log) = chainedLogger(file)
       log("only-line")
-      val lines = Files.readAllLines(file.toPath()).toArray(new Array[String](0))
+      val lines =
+        Files.readAllLines(file.toPath()).toArray(new Array[String](0))
       val expected = lines.last.substring(0, lines.last.indexOf(' '))
       assertEquals(appender.currentChainHead(), expected)
       assert(appender.currentChainHead().length == 64)
@@ -235,7 +242,10 @@ class TamperEvidentSuite extends FunSuite {
       )
       storeItem(storage, root)
       val files = CbomEmitter.emitForStorage(storage, "1.6", dir).get
-      assertEquals(files.head.getName(), "cbom_root-ca_crt_0000000000000000.json")
+      assertEquals(
+        files.head.getName(),
+        "cbom_root-ca_crt_0000000000000000.json"
+      )
     } finally {
       cleanup(dir)
     }
@@ -269,18 +279,32 @@ class TamperEvidentSuite extends FunSuite {
   // T-07 — a .grc carries correlation_id and full per-file sha256 in info, and
   // log_chain_head only when tamper-evidence is active. THEORY: info is purely
   // additive; the sha256 arrays are index-aligned with dataFiles/indexFiles.
-  test("T-07 .grc info records correlation id, per-file sha256, and chain head") {
+  test(
+    "T-07 .grc info records correlation id, per-file sha256, and chain head"
+  ) {
     val dir = tempDir()
     try {
-      val chainHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      TamperEvidentLog.start("11111111-2222-3333-4444-555555555555", () => Some(chainHex))
-      val items = Vector(
-        makeItem("gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-        makeItem("gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+      val chainHex =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      TamperEvidentLog.start(
+        "11111111-2222-3333-4444-555555555555",
+        () => Some(chainHex)
       )
-      val (dataAndIndex, clusterFile) = GraphManager.writeEntries(dir, items.iterator)
+      val items = Vector(
+        makeItem(
+          "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ),
+        makeItem(
+          "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        )
+      )
+      val (dataAndIndex, clusterFile) =
+        GraphManager.writeEntries(dir, items.iterator)
       val env = readClusterEnv(clusterFile)
-      assertEquals(env.info("correlation_id"), "11111111-2222-3333-4444-555555555555")
+      assertEquals(
+        env.info("correlation_id"),
+        "11111111-2222-3333-4444-555555555555"
+      )
       assertEquals(env.info("log_chain_head"), chainHex)
       // sha256 JSON arrays, index-aligned with dataFiles/indexFiles
       val sha = parse(env.info("sha256"))
@@ -305,11 +329,16 @@ class TamperEvidentSuite extends FunSuite {
     try {
       TamperEvidentLog.start("99999999-8888-7777-6666-555555555555", () => None)
       val items = Vector(
-        makeItem("gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        makeItem(
+          "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        )
       )
       val (_, clusterFile) = GraphManager.writeEntries(dir, items.iterator)
       val env = readClusterEnv(clusterFile)
-      assertEquals(env.info("correlation_id"), "99999999-8888-7777-6666-555555555555")
+      assertEquals(
+        env.info("correlation_id"),
+        "99999999-8888-7777-6666-555555555555"
+      )
       assert(!env.info.contains("log_chain_head"))
     } finally {
       TamperEvidentLog.start("", () => None)
@@ -325,21 +354,56 @@ class TamperEvidentSuite extends FunSuite {
     try {
       TamperEvidentLog.start(
         "abcd1234-0000-0000-0000-000000000000",
-        () => Some("feedface00000000000000000000000000000000000000000000000000000000")
+        () =>
+          Some(
+            "feedface00000000000000000000000000000000000000000000000000000000"
+          )
       )
-      TamperEvidentLog.addGrc("2026_01_02_03_04_05_deadbeef.grc", "beefcafe0000000000000000000000000000000000000000000000000000000000")
-      val file = TamperEvidentLog.writeChecksum(dir, "abcd1234-0000-0000-0000-000000000000")
-      assertEquals(file.getName(), "goat_rodeo_abcd1234-0000-0000-0000-000000000000_checksum.json")
+      TamperEvidentLog.addGrc(
+        "2026_01_02_03_04_05_deadbeef.grc",
+        "beefcafe0000000000000000000000000000000000000000000000000000000000"
+      )
+      val file = TamperEvidentLog.writeChecksum(
+        dir,
+        "abcd1234-0000-0000-0000-000000000000"
+      )
+      assertEquals(
+        file.getName(),
+        "goat_rodeo_abcd1234-0000-0000-0000-000000000000_checksum.json"
+      )
       val json = parse(Files.readString(file.toPath()))
-      assertEquals((json \ "correlation_id").values.toString, "abcd1234-0000-0000-0000-000000000000")
-      assertEquals((json \ "final_chain_head").values.toString, "feedface00000000000000000000000000000000000000000000000000000000")
-      assertEquals((json \ "grcs")(0) \ "name" match {
-        case org.json4s.JString(s) => s
-        case other                 => fail(s"expected string, got $other")
-      }, "2026_01_02_03_04_05_deadbeef.grc")
+      assertEquals(
+        (json \ "correlation_id").values.toString,
+        "abcd1234-0000-0000-0000-000000000000"
+      )
+      assertEquals(
+        (json \ "final_chain_head").values.toString,
+        "feedface00000000000000000000000000000000000000000000000000000000"
+      )
+      assertEquals(
+        (json \ "grcs")(0) \ "name" match {
+          case org.json4s.JString(s) => s
+          case other                 => fail(s"expected string, got $other")
+        },
+        "2026_01_02_03_04_05_deadbeef.grc"
+      )
     } finally {
       TamperEvidentLog.start("", () => None)
       cleanup(dir)
     }
+  }
+
+  // T-10 — TamperEvidentLog.reset() invokes the run's cleanup callback (the
+  // mechanism by which the chain appender is detached from the root logger).
+  // THEORY: cleanup must always run at the end of a run so a tamper-evident
+  // appender never leaks into subsequent work in the same JVM.
+  test("T-10 reset invokes the run cleanup callback") {
+    val called = new java.util.concurrent.atomic.AtomicBoolean(false)
+    TamperEvidentLog.start("corr-id", () => None, () => called.set(true))
+    TamperEvidentLog.addGrc("a.grc", "beef")
+    TamperEvidentLog.reset()
+    assert(called.get(), "reset must invoke the cleanup callback")
+    assertEquals(TamperEvidentLog.correlationId, "")
+    assertEquals(TamperEvidentLog.grcs, Vector())
   }
 }

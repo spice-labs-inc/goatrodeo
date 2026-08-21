@@ -28,8 +28,7 @@ import java.nio.charset.StandardCharsets
   *
   * Each emitted line is prefixed with the cumulative digest of the chain:
   *
-  *   digest_1 = SHA256(payload_1)
-  *   digest_N = SHA256(digest_{N-1} || payload_N)
+  * digest_1 = SHA256(payload_1) digest_N = SHA256(digest_{N-1} || payload_N)
   *
   * and written as `<digest_N> <payload_N>`. The payload is the rendered log
   * event (its exact text is recovered verbatim by a verifier, so no pattern
@@ -45,7 +44,8 @@ import java.nio.charset.StandardCharsets
 final class ChainAppender extends AppenderBase[ILoggingEvent] {
 
   private var file: Option[File] = None
-  private var pattern: String = "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n"
+  private var pattern: String =
+    "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n"
   private var layout: Option[PatternLayout] = None
   private var writer: Option[BufferedWriter] = None
   private var prevDigest: Array[Byte] = Array.emptyByteArray

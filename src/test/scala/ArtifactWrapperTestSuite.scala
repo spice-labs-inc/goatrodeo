@@ -204,6 +204,30 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     }
   }
 
+  // newWrapper - a name with NUL padding (as produced by `ar` archives) must
+  // not throw InvalidPathException and must yield a wrapper whose path has no
+  // NUL bytes. THEORY: GNU/Berkeley `ar` NUL-pads member names, and NUL is
+  // illegal in filenames, so the wrapper name must be sanitized before use.
+  test("newWrapper - sanitizes NUL bytes in archive member names") {
+    val tempDir = Files.createTempDirectory("nulnametest")
+    try {
+      val data = "static archive member".getBytes("UTF-8")
+      val input = new ByteArrayInputStream(data)
+      val wrapper = ArtifactWrapper.newWrapper(
+        "obj/libpng.o\u0000\u0000\u0000\u0000",
+        data.length,
+        input,
+        None,
+        tempDir
+      )
+      assert(wrapper.isInstanceOf[ByteWrapper])
+      assert(!wrapper.path().contains('\u0000'))
+      assertEquals(wrapper.path(), "obj/libpng.o")
+    } finally {
+      Helpers.deleteDirectory(tempDir)
+    }
+  }
+
   test("newWrapper - fixes path starting with /") {
     val tempDir = Files.createTempDirectory("fixpath2test")
     try {

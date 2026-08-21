@@ -243,7 +243,7 @@ object Builder {
     // the last line of the log. Correlates the run id, the log, and every
     // .grc written across all batch dirs.
     TamperEvidentLog.correlationId match {
-      case "" => ()
+      case ""     => ()
       case corrId => TamperEvidentLog.writeChecksum(dest, corrId)
     }
     // Clear run-scoped tamper-evidence state so the correlation ID does not leak
@@ -444,7 +444,8 @@ object Builder {
 
                 }
                 logger.error(
-                  f"Failed IO ${toProcess.main} ${toProcess.mimeType} ${ioe}"
+                  f"Failed IO ${toProcess.main} ${toProcess.mimeType} ${ioe}",
+                  ioe
                 )
               }
               case e: Exception => {

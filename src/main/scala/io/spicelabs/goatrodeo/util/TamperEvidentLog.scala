@@ -24,10 +24,10 @@ import java.util.concurrent.atomic.AtomicReference
 /** Run-scoped holder for the tamper-evident logging state.
   *
   * A single run has one [[correlationId]] (a UUID generated at run start), an
-  * optional provider of the current log-chain head (from the
-  * [[ChainAppender]], absent when tamper-evidence is disabled), and an
-  * accumulating list of the `.grc` clusters written during the run (name +
-  * full 256-bit SHA-256) used to build the final checksum file.
+  * optional provider of the current log-chain head (from the [[ChainAppender]],
+  * absent when tamper-evidence is disabled), and an accumulating list of the
+  * `.grc` clusters written during the run (name + full 256-bit SHA-256) used to
+  * build the final checksum file.
   *
   * Mutable process state is deliberate here: the value is set once at run start
   * and read from many worker threads (each batch writes its own `.grc`), which
@@ -66,8 +66,8 @@ object TamperEvidentLog {
 
   /** Clear all run state and release run-scoped logging resources. Called at
     * the end of a run so the correlation ID and any attached log appender do
-    * not leak into subsequent work in the same JVM (e.g. other test suites or
-    * a library consumer running multiple builds).
+    * not leak into subsequent work in the same JVM (e.g. other test suites or a
+    * library consumer running multiple builds).
     */
   def reset(): Unit = {
     val c = cleanupRef.getAndSet(() => ())

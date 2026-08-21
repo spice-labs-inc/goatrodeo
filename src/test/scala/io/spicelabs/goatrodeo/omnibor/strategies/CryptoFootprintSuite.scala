@@ -119,7 +119,8 @@ class CryptoFootprintSuite extends FunSuite {
     )
   }
 
-  test("T-E-05 scan is bounded: needles beyond the cap are not seen") {    val near =
+  test("T-E-05 scan is bounded: needles beyond the cap are not seen") {
+    val near =
       artifact("lib.so", "prefix" + ("A" * 1024) + "EVP_sha256" + "suffix")
     assert(
       CryptoFootprintStrategy.contentOf(near).contains("EVP_sha256"),
@@ -358,7 +359,10 @@ class CryptoFootprintSuite extends FunSuite {
         "mbedtls_ctr_drbg_init"
       )
     )
-    assertEquals(m(adHoc("confidence")).toVector.map(_.value).toSet, Set("symbol"))
+    assertEquals(
+      m(adHoc("confidence")).toVector.map(_.value).toSet,
+      Set("symbol")
+    )
     assertEquals(m(adHoc("unknown")).toVector.map(_.value).toSet, Set("true"))
     assert(
       !m.contains(adHoc("algorithm")),

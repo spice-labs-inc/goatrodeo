@@ -172,7 +172,9 @@ class CbomIntegrationSuite extends FunSuite {
   // carries the run's correlation ID. THEORY: the builder routes through
   // Howdy.run, so withTamperEvidentLog must produce the tamper-evident
   // artifacts and correlate the CBOMs to the run.
-  test("T4.3 GoatRodeoBuilder tamper-evident run produces log, checksum, correlation") {
+  test(
+    "T4.3 GoatRodeoBuilder tamper-evident run produces log, checksum, correlation"
+  ) {
     val inputDir = Files.createTempDirectory("tel-int-input").toFile()
     val outputDir = Files.createTempDirectory("tel-int-output").toFile()
     val logFile = new File(outputDir, "run.log")
@@ -189,16 +191,19 @@ class CbomIntegrationSuite extends FunSuite {
         .run()
 
       assert(logFile.exists(), "tamper-evident log file should exist")
-      val logLines = Files.readAllLines(logFile.toPath()).toArray(new Array[String](0))
+      val logLines =
+        Files.readAllLines(logFile.toPath()).toArray(new Array[String](0))
       assert(logLines.nonEmpty, "tamper-evident log should not be empty")
       assert(
         logLines.exists(_.contains("Correlation ID:")),
         "log should contain the correlation ID as the first line"
       )
-      val checksums = outputDir.listFiles(f => f.getName.endsWith("_checksum.json"))
+      val checksums =
+        outputDir.listFiles(f => f.getName.endsWith("_checksum.json"))
       assertEquals(checksums.length, 1, "exactly one checksum file")
       val checksum =
-        org.json4s.native.JsonMethods.parse(Files.readString(checksums(0).toPath()))
+        org.json4s.native.JsonMethods
+          .parse(Files.readString(checksums(0).toPath()))
       val corrId = text(checksum, "correlation_id")
       assert(corrId.nonEmpty, "checksum should carry a correlation ID")
       val cboms = outputDir.listFiles(f => f.getName.startsWith("cbom_"))

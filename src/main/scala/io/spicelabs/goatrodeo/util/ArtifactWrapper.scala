@@ -214,7 +214,7 @@ object ArtifactWrapper {
         .getOrElse(MediaType.OCTET_STREAM)
       massageMimeType(fileName, rawData, detected)
     } catch {
-      case e: Throwable =>
+      case e: Exception =>
         // logger.error(
         //   f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
         //   e
@@ -404,7 +404,7 @@ object ArtifactWrapper {
       tempPath: Path,
       lastModified: Option[Instant] = None
   ): ArtifactWrapper = {
-    val name = fixPath(nominalPath)
+    val name = sanitizeName(fixPath(nominalPath))
     val forceTempFile = requireTempFile(name)
 
     // a defined temp dir implies a RAM disk... copy everything but the smallest items
@@ -479,6 +479,22 @@ object ArtifactWrapper {
     if (dot > 0 && dot < base.length - 1) base.substring(dot + 1)
     else ""
   }
+
+  /** Remove characters that are illegal in a filename from an artifact name.
+    *
+    * Archive formats (notably GNU/Berkeley `ar`) NUL-pad member names to a
+    * fixed width, so a static-library entry's name (and its extension) can end
+    * with `\u0000` bytes. Passing those into `Files.createTempFile` throws
+    * `InvalidPathException: Nul character not allowed`. NUL is the only
+    * character POSIX filenames cannot contain, so stripping it is safe and
+    * sufficient; anything else is left untouched.
+    *
+    * @param name
+    *   the artifact (file) name
+    * @return
+    *   the name with NUL characters removed
+    */
+  def sanitizeName(name: String): String = name.replaceAll("\u0000", "")
 }
 
 /** An ArtifactWrapper backed by an actual file on disk.

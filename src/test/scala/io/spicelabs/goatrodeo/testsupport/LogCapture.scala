@@ -3,10 +3,10 @@ package io.spicelabs.goatrodeo.testsupport
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
+import ch.qos.logback.core.AppenderBase
 import org.slf4j.LoggerFactory
 
-import scala.jdk.CollectionConverters.*
+import java.util.concurrent.atomic.AtomicReference
 
 /** Shared helper for suites that assert on what was (or was not) logged.
   *
@@ -21,6 +21,13 @@ import scala.jdk.CollectionConverters.*
   *      suites running in parallel cannot leak into a "nothing was logged"
   *      assertion.
   *
+  * The capture appender stores events in an immutable `Vector` wrapped in an
+  * `AtomicReference`, updated with `getAndUpdate(_ :+ event)`. Because the
+  * backing store is immutable and each append is an atomic swap, a thread that
+  * logs through the root logger while another thread reads the captured events
+  * cannot cause a `ConcurrentModificationException` (no mutable Java collection
+  * is ever shared).
+  *
   * Consequence for callers: assertions must be about logging done on the
   * calling thread. A body that logs from worker threads it spawns will appear
   * silent.
@@ -28,6 +35,21 @@ import scala.jdk.CollectionConverters.*
 object LogCapture {
 
   private val lock = new Object()
+
+  /** A logback appender that captures events into a persistent `Vector` inside
+    * an `AtomicReference`. Appends are atomic functional updates, so the event
+    * list is safe to read concurrently from another thread.
+    */
+  final class VectorCaptureAppender extends AppenderBase[ILoggingEvent] {
+    private val events: AtomicReference[Vector[ILoggingEvent]] =
+      new AtomicReference(Vector())
+
+    /** Snapshot of all events captured so far. */
+    def captured(): Vector[ILoggingEvent] = events.get()
+
+    override def append(event: ILoggingEvent): Unit =
+      events.getAndUpdate(_ :+ event)
+  }
 
   /** Force SLF4J to bind to logback, retrying while it briefly reports a
     * `SubstituteLoggerFactory` during initialisation.
@@ -51,7 +73,7 @@ object LogCapture {
     LoggerFactory.getLogger(getClass)
     val ctx = loggerContext()
     val root = ctx.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
-    val appender = new ListAppender[ILoggingEvent]()
+    val appender = new VectorCaptureAppender()
     appender.setContext(ctx)
     appender.start()
     root.addAppender(appender)
@@ -60,8 +82,7 @@ object LogCapture {
     val thread = Thread.currentThread().getName
     try {
       val result = body()
-      val mine =
-        appender.list.asScala.toVector.filter(_.getThreadName == thread)
+      val mine = appender.captured().filter(_.getThreadName == thread)
       (result, mine)
     } finally {
       root.setLevel(priorLevel)

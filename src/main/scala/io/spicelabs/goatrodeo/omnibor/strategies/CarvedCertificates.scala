@@ -35,16 +35,16 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
 
-/** Detects X.509 certificates carved (DER-encoded, at arbitrary offsets) out
-  * of binary artifacts — firmware ELF sections, raw blobs.
+/** Detects X.509 certificates carved (DER-encoded, at arbitrary offsets) out of
+  * binary artifacts — firmware ELF sections, raw blobs.
   *
   * Claims purely by the `application/x-goatrodeo-carved-x509` MIME emitted
-  * during the MIME pass (bounded 256 KB probe); processing performs the
-  * bounded carve ([[CarvedCertAugmenter.carveCertificates]], 16 MiB) and
-  * emits per-cert metadata through the existing `perCertMetadata` path under
+  * during the MIME pass (bounded 256 KB probe); processing performs the bounded
+  * carve ([[CarvedCertAugmenter.carveCertificates]], 16 MiB) and emits per-cert
+  * metadata through the existing `perCertMetadata` path under
   * `Certificates:Cert:<idx>:*` keys, so the CBOM emitter produces ordinary
-  * certificate components — including `KeySize` (e.g. an RSA-1024 cert
-  * surfaces with KeySize 1024).
+  * certificate components — including `KeySize` (e.g. an RSA-1024 cert surfaces
+  * with KeySize 1024).
   *
   * Safety: only fully parsed certificates are emitted; no raw bytes and no
   * private key material leave the artifact.

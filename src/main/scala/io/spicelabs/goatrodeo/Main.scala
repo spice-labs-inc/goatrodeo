@@ -23,8 +23,8 @@ import io.spicelabs.goatrodeo.util.ChainAppender
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
-import scopt.OParser
 import org.slf4j.LoggerFactory
+import scopt.OParser
 
 import java.io.File
 import java.nio.file.Files
@@ -89,6 +89,16 @@ object Howdy {
   @static
   def run(params: Config): Unit = {
     setupTamperEvidentLogging(params)
+    try {
+      runImpl(params)
+    } finally {
+      // Guaranteed release of run-scoped logging resources (e.g. detaching the
+      // chain appender from the root logger) even if the run throws.
+      TamperEvidentLog.reset()
+    }
+  }
+
+  private def runImpl(params: Config): Unit = {
     startComponents(params)
 
     val logger = Logger(getClass())
@@ -120,7 +130,10 @@ object Howdy {
       params.ingested match {
         case None =>
           if (params.printProcessedFiles) {
-            ((f: File) => logger.info(f"Processed ${f.getPath()}"), (good: Boolean) => {})
+            (
+              (f: File) => logger.info(f"Processed ${f.getPath()}"),
+              (good: Boolean) => {}
+            )
           } else {
             ((f: File) => {}, (good: Boolean) => {})
           }
@@ -258,8 +271,8 @@ object Howdy {
     * the run-scoped [[TamperEvidentLog]] state with a fresh correlation ID.
     *
     * The correlation ID is emitted as the first log line once the chain
-    * appender (if any) is installed, so it is the first chained line and anchors
-    * every later line, `.grc`, and the final checksum file to this run.
+    * appender (if any) is installed, so it is the first chained line and
+    * anchors every later line, `.grc`, and the final checksum file to this run.
     *
     * @param params
     *   the configuration parameters

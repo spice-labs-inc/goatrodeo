@@ -15,11 +15,10 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.*
 import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.*
-
-import io.spicelabs.goatrodeo.util.TamperEvidentLog
 
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -266,17 +265,26 @@ object CbomEmitter {
 
     val topProps: List[JObject] = List(
       if (truncated)
-        Some(JObject("name" -> JString("cbom:truncated"), "value" -> JString("true")))
+        Some(
+          JObject(
+            "name" -> JString("cbom:truncated"),
+            "value" -> JString("true")
+          )
+        )
       else None,
       Option(TamperEvidentLog.correlationId)
         .filter(_.nonEmpty)
         .map(corr =>
-          JObject("name" -> JString("goatrodeo:correlation-id"), "value" -> JString(corr))
+          JObject(
+            "name" -> JString("goatrodeo:correlation-id"),
+            "value" -> JString(corr)
+          )
         )
     ).flatten
 
-    val fields = if (topProps.isEmpty) baseFields
-    else baseFields :+ ("properties" -> JArray(topProps))
+    val fields =
+      if (topProps.isEmpty) baseFields
+      else baseFields :+ ("properties" -> JArray(topProps))
 
     JObject(fields)
   }
@@ -403,11 +411,13 @@ object CbomEmitter {
     * (the path within its parent), falling back to its gitoid identifier.
     */
   private def itemName(item: Item): String =
-    item.bodyAsItemMetaData.flatMap(_.fileNames.headOption).getOrElse(item.identifier)
+    item.bodyAsItemMetaData
+      .flatMap(_.fileNames.headOption)
+      .getOrElse(item.identifier)
 
-  /** The three traversal-path properties for a chain of container Items
-    * (root → … → item): the file path, the OmniBOR (`gitoid:blob:sha256`)
-    * path, and the SWHID path — each joining its nodes with [[PathSeparator]].
+  /** The three traversal-path properties for a chain of container Items (root →
+    * … → item): the file path, the OmniBOR (`gitoid:blob:sha256`) path, and the
+    * SWHID path — each joining its nodes with [[PathSeparator]].
     */
   private def pathProps(chain: Vector[Item]): List[JObject] = {
     val sep = PathSeparator
@@ -466,12 +476,18 @@ object CbomEmitter {
     // `swhid:core` (the SWHID content id, from the item's sha1 gitoid alias)
     // is always emitted together with `omnibor:core` (the item's own
     // `gitoid:blob:sha256` OmniBOR id): neither appears without the other.
-    val coreProps: List[JObject] = swhidFor(item).map { s =>
-      List(
-        JObject("name" -> JString("swhid:core"), "value" -> JString(s)),
-        JObject("name" -> JString("omnibor:core"), "value" -> JString(item.identifier))
-      )
-    }.toList.flatten
+    val coreProps: List[JObject] = swhidFor(item)
+      .map { s =>
+        List(
+          JObject("name" -> JString("swhid:core"), "value" -> JString(s)),
+          JObject(
+            "name" -> JString("omnibor:core"),
+            "value" -> JString(item.identifier)
+          )
+        )
+      }
+      .toList
+      .flatten
     val allProps = extraProps.arr ++ coreProps ++ pathProps(chain)
     val withProps =
       if (allProps.isEmpty) JObject(baseFields)
@@ -1083,7 +1099,9 @@ object CbomEmitter {
         (c >= '0' && c <= '9') || c == '-' || c == '_'
       if (ok) c else '_'
     }
-    val name = if (escaped.length > MaxCbomNameChars) escaped.takeRight(MaxCbomNameChars) else escaped
+    val name =
+      if (escaped.length > MaxCbomNameChars) escaped.takeRight(MaxCbomNameChars)
+      else escaped
     f"cbom_${name}_${short}.json"
   }
 

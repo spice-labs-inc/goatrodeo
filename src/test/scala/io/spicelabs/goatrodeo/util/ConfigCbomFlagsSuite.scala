@@ -133,7 +133,9 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
   }
 
-  test("T4.7 GoatRodeoBuilder withExtraArg supports printFiles/tamperEvidentLog") {
+  test(
+    "T4.7 GoatRodeoBuilder withExtraArg supports printFiles/tamperEvidentLog"
+  ) {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")
       .withExtraArg("printFiles", "true")

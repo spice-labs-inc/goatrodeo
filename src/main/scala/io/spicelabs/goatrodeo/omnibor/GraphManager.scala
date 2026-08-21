@@ -206,7 +206,12 @@ object GraphManager {
       f"Finished index rename at ${Duration.between(start, Instant.now())}"
     )
 
-    DataAndIndexFiles(sha256Long, indexSha256Long, dataFileSha256, indexFileSha256)
+    DataAndIndexFiles(
+      sha256Long,
+      indexSha256Long,
+      dataFileSha256,
+      indexFileSha256
+    )
   }
 
   /** Write a collection of Items to GRD/GRI/GRC files.
@@ -269,7 +274,9 @@ object GraphManager {
     val griHex = fileSet.map(_.indexFileSha256).toVector
     def jsonArr(xs: Vector[String]): String =
       xs.map(h => "\"" + h + "\"").mkString("[", ",", "]")
-    val sha256Json = s"""{"grd": ${jsonArr(grdHex)}, "gri": ${jsonArr(griHex)}}"""
+    val sha256Json = s"""{"grd": ${jsonArr(grdHex)}, "gri": ${jsonArr(
+        griHex
+      )}}"""
     val info = scala.collection.immutable.TreeMap[String, String](
       "correlation_id" -> TamperEvidentLog.correlationId,
       "sha256" -> sha256Json

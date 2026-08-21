@@ -22,16 +22,15 @@ import scala.util.Try
 
 /** MIME augmentation and carving for DER X.509 certificates embedded at
   * arbitrary offsets inside binary artifacts (firmware ELF sections, raw
-  * blobs). Firmware certs are DER byte arrays — not PEM text — so the
-  * existing PEM-marker detectors never see them.
+  * blobs). Firmware certs are DER byte arrays — not PEM text — so the existing
+  * PEM-marker detectors never see them.
   *
   * Two-phase, like the other content detectors:
   *   - the MIME pass probes a bounded window (256 KB) for candidate DER
   *     structures containing an SPKI OID needle and emits
   *     `application/x-goatrodeo-carved-x509`;
   *   - the claiming strategy calls [[carveCertificates]] during processing to
-  *     fully parse (and dedupe) the certificates within a larger bounded
-  *     scan.
+  *     fully parse (and dedupe) the certificates within a larger bounded scan.
   *
   * Safety: only full DER parses are ever returned — a length-forged candidate
   * never yields a certificate — and the byte caps bound hostile inputs.
@@ -65,11 +64,21 @@ object CarvedCertAugmenter {
     0x01
   )
   private val EcSpkiOid: Array[Byte] =
-    Array[Byte](0x06, 0x07, 0x2a, 0x86.toByte, 0x48, 0xce.toByte, 0x3d, 0x02, 0x01)
+    Array[Byte](
+      0x06,
+      0x07,
+      0x2a,
+      0x86.toByte,
+      0x48,
+      0xce.toByte,
+      0x3d,
+      0x02,
+      0x01
+    )
 
   /** Applicability rule: block-list shaped — text/XML/JSON/class files can
-    * never carry carved DER certs; binaries and unknown fragments (ELF
-    * sections are octet-stream) stay probed.
+    * never carry carved DER certs; binaries and unknown fragments (ELF sections
+    * are octet-stream) stay probed.
     */
   private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
     ArtifactWrapper.noneOf(
@@ -81,8 +90,7 @@ object CarvedCertAugmenter {
 
   /** Parse the DER length header at `headerIdx` (pointing at the `0x30`
     * SEQUENCE byte). Returns the total DER object size (header + content), or
-    * None when the header is malformed or the declared length is out of
-    * bounds.
+    * None when the header is malformed or the declared length is out of bounds.
     */
   private[goatrodeo] def derObjectLength(
       bytes: Array[Byte],
@@ -127,7 +135,11 @@ object CarvedCertAugmenter {
     false
   }
 
-  private def startsWith(hay: Array[Byte], at: Int, needle: Array[Byte]): Boolean = {
+  private def startsWith(
+      hay: Array[Byte],
+      at: Int,
+      needle: Array[Byte]
+  ): Boolean = {
     if (at + needle.length > hay.length) return false
     var j = 0
     while (j < needle.length) {
@@ -170,9 +182,9 @@ object CarvedCertAugmenter {
     false
   }
 
-  /** Scan `bytes` for embedded DER X.509 certificates (deduped by DER
-    * SHA-256). Returns the parsed certificates and whether more candidates
-    * existed beyond `maxCerts`.
+  /** Scan `bytes` for embedded DER X.509 certificates (deduped by DER SHA-256).
+    * Returns the parsed certificates and whether more candidates existed beyond
+    * `maxCerts`.
     */
   private[goatrodeo] def carveCertificates(
       bytes: Array[Byte],

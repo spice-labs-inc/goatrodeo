@@ -24,13 +24,9 @@ import scala.util.Using
   *
   * ArduPilot compiles its `ROMFS/` directory into a generated C data table:
   *
-  *   struct embedded_file {
-  *     const char *filename;        // pointer to a NUL-terminated path string
-  *     uint32_t compressed_size;
-  *     uint32_t decompressed_size;
-  *     uint32_t crc;
-  *     const uint8_t *contents;     // pointer to a raw-DEFLATE byte stream
-  *   };
+  * struct embedded_file { const char *filename; // pointer to a NUL-terminated
+  * path string uint32_t compressed_size; uint32_t decompressed_size; uint32_t
+  * crc; const uint8_t *contents; // pointer to a raw-DEFLATE byte stream };
   *
   * The on-disk layout is a contiguous array of such structs; pointer width
   * depends only on the ELF class (32-bit: 20-byte structs; 64-bit: 32-byte),
@@ -39,12 +35,12 @@ import scala.util.Using
   *
   * Two-phase discipline. `read` first runs a cheap gate through
   * `ArtifactWrapper.withStream` that reads only the ELF head and rejects any
-  * artifact that is not an ELF (magic + class). Only if that gate passes is
-  * the balance of the work performed, and then through `ArtifactWrapper
-  * .withFile` so that pointer resolution gets cheap random access. Nothing is
-  * loaded whole into memory: the anchor/pointer scan is a bounded
-  * forward-stream pass, and struct/name/content reads are seek-and-read
-  * regions. Non-ELF artifacts never trigger a `withFile`.
+  * artifact that is not an ELF (magic + class). Only if that gate passes is the
+  * balance of the work performed, and then through `ArtifactWrapper .withFile`
+  * so that pointer resolution gets cheap random access. Nothing is loaded whole
+  * into memory: the anchor/pointer scan is a bounded forward-stream pass, and
+  * struct/name/content reads are seek-and-read regions. Non-ELF artifacts never
+  * trigger a `withFile`.
   */
 object ApRomfs {
 
@@ -113,9 +109,9 @@ object ApRomfs {
     }
   }
 
-  /** Read an AP_ROMFS embedded file store from the artifact's stream.
-    * Returns the decompressed ROMFS files (each bounded by [[MaxFileBytes]]),
-    * or None if the artifact is not an AP_ROMFS-bearing ELF.
+  /** Read an AP_ROMFS embedded file store from the artifact's stream. Returns
+    * the decompressed ROMFS files (each bounded by [[MaxFileBytes]]), or None
+    * if the artifact is not an AP_ROMFS-bearing ELF.
     */
   def read(artifact: ArtifactWrapper): Option[Vector[(String, Array[Byte])]] = {
     gateElf(artifact).flatMap { elf =>
@@ -150,7 +146,8 @@ object ApRomfs {
         val stride = if (cls == 1) 20 else 32
         val contentsOff = if (cls == 1) 16 else 24
         val phoff = if (cls == 1) u32(head, 0x1c, le) else u64(head, 0x20, le)
-        val phentsize = if (cls == 1) u16(head, 0x2a, le) else u16(head, 0x36, le)
+        val phentsize =
+          if (cls == 1) u16(head, 0x2a, le) else u16(head, 0x36, le)
         val phnum = if (cls == 1) u16(head, 0x2c, le) else u16(head, 0x38, le)
         if (phoff <= 0 || phnum <= 0) {
           None
@@ -164,10 +161,17 @@ object ApRomfs {
             else {
               val (p_offset, p_vaddr, p_filesz) =
                 if (cls == 1)
-                  (u32(head, off + 4, le).toLong, u32(head, off + 8, le).toLong,
-                    u32(head, off + 16, le).toLong)
+                  (
+                    u32(head, off + 4, le).toLong,
+                    u32(head, off + 8, le).toLong,
+                    u32(head, off + 16, le).toLong
+                  )
                 else
-                  (u64(head, off + 8, le), u64(head, off + 16, le), u64(head, off + 32, le))
+                  (
+                    u64(head, off + 8, le),
+                    u64(head, off + 16, le),
+                    u64(head, off + 32, le)
+                  )
               if (p_offset >= 0 && p_filesz >= 0 && p_filesz < (1L << 40)) {
                 segs += Seg(p_vaddr, p_offset, p_filesz)
               }
@@ -182,7 +186,11 @@ object ApRomfs {
 
   // --- Single forward read -------------------------------------------------
 
-  private def readAt(artifact: ArtifactWrapper, offset: Long, count: Int): Array[Byte] = {
+  private def readAt(
+      artifact: ArtifactWrapper,
+      offset: Long,
+      count: Int
+  ): Array[Byte] = {
     val buf = new Array[Byte](count)
     artifact.withStream { s =>
       var need = offset
@@ -204,7 +212,11 @@ object ApRomfs {
   /** Seek-and-read `len` bytes at `offset` from a random-access file. If the
     * read runs short (EOF), the remainder of the returned buffer stays zeroed.
     */
-  private def rafRead(raf: RandomAccessFile, offset: Long, len: Int): Array[Byte] = {
+  private def rafRead(
+      raf: RandomAccessFile,
+      offset: Long,
+      len: Int
+  ): Array[Byte] = {
     raf.seek(offset)
     val buf = new Array[Byte](len)
     var total = 0
@@ -227,10 +239,14 @@ object ApRomfs {
   private def u32(b: Array[Byte], off: Int, le: Boolean): Long = {
     if (off + 3 >= b.length) 0L
     else if (le)
-      ((b(off) & 0xff) | ((b(off + 1) & 0xff) << 8) | ((b(off + 2) & 0xff) << 16) |
+      ((b(off) & 0xff) | ((b(off + 1) & 0xff) << 8) | ((b(
+        off + 2
+      ) & 0xff) << 16) |
         ((b(off + 3) & 0xffL) << 24)).toLong
     else
-      ((b(off) & 0xffL) << 24 | ((b(off + 1) & 0xff) << 16) | ((b(off + 2) & 0xff) << 8) |
+      ((b(off) & 0xffL) << 24 | ((b(off + 1) & 0xff) << 16) | ((b(
+        off + 2
+      ) & 0xff) << 8) |
         (b(off + 3) & 0xff)).toLong
   }
 
@@ -255,7 +271,12 @@ object ApRomfs {
     }
   }
 
-  private def readValue(buf: Array[Byte], i: Int, ptr: Int, le: Boolean): Long = {
+  private def readValue(
+      buf: Array[Byte],
+      i: Int,
+      ptr: Int,
+      le: Boolean
+  ): Long = {
     var v = 0L
     if (le) {
       var k = 0
@@ -397,7 +418,8 @@ object ApRomfs {
     while (!done && i < MaxFiles) {
       val off = base + i * e.stride
       val fields = rafRead(raf, off, e.contentsOff + e.ptr)
-      val fnPtr = if (e.ptr == 4) u32(fields, 0, le = true) else u64(fields, 0, le = true)
+      val fnPtr =
+        if (e.ptr == 4) u32(fields, 0, le = true) else u64(fields, 0, le = true)
       val fnOff = e.v2o(fnPtr)
       val cp = readValue(fields, e.contentsOff, e.ptr, le = true)
       val ds = u32(fields, 12, le = true).toInt
@@ -410,7 +432,8 @@ object ApRomfs {
     while (!fdone && fi < i) {
       val off = base + fi * e.stride
       val fields = rafRead(raf, off, e.contentsOff + e.ptr)
-      val fnPtr = if (e.ptr == 4) u32(fields, 0, le = true) else u64(fields, 0, le = true)
+      val fnPtr =
+        if (e.ptr == 4) u32(fields, 0, le = true) else u64(fields, 0, le = true)
       val fnOff = e.v2o(fnPtr)
       val cp = readValue(fields, e.contentsOff, e.ptr, le = true)
       val ds = u32(fields, 12, le = true).toInt
@@ -433,7 +456,10 @@ object ApRomfs {
     files.result()
   }
 
-  private def inflateMem(input: Array[Byte], expected: Int): Option[Array[Byte]] = {
+  private def inflateMem(
+      input: Array[Byte],
+      expected: Int
+  ): Option[Array[Byte]] = {
     Try {
       val inflater = new Inflater(true)
       inflater.setInput(input, 0, input.length)
