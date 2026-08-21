@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 
 import java.io.BufferedWriter
 import java.io.File
@@ -236,6 +237,18 @@ object Builder {
     done(!dead_?.get())
 
     logger.info("Done with run")
+
+    // Write the run-level tamper-evident checksum as the final action (no
+    // chained log line follows it), so its final_chain_head is the digest of
+    // the last line of the log. Correlates the run id, the log, and every
+    // .grc written across all batch dirs.
+    TamperEvidentLog.correlationId match {
+      case "" => ()
+      case corrId => TamperEvidentLog.writeChecksum(dest, corrId)
+    }
+    // Clear run-scoped tamper-evidence state so the correlation ID does not leak
+    // into subsequent work in the same JVM.
+    TamperEvidentLog.reset()
   }
 
   private def processMaxRecords(

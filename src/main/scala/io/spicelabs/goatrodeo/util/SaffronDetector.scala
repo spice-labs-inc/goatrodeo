@@ -1,6 +1,8 @@
 package io.spicelabs.goatrodeo.util
 
 import io.spicelabs.saffron.DiskFormat
+import io.spicelabs.saffron.container.ContainerDetector
+import io.spicelabs.saffron.container.ContainerFormat
 
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
@@ -16,10 +18,36 @@ object SaffronDetector {
     */
   val minInMemoryProbeSize: Long = 1L * 1024 * 1024
 
+  /** MIME names for Saffron's OT/embedded binary container formats. */
+  private val ContainerMimes: Map[ContainerFormat, String] = Map(
+    ContainerFormat.LINUX_KERNEL -> "application/x-saffron-linux-kernel",
+    ContainerFormat.FIT_IMAGE -> "application/x-saffron-fit-image",
+    ContainerFormat.DTB -> "application/x-saffron-dtb",
+    ContainerFormat.ELF -> "application/x-saffron-elf",
+    ContainerFormat.RPI_FIRMWARE -> "application/x-saffron-rpi-firmware",
+    ContainerFormat.ANDROID_BOOT -> "application/x-saffron-android-boot",
+    ContainerFormat.COMPRESSED_SINGLE -> "application/x-saffron-compressed-single",
+    ContainerFormat.WIM -> "application/x-saffron-wim",
+    ContainerFormat.DMG -> "application/x-saffron-dmg"
+  )
+
+  /** Every container MIME this detector can emit. */
+  val containerMimeTypes: Set[String] = ContainerMimes.values.toSet
+
+  private def containerMime(fmt: ContainerFormat): Option[String] =
+    ContainerMimes.get(fmt)
+
+  private def containerMimeOf(path: java.nio.file.Path): Option[String] = {
+    Try(ContainerDetector.detect(path)).toOption
+      .flatMap(_.toScala)
+      .flatMap(containerMime)
+  }
+
   // detect if an artifact wrapper is a mime type known to saffron
   private def readFormat(artifact: ArtifactWrapper): Set[String] = {
     artifact.withFile(file => {
-      Try(DiskFormat.detect(file.toPath())).toOption
+      val path = file.toPath()
+      val diskMimes = Try(DiskFormat.detect(path)).toOption
         .flatMap(_.toScala)
         .map(d =>
           // RAW disk images report the generic octet-stream MIME type. Promote
@@ -29,6 +57,8 @@ object SaffronDetector {
           else Set(d.mimeType())
         )
         .getOrElse(Set.empty[String])
+      val containerMimes = containerMimeOf(path).toSet
+      diskMimes ++ containerMimes
     })
   }
 

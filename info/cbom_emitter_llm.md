@@ -28,10 +28,14 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 1. After the ADG is built, `Builder` calls `CbomEmitter.emitForStorage(storage, version, dir)` if `--emit-cbom-dir` is set.
 2. Find all root Items (`Item.isRoot()`).
 3. For each root, walk `contains` edges with a visited `Set` and a depth limit of 32.
-4. Collect Items whose metadata contains `Certificates:`, `openssl.cnf:`, or `java.security:` keys.
-5. Omit private-key Items (`Certificates:DerivedFromPrivateKey == true` or `Description` contains "private key").
+4. Collect Items whose metadata contains a known crypto family key (see list).
+5. Do **not** redact private keys in the emitter: private-key bytes are
+   discarded at capture time and never enter ADG metadata; marker flags are
+   emitted faithfully.
 6. Deduplicate by GitOID and cap at 100,000 components per root.
-7. Map each Item to a CycloneDX `cryptographic-asset` component.
+7. Map each Item to a CycloneDX `cryptographic-asset` component, emitting
+   `swhid:core` + `omnibor:core` together and the three `goatrodeo:*:path`
+   traversal properties.
 8. Write one JSON file per root with an atomic temp-file + rename.
 
 ## Component mapping
@@ -45,18 +49,44 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 | CRL | `related-crypto-material` | `type: other` |
 | Public key (SSH/PGP) | `related-crypto-material` | `type: public-key`, includes `size` when known |
 
+## Core identifiers and traversal paths
+
+- `swhid:core` = `swh:1:cnt:<sha1>` from the item's `alias:from`
+  `gitoid:blob:sha1:` edge (no re-hash). `omnibor:core` = the item's own
+  `gitoid:blob:sha256:<hex>` (== `bom-ref`).
+- `swhid:core` and `omnibor:core` are always emitted together and each equals
+  the leaf of its `goatrodeo:*:path`. — `T3.35`, `T3.44`
+- `goatrodeo:path` = chain of container names (first `fileNames`, fallback
+  gitoid); `goatrodeo:omnibor-path` = chain of `gitoid:blob:sha256` ids;
+  `goatrodeo:swhid-path` = chain of `swh:1:cnt` ids; joined by `|:|`.
+  — `T3.42`
+
+## ADG handoff
+
+The emitter reads a set of `Item`s (`identifier`, `connections`, `body_mime_type`,
+`body` = `ItemMetaData` with `fileNames`/`mimeType`/`fileSize`/`extra`). Edges:
+`contained:down` (contains), `contained:up` (containedBy), `alias:from`,
+`alias:to`, `build:down`, `build:up`, `tag:from`, `tag:to`. Crypto metadata is in
+`extra` keys under any family prefix (`Certificates:`, `openssl.cnf:`,
+`java.security:`, `PasswordHash:`, `Usign:`, `SSH:`, `TLSConfig:`,
+`EmbeddedCertificates:`, `ServiceCrypto:`, `Kerberos:`, `JWT:`, `JWK:`,
+`EmbeddedKey:`, `CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`). Roots:
+`isRoot()` (metadata mime, not `"tags"`, no `alias:to`/`contained:up`). One CBOM
+per root, filename `cbom_gitoid_blob_sha256_<root-hex>.json`. See
+`info/cbom_emitter.md` → "Handoff" for the full algorithm.
+
 ## Security boundaries
 
 - Symlink components in the output path are rejected. — `T3.21`
 - New directories are created with `0750`; files are written with `0640` (POSIX only). — `T3.22`
 - Atomic writes prevent partial CBOM files and leave no `.tmp` files behind. — `T3.22`
 - Traversal depth ≤ 32, component count ≤ 100,000 per root.
-- Private keys are redacted.
+- Private-key bytes never enter the ADG (capture-time enforcement); marker flags are emitted.
 - All failures are wrapped in `Try` and logged.
 
 ## Tests
 
-`CbomEmitterSuite` (34 tests):
+`CbomEmitterSuite` (41 tests):
 - `T3.1` / `T3.17` — CLI parsing and validation.
 - `T3.2` — empty CBOM.
 - `T3.3` / `T3.13` — certificate component mapping.
@@ -71,7 +101,7 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 - `T3.15` — cyclic `contains` graph.
 - `T3.16` — duplicate GitOID deduplication.
 - `T3.18` — output directory auto-creation.
-- `T3.19` — private key redaction.
+- `T3.19` — private-key-marker items emitted faithfully (no redaction).
 - `T3.20` — size limit / truncation.
 - `T3.21`/`T3.22` — symlink rejection / atomic writes.
 - `T3.23`–`T3.28` — algorithm refs (keys, CRLs, EC curves, password hashes, usign).
@@ -81,12 +111,13 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 - `T3.32` — ServiceCrypto blake2b/sha3 → hash assets.
 - `T3.33` — golden byte-identity across 15 pre-existing metadata families.
 - `T3.34` — hostile JWT `alg` never mints a hash asset.
-- `T3.35` — artifact-backed component carries its `swhid:core`
-  (`swh:1:cnt:<sha1>`, derived from the `alias:from` `gitoid:blob:sha1:`
-  edge); 1.6/1.7 schema-valid.
-- `T3.36` — no SWHID property without a sha1 alias; still schema-valid.
-- `T3.37` — malformed sha1 aliases (non-hex, wrong length, uppercase) are
-  ignored.
+- `T3.35` — artifact-backed component carries `swhid:core` + `omnibor:core`.
+- `T3.36` — no core properties without a sha1 alias; still schema-valid.
+- `T3.37` — malformed sha1 aliases ignored.
+- `T3.41` — carved RSA-1024 cert in an ELF surfaces in the CBOM.
+- `T3.42` — nested container chain produces the three `goatrodeo:*:path`.
+- `T3.43` — ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024.
+- `T3.44` — `swhid:core`/`omnibor:core` pair agree with the path leaf.
 
 `CryptoAlgorithmsSuite` (6 tests) — registry totality/classification/
 parameter/regression/hygiene/collision (R-T-01..06).

@@ -71,6 +71,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_TARGET: github
 
+      - name: Index and Upload ADG
+        uses: spice-labs-inc/action-spice-labs-surveyor@v5
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          input: "${{ github.workspace }}"
+          subject: "${{ github.event.repository.name }}"
+          cli_image_tag: "1.6.3"
+
   publish-to-central:
     name: Re-publish Goatrodeo to Maven Central
     runs-on: ubuntu-24.04
@@ -228,6 +236,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Save a local copy of the built image under target/release/
           outputs: type=oci,dest=target/release/goatrodeo-image.tar
+
+      - name: Index and Upload ADG
+        uses: spice-labs-inc/action-spice-labs-surveyor@v5
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          input: "${{ github.workspace }}"
+          subject: "${{ github.event.repository.name }}"
+          cli_image_tag: "1.6.3"
 
   notify:
     needs: [publish-jars, publish-to-central, docker-image]

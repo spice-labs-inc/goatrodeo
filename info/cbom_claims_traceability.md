@@ -94,3 +94,34 @@ Claims in `info/cbom_emitter.md` "OmniBOR and SWHID identifiers":
 | Artifact-backed components keep `bom-ref` = `gitoid:blob:sha256` and gain `swhid:core` = `swh:1:cnt:<sha1>` from the `alias:from` sha1 edge; output validates against CycloneDX 1.6 and 1.7. | `CbomEmitterSuite.T3.35` |
 | Items without a `gitoid:blob:sha1:` alias emit no SWHID property and stay schema-valid. | `CbomEmitterSuite.T3.36` |
 | Malformed aliases (non-hex, wrong length, uppercase) are ignored — no bogus SWHID is minted. | `CbomEmitterSuite.T3.37` |
+
+## Phase J — Carved DER Certificates (2026-08-19)
+
+Claims in the carved-cert phase plan (`workspace/2026_08_19_carved_certs_plan.md`):
+
+| Claim | Verified By |
+|-------|-------------|
+| Carved DER X.509 certs in binaries are detected in the 256 KB probe window and missed beyond it (doctrine). | `CarvedCertAugmenterSuite.A-2`, `CarvedCertificatesSuite.C-5` |
+| The carve parses only fully valid certs, dedupes, and honours caps. | `CarvedCertificatesSuite.C-1`, `C-2`, `CarvedCertAugmenterSuite.A-3` |
+| An RSA-1024 cert embedded in an ELF surfaces in the CBOM as a certificate component with KeySize 1024 and `alg:pke:rsa`/1024. | `CbomEmitterSuite.T3.41` |
+| mbedTLS symbols flag firmware binaries with classifier `mbedtls` and `unknown=true` (no invented algorithm). | `CryptoFootprintSuite.T-E-11` |
+| Unknown-flagged footprint items are not silently dropped from the CBOM. | `IoTGoatCbomSuite.T4.5` (regression restored), full `sbt test` |
+
+## Phase K — Traversal-Derived CBOM Paths (2026-08-20)
+
+Claims in `info/cbom_enhancements.md`:
+
+| Claim | Verified By |
+|-------|-------------|
+| Every item-backed component carries `goatrodeo:path`, `goatrodeo:omnibor-path`, `goatrodeo:swhid-path` built from the `contains` hierarchy (root → … → item), joined by `|:|`. | `CbomEmitterSuite.T3.42` |
+| Adding the path properties is the only delta to pre-existing output (byte-identity preserved otherwise). | `CbomEmitterSuite.T3.33` (regenerated goldens; diff verified = only the three props) |
+| Algorithm assets carry the path of the item that produced them. | `CbomEmitterSuite.T3.42`, golden content |
+| Full regression after the emitter change. | `sbt test` (2,340/0) |
+
+## Phase L — ArduPilot AP_ROMFS Container Reader (2026-08-20)
+
+| Claim | Verified By |
+|-------|-------------|
+| ArduPilot `AP_ROMFS` is treated as an archive: its embedded files become inner artifacts (read via `withStream` only, bounded). | `ApRomfsSuite.AR-1`, `AR-2`, `AR-3` |
+| The Surveyor-OT-Demo trust-store certs (RSA-1024) surface in the CBOM with `KeySize 1024` and `goatrodeo:path`. | `CbomEmitterSuite.T3.43` |
+| Corpus: ArduPilot + PX4 images under `test_data/firmware-images/`. | fixture presence + AR-1 |

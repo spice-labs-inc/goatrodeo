@@ -1981,12 +1981,13 @@ class CbomEmitterSuite extends FunSuite {
 
   // T3.35 — the component's bom-ref is the sha256 GitOID, and the SWHID
   // (`swh:1:cnt:<sha1>`) is emitted as the `swhid:core` property derived
-  // from the item's `alias:from` `gitoid:blob:sha1:<hex>` edge. THEORY: the
-  // SWHID content identifier is the same sha1 bytes with a different prefix,
-  // so no extra hashing is needed — the pass only translates the identifier
-  // the Item already carries. Output must stay valid against CycloneDX 1.6
-  // and 1.7.
-  test("T3.35 artifact-backed component carries its SWHID") {
+  // from the item's `alias:from` `gitoid:blob:sha1:<hex>` edge. `swhid:core`
+  // is always paired with `omnibor:core` (the item's own `gitoid:blob:sha256`
+  // OmniBOR id). THEORY: the SWHID content identifier is the same sha1 bytes
+  // with a different prefix, so no extra hashing is needed — the pass only
+  // translates the identifier the Item already carries. Output must stay
+  // valid against CycloneDX 1.6 and 1.7.
+  test("T3.35 artifact-backed component carries its SWHID and OmniBOR core") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2010,6 +2011,49 @@ class CbomEmitterSuite extends FunSuite {
             propertyMap(comp).get("swhid:core"),
             Some(s"swh:1:cnt:${sha1hex}")
           )
+          assertEquals(
+            propertyMap(comp).get("omnibor:core"),
+            Some(certId)
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.44 — `swhid:core` and `omnibor:core` are always emitted together, and
+  // `swhid:core` always equals the final (leaf) node of `goatrodeo:swhid-path`
+  // while `omnibor:core` equals the final node of `goatrodeo:omnibor-path`.
+  // THEORY: the core identifiers must describe the item itself (never a third,
+  // unrelated id), so each core must correspond to the item's own node in the
+  // traversal path.
+  test("T3.44 swhid:core/omnibor:core pair always agree with the path leaf") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val sha1hex = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b"
+      val certId =
+        "gitoid:blob:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      val cert = swhidCert(certId, Some(s"gitoid:blob:sha1:${sha1hex}"))
+      val root = makeItem(
+        id = SwhidRootId,
+        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, cert)
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val comp = findComponentByRef(json, certId).get
+          val pm = propertyMap(comp)
+          assert(pm.contains("swhid:core"), "swhid:core must be present")
+          assert(pm.contains("omnibor:core"), "omnibor:core must be present")
+          val swhidPath = pm.get("goatrodeo:swhid-path").get.split("\\|:\\|").toList
+          val omniPath = pm.get("goatrodeo:omnibor-path").get.split("\\|:\\|").toList
+          assertEquals(pm.get("swhid:core").get, swhidPath.last)
+          assertEquals(pm.get("omnibor:core").get, omniPath.last)
           assert(validate(compact(render(json)), schema).isEmpty)
       }
     } finally {
@@ -2040,6 +2084,7 @@ class CbomEmitterSuite extends FunSuite {
           val json = writeAndRead(storage, root, dir, version)
           val comp = findComponentByRef(json, certId).get
           assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(propertyMap(comp).get("omnibor:core").isEmpty)
           assert(validate(compact(render(json)), schema).isEmpty)
       }
     } finally {
@@ -2087,6 +2132,7 @@ class CbomEmitterSuite extends FunSuite {
           val json = writeAndRead(storage, root, dir, version)
           val comp = findComponentByRef(json, certId).get
           assert(propertyMap(comp).get("swhid:core").isEmpty)
+          assert(propertyMap(comp).get("omnibor:core").isEmpty)
           assert(validate(compact(render(json)), schema).isEmpty)
       }
     } finally {
@@ -2321,6 +2367,204 @@ class CbomEmitterSuite extends FunSuite {
               "parameterSetIdentifier"
             ),
             "2048"
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.41 — end-to-end: a docker-built ELF containing a carved RSA-1024 DER
+  // certificate flows through the full pipeline (MIME probe → carve strategy
+  // → metadata) and the CBOM contains a certificate component with
+  // KeySize 1024 plus an `alg:pke:rsa` asset parameterized 1024.
+  test("T3.41 carved RSA-1024 cert in an ELF surfaces in the CBOM") {
+    val dir = tempDir()
+    try {
+      val fixture =
+        new File("test_data/carved-certs/elf-rsa1024-cert")
+      assert(fixture.exists(), "carved corpus fixtures required — run gen_carved_elf_corpus.sh")
+      val items = CertificatesPipelineRunner.runGoatRodeoOnSingleFile(fixture)
+      assert(items.nonEmpty, "pipeline should produce items for the ELF")
+      val carved = items.filter(_.identifier != "gitoid:blob:sha256:" + ("0" * 64))
+      assert(carved.exists { i =>
+        i.bodyAsItemMetaData.exists(_.extra.keys.exists(_.startsWith("Certificates:Cert:0:")))
+      }, "a carved-certificate item must exist")
+
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val storage = MemStorage(None)
+      items.foreach(i =>
+        storeItem(
+          storage,
+          i.copy(connections = i.connections + (EdgeType.containedBy -> rootId))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(
+          items.map(i => EdgeType.contains -> i.identifier)*
+        ),
+        fileNames = TreeSet("root")
+      )
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val certs = getComponents(json).filter { c =>
+            (c \ "cryptoProperties" \ "assetType") == JString("certificate")
+          }
+          assert(certs.nonEmpty, "carved cert must emit a certificate component")
+          val cert1024 = certs.find { c =>
+            propertyMap(c).get("Certificates:Cert:0:KeySize").contains("1024") ||
+            propertyMap(c).get("Certificates:KeySize").contains("1024")
+          }
+          assert(cert1024.isDefined, s"no certificate component with KeySize 1024: ${certs.map(propertyMap)}")
+          val alg = findComponentByRef(json, "alg:pke:rsa")
+          assert(alg.isDefined, "carved cert must emit an rsa algorithm asset")
+          assertEquals(
+            getString(alg.get, "cryptoProperties", "algorithmProperties", "parameterSetIdentifier"),
+            "1024"
+          )
+          assert(validate(compact(render(json)), schema).isEmpty)
+      }
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.42 — every item-backed component carries the traversal-derived paths
+  // (`goatrodeo:path`, `goatrodeo:omnibor-path`, `goatrodeo:swhid-path`) built
+  // from the ADG `contains` hierarchy from the root down to the item.
+  test("T3.42 nested components carry traversal-derived paths") {
+    val dir = tempDir()
+    try {
+      val storage = MemStorage(None)
+      val sha1Root = "aa" * 20
+      val sha1Container = "bb" * 20
+      val sha1Leaf = "cc" * 20
+      val rootId = "gitoid:blob:sha256:" + ("0" * 64)
+      val containerId = "gitoid:blob:sha256:" + ("1" * 64)
+      val leafId = "gitoid:blob:sha256:" + ("2" * 64)
+      val container = makeItem(
+        id = containerId,
+        connections = TreeSet(
+          EdgeType.containedBy -> rootId,
+          EdgeType.contains -> leafId,
+          EdgeType.aliasFrom -> s"gitoid:blob:sha1:$sha1Container"
+        ),
+        fileNames = TreeSet("nested/cert.pem"),
+        mimeTypes = TreeSet("application/x-pem-file"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("nested/cert.pem"))
+        )
+      )
+      val leaf = makeItem(
+        id = leafId,
+        connections = TreeSet(
+          EdgeType.containedBy -> containerId,
+          EdgeType.aliasFrom -> s"gitoid:blob:sha1:$sha1Leaf"
+        ),
+        fileNames = TreeSet("nested/cert.pem"),
+        mimeTypes = TreeSet("application/x-pem-file"),
+        extra = TreeMap(
+          "Name" -> TreeSet(StringOrPair("nested/cert.pem")),
+          "Certificates:SubjectDN" -> TreeSet(StringOrPair("CN=leaf")),
+          "Certificates:KeyAlgorithm" -> TreeSet(StringOrPair("rsa")),
+          "Certificates:KeySize" -> TreeSet(StringOrPair("2048")),
+          "Certificates:Cert:0:SubjectDN" -> TreeSet(StringOrPair("CN=leaf"))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(
+          EdgeType.contains -> container.identifier,
+          EdgeType.aliasFrom -> s"gitoid:blob:sha1:$sha1Root"
+        ),
+        fileNames = TreeSet("firmware.img"),
+        extra = TreeMap("Name" -> TreeSet(StringOrPair("firmware.img")))
+      )
+      storeItem(storage, root)
+      storeItem(storage, container)
+      storeItem(storage, leaf)
+
+      val json = writeAndRead(storage, root, dir)
+      val comp = findComponentByRef(json, leafId).get
+      val path = propertyMap(comp)
+      assertEquals(
+        path.get("goatrodeo:path"),
+        Some("firmware.img|:|nested/cert.pem|:|nested/cert.pem")
+      )
+      assertEquals(
+        path.get("goatrodeo:omnibor-path"),
+        Some(s"$rootId|:|$containerId|:|$leafId")
+      )
+      assertEquals(
+        path.get("goatrodeo:swhid-path"),
+        Some(
+          s"swh:1:cnt:$sha1Root|:|swh:1:cnt:$sha1Container|:|swh:1:cnt:$sha1Leaf"
+        )
+      )
+    } finally {
+      cleanup(dir)
+    }
+  }
+
+  // T3.43 — end-to-end: an ArduPilot firmware ELF's AP_ROMFS is treated as a
+  // container, so its embedded trust-store certs (RSA-1024) surface in the
+  // CBOM with KeySize 1024 and the traversal-derived goatrodeo:path.
+  test("T3.43 ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024") {
+    val dir = tempDir()
+    try {
+      val fixture =
+        new File("test_data/firmware-images/ardupilot/arducopter")
+      assert(fixture.exists(), "arducopter fixture required in firmware-images")
+      val items = CertificatesPipelineRunner.runGoatRodeoOnSingleFile(fixture)
+      val hasKeySize = (k: String) =>
+        items.exists { i =>
+          i.bodyAsItemMetaData.exists(_.extra.get(k).exists(_.map(_.value).toSet.contains("1024")))
+        }
+      assert(
+        hasKeySize("Certificates:KeySize") ||
+          hasKeySize("Certificates:Cert:0:KeySize"),
+        "arducopter must yield a certificate item with KeySize 1024"
+      )
+
+      val rootId =
+        "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      val storage = MemStorage(None)
+      items.foreach(i =>
+        storeItem(
+          storage,
+          i.copy(connections = i.connections + (EdgeType.containedBy -> rootId))
+        )
+      )
+      val root = makeItem(
+        id = rootId,
+        connections = TreeSet(
+          items.map(i => EdgeType.contains -> i.identifier)*
+        ),
+        fileNames = TreeSet("root")
+      )
+
+      Vector("1.6" -> schema16, "1.7" -> schema17).foreach {
+        case (version, schema) =>
+          val json = writeAndRead(storage, root, dir, version)
+          val certs = getComponents(json).filter { c =>
+            (c \ "cryptoProperties" \ "assetType") == JString("certificate")
+          }
+          val rsa1024 = certs.find { c =>
+            propertyMap(c).get("Certificates:KeySize").contains("1024") ||
+            propertyMap(c).get("Certificates:Cert:0:KeySize").contains("1024")
+          }
+          assert(
+            rsa1024.isDefined,
+            s"no certificate component with KeySize 1024: ${certs.map(propertyMap)}"
+          )
+          assert(
+            propertyMap(rsa1024.get).get("goatrodeo:path").isDefined,
+            "certificate component should carry a goatrodeo:path"
           )
           assert(validate(compact(render(json)), schema).isEmpty)
       }

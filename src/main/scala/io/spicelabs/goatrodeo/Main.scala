@@ -19,12 +19,16 @@ import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
+import io.spicelabs.goatrodeo.util.ChainAppender
 import io.spicelabs.goatrodeo.util.Config
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import scopt.OParser
+import org.slf4j.LoggerFactory
 
 import java.io.File
 import java.nio.file.Files
+import java.util.UUID
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Failure
@@ -84,6 +88,7 @@ object Howdy {
     */
   @static
   def run(params: Config): Unit = {
+    setupTamperEvidentLogging(params)
     startComponents(params)
 
     val logger = Logger(getClass())
@@ -113,13 +118,21 @@ object Howdy {
     // capture what was ingested and output it on successful run
     val (onFileFinish: (File => Unit), onRunFinish: (Boolean => Unit)) =
       params.ingested match {
-        case None => ((f: File) => {}, (good: Boolean) => {})
+        case None =>
+          if (params.printProcessedFiles) {
+            ((f: File) => logger.info(f"Processed ${f.getPath()}"), (good: Boolean) => {})
+          } else {
+            ((f: File) => {}, (good: Boolean) => {})
+          }
         case Some(destFile) => {
           @volatile
           var success: Vector[File] = Vector()
           val sync = Object()
           (
             (f: File) => {
+              if (params.printProcessedFiles) {
+                logger.info(f"Processed ${f.getPath()}")
+              }
               sync.synchronized {
                 success = success :+ f.getCanonicalFile()
               }; ()
@@ -239,5 +252,41 @@ object Howdy {
 
       Helpers.exitZero()
     }
+  }
+
+  /** Install the tamper-evident logging appender (if requested) and initialize
+    * the run-scoped [[TamperEvidentLog]] state with a fresh correlation ID.
+    *
+    * The correlation ID is emitted as the first log line once the chain
+    * appender (if any) is installed, so it is the first chained line and anchors
+    * every later line, `.grc`, and the final checksum file to this run.
+    *
+    * @param params
+    *   the configuration parameters
+    */
+  @static
+  private def setupTamperEvidentLogging(params: Config): Unit = {
+    val correlationId = UUID.randomUUID().toString
+    var chainHead: () => Option[String] = () => None
+    var cleanup: () => Unit = () => ()
+    params.tamperEvidentLog.foreach { file =>
+      val lc = LoggerFactory
+        .getILoggerFactory()
+        .asInstanceOf[ch.qos.logback.classic.LoggerContext]
+      val appender = new ChainAppender()
+      appender.setContext(lc)
+      appender.setFile(file)
+      appender.start()
+      val root =
+        lc.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
+      root.addAppender(appender)
+      chainHead = () => Some(appender.currentChainHead())
+      cleanup = () => {
+        root.detachAppender(appender)
+        appender.stop()
+      }
+    }
+    TamperEvidentLog.start(correlationId, chainHead, cleanup)
+    logger.info(f"Correlation ID: ${correlationId}")
   }
 }

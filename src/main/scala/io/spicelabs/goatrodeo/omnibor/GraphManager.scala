@@ -6,6 +6,7 @@ import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.Position
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
 
@@ -62,7 +63,12 @@ object GraphManager {
     * @param indexFile
     *   the hash of the GRI index file
     */
-  case class DataAndIndexFiles(dataFile: Long, indexFile: Long)
+  case class DataAndIndexFiles(
+      dataFile: Long,
+      indexFile: Long,
+      dataFileSha256: String,
+      indexFileSha256: String
+  )
   private def writeABlock(
       targetDirectory: File,
       items: Iterator[Item],
@@ -140,6 +146,9 @@ object GraphManager {
     val sha256Long = Helpers.byteArrayToLong63Bits(
       Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
     )
+    val dataFileSha256 = Helpers.toHex(
+      Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
+    )
 
     val targetFileName =
       new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.grd")
@@ -184,6 +193,9 @@ object GraphManager {
     val indexSha256Long = Helpers.byteArrayToLong63Bits(
       Helpers.computeSHA256(new FileInputStream(targetIndexName))
     )
+    val indexFileSha256 = Helpers.toHex(
+      Helpers.computeSHA256(new FileInputStream(targetIndexName))
+    )
 
     val indexTargetFileName =
       new File(targetDirectory, f"${Helpers.toHex(indexSha256Long)}.gri")
@@ -194,7 +206,7 @@ object GraphManager {
       f"Finished index rename at ${Duration.between(start, Instant.now())}"
     )
 
-    DataAndIndexFiles(sha256Long, indexSha256Long)
+    DataAndIndexFiles(sha256Long, indexSha256Long, dataFileSha256, indexFileSha256)
   }
 
   /** Write a collection of Items to GRD/GRI/GRC files.
@@ -253,10 +265,20 @@ object GraphManager {
     val writer = fileWriter.getChannel()
 
     Helpers.writeInt(writer, Consts.ClusterFileMagicNumber)
+    val grdHex = fileSet.map(_.dataFileSha256).toVector
+    val griHex = fileSet.map(_.indexFileSha256).toVector
+    def jsonArr(xs: Vector[String]): String =
+      xs.map(h => "\"" + h + "\"").mkString("[", ",", "]")
+    val sha256Json = s"""{"grd": ${jsonArr(grdHex)}, "gri": ${jsonArr(griHex)}}"""
+    val info = scala.collection.immutable.TreeMap[String, String](
+      "correlation_id" -> TamperEvidentLog.correlationId,
+      "sha256" -> sha256Json
+    ) ++ TamperEvidentLog.currentChainHead.map("log_chain_head" -> _)
     val clusterEnvelope =
       ClusterFileEnvelope.build(
         indexFiles = fileSet.map(_.indexFile).toVector,
-        dataFiles = fileSet.map(_.dataFile).toVector
+        dataFiles = fileSet.map(_.dataFile).toVector,
+        info = info
       )
     val envelopeBytes = clusterEnvelope.encode()
     Helpers.writeShort(writer, envelopeBytes.length)
@@ -283,6 +305,9 @@ object GraphManager {
       )
 
     tempFile.toFile().renameTo(targetFile)
+    val grcSha256 = Helpers.toHex(Helpers.computeSHA256(targetFile))
+    logger.info(f"Wrote ADG cluster ${grcName} sha256 ${grcSha256}")
+    TamperEvidentLog.addGrc(grcName, grcSha256)
     if (false) {
       for { i <- biggest } {
         logger.info(

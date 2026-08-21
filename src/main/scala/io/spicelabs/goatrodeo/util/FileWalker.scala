@@ -5,6 +5,7 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
 import io.spicelabs.saffron.DiskReader
+import io.spicelabs.saffron.container.BinaryContainerMount
 import io.spicelabs.saffron.fs.FileSystemEntry
 import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
 import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
@@ -16,6 +17,7 @@ import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -23,6 +25,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
 import scala.util.Using
 
@@ -246,7 +249,32 @@ object FileWalker {
 
   private def isSaffronSupported(mime: Set[String], path: Path) = {
     // if we get some recognized mimes, succeed fast, otherwise check DiskReader
-    mime.intersect(saffronMimeTypes).nonEmpty || DiskReader.isSupported(path)
+    mime.intersect(saffronMimeTypes).nonEmpty ||
+    mime.intersect(SaffronDetector.containerMimeTypes).nonEmpty ||
+    DiskReader.isSupported(path)
+  }
+
+  /** Read an ArduPilot `AP_ROMFS` embedded file store as an archive: every
+    * ROMFS file becomes an inner artifact (decompressed), so e.g. the
+    * certificate files under `etc/ssl/certs` flow through the normal
+    * certificate strategy.
+    */
+  private def asApRomfs(
+      in: ArtifactWrapper,
+      tempPath: Path
+  ): OptionalArchiveStream = {
+    ApRomfs.read(in).map { files =>
+      val wrappers = files.map { case (name, data) =>
+        ArtifactWrapper.newWrapper(
+          name,
+          data.length.toLong,
+          new ByteArrayInputStream(data),
+          in.tempDir,
+          tempPath
+        )
+      }.toVector
+      wrappers -> "ArduPilot ROMFS"
+    }
   }
 
   private def asSaffronFilesystem(
@@ -256,9 +284,26 @@ object FileWalker {
     in.withFile(f => {
       val path = f.toPath()
       if (isSaffronSupported(in.mimeType, path)) {
-        Try {
-          val disk = DiskReader.open(path)
-          val systems = FileSystemMount.mountAll(disk).asScala
+        val mimes = in.mimeType
+        val diskSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
+          if (
+            mimes.intersect(saffronMimeTypes).nonEmpty ||
+            DiskReader.isSupported(path)
+          ) {
+            Try {
+              val disk = DiskReader.open(path)
+              FileSystemMount.mountAll(disk).asScala.toVector
+            }.getOrElse(Vector())
+          } else Vector()
+        val containerSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
+          if (mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty) {
+            Try {
+              BinaryContainerMount.mount(path).toScala.toVector
+            }.getOrElse(Vector())
+          } else Vector()
+        val systems = diskSystems ++ containerSystems
+        if (systems.isEmpty) None
+        else {
           val files =
             for {
               system <- systems
@@ -282,8 +327,8 @@ object FileWalker {
               }
             })
             .toVector
-          artifacts -> s"Saffron ${disk.format().name()}"
-        }.toOption
+          Some(artifacts -> "Saffron")
+        }
       } else {
         None
       }
@@ -461,6 +506,7 @@ object FileWalker {
 
         ret
       }.orElse(asRPMWrapper(in, tempDir))
+        .orElse(asApRomfs(in, tempDir))
         .orElse(asSaffronFilesystem(in, tempDir))
         .orElse(
           asISOWrapper(in, tempDir)

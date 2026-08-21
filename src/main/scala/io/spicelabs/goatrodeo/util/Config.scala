@@ -115,7 +115,9 @@ case class Config(
     progressListener: Option[ProgressListener] = None,
     cutoff: Option[Instant] = None,
     cbomDir: Option[File] = None,
-    cbomVersion: String = "1.6"
+    cbomVersion: String = "1.6",
+    printProcessedFiles: Boolean = false,
+    tamperEvidentLog: Option[File] = None
 ) {
 
   /** Build a list of file list builders from the configuration.
@@ -235,6 +237,16 @@ object Config {
           "Append all the ingested files to this file on successful completion"
         )
         .action((x, c) => c.copy(ingested = ExpandFiles(x).headOption)),
+      opt[Boolean]("print-files")
+        .text(
+          "Log the path of each top-level file after it is processed, one log line per file"
+        )
+        .action((x, c) => c.copy(printProcessedFiles = x)),
+      opt[File]("tamper-evident-log")
+        .text(
+          "Write a hash-chained, tamper-evident log of this run to the given file"
+        )
+        .action((x, c) => c.copy(tamperEvidentLog = ExpandFiles(x).headOption)),
       opt[File]("ignore")
         .text(
           "A file containing paths to ignore, likely because they have been processed in the past"

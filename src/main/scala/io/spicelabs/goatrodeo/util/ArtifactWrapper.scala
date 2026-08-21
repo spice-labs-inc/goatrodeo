@@ -314,6 +314,9 @@ object ArtifactWrapper {
   addMimeTypeAugmenter(CryptoContentDetector.mimeRule)(
     CryptoContentDetector.mimeTypeAugmenter
   )
+  addMimeTypeAugmenter(CarvedCertAugmenter.mimeRule)(
+    CarvedCertAugmenter.mimeTypeAugmenter
+  )
 
   private def massageMimeType(
       fileName: String,

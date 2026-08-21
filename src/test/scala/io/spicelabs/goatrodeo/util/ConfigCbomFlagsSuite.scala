@@ -91,4 +91,55 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(config.cbomDir, Some(Paths.get("/tmp/cbom").toFile()))
     assertEquals(config.cbomVersion, "1.7")
   }
+
+  // T4.5 — `--print-files` (CLI + README sync) controls the per-file
+  // progress flag. THEORY: a bare-true boolean flag that prints each top-level
+  // file after processing must parse to `printProcessedFiles = true`, default
+  // to `false` when omitted, and accept an explicit `false`.
+  test("T4.5 --print-files true sets printProcessedFiles") {
+    val parsed = parse("-b", "/tmp/in", "--print-files", "true")
+    assert(parsed.isDefined, "Valid --print-files flag should parse")
+    assertEquals(parsed.get.printProcessedFiles, true)
+  }
+
+  test("T4.5 --print-files defaults to false when omitted") {
+    val parsed = parse("-b", "/tmp/in")
+    assert(parsed.isDefined)
+    assertEquals(parsed.get.printProcessedFiles, false)
+  }
+
+  test("T4.5 --print-files false is accepted") {
+    val parsed = parse("-b", "/tmp/in", "--print-files", "false")
+    assert(parsed.isDefined)
+    assertEquals(parsed.get.printProcessedFiles, false)
+  }
+
+  test("T4.6 --tamper-evident-log parses and defaults to None") {
+    val parsed = parse("-b", "/tmp/in", "--tamper-evident-log", "/tmp/run.log")
+    assert(parsed.isDefined)
+    assertEquals(parsed.get.tamperEvidentLog, Some(new File("/tmp/run.log")))
+    val omitted = parse("-b", "/tmp/in")
+    assert(omitted.isDefined)
+    assertEquals(omitted.get.tamperEvidentLog, None)
+  }
+
+  test("T4.7 GoatRodeoBuilder exposes print-files and tamper-evident-log") {
+    val builder = new GoatRodeoBuilder()
+      .withPayload("/tmp/in")
+      .withPrintFiles(true)
+      .withTamperEvidentLog("/tmp/run.log")
+    val config = builderConfig(builder)
+    assertEquals(config.printProcessedFiles, true)
+    assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
+  }
+
+  test("T4.7 GoatRodeoBuilder withExtraArg supports printFiles/tamperEvidentLog") {
+    val builder = new GoatRodeoBuilder()
+      .withPayload("/tmp/in")
+      .withExtraArg("printFiles", "true")
+      .withExtraArg("tamperEvidentLog", "/tmp/run.log")
+    val config = builderConfig(builder)
+    assertEquals(config.printProcessedFiles, true)
+    assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
+  }
 }

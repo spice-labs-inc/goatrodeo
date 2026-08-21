@@ -60,6 +60,7 @@ only cost performance, never a false negative.
 | `JavaArchiveDetector` | `text/*`, `application/xml`, `application/java-vm` |
 | `DotnetDetector` | `text/*`, `application/xml`, `application/java-vm` |
 | `SaffronDetector` | `application/java-vm` only (text families stay probed: Tika mislabels `.vhd` as `text/x-vhdl` and Saffron exists to re-check those) |
+| `CarvedCertAugmenter` | `text/*`, `application/xml`, `application/json`, `application/java-vm` (probes binaries/unknown fragments for carved DER X.509 certs) |
 
 Verified by `MimeAugmenterRuleSuite` (R-1 rule table, R-2 class files
 augment nothing, R-3 XML keeps crypto detection while skipping
