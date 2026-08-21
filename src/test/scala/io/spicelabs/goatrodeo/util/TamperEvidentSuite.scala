@@ -283,7 +283,7 @@ class TamperEvidentSuite extends FunSuite {
     "T-07 .grc info records correlation id, per-file sha256, and chain head"
   ) {
     val dir = tempDir()
-    try {
+    try TamperEvidentLog.sync.synchronized {
       val chainHex =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       TamperEvidentLog.start(
@@ -326,7 +326,7 @@ class TamperEvidentSuite extends FunSuite {
   // THEORY: the chain head is a flag-gated, additive field.
   test("T-08 .grc info omits log_chain_head when tamper-evidence is off") {
     val dir = tempDir()
-    try {
+    try TamperEvidentLog.sync.synchronized {
       TamperEvidentLog.start("99999999-8888-7777-6666-555555555555", () => None)
       val items = Vector(
         makeItem(
@@ -351,7 +351,7 @@ class TamperEvidentSuite extends FunSuite {
   // run's .grc files to the chained log.
   test("T-09 checksum file shape") {
     val dir = tempDir()
-    try {
+    try TamperEvidentLog.sync.synchronized {
       TamperEvidentLog.start(
         "abcd1234-0000-0000-0000-000000000000",
         () =>
@@ -398,12 +398,14 @@ class TamperEvidentSuite extends FunSuite {
   // THEORY: cleanup must always run at the end of a run so a tamper-evident
   // appender never leaks into subsequent work in the same JVM.
   test("T-10 reset invokes the run cleanup callback") {
-    val called = new java.util.concurrent.atomic.AtomicBoolean(false)
-    TamperEvidentLog.start("corr-id", () => None, () => called.set(true))
-    TamperEvidentLog.addGrc("a.grc", "beef")
-    TamperEvidentLog.reset()
-    assert(called.get(), "reset must invoke the cleanup callback")
-    assertEquals(TamperEvidentLog.correlationId, "")
-    assertEquals(TamperEvidentLog.grcs, Vector())
+    TamperEvidentLog.sync.synchronized {
+      val called = new java.util.concurrent.atomic.AtomicBoolean(false)
+      TamperEvidentLog.start("corr-id", () => None, () => called.set(true))
+      TamperEvidentLog.addGrc("a.grc", "beef")
+      TamperEvidentLog.reset()
+      assert(called.get())
+      assertEquals(TamperEvidentLog.correlationId, "")
+      assertEquals(TamperEvidentLog.grcs, Vector())
+    }
   }
 }

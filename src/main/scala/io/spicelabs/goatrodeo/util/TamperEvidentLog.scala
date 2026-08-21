@@ -43,6 +43,12 @@ object TamperEvidentLog {
   private val cleanupRef: AtomicReference[() => Unit] =
     new AtomicReference(() => ())
 
+  /** Lock serializing run-state mutations against [[start]]/[[reset]]. Held by
+    * tests that exercise the global holder so a concurrent run's [[reset]]
+    * cannot clear the state under them while they are mid-assertion.
+    */
+  val sync = new Object()
+
   /** Initialize the run state. Call once at the start of a Goat Rodeo run.
     *
     * @param correlationId
@@ -57,7 +63,7 @@ object TamperEvidentLog {
       correlationId: String,
       headProvider: () => Option[String],
       cleanup: () => Unit = () => ()
-  ): Unit = {
+  ): Unit = sync.synchronized {
     corrId = correlationId
     headRef.set(headProvider)
     grcRef.set(Vector())
@@ -69,7 +75,7 @@ object TamperEvidentLog {
     * not leak into subsequent work in the same JVM (e.g. other test suites or a
     * library consumer running multiple builds).
     */
-  def reset(): Unit = {
+  def reset(): Unit = sync.synchronized {
     val c = cleanupRef.getAndSet(() => ())
     try c()
     catch {
