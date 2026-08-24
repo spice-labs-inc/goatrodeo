@@ -46,15 +46,100 @@ object ConfigurationParser {
 
   /** Parse a command line into a [[Configuration]], seeded with the ambient
     * process state the run started in.
+    *
+    * The lower sources are read first and the command line applied on top, so
+    * precedence runs defaults < config file < environment < command line. That
+    * is done by parsing twice: once to discover `--config`, then again seeded
+    * with what the file and the environment said. Parsing is pure and cheap,
+    * and this keeps the flag definitions the single description of what the
+    * command line means.
+    *
+    * The second parse happens whether or not `--config` named a file: the
+    * environment is a source in its own right, and skipping the resolution when
+    * there was no file to read is what used to make `GOATRODEO_ANALYSIS_*` do
+    * nothing on a run that named none.
     */
   def parse(
       args: Array[String],
-      runtime: RuntimeEnvironment = RuntimeEnvironment.default
+      runtime: RuntimeEnvironment = RuntimeEnvironment.default,
+      environment: Map[String, String] = sys.env
   ): Option[Configuration] =
-    OParser.parse(parser, args, Configuration(runtime = runtime))
+    parseWith(args, Configuration(runtime = runtime)).flatMap { discovered =>
+      val file = discovered.configFile
+      ConfigurationToml.fromSources(
+        file.map(_.toPath()),
+        Configuration(runtime = runtime, configFile = file),
+        environment
+      ) match {
+        case Right((resolved, resolution)) =>
+          val withFlags = parseWith(args, resolved)
+          // The file and the environment report their own disagreements as they
+          // are resolved; this is the last layer, and the only one that cannot
+          // report itself, because scopt folds flags straight into the
+          // configuration with nowhere to record where a value came from. The
+          // resolution is what remembers which of the lower sources actually
+          // supplied the value being displaced.
+          withFlags.foreach { full =>
+            full.differencesFrom(resolved).foreach { (field, was, now) =>
+              ConfigurationToml.sourceOf(resolution, field).foreach { source =>
+                logger.info(
+                  s"${ConfigurationToml.displayName(field)} = ${show(now)} " +
+                    s"(command line) overrides ${show(was)} ($source)"
+                )
+              }
+            }
+          }
+          withFlags
+        case Left(error) => {
+          logger.error(
+            file.fold(s"Invalid configuration: $error")(file =>
+              s"Invalid config file $file: $error"
+            )
+          )
+          None
+        }
+      }
+    }
+
+  /** Values as a person wrote them, not as Scala prints them. */
+  private def show(value: Any): String = value match {
+    case Some(v)         => show(v)
+    case None            => "unset"
+    case v: Vector[?]    => v.map(show).mkString("[", ", ", "]")
+    case f: java.io.File => f.toString
+    case other           => other.toString
+  }
+
+  private def parseWith(
+      args: Array[String],
+      base: Configuration
+  ): Option[Configuration] =
+    OParser.parse(parser, args, base)
 
   /** Render the usage text. */
   def usage: String = OParser.usage(parser)
+
+  /** A flag's pre-rename spelling, still accepted and warned about.
+    *
+    * Hidden, so that `--help` describes one way to say each thing and nobody
+    * learns the old spelling from this program. Present, because these flags
+    * are written down in scripts and images that are not rebuilt when Goat
+    * Rodeo is, and a rename that breaks them on the day it merges is a rename
+    * that gets reverted. They come out a release after the callers are fixed.
+    */
+  private def deprecated[A: scopt.Read](old: String, current: String)(
+      action: (A, Configuration) => Configuration
+  ): OParser[A, Configuration] =
+    builder
+      .opt[A](old)
+      .hidden()
+      .text(s"Deprecated: use --$current")
+      .action { (x, c) =>
+        logger.warn(
+          s"--$old has been renamed to --$current and will stop working in a future release"
+        )
+        action(x, c)
+      }
 
   /** The command line argument parser definition. */
   lazy val parser: OParser[Unit, Configuration] = {
@@ -62,13 +147,16 @@ object ConfigurationParser {
     OParser.sequence(
       programName("goatrodeo"),
       head("goatrodeo", hellogoat.BuildInfo.version),
-      opt[File]("block")
+      opt[File]("block-list")
         .text(
           "The gitoid block list. Do not process these gitoids. Used for common gitoids such as license files"
         )
         .action((x, c) =>
           c.copy(blockList = ExpandFiles(x, c.runtime.homeDir).headOption)
         ),
+      deprecated[File]("block", "block-list")((x, c) =>
+        c.copy(blockList = ExpandFiles(x, c.runtime.homeDir).headOption)
+      ),
       opt[File]('b', "build")
         .text("Build gitoid database from jar files in a directory")
         .action((x, c) => {
@@ -157,11 +245,14 @@ object ConfigurationParser {
             Pattern.compile(p)
           })))
         ),
-      opt[Int]("maxrecords")
+      opt[Int]("max-records")
         .text(
           "The maximum number of records to process at once. Default 50,000"
         )
         .action((x, c) => if (x > 100) c.copy(maxRecords = x) else c),
+      deprecated[Int]("maxrecords", "max-records")((x, c) =>
+        if (x > 100) c.copy(maxRecords = x) else c
+      ),
       opt[File]('o', "out")
         .text("output directory for the file-system based gitoid storage")
         .action((x, c) => c.copy(out = Some(x))),
@@ -173,6 +264,11 @@ object ConfigurationParser {
       opt[File]("dump-json")
         .text("Make a directory and dump the ADG as JSON in to directory")
         .action((x, c) => c.copy(emitJsonDir = Some(x))),
+      opt[File]("config")
+        .text(
+          "Read settings from this TOML file. Anything also given on the command line wins."
+        )
+        .action((x, c) => c.copy(configFile = Some(x))),
       opt[File]("emit-cbom-dir")
         .text(
           "Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input into this directory"
@@ -185,9 +281,12 @@ object ConfigurationParser {
           if (Set("1.6", "1.7").contains(v)) success
           else failure(s"--cbom-version must be 1.6 or 1.7, got $v")
         ),
-      opt[File]("tempdir")
+      opt[File]("temp-dir")
         .text("Where to temporarily store files... should be a RAM disk")
         .action((x, c) => c.copy(tempDir = Some(x))),
+      deprecated[File]("tempdir", "temp-dir")((x, c) =>
+        c.copy(tempDir = Some(x))
+      ),
       opt[Int]('t', "threads")
         .text(
           "How many threads to run (default 4). Should be 2x-3x number of cores"

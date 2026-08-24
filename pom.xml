@@ -60,6 +60,8 @@
     <json4s.version>4.0.7</json4s.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <logback.version>1.5.15</logback.version>
+    <tomlj.version>1.1.1</tomlj.version>
+    <spice-config.version>1.0.0</spice-config.version>
     <scala-parallel-collections.version>1.2.0</scala-parallel-collections.version>
     <scala-logging.version>3.9.4</scala-logging.version>
     <tika.version>3.2.3</tika.version>
@@ -235,6 +237,21 @@
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <version>${logback.version}</version>
+    </dependency>
+    <!-- Config files. The same version Allspice uses, so a table parsed by one and
+         handed to the other cannot disagree about TOML semantics. -->
+    <dependency>
+      <groupId>org.tomlj</groupId>
+      <artifactId>tomlj</artifactId>
+      <version>${tomlj.version}</version>
+    </dependency>
+    <!-- The naming, layering and precedence rules, shared with every other Spice
+         component. One implementation, because rules copied into several codebases
+         are rules that will disagree, and these already have. -->
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>spice-config</artifactId>
+      <version>${spice-config.version}</version>
     </dependency>
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
