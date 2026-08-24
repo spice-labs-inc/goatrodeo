@@ -6,7 +6,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetFile
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
@@ -17,6 +17,11 @@ import scala.util.Success
 import scala.util.Try
 
 class DotNetTesting extends munit.FunSuite {
+
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
 
   def createTestItem(id: String): Item = {
     Item(
@@ -61,7 +66,7 @@ class DotNetTesting extends munit.FunSuite {
     val name = "test_data/Smoke.dll"
     val wrapper = FileWrapper(File(name), name, None)
     val store1 =
-      ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(wrapper)
     val gitoid = store1.keys().find(key => key.startsWith("gitoid"))
     assertEquals(
       "gitoid:blob:sha1:4b71d999259c4f7b593a13df83c4f5d3bbf760a0",
@@ -94,7 +99,7 @@ class DotNetTesting extends munit.FunSuite {
     val name = "test_data/hackproj.dll"
     val wrapper = FileWrapper(File(name), name, None)
     val store1 =
-      ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(wrapper)
     val keys = store1.keys()
     val purl = store1.keys().find(key => key.startsWith("pkg:nuget"))
     assertEquals(purl, Some("pkg:nuget/hackproj@1.0.0"))
@@ -104,7 +109,7 @@ class DotNetTesting extends munit.FunSuite {
     val name = "test_data/newtonsoft.json.13.0.4.nupkg"
     val wrapper = FileWrapper(File(name), name, None)
     val store1 =
-      ToProcess.buildGraphFromArtifactWrapper(wrapper, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(wrapper)
     val keys = store1.keys()
     val purl = store1.keys().find(key => key.startsWith("pkg:nuget"))
     assertEquals(purl, Some("pkg:nuget/Newtonsoft.Json@13.0.0"))
@@ -240,7 +245,7 @@ class DotNetTesting extends munit.FunSuite {
 
     val nested = FileWrapper(File(name), name, None)
     val store1 =
-      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(nested)
 
     val result = store1.purls()
     assertEquals(result.size, 1)

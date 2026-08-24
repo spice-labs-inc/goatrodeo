@@ -18,7 +18,8 @@ import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.ProgressListener
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
@@ -60,49 +61,41 @@ object Builder {
   /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
     *
-    * @param storage
+    * @param dest
     *   the storage destination of the corpus
-    * @param threadCnt
-    *   the number of threads to use when computings
-    * @param blockList
-    *   a file containing gitoids to not process (e.g., Apache license files)
-    * @param maxRecords
-    *   the maximum number of records to process at once
     * @param tag
     *   the tag associated with this run
     * @param fileListers
     *   a sequence of functions that list files. This allows for multiple `-b`
     *   and and `--file-list` flags to be sent in
-    * @param ignorePathList
+    * @param ignorePathSet
     *   a set of paths (canonical) to exclude. This can be used to exclude files
     *   that were processed in previous runs
     * @param excludeFileRegex
     *   regular expressions to exclude from processing
     * @param finishedFile
     *   once a file has been processed, write the file to a destination
-    * @param call
+    * @param done
     *   when the processing is done, true success, false failure
+    *
+    * Thread count, block list, record cap, temp directory and cutoff all come
+    * from the contextual [[Configuration]] (reached as `config`) rather than
+    * being passed separately.
     */
   def buildDB(
       dest: File,
-      threadCnt: Int,
-      blockList: Option[File],
-      maxRecords: Int,
       tag: Option[TagInfo],
-      tempDir: Option[File],
-      args: Config,
       fileListers: Seq[(File, () => Seq[File])],
       ignorePathSet: Set[String],
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
-      preWriteDB: Vector[Storage => Boolean] = Vector(),
-      fsFilePaths: Boolean = false
-  ): Unit = {
+      preWriteDB: Vector[Storage => Boolean] = Vector()
+  )(using Configuration): Unit = {
     val totalStart = Instant.now()
     // Fresh per-run dispatcher; enforces monotonic current and catches
     // exceptions thrown by the caller-supplied ProgressListener.
-    val progressNotifier = ProgressListener.notifier(args.progressListener)
+    val progressNotifier = ProgressListener.notifier(config.progressListener)
 
     val runningCnt = AtomicInteger(0)
     val dead_? = AtomicBoolean(false)
@@ -113,11 +106,10 @@ object Builder {
         ignorePathSet,
         excludeFileRegex,
         finishedFile,
-        tempDir,
+        config.tempDir,
         runningCnt,
-        fsFilePaths = fsFilePaths,
-        dead_? = dead_?,
-        args = args
+        fsFilePaths = config.fsFilePaths,
+        dead_? = dead_?
       )
 
     // The count of all the files found
@@ -132,12 +124,12 @@ object Builder {
       )
 
       // Add version and date from Config if provided
-      val withVersion = args.tagVersion match {
+      val withVersion = config.tagVersion match {
         case Some(version) => base + ("version" -> Dom.StringElem(version))
         case None          => base
       }
 
-      val withConfigDate = args.tagDate match {
+      val withConfigDate = config.tagDate match {
         case Some(date) =>
           import io.spicelabs.goatrodeo.util.DateParser
           withVersion + ("date" -> Dom.StringElem(DateParser.toIso8601(date)))
@@ -163,7 +155,7 @@ object Builder {
     }
 
     // Get the gitoids to block
-    val blockGitoids: Set[String] = blockList match {
+    val blockGitoids: Set[String] = config.blockList match {
       case None => Set()
       case Some(file) =>
         Try {
@@ -200,7 +192,7 @@ object Builder {
       File(dest.getParentFile(), f"${destFileName}_${cnt}")
     }
 
-    if (runningCnt.get() > maxRecords) {
+    if (runningCnt.get() > config.maxRecords) {
       updatedDest = destWithCount(dest, 0)
     }
 
@@ -214,14 +206,12 @@ object Builder {
     // after the current one fully finishes). Additionally the batch before the
     // current one must have completed its write, so at most two batches (and
     // therefore two storages) are ever alive at once.
-    val windDownThreshold = Builder.windDownThreshold(threadCnt)
+    val windDownThreshold = Builder.windDownThreshold(config.threads)
 
     def startNextBatch(): Option[BatchState] = {
       loopCnt += 1
       val ret = processMaxRecords(
         updatedDest,
-        threadCnt = threadCnt,
-        maxRecords = maxRecords,
         queue = queue,
         stillWorking = stillWorking,
         blockGitoids = blockGitoids,
@@ -232,8 +222,6 @@ object Builder {
         dead_? = dead_?,
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
-        tempDir = tempDir,
-        args = args,
         progressNotifier = progressNotifier,
         preWriteDB = preWriteDB
       )
@@ -290,8 +278,6 @@ object Builder {
 
   private def processMaxRecords(
       destDir: File,
-      threadCnt: Int,
-      maxRecords: Int,
       queue: ConcurrentLinkedQueue[ToProcess],
       stillWorking: AtomicBoolean,
       blockGitoids: Set[String],
@@ -302,11 +288,9 @@ object Builder {
       dead_? : AtomicBoolean,
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
-      tempDir: Option[File],
-      args: Config,
       progressNotifier: ProgressListener.Notifier,
       preWriteDB: Vector[Storage => Boolean] = Vector()
-  ): Option[BatchState] = {
+  )(using Configuration): Option[BatchState] = {
 
     val liveWorkers = AtomicInteger(0)
     val saverDone = AtomicBoolean(false)
@@ -346,8 +330,8 @@ object Builder {
 
     val batchName = destDir.getName()
 
-    // fork `threadCnt` threads to do the work
-    val threads = for { threadNum <- 0 until threadCnt } yield {
+    // fork `config.threads` threads to do the work
+    val threads = for { threadNum <- 0 until config.threads } yield {
       val t = new Thread(
         () => {
           liveWorkers.incrementAndGet()
@@ -369,100 +353,98 @@ object Builder {
             // if the channel is closed/empty, `None` will be
             // returned, handle it gracefully
 
-            var toProcessOpt: Option[ToProcess] = None
-            while (
-              (cnt
-                .get() - startedRunning) < maxRecords // only run so many items
-              &&
-              !dead_?.get() && {
-                toProcessOpt = Option(doPoll())
-                toProcessOpt.isDefined
-              }
-            ) {
-              val toProcess = toProcessOpt.get
-              val localStart = Instant.now()
-              try {
-                // build the package
+          var toProcessOpt: Option[ToProcess] = None
+          while (
+            (cnt.get() - startedRunning) < config.maxRecords // only run so many items
+            &&
+            !dead_?.get() && {
+              toProcessOpt = Option(doPoll())
+              toProcessOpt.isDefined
+            }
+          ) {
+            val toProcess = toProcessOpt.get
+            val localStart = Instant.now()
+            try {
+              // build the package
 
-                val byHash: Map[String, Vector[Augmentation]] =
-                  if (args.useStaticMetadata) {
-                    toProcess.runStaticMetadataGather(args.mimeFilter)
-                  } else {
-                    Map()
-                  }
+              val byHash: Map[String, Vector[Augmentation]] =
+                if (config.useStaticMetadata) {
+                  toProcess.runStaticMetadataGather(config.mimeFilter)
+                } else {
+                  Map()
+                }
 
-                toProcess.process(
-                  None,
-                  store = storage,
-                  tag = tag,
-                  args = args,
-                  parentScope =
-                    ParentScope.forAndWith(toProcess.main, None, byHash),
-                  blockList = blockGitoids,
-                  keepRunning = () => !dead_?.get(),
-                  atEnd = (parent, _) => {
-                    if (parent.isEmpty) {
-                      val updatedCnt = cnt.addAndGet(1)
-                      val theDuration = Duration
-                        .between(localStart, Instant.now())
-                      if (
-                        theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
-                      ) {
+              toProcess.process(
+                None,
+                store = storage,
+                tag = tag,
+                parentScope =
+                  ParentScope.forAndWith(toProcess.main, None, byHash),
+                blockList = blockGitoids,
+                keepRunning = () => !dead_?.get(),
+                atEnd = (parent, _) => {
+                  if (parent.isEmpty) {
+                    val updatedCnt = cnt.addAndGet(1)
+                    val theDuration = Duration
+                      .between(localStart, Instant.now())
+                    if (
+                      theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
+                    ) {
 
-                        // if we've got a temp dir and we're down to 10% free space, bail
-                        tempDir match {
-                          case Some(theDir) =>
-                            for {
-                              fileStore <- Try {
-                                Files.getFileStore(
-                                  theDir.toPath().toAbsolutePath()
-                                )
-                              }.toOption
-                              total <- Try {
-                                fileStore.getTotalSpace().toDouble
-                              }
-                              available <- Try {
-                                fileStore.getUsableSpace().toDouble
-                              }
-                            } {
-                              val remaining = available / total
-                              if (remaining < 0.05) {
-                                val errorMsg =
-                                  s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
-                                logger.error(errorMsg)
-                                dead_?.set(true)
-                                throw new Exception(errorMsg)
-                              }
+                      // if we've got a temp dir and we're down to 10% free space, bail
+                      config.tempDir match {
+                        case Some(theDir) =>
+                          for {
+                            fileStore <- Try {
+                              Files.getFileStore(
+                                theDir.toPath().toAbsolutePath()
+                              )
+                            }.toOption
+                            total <- Try {
+                              fileStore.getTotalSpace().toDouble
+                            }.toOption
+                            available <- Try {
+                              fileStore.getUsableSpace().toDouble
+                            }.toOption
+                          } {
+                            val remaining = available / total
+                            if (remaining < 0.05) {
+                              val errorMsg =
+                                s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
+                              logger.error(errorMsg)
+                              dead_?.set(true)
+                              throw new Exception(errorMsg)
                             }
-                          case _ => // do nothing
-                        }
-                        val now = Instant.now()
-                        val totalDuration = Duration.between(totalStart, now)
-                        val processDuration = Duration.between(loopStart, now)
-                        val totalItems = runningCnt.get()
-                        val avgMsg = if (processDuration.getSeconds() > 0) {
-                          val itemsPerSecond =
-                            updatedCnt.toDouble / processDuration
-                              .getSeconds()
-                              .toDouble
-                          val itemsPerMinute = itemsPerSecond * 60.0d
-                          val left = totalItems.toDouble - updatedCnt.toDouble
-                          val remainingDuration = Duration.ZERO.plusSeconds(
-                            (left / itemsPerSecond).round
-                          )
-                          f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
-                        } else ""
-                        logger.info(
-                          f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
-                        )
-                        progressNotifier.notify(
-                          updatedCnt.toLong,
-                          totalItems.toLong
-                        )
+                          }
+                        case _ => // do nothing
                       }
+                      val now = Instant.now()
+                      val totalDuration = Duration.between(totalStart, now)
+                      val processDuration = Duration.between(loopStart, now)
+                      val totalItems = runningCnt.get()
+                      val avgMsg = if (processDuration.getSeconds() > 0) {
+                        val itemsPerSecond =
+                          updatedCnt.toDouble / processDuration
+                            .getSeconds()
+                            .toDouble
+                        val itemsPerMinute = itemsPerSecond * 60.0d
+                        val left = totalItems.toDouble - updatedCnt.toDouble
+                        val remainingDuration = Duration.ZERO.plusSeconds(
+                          (left / itemsPerSecond).round
+                        )
+                        f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
+                      } else ""
+                      logger.info(
+                        f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
+                      )
+                      progressNotifier.notify(
+                        updatedCnt.toLong,
+                        totalItems.toLong
+                      )
                     }
                   }
-                )
+                }
+              )
 
               } catch {
                 case oom: OutOfMemoryError => {
@@ -541,12 +523,12 @@ object Builder {
               case (writeIt, preWriteFunc) => writeIt & preWriteFunc(storage)
             }
 
-            args.cbomDir.foreach { cbomDir =>
+            config.cbomDir.foreach { cbomDir =>
               if (!dead_?.get()) {
                 CbomEmitter
                   .emitForStorage(
                     storage,
-                    args.cbomVersion,
+                    config.cbomVersion,
                     cbomDir,
                     TamperEvidentLog.correlationId
                   ) match {
@@ -566,7 +548,7 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                writeGoatRodeoFiles(lf, args.cutoff)
+                writeGoatRodeoFiles(lf, config.cutoff)
               case _ => logger.error("Didn't write"); None
             }
 

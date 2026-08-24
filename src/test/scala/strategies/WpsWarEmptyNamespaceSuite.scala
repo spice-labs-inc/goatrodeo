@@ -6,7 +6,7 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 import munit.FunSuite
@@ -45,6 +45,11 @@ import scala.collection.immutable.TreeSet
   * through its own `applyAccumulatedAugmentation`.
   */
 class WpsWarEmptyNamespaceSuite extends FunSuite {
+
+  /** The default configuration for these tests; calls needing different
+    * settings pass an explicit `(using ...)`.
+    */
+  private given Configuration = Configuration()
 
   // ==================== Test 1: resolveGroupIdArtifactIdVersion unit test ====================
 
@@ -134,8 +139,7 @@ class WpsWarEmptyNamespaceSuite extends FunSuite {
     assert(strategy.nonEmpty, "Expected at least one strategy from directory")
 
     val store = ToProcess.buildGraphForToProcess(
-      strategy,
-      args = Config()
+      strategy
     )
 
     // pURLs are stored in the store via store.addPurl() during

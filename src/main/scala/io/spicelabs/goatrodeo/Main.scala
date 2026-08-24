@@ -16,15 +16,20 @@ package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
+import io.spicelabs.config.LogbackLogging
+import io.spicelabs.config.Logging
+import io.spicelabs.config.Origin
+import io.spicelabs.config.Resolution
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.util.ChainAppender
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.config
+import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.slf4j.LoggerFactory
-import scopt.OParser
 
 import java.io.File
 import java.nio.file.Files
@@ -67,13 +72,41 @@ object Howdy {
     )
 
     // parse the CLI params
-    val parsed = OParser.parse(Config.parser1, args, Config())
+    val parsed = ConfigurationParser.parse(args)
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(params) => run(params)
-      case _            => Helpers.bailFail()
+      case Some(config) =>
+        // Applied here, where this program owns the process. Embedded in another program
+        // through GoatRodeoBuilder, the host owns logging and chose its levels
+        // deliberately, so nothing on that path touches them.
+        applyLogging(config)
+        run(using config)
+      case _ => Helpers.bailFail()
     }
+  }
+
+  /** Apply the resolved `[logging]` group — the same group, keys and precedence
+    * as every other Spice tool.
+    *
+    * Only the loggers this program owns are moved: a level says how much *this*
+    * program should say, and lifting Tika or the bytecode readers along with it
+    * would bury the output the person asked for.
+    */
+  private def applyLogging(config: Configuration): Unit = {
+    val defaults = Logging.defaults().get(Logging.GROUP).asScala
+    val settings = (defaults ++ config.logging).map { case (key, value) =>
+      key -> (value.asInstanceOf[Object])
+    }
+    LogbackLogging.apply(
+      Resolution.of(
+        java.util.Map.of(Logging.GROUP, settings.asJava),
+        Origin.embedded(Logging.GROUP)
+      ),
+      // Fully qualified because it names a logger, not a type: this is the
+      // package whose loggers move, and it stays right when the imports change.
+      "io.spicelabs.goatrodeo"
+    )
   }
 
   /** Run the Goat Rodeo builder with the given configuration.
@@ -83,19 +116,19 @@ object Howdy {
     *      if requested 3. Processes files to build the ADG 4. Outputs results
     *      to the specified directory
     *
-    * @param params
-    *   the configuration parameters
+    * Everything it needs comes from the contextual [[Configuration]], reached
+    * as `config`.
     */
   @static
-  def run(params: Config): Unit = {
+  def run(using Configuration): Unit = {
     // Hold the tamper-evidence lock for the whole run: the correlation ID (and
     // chain-head state) is process-global, and no other run or test may mutate
     // it while this run's CBOMs and checksum are being written. Concurrent
     // runs are serialized, which is fine — Goat Rodeo is one run per JVM.
     TamperEvidentLog.sync.synchronized {
-      setupTamperEvidentLogging(params)
+      setupTamperEvidentLogging
       try {
-        runImpl(params)
+        runImpl
       } finally {
         // Guaranteed release of run-scoped logging resources (e.g. detaching the
         // chain appender from the root logger) even if the run throws.
@@ -104,28 +137,28 @@ object Howdy {
     }
   }
 
-  private def runImpl(params: Config): Unit = {
-    startComponents(params)
+  private def runImpl(using Configuration): Unit = {
+    startComponents
 
     val logger = Logger(getClass())
 
-    val fileListers = params.getFileListBuilders()
+    val fileListers = config.getFileListBuilders()
 
-    if (!params.nonexistantDirectories.isEmpty) {
+    if (!config.nonexistentDirectories.isEmpty) {
       logger.error(
         "One or more directories in a -b or --build option was not found: "
       )
-      params.nonexistantDirectories.foreach(f =>
+      config.nonexistentDirectories.foreach(f =>
         logger.error(f.getAbsolutePath())
       )
-      logger.info(OParser.usage(Config.parser1))
+      logger.info(ConfigurationParser.usage)
       Helpers.bailFail()
       return
     }
 
     if (fileListers.isEmpty) {
       logger.error("At least one `-b` or `--file-list` must be provided")
-      logger.info(OParser.usage(Config.parser1))
+      logger.info(ConfigurationParser.usage)
       Helpers.bailFail()
       return
     }
@@ -133,9 +166,9 @@ object Howdy {
     // if the `ingested` option was selected, build functions to
     // capture what was ingested and output it on successful run
     val (onFileFinish: (File => Unit), onRunFinish: (Boolean => Unit)) =
-      params.ingested match {
+      config.ingested match {
         case None =>
-          if (params.printProcessedFiles) {
+          if (config.printProcessedFiles) {
             (
               (f: File) => logger.info(f"Processed ${f.getPath()}"),
               (good: Boolean) => {}
@@ -149,7 +182,7 @@ object Howdy {
           val sync = Object()
           (
             (f: File) => {
-              if (params.printProcessedFiles) {
+              if (config.printProcessedFiles) {
                 logger.info(f"Processed ${f.getPath()}")
               }
               sync.synchronized {
@@ -187,7 +220,7 @@ object Howdy {
     // get the set of paths to ignore
     val ignorePathSet = (
       for {
-        ignore <- params.ignore
+        ignore <- config.ignore
         lines <- Try {
           Files.readAllLines(ignore.toPath()).asScala
         }.toOption.toVector
@@ -195,7 +228,7 @@ object Howdy {
       } yield line
     ).toSet
 
-    val dest = params.out match {
+    val dest = config.out match {
       case None =>
         logger.error("Must provide an `--out` directory")
         Helpers.bailFail()
@@ -204,7 +237,7 @@ object Howdy {
     }
 
     var badPat = false
-    val excludePatterns = params.exclude.flatMap((str, pat) =>
+    val excludePatterns = config.exclude.flatMap((str, pat) =>
       pat match {
         case Failure(exception) =>
           logger.error(
@@ -222,19 +255,16 @@ object Howdy {
     }
 
     val preWriteDB: Vector[Storage => Boolean] =
-      params.dumpRootDir.toVector.map(dir =>
+      config.dumpRootDir.toVector.map(dir =>
         (storage: Storage) => { storage.emitRootsToDir(dir); true }
       ) ++
-        params.emitJsonDir.toVector.map(dir =>
+        config.emitJsonDir.toVector.map(dir =>
           (storage: Storage) => { storage.emitAllItemsToDir(dir); true }
         )
 
     Builder.buildDB(
       dest = dest,
-      tempDir = params.tempDir,
-      threadCnt = params.threads,
-      maxRecords = params.maxRecords,
-      tag = (params.tag, params.tagJson) match {
+      tag = (config.tag, config.tagJson) match {
         case (None, None)       => None
         case (Some(tag), v)     => Some(TagInfo(tag, v))
         case (_, Some(tagJson)) => Some(TagInfo("N/A", Some(tagJson)))
@@ -242,14 +272,9 @@ object Howdy {
       fileListers = fileListers,
       ignorePathSet = ignorePathSet,
       excludeFileRegex = excludePatterns,
-      blockList = params.blockList,
       finishedFile = onFileFinish,
       done = onRunFinish,
-      // Fall back to the goatrodeo.expiry system property when no explicit cutoff was set.
-      args =
-        params.copy(cutoff = params.cutoff.orElse(Config.expiryFromProperty)),
-      preWriteDB = preWriteDB,
-      fsFilePaths = params.fsFilePaths
+      preWriteDB = preWriteDB
     )
 
   }
@@ -258,16 +283,13 @@ object Howdy {
     *
     * Starts the RodeoHost component runtime, processes component arguments, and
     * optionally prints component information.
-    *
-    * @param params
-    *   the configuration parameters containing component settings
     */
   @static
-  def startComponents(params: Config) = {
-    if (params.printComponentInfo) {
+  def startComponents(using Configuration) = {
+    if (config.printComponentInfo) {
       Helpers.exitZero()
     }
-    if (params.printComponentArgumentInfo) {
+    if (config.printComponentArgumentInfo) {
 
       Helpers.exitZero()
     }
@@ -279,16 +301,13 @@ object Howdy {
     * The correlation ID is emitted as the first log line once the chain
     * appender (if any) is installed, so it is the first chained line and
     * anchors every later line, `.grc`, and the final checksum file to this run.
-    *
-    * @param params
-    *   the configuration parameters
     */
   @static
-  private def setupTamperEvidentLogging(params: Config): Unit = {
+  private def setupTamperEvidentLogging(using Configuration): Unit = {
     val correlationId = UUID.randomUUID().toString
     var chainHead: () => Option[String] = () => None
     var cleanup: () => Unit = () => ()
-    params.tamperEvidentLog.foreach { file =>
+    config.tamperEvidentLog.foreach { file =>
       val lc = LoggerFactory
         .getILoggerFactory()
         .asInstanceOf[ch.qos.logback.classic.LoggerContext]

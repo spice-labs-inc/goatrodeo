@@ -168,7 +168,7 @@ object AdaptiveMimeBuilder {
     */
   def computeMimeTypes(
       files: Vector[ArtifactWrapper],
-      args: Config,
+      args: Configuration,
       logger: Logger,
       progressEvery: Long = 100000L,
       progress: Option[(Long, Int) => Unit] = None,

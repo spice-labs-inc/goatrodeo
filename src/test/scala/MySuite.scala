@@ -16,7 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.*
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -25,6 +25,11 @@ import java.util.regex.Pattern
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
 class MySuite extends munit.FunSuite {
+
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
 
   test("Gitoid URL converts to file path components") {
     val test = List(
@@ -163,9 +168,8 @@ class MySuite extends munit.FunSuite {
     val nested = FileWrapper(File(name), name, None)
 
     val store = ToProcess.buildGraphFromArtifactWrapper(
-      nested,
-      args = Config(useStaticMetadata = true)
-    )
+      nested
+    )(using Configuration(useStaticMetadata = true))
 
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
@@ -240,10 +244,8 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(
-      nested,
-      args = Config() // useStaticMetadata defaults to false
-    )
+    // useStaticMetadata defaults to false
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
 
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
@@ -305,7 +307,7 @@ class MySuite extends munit.FunSuite {
     val nested =
       FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
     val gitoids = store.gitoidKeys()
 
     assert(
@@ -319,7 +321,7 @@ class MySuite extends munit.FunSuite {
     val nested =
       FileWrapper(File(name), name, None)
 
-    val store = ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+    val store = ToProcess.buildGraphFromArtifactWrapper(nested)
     val gitoids = store.gitoidKeys()
     val cnt = gitoids.size
 
@@ -340,17 +342,16 @@ class MySuite extends munit.FunSuite {
     val name = "test_data/nested.tar"
     val nested = FileWrapper(File(name), name, None)
     val store1 =
-      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(nested)
     val store2 = ToProcess.buildGraphFromArtifactWrapper(
       nested,
-      args = Config(),
       block = Set(
         "gitoid:blob:sha256:e3f8d493cb200fd95c4881e248148836628e0f06ddb3c28cb3f95cf784e2f8e4"
       )
     )
 
     val store3 =
-      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(nested)
 
     assertEquals(
       store1.keys().toSet,
@@ -410,7 +411,6 @@ class MySuite extends munit.FunSuite {
     var packages: Vector[String] = Vector()
     val store = ToProcess.buildGraphForToProcess(
       strategy,
-      args = Config(),
       purlOut = purl => {
         packages = packages :+ purl
       }

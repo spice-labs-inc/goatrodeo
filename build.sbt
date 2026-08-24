@@ -242,6 +242,12 @@ lazy val root = project
     libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
+    // Config files. Kept in step with pom.xml, which declares the same two: the sbt and
+    // Maven builds compile the same sources, so a dependency added to one and not the
+    // other fails whichever build CI happens to run.
+    libraryDependencies += "org.tomlj" % "tomlj" % "1.1.1",
+    // The naming, layering and precedence rules every Spice component shares.
+    libraryDependencies += "io.spicelabs" % "spice-config" % "1.0.0",
     // Still required at the boundary: the annatto/baharat readers hand back
     // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",

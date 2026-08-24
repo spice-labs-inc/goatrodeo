@@ -40,14 +40,42 @@ Only `1.6` and `1.7` are accepted; everything else is a parse error.
 
 ## Component mapping
 
-| Metadata family | `assetType` | Notes |
-|-----------------|-------------|-------|
-| X.509 cert (`Certificates:SubjectDN` present) | `certificate` | `certificateProperties` with subject/issuer/dates; sig/key/size as `properties` |
-| OpenSSL config | `protocol` | `protocolProperties.type: tls` with version and cipher suites |
-| Java security | `related-crypto-material` | Disabled/legacy algorithms and named groups as `properties` |
-| Keystore | `related-crypto-material` | `type: key` |
-| CRL | `related-crypto-material` | `type: other` |
-| Public key (SSH/PGP) | `related-crypto-material` | `type: public-key`, includes `size` when known |
+Full family prefix list: `Certificates:`, `openssl.cnf:`, `java.security:`,
+`PasswordHash:`, `Usign:`, `SSH:`, `TLSConfig:`, `EmbeddedCertificates:`,
+`ServiceCrypto:`, `Kerberos:`, `JWT:`, `JWK:`, `EmbeddedKey:`,
+`CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`, `CloudKey:`,
+`DbEncryption:`.
+
+Dispatch is ordered, first match wins:
+
+| Family | `assetType` / material | Algorithm assets |
+|--------|------------------------|------------------|
+| X.509 cert | `certificate` | key → `pke`, sig → `signature` |
+| OpenSSL config | `protocol` | — |
+| Java security | related-crypto-material `other` | — |
+| Keystore key entries | related-crypto-material `key` | entry keys → `pke` |
+| CRL | related-crypto-material `other` | sig → `signature` |
+| Public key | related-crypto-material `public-key` | key → `pke`; ssh-cert sig → `signature` |
+| PasswordHash | related-crypto-material `password` | alg → `hash` |
+| Usign | related-crypto-material `public-key` | key → `pke` |
+| SSH | material from `SSH:MaterialType` (placeholder → private-key) | key → `pke`, sig → `signature` |
+| TLSConfig / EmbeddedCertificates | related-crypto-material `other` | — |
+| EmbeddedKey | from `EmbeddedKey:kind` | key → `pke` |
+| ServiceCrypto | related-crypto-material `other` | `ServiceCrypto:algorithms` ∪ `DbEncryption:algorithms` → `other` |
+| Kerberos | related-crypto-material `other` | `Kerberos:algorithms` → `other` |
+| JWT | related-crypto-material `other` | `JWT:signature_algorithm` → `signature`; `none` filtered |
+| JWK | public-key / private-key (from `JWK:private_present`) | kty → `pke` |
+| CryptoAlgorithms | no material (pure algorithm assets) | → `other`; empty → material `other` |
+| CryptoDependency | `library` components `dep-<name>` | crypto-family props + joined algorithms |
+| MobileTls | related-crypto-material `other` | `MobileTls:algorithms` → `other` |
+| CloudKey | related-crypto-material `other` | none |
+| DbEncryption | related-crypto-material `other` | `DbEncryption:algorithms` ∪ `ServiceCrypto:algorithms` → `other` |
+
+- Component `name` = first `Name` else first `Description` else gitoid; empty
+  name → no component. `description` = first `Description`.
+- Every `extra` value under a recognized prefix → one `properties` entry.
+- Algorithm bom-refs `alg:<primitive>:<normalized-name>`; deduped by bom-ref
+  across the CBOM, first occurrence wins.
 
 ## Core identifiers and traversal paths
 
@@ -70,9 +98,12 @@ The emitter reads a set of `Item`s (`identifier`, `connections`, `body_mime_type
 `extra` keys under any family prefix (`Certificates:`, `openssl.cnf:`,
 `java.security:`, `PasswordHash:`, `Usign:`, `SSH:`, `TLSConfig:`,
 `EmbeddedCertificates:`, `ServiceCrypto:`, `Kerberos:`, `JWT:`, `JWK:`,
-`EmbeddedKey:`, `CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`). Roots:
+`EmbeddedKey:`, `CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`,
+`CloudKey:`, `DbEncryption:`). Roots:
 `isRoot()` (metadata mime, not `"tags"`, no `alias:to`/`contained:up`). One CBOM
-per root, filename `cbom_gitoid_blob_sha256_<root-hex>.json`. See
+per root, filename `cbom_<escaped-first-file-name>_<last-16-of-gitoid>.json`
+(name escaped `[A-Za-z0-9_-]`, truncated 80 chars). serialNumber = UUID v5 of
+the root identifier; timestamp is emit-time (non-deterministic). See
 `info/cbom_emitter.md` → "Handoff" for the full algorithm.
 
 ## Security boundaries

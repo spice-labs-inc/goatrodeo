@@ -34,36 +34,102 @@ The emitter follows `contains` edges (`EdgeType.contains`) transitively from eac
 
 ## Component mapping
 
-Items are recognized as cryptographic when their metadata contains keys under any of these prefixes:
+Items are recognized as cryptographic when their metadata (`ItemMetaData.extra`)
+contains keys under any of these prefixes:
 
-- `Certificates:` — from the `Certificates` strategy.
-- `openssl.cnf:` — from the `OpenSSLConfig` strategy.
-- `java.security:` — from the `JavaSecurity` strategy.
+`Certificates:`, `openssl.cnf:`, `java.security:`, `PasswordHash:`, `Usign:`,
+`SSH:`, `TLSConfig:`, `EmbeddedCertificates:`, `ServiceCrypto:`, `Kerberos:`,
+`JWT:`, `JWK:`, `EmbeddedKey:`, `CryptoAlgorithms:`, `CryptoDependency:`,
+`MobileTls:`, `CloudKey:`, `DbEncryption:`.
 
-Each recognized Item becomes one CycloneDX component with `type: cryptographic-asset` and a `bom-ref` equal to the Item's GitOID.
+Each recognized Item becomes one CycloneDX component with
+`type: cryptographic-asset` and a `bom-ref` equal to the Item's GitOID — with
+one exception: `CryptoDependency:` items become **`library`** components (see
+below).
+
+### Component name and description
+
+- `name` = the first value of `Name`, else the first value of `Description`,
+  else the Item's GitOID. An Item whose derived name is empty emits **no**
+  component.
+- `description` = the first value of `Description`, when present.
+- Every `extra` value under a recognized prefix is emitted as a separate
+  `properties` entry (`{name, value}`), with its raw key as the name.
+
+### Family dispatch (evaluated in this order; first match wins)
+
+An Item can carry more than one family; the emitter evaluates the families in
+this exact order and applies the first matching branch:
+
+| Family (key prefix) | `cryptoProperties.assetType` | Related material type | Algorithm assets |
+|---------------------|------------------------------|----------------------|------------------|
+| `Certificates:` (X.509 cert) | `certificate` | — (`certificateProperties`) | key alg → `pke` (+ size/curve), sig alg → `signature` |
+| `openssl.cnf:` | `protocol` | — (`protocolProperties.type: tls`) | — |
+| `java.security:` | `related-crypto-material` | `other` | — |
+| `Certificates:` (keystore key entries) | `related-crypto-material` | `key` | entry key algs → `pke` (+ size/curve) |
+| `Certificates:` (CRL) | `related-crypto-material` | `other` | sig alg → `signature` |
+| `Certificates:` (public key) | `related-crypto-material` | `public-key` | key alg → `pke`; SSH-cert sig → `signature` |
+| `PasswordHash:` | `related-crypto-material` | `password` | `PasswordHash:Algorithm` → `hash` |
+| `Usign:` | `related-crypto-material` | `public-key` | key alg → `pke` (+ size) |
+| `SSH:` | `related-crypto-material` | from `SSH:MaterialType` (`private-key-placeholder` → `private-key`) | key alg → `pke`; SSH-cert sig → `signature` |
+| `TLSConfig:` | `related-crypto-material` | `other` | — |
+| `EmbeddedCertificates:` | `related-crypto-material` | `other` | — |
+| `EmbeddedKey:` | `related-crypto-material` | from `EmbeddedKey:kind` | key alg → `pke` (+ size) |
+| `ServiceCrypto:` | `related-crypto-material` | `other` | `ServiceCrypto:algorithms` ∪ `DbEncryption:algorithms` → `other` |
+| `Kerberos:` | `related-crypto-material` | `other` | `Kerberos:algorithms` → `other` |
+| `JWT:` | `related-crypto-material` | `other` | `JWT:signature_algorithm` → `signature` (`none` filtered) |
+| `JWK:` | `related-crypto-material` | `public-key` / `private-key` (from `JWK:private_present`) | `kty` RSA→`rsa`, EC→`ec` → `pke` (+ size) |
+| `CryptoAlgorithms:` | (none — no material component) | — | `CryptoAlgorithms:algorithm` → `other`; empty → material `other` |
+| `CryptoDependency:` | `library` components (not keyed by GitOID) | — | crypto-family `properties`, joined `algorithms` property |
+| `MobileTls:` | `related-crypto-material` | `other` | `MobileTls:algorithms` → `other` |
+| `CloudKey:` | `related-crypto-material` | `other` | none (identifiers/specs are properties) |
+| `DbEncryption:` | `related-crypto-material` | `other` | `DbEncryption:algorithms` ∪ `ServiceCrypto:algorithms` → `other` |
+
+Algorithm assets are synthetic components keyed
+`alg:<primitive>:<normalized-name>`; the name is lowercased with
+non-alphanumeric runs collapsed to `-` (leading/trailing `-` stripped; empty
+result → no component). `primitive` is the context where given (`pke`,
+`signature`, `hash`), else the registry classification. `parameterSetIdentifier`
+and `curve` come from the size/curve metadata and the registry. Synthetic
+algorithm components are deduplicated across the whole CBOM by `bom-ref`,
+keeping the first occurrence.
 
 ### X.509 certificates
 
-Certificate Items map to `cryptoProperties.assetType: certificate` with `certificateProperties` that include:
+Certificate Items map to `cryptoProperties.assetType: certificate` with
+`certificateProperties` that include:
 
-- `subjectName` (from `Certificates:SubjectDN`)
-- `issuerName` (from `Certificates:IssuerDN`)
-- `notValidBefore` and `notValidAfter` (ISO-8601 UTC)
+- `subjectName` (from `Certificates:SubjectDN` or `Certificates:Cert:0:SubjectDN`)
+- `issuerName` (from `Certificates:IssuerDN` or `Certificates:Cert:0:IssuerDN`)
+- `notValidBefore` and `notValidAfter` (ISO-8601 UTC, from
+  `Certificates:NotBefore`/`NotAfter`)
 - `certificateFormat: "X.509"`
 
-Signature algorithm, public key algorithm, and key size are preserved as component `properties` (e.g., `Certificates:SigAlgorithm`, `Certificates:KeyAlgorithm`, `Certificates:KeySize`). — verified by `CbomEmitterSuite.T3.3` and `CbomEmitterSuite.T3.13`.
+Signature algorithm, public key algorithm, and key size are preserved as
+component `properties` (e.g., `Certificates:SigAlgorithm`,
+`Certificates:KeyAlgorithm`, `Certificates:KeySize`). — verified by
+`CbomEmitterSuite.T3.3` and `CbomEmitterSuite.T3.13`.
 
 ### OpenSSL configuration
 
-OpenSSL config Items map to `cryptoProperties.assetType: protocol` with `protocolProperties.type: tls`. The captured `min_protocol`, `max_protocol`, and `cipher_string` values are emitted as `version` and `cipherSuites`. — verified by `CbomEmitterSuite.T3.4`.
+OpenSSL config Items map to `cryptoProperties.assetType: protocol` with
+`protocolProperties.type: tls`. The captured `min_protocol`, `max_protocol`, and
+`cipher_string` values are emitted as `version` and `cipherSuites`. — verified
+by `CbomEmitterSuite.T3.4`.
 
 ### Java security policy
 
-Java `java.security` Items map to `cryptoProperties.assetType: related-crypto-material`. Disabled algorithms, legacy algorithms, named groups, and other captured values are emitted as component `properties`. — verified by `CbomEmitterSuite.T3.5`.
+Java `java.security` Items map to `cryptoProperties.assetType: related-crypto-material`.
+Disabled algorithms, legacy algorithms, named groups, and other captured values
+are emitted as component `properties`. — verified by `CbomEmitterSuite.T3.5`.
 
 ### Keys, keystores, CRLs, and other material
 
-Public keys, SSH keys, PGP keys, keystores, and CRLs are emitted as `cryptographic-asset` components with `relatedCryptoMaterialProperties`. Keystore entries are typed as `key`; CRLs and Java security files are typed as `other`; public keys are typed as `public-key`. Key size is included when available.
+Public keys, SSH keys, PGP keys, keystores, and CRLs are emitted as
+`cryptographic-asset` components with `relatedCryptoMaterialProperties`.
+Keystore entries are typed as `key`; CRLs and Java security files are typed as
+`other`; public keys are typed as `public-key`. Key size is included when
+available.
 
 ## Private-key handling
 
@@ -172,27 +238,48 @@ Cryptographic material lives in `ItemMetaData.extra`, whose keys use a
    with one of: `Certificates:`, `openssl.cnf:`, `java.security:`,
    `PasswordHash:`, `Usign:`, `SSH:`, `TLSConfig:`, `EmbeddedCertificates:`,
    `ServiceCrypto:`, `Kerberos:`, `JWT:`, `JWK:`, `EmbeddedKey:`,
-   `CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`. — `T3.3`–`T3.5`,
-   `T3.38`–`T3.43`.
+   `CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`, `CloudKey:`,
+   `DbEncryption:`. — `T3.3`–`T3.5`, `T3.38`–`T3.43`.
 4. **Cap.** Per root, at most 100,000 collected components; beyond that the CBOM
    is emitted with a `cbom:truncated` top-level property. — `T3.20`.
-5. **Map.** Each collected Item becomes one `cryptographic-asset` component
-   (`bom-ref` = its `gitoid:blob:sha256`); referenced algorithms become
-   synthetic `algorithm` components keyed by `alg:<primitive>:<name>`. — `T3.3`,
-   `T3.23`–`T3.28`, `T3.41`–`T3.43`.
+5. **Map.** For each collected Item, derive `name`/`description` from `Name` /
+   `Description` (empty name → skip the Item), then apply the
+   [family dispatch table](#family-dispatch-evaluated-in-this-order-first-match-wins)
+   **in the documented order, first match wins**. The chosen branch produces the
+   main component (`certificate` / `protocol` / `related-crypto-material` /
+   `library` — or none for pure-`CryptoAlgorithms` items) plus the referenced
+   synthetic `algorithm` components keyed `alg:<primitive>:<name>`. Algorithm
+   names use the per-branch context (`pke`, `signature`, `hash`, `other`);
+   `ServiceCrypto` and `DbEncryption` branches union both families'
+   `algorithms` sets. — `T3.3`, `T3.23`–`T3.28`, `T3.41`–`T3.43`.
 6. **Identifiers.** See the identifiers section above: emit `swhid:core` +
    `omnibor:core` together (from the item's sha1 alias and its own id), and the
    three `goatrodeo:*:path` traversal properties.
-7. **Filename.** `cbom_gitoid_blob_sha256_<root-hex>.json` (deterministic from
-   the root gitoid). — `T3.8`.
-8. **Schema.** `specVersion` = `1.6` or `1.7`; `serialNumber` is a UUID derived
-   from the root identifier. Output must validate against the official CycloneDX
-   1.6/1.7 JSON schemas. — `T3.6`.
+7. **Filename.** `cbom_<escaped-first-file-name>_<last-16-of-gitoid>.json` —
+   the root's first `fileNames` entry escaped (`[A-Za-z0-9_-]` kept, everything
+   else → `_`, truncated to 80 chars keeping the tail) plus the last 16 hex
+   chars of the root gitoid. — `T3.8`, `TamperEvidentSuite.T-05`.
+8. **Schema.** `specVersion` = `1.6` or `1.7`; `serialNumber` =
+   `urn:uuid:` + UUID v5 name-based on the root identifier's UTF-8 bytes;
+   `metadata.tools` = `{type: application, name: goatrodeo, version:
+   <BuildInfo.version>}`; `metadata.timestamp` is the emit-time instant (the
+   only non-deterministic field). Output must validate against the official
+   CycloneDX 1.6/1.7 JSON schemas. — `T3.6`.
 
 ### Notes and edge cases
 
-- Synthetic `algorithm` components are deduplicated across a root by `bom-ref`,
-  keeping the first occurrence. — `T3.16`.
+- The root Item itself is checked for cryptographic metadata and, if crypto,
+  included in the CBOM with chain `[root]`.
+- Synthetic `algorithm` components are deduplicated across the whole CBOM by
+  `bom-ref`, keeping the first occurrence. — `T3.16`.
+- `CryptoDependency:` items become `library` components (`bom-ref`
+  `dep-<name>`), not cryptographic-asset components; their `CryptoDependency:`
+  values become `crypto-family` properties plus a joined `algorithms` property.
+- JWT `none` never becomes an algorithm; JWT algorithms use the `signature`
+  context (attacker-controlled input). — `T3.34`.
+- SSH `private-key-placeholder` maps to CycloneDX `private-key` material type;
+  the original marker is preserved as a property. — `ExtendedCaptureCbomSuite`.
+- An Item whose derived `name` is empty emits no component at all.
 - No whole-image or whole-graph loads are required; the traversal reads Items by
   key. Cryptographic items and containers may be embedded in AP_ROMFS and other
   nested containers (ArduPilot `AP_ROMFS`, PX4 tar ROMFS). — `T3.41`, `T3.43`.

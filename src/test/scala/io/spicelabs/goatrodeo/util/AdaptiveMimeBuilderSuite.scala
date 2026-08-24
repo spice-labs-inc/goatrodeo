@@ -71,7 +71,11 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     val wrapper = FileWrapper(f, "gone.bin", None)
     f.delete()
     val res =
-      AdaptiveMimeBuilder.computeMimeTypes(Vector(wrapper), Config(), logger)
+      AdaptiveMimeBuilder.computeMimeTypes(
+        Vector(wrapper),
+        Configuration(),
+        logger
+      )
     assertEquals(res.total, 1L)
     assertEquals(res.completed, 1L)
   }
@@ -88,7 +92,8 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     }.toVector
     val byteWrappers = (0 until 10).map(bw).toVector
     val files = fileWrappers ++ byteWrappers
-    val res = AdaptiveMimeBuilder.computeMimeTypes(files, Config(), logger)
+    val res =
+      AdaptiveMimeBuilder.computeMimeTypes(files, Configuration(), logger)
     assertEquals(res.total, 20L)
     assertEquals(res.completed, 20L)
 
@@ -104,7 +109,7 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     val files = (0 until 500).map(bw).toVector
     val res = AdaptiveMimeBuilder.computeMimeTypes(
       files,
-      Config(threads = 4),
+      Configuration(threads = 4),
       logger,
       progressEvery = 1,
       progress = Some((_, _) => {
@@ -128,7 +133,7 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     val files = (0 until 100).map(bw).toVector
     AdaptiveMimeBuilder.computeMimeTypes(
       files,
-      Config(),
+      Configuration(),
       logger,
       progressEvery = 1,
       progress = Some((_, _) => {
@@ -170,7 +175,7 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     )
     val res = AdaptiveMimeBuilder.computeMimeTypes(
       files,
-      Config(),
+      Configuration(),
       logger,
       progressEvery = 1,
       progress = Some((c, w) => seen.add((c, w))),
@@ -190,7 +195,7 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
     val seen = ConcurrentLinkedQueue[(Long, Int)]()
     val res = AdaptiveMimeBuilder.computeMimeTypes(
       files,
-      Config(),
+      Configuration(),
       logger,
       progressEvery = 5,
       progress = Some((c, w) => seen.add((c, w)))
@@ -201,14 +206,15 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
       Vector(5L, 10L, 15L, 20L, 25L)
     )
 
-    val resNone = AdaptiveMimeBuilder.computeMimeTypes(files, Config(), logger)
+    val resNone =
+      AdaptiveMimeBuilder.computeMimeTypes(files, Configuration(), logger)
     assertEquals(resNone.completed, 25L)
   }
 
   // T-A-07 — an empty corpus completes immediately with zero counts.
   test("T-A-07 empty corpus completes immediately") {
     val res =
-      AdaptiveMimeBuilder.computeMimeTypes(Vector(), Config(), logger)
+      AdaptiveMimeBuilder.computeMimeTypes(Vector(), Configuration(), logger)
     assertEquals(res.total, 0L)
     assertEquals(res.completed, 0L)
 
@@ -220,7 +226,8 @@ class AdaptiveMimeBuilderSuite extends FunSuite {
   // exactly once.
   test("T-A-08 real mimeType work drains cleanly") {
     val files = (0 until 100).map(bw).toVector
-    val res = AdaptiveMimeBuilder.computeMimeTypes(files, Config(), logger)
+    val res =
+      AdaptiveMimeBuilder.computeMimeTypes(files, Configuration(), logger)
     assertEquals(res.total, 100L)
     assertEquals(res.completed, 100L)
 

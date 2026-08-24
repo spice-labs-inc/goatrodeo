@@ -16,7 +16,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemTagData
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
@@ -31,6 +31,12 @@ object MetadataSuite {
 
 }
 class MetadataSuite extends munit.FunSuite {
+
+  /** The default configuration for these tests; individual calls override it
+    * with an explicit `(using ...)` where they need different settings.
+    */
+  private given Configuration = Configuration()
+
   test("Metadata collection works") {
     if (StaticMetadata.hasSyft) {
       val file = File("test_data/jar_test/slf4j-simple-1.6.1.jar")
@@ -544,7 +550,7 @@ the performance, all instances of the terminal are sharing a single process."""
     val file = File(s"test_data/$filename")
     val nested = FileWrapper(file, filename, None, f => ())
     val store1 =
-      ToProcess.buildGraphFromArtifactWrapper(nested, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(nested)
     store1
   }
 }

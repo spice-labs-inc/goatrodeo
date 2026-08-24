@@ -8,7 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import io.spicelabs.goatrodeo.util.Config
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.JavaSecurityDetector
 import io.spicelabs.goatrodeo.util.JavaSecurityParser
 import munit.FunSuite
@@ -25,6 +25,11 @@ import scala.collection.immutable.TreeSet
   * `include` resolution happen inside the strategy during processing.
   */
 class JavaSecuritySuite extends FunSuite {
+
+  /** The default configuration for these tests; calls needing different
+    * settings pass an explicit `(using ...)`.
+    */
+  private given Configuration = Configuration()
 
   private val adHoc = MKC.adHoc("java.security")
 
@@ -156,7 +161,7 @@ class JavaSecuritySuite extends FunSuite {
 
     val store = MemStorage(None)
     val parentScope = ParentScope.forAndWith("root", None, Map())
-    bundle.process(None, store, parentScope, None, Config())
+    bundle.process(None, store, parentScope, None)
 
     val mainItemOpt = store.keys().flatMap(store.read).find { item =>
       item.bodyAsItemMetaData
@@ -206,7 +211,7 @@ class JavaSecuritySuite extends FunSuite {
     )
 
     val store =
-      ToProcess.buildGraphFromArtifactWrapper(zipWrapper, args = Config())
+      ToProcess.buildGraphFromArtifactWrapper(zipWrapper)
 
     val configItemOpt = store.keys().flatMap(store.read).find { item =>
       item.bodyAsItemMetaData
@@ -226,8 +231,7 @@ class JavaSecuritySuite extends FunSuite {
   test("non-Java-security files do not receive java.security metadata") {
     val text = ByteWrapper("hello".getBytes("UTF-8"), "readme.txt", None)
     val store = ToProcess.buildGraphForToProcess(
-      Vector(GenericFile(text)),
-      args = Config()
+      Vector(GenericFile(text))
     )
     val itemOpt = store.keys().flatMap(store.read).find { item =>
       item.bodyAsItemMetaData.exists(_.fileNames.contains("readme.txt"))

@@ -24,19 +24,19 @@ import java.nio.file.Paths
 /** T4.4 — README / CLI sync test for the CycloneDX CBOM flags.
   *
   * Verifies that the CLI flags documented in `README.md` (`--emit-cbom-dir` and
-  * `--cbom-version`) parse correctly via `Config.parser1`, reject invalid
-  * input, and are accessible from the programmatic builder API.
+  * `--cbom-version`) parse correctly via `ConfigurationParser.parser`, reject
+  * invalid input, and are accessible from the programmatic builder API.
   */
 class ConfigCbomFlagsSuite extends FunSuite {
 
-  private def parse(args: String*): Option[Config] = {
-    OParser.parse(Config.parser1, args, Config())
+  private def parse(args: String*): Option[Configuration] = {
+    ConfigurationParser.parse(args.toArray)
   }
 
-  private def builderConfig(b: GoatRodeoBuilder): Config = {
+  private def builderConfig(b: GoatRodeoBuilder): Configuration = {
     val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
     field.setAccessible(true)
-    field.get(b).asInstanceOf[Config]
+    field.get(b).asInstanceOf[Configuration]
   }
 
   test("T4.4 --emit-cbom-dir and --cbom-version parse correctly") {

@@ -42,7 +42,10 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scala.version>3.8.3</scala.version>
-    <maven.compiler.release>17</maven.compiler.release>
+    <!-- Kept in step with build.sbt's `-release`. #301 raised that to 21 to use virtual
+         threads (Thread.ofVirtual in AdaptiveMimeBuilder); this build stayed at 17 and so
+         stopped compiling, which nothing noticed because CI runs sbt. -->
+    <maven.compiler.release>21</maven.compiler.release>
     <!-- The sbt version used by the sibling build.sbt build; surfaced in BuildInfo for parity -->
     <sbt.version>1.10.6</sbt.version>
 
@@ -57,6 +60,8 @@
     <json4s.version>4.0.7</json4s.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <logback.version>1.5.15</logback.version>
+    <tomlj.version>1.1.1</tomlj.version>
+    <spice-config.version>1.0.0</spice-config.version>
     <scala-parallel-collections.version>1.2.0</scala-parallel-collections.version>
     <scala-logging.version>3.9.4</scala-logging.version>
     <tika.version>3.2.3</tika.version>
@@ -74,6 +79,11 @@
     <munit.version>0.7.29</munit.version>
     <scalacheck.version>1.18.1</scalacheck.version>
     <zstd-jni.version>1.5.6-9</zstd-jni.version>
+    <!-- Must equal the `version` in .scalafmt.conf. Spotless bundles one scalafmt build and
+         refuses any other exactly, so omitting this does not mean "whatever the config asks
+         for": it means the plugin's own default silently becomes the requirement, and the
+         check dies before it formats anything. -->
+    <scalafmt.version>3.7.15</scalafmt.version>
 
     <!-- Test parallelism: independent test classes are distributed over several
          forked JVMs, restoring what sbt's default `Test / parallelExecution`
@@ -227,6 +237,21 @@
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <version>${logback.version}</version>
+    </dependency>
+    <!-- Config files. The same version Allspice uses, so a table parsed by one and
+         handed to the other cannot disagree about TOML semantics. -->
+    <dependency>
+      <groupId>org.tomlj</groupId>
+      <artifactId>tomlj</artifactId>
+      <version>${tomlj.version}</version>
+    </dependency>
+    <!-- The naming, layering and precedence rules, shared with every other Spice
+         component. One implementation, because rules copied into several codebases
+         are rules that will disagree, and these already have. -->
+    <dependency>
+      <groupId>io.spicelabs</groupId>
+      <artifactId>spice-config</artifactId>
+      <version>${spice-config.version}</version>
     </dependency>
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
@@ -510,7 +535,10 @@
             <arg>-Yexplicit-nulls</arg>
             <arg>-no-indent</arg>
             <arg>-release</arg>
-            <arg>17</arg>
+            <!-- The same number javac gets, so the two compilers cannot drift apart:
+                 this one governs the Scala sources, which is where Thread.ofVirtual is
+                 actually used. -->
+            <arg>${maven.compiler.release}</arg>
             <!-- Enable SemanticDB output to match build.sbt's semanticdbEnabled -->
             <arg>-Ysemanticdb</arg>
           </args>
@@ -732,6 +760,7 @@
         <configuration>
           <scala>
             <scalafmt>
+              <version>${scalafmt.version}</version>
               <file>${project.basedir}/.scalafmt.conf</file>
             </scalafmt>
           </scala>
