@@ -409,8 +409,13 @@ class GoatRodeoBuilder {
     * carries so that it can stay dependency-free; see [[TomlTables]].
     *
     * Settings already given to this builder are the defaults the table is
-    * applied on top of, and anything the caller sets afterwards wins — so the
-    * embedding program keeps the final say, as it does for the command line.
+    * applied on top of, and the embedding program keeps the final say
+    * afterwards, as it does for the command line — but what "afterwards" does
+    * depends on the setting: a later scalar setter (`withThreads`,
+    * `withTempDir`) replaces the table's value, while a later list setter
+    * (`withPayload`, `withIgnore`, `withFileList`, `withExcludePattern`,
+    * `withMimeFilter`) appends to it. A caller that wants to replace a list the
+    * table supplied cannot do it through this builder.
     *
     * `cutoff` is refused here: embedded, the analysis cutoff comes from the
     * Spice Pass, which constrains what the platform will accept.

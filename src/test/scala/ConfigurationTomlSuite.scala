@@ -174,6 +174,62 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     }
   }
 
+  test(
+    "an overridden setting is reported against the source that supplied it"
+  ) {
+    // The file and the environment are resolved together, so crediting the file
+    // for everything the command line displaces names the wrong loser whenever
+    // the value came from a variable.
+    val reported = scala.collection.mutable.ArrayBuffer[String]()
+    withConfigFile("[analysis]\nthreads = 4\nmax_records = 999999\n") { path =>
+      ConfigurationToml
+        .fromSources(
+          Some(path),
+          Configuration(),
+          environment = Map("GOATRODEO_ANALYSIS_THREADS" -> "9"),
+          report = reported.append(_)
+        ) match {
+        case Right((resolved, resolution)) =>
+          assertEquals(
+            ConfigurationToml.sourceOf(resolution, "threads"),
+            Some("GOATRODEO_ANALYSIS_THREADS"),
+            "the environment set this one last"
+          )
+          assertEquals(
+            ConfigurationToml.sourceOf(resolution, "maxRecords"),
+            Some(s"[analysis] in $path"),
+            "and the file set this one"
+          )
+          assertEquals(
+            ConfigurationToml.sourceOf(resolution, "tag"),
+            None,
+            "a setting left at its default has no source to name"
+          )
+        case Left(error) => fail(error)
+      }
+    }
+  }
+
+  test("an overridden setting is named as its writer spelled it") {
+    // Configuration's field names are a fourth spelling, unrelated to the three
+    // the documentation promises. Reporting `maxRecords` describes a name that
+    // appears in no file, flag or variable.
+    assertEquals(ConfigurationToml.displayName("maxRecords"), "max_records")
+    assertEquals(ConfigurationToml.displayName("emitJsonDir"), "dump_json")
+    assertEquals(ConfigurationToml.displayName("cbomDir"), "emit_cbom_dir")
+  }
+
+  test("every field with a config-file key names a key that exists") {
+    // The map is written out by hand because the relation is not mechanical;
+    // this is what stops it drifting from the schema beside it.
+    ConfigurationToml.fieldKeys.foreach { key =>
+      assert(
+        ConfigurationToml.accepts(key),
+        s"$key is reported as a config key but the schema does not accept it"
+      )
+    }
+  }
+
   test("--config records the file it read") {
     withConfigFile("[analysis]\nthreads = 4\n") { path =>
       val config = ConfigurationParser
@@ -229,6 +285,43 @@ class ConfigurationTomlSuite extends munit.FunSuite {
       )
       assert(reported.head.contains("overrides"), reported.head)
     }
+  }
+
+  test("the environment is read on a run that names no config file") {
+    // The environment is a source in its own right. Reaching it only through
+    // --config meant a run that wanted to set one thing, and said so the way the
+    // documentation describes, was silently ignored.
+    val config = ConfigurationParser
+      .parse(
+        Array("--out", "/tmp/out"),
+        environment = Map("GOATRODEO_ANALYSIS_THREADS" -> "9")
+      )
+      .getOrElse(fail("expected a parse"))
+    assertEquals(config.threads, 9)
+    assertEquals(config.configFile, None, "and there was no file")
+  }
+
+  test("the command line beats the environment, with no config file either") {
+    val config = ConfigurationParser
+      .parse(
+        Array("--threads", "12"),
+        environment = Map("GOATRODEO_ANALYSIS_THREADS" -> "9")
+      )
+      .getOrElse(fail("expected a parse"))
+    assertEquals(config.threads, 12)
+  }
+
+  test("an unknown variable in a group this program claims is an error") {
+    // The same rule as a mistyped key in the file, for the same reason: a
+    // setting that is quietly not in force is how configuration becomes
+    // undebuggable.
+    assertEquals(
+      ConfigurationParser.parse(
+        Array("--out", "/tmp/out"),
+        environment = Map("GOATRODEO_ANALYSIS_TREADS" -> "9")
+      ),
+      None
+    )
   }
 
   test("a variable that names no group is not a setting") {

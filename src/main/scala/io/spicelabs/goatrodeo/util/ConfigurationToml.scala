@@ -61,6 +61,75 @@ object ConfigurationToml {
     */
   val EnvironmentPrefix: String = "GOATRODEO"
 
+  /** The config-file key each [[Configuration]] field is written as.
+    *
+    * WHY this is written out rather than derived: the flag, the key and the
+    * environment variable are three spellings of one name, related mechanically
+    * — but the *field* is a fourth, and it is not related to them at all.
+    * `emitJsonDir` is `dump_json`, `cbomDir` is `emit_cbom_dir`,
+    * `useStaticMetadata` is `static_metadata`. Anything that turns a field name
+    * into a key by rule would be wrong for a third of them.
+    *
+    * Used to report an overridden setting under the name its writer used.
+    * Fields absent here have no config-file key — a flag-only setting, or
+    * `runtime`, which is not a setting at all.
+    */
+  private val keyForField: Map[String, String] = Map(
+    "out" -> "out",
+    "build" -> "build",
+    "fileList" -> "file_list",
+    "ingested" -> "ingested",
+    "ignore" -> "ignore",
+    "blockList" -> "block_list",
+    "exclude" -> "exclude_pattern",
+    "threads" -> "threads",
+    "maxRecords" -> "max_records",
+    "tempDir" -> "temp_dir",
+    "useStaticMetadata" -> "static_metadata",
+    "fsFilePaths" -> "fs_file_paths",
+    "dumpRootDir" -> "dump_roots",
+    "emitJsonDir" -> "dump_json",
+    "mimeFilter" -> "mime_filter",
+    "tag" -> "tag",
+    "tagJson" -> "tag_json",
+    "tagVersion" -> "tag_version",
+    "tagDate" -> "tag_date",
+    "packageTags" -> "package_tags",
+    "packageTagsShortName" -> "package_tags_short_name",
+    "cbomDir" -> "emit_cbom_dir",
+    "cbomVersion" -> "cbom_version"
+  )
+
+  /** How a setting should be named in a message, given the field it lives in.
+    *
+    * Its config-file key where it has one, so that the three-spellings rule
+    * holds in output too; the field name otherwise, which is the best available
+    * name for something a file cannot set.
+    */
+  def displayName(field: String): String = keyForField.getOrElse(field, field)
+
+  /** Where the value of a setting came from, named as the person who set it
+    * would recognise it — `GOATRODEO_ANALYSIS_THREADS`, or `[analysis] in
+    * /etc/goatrodeo.toml`.
+    *
+    * `None` for a setting no source supplied, which is every setting left at
+    * its default.
+    */
+  def sourceOf(resolved: Resolution, field: String): Option[String] =
+    keyForField
+      .get(field)
+      .flatMap(key => resolved.setting(Group, key).toScala)
+      .map(_.origin.describe)
+
+  /** The config-file keys [[keyForField]] claims exist, so that a test can hold
+    * it against the schema rather than trusting two hand-written lists to
+    * agree.
+    */
+  def fieldKeys: Set[String] = keyForField.values.toSet
+
+  /** Whether the `[analysis]` table accepts this key. */
+  def accepts(key: String): Boolean = knownKeys.contains(key)
+
   /** Keys accepted in the `[analysis]` table. */
   private val knownKeys: Set[String] = Set(
     "out",
@@ -112,50 +181,77 @@ object ConfigurationToml {
 
   private case class Invalid(message: String) extends RuntimeException(message)
 
-  /** Read a whole Goat Rodeo config file, plus the environment.
+  /** Read the environment, and a config file if there is one.
     *
     * Standalone, this is where the ladder is applied: defaults, then the
     * `[analysis]` table, then `GOATRODEO_ANALYSIS_*`. Command-line flags are
     * applied on top by [[ConfigurationParser]], which is the only part that
     * knows what a flag is.
+    *
+    * WHY the file is optional rather than the way in: the environment is a
+    * source in its own right, and making it reachable only through `--config`
+    * meant `GOATRODEO_ANALYSIS_THREADS` silently did nothing on a run that
+    * named no file — which is every run that only wanted to set one thing.
+    * Every source is now consulted on every run, and the file is the one that
+    * may be absent.
+    *
+    * The [[Resolution]] is returned alongside the configuration because it is
+    * the only thing that knows *where* each value came from; [[Configuration]]
+    * records values, not their origins, and the override reporting needs both.
     */
+  def fromSources(
+      path: Option[Path],
+      base: Configuration = Configuration(),
+      environment: Map[String, String] = sys.env,
+      report: String => Unit = message => logger.info(message)
+  ): Either[String, (Configuration, Resolution)] = {
+    val resolver = new Resolver(
+      EnvironmentPrefix,
+      java.util.Set.of(Group),
+      message => report(message)
+    )
+
+    val withFile: Either[String, Resolver] = path match {
+      case None => Right(resolver)
+      case Some(path) if !Files.exists(path) =>
+        Left(s"config file not found: $path")
+      case Some(path) =>
+        val result = Toml.parse(Files.readString(path))
+        if (!result.errors().isEmpty())
+          Left(result.errors().asScala.map(_.toString).mkString("; "))
+        else {
+          val root = TomlTables.toPlainMap(result)
+          val loose = root.asScala
+            .collect {
+              case (key, value) if !value.isInstanceOf[java.util.Map[?, ?]] =>
+                key
+            }
+            .toSeq
+            .sorted
+          if (loose.nonEmpty)
+            Left(
+              s"settings belong in a table: move ${loose.mkString(", ")} under [$Group]"
+            )
+          else Right(resolver.withFile(path, root, java.util.List.of()))
+        }
+    }
+
+    withFile.flatMap { resolver =>
+      val resolved = resolver.withEnvironment(environment.asJava).resolve()
+      fromResolution(resolved, base, Group).map((_, resolved))
+    }
+  }
+
+  /** Read a whole Goat Rodeo config file, plus the environment. */
   def fromFile(
       path: Path,
       base: Configuration = Configuration(),
       environment: Map[String, String] = sys.env,
       report: String => Unit = message => logger.info(message)
-  ): Either[String, Configuration] = {
-    if (!Files.exists(path)) Left(s"config file not found: $path")
-    else {
-      val result = Toml.parse(Files.readString(path))
-      if (!result.errors().isEmpty())
-        Left(result.errors().asScala.map(_.toString).mkString("; "))
-      else {
-        val root = TomlTables.toPlainMap(result)
-        val loose = root.asScala
-          .collect {
-            case (key, value) if !value.isInstanceOf[java.util.Map[?, ?]] => key
-          }
-          .toSeq
-          .sorted
-        if (loose.nonEmpty)
-          Left(
-            s"settings belong in a table: move ${loose.mkString(", ")} under [$Group]"
-          )
-        else {
-          val resolved = new Resolver(
-            EnvironmentPrefix,
-            java.util.Set.of(Group),
-            message => report(message)
-          )
-            .withFile(path, root, java.util.List.of())
-            .withEnvironment(environment.asJava)
-            .resolve()
-          fromResolution(resolved, base, Group)
-        }
-      }
-    }
-  }
+  ): Either[String, Configuration] =
+    fromSources(Some(path), base, environment, report).map((config, _) =>
+      config
+    )
 
   /** Read a Goat Rodeo configuration from a table.
     *

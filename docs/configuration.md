@@ -102,13 +102,28 @@ Callers that need the cutoff to originate in a Spice Pass (Allspice, the `spice`
 the pass themselves and call `withCutoff`. Goat Rodeo has no notion of a pass and does not
 want one.
 
+No config file may supply it either — not a standalone Goat Rodeo file, and not a table
+nested inside a `spice` or Allspice one. `cutoff` is an entitlement rather than a preference:
+embedded, it is the pass's `x-cutoff`, which constrains what the platform is willing to
+accept, and a file supplying it would hand a user the ability to widen a scope the platform
+deliberately narrowed. Standalone there is no pass to contradict, but a value that can be
+read from two kinds of place is how the embedded rule gets forgotten.
+
+It is refused *by name* (`ConfigurationToml.alwaysRejected`) rather than by being left out of
+the schema: an unrecognised key reports a typo, which is the wrong thing to say about a key
+that is spelled correctly and deliberately unavailable.
+
 ## `RuntimeEnvironment`
 
-Ambient process state — working directory, home directory, environment, system properties —
-is captured once, in `RuntimeEnvironment.default`, and carried on the configuration. This is
-the only place Goat Rodeo reads it. Tilde expansion (`ExpandFiles.fixTilde`) takes the home
-directory as a parameter rather than calling `System.getProperty("user.home")` at the point
-of use, so a test can supply a different one without mutating global JVM state.
+Working directory and home directory are captured once, in `RuntimeEnvironment.default`, and
+carried on the configuration, so that nothing downstream reaches for them itself. Tilde
+expansion (`ExpandFiles.fixTilde`) takes the home directory as a parameter rather than
+calling `System.getProperty("user.home")` at the point of use, so a test can supply a
+different one without mutating global JVM state.
+
+The process environment is ambient state too, but it is a configuration *source* rather than
+something a run is described by, so it enters through the resolver alongside the config file
+— see below — rather than being carried here.
 
 
 ## The config file
@@ -144,15 +159,25 @@ Lowest to highest:
 
     defaults  <  [analysis]  <  environment  <  command line
 
-and when one of those displaces another, it says so:
+Each layer is consulted on every run. The config file is the one that may be absent, and its
+absence is not a reason to skip the ones above it: `GOATRODEO_ANALYSIS_THREADS=16` works on a
+run that passes no `--config` at all.
+
+When one layer displaces another, it says so, naming the source that supplied the value being
+displaced:
 
 ```
 threads = 9 (GOATRODEO_ANALYSIS_THREADS) overrides 4 ([analysis] in /etc/goatrodeo.toml)
-threads = 12 (command line) overrides 9 (/etc/goatrodeo.toml)
+threads = 12 (command line) overrides 9 (GOATRODEO_ANALYSIS_THREADS)
 ```
 
 Overriding a *default* is not reported: that is every setting on every run, and the noise
 would bury the cases where two deliberate choices conflict.
+
+A setting is named by its config key throughout, including on the command-line line, so the
+three spellings above are the only ones that ever appear. `Configuration`'s field names are a
+fourth, unrelated spelling — `emitJsonDir` for `dump_json` — and `ConfigurationToml.keyForField`
+exists to keep them out of anything a person reads.
 
 The rules themselves — naming, layering, precedence, provenance — live in
 [`spice-config`](https://github.com/spice-labs-inc/spice-config), shared with every
@@ -163,7 +188,10 @@ is particular to Goat Rodeo.
 Three rules are worth knowing:
 
 - **An unknown key is an error.** A mistyped key that is silently ignored is how a config file
-  becomes undebuggable: the value you wrote is simply not in force and nothing says so.
+  becomes undebuggable: the value you wrote is simply not in force and nothing says so. The
+  same holds for a variable — `GOATRODEO_ANALYSIS_TREADS=9` fails the run rather than doing
+  nothing. Variables outside a group this program claims (`GOATRODEO_IMAGE`, say) are not
+  settings and are left alone.
 - **A setting outside a table is an error.** Bare keys at the root are how this file used to be
   written, and silently ignoring them would be the same failure by another route; the message
   names the keys and says they belong under `[analysis]`.
@@ -192,12 +220,5 @@ dependency-free — back to a `TomlTable`, so there is one reader either way. Us
 `TomlTables.toPlainMap` rather than `TomlTable.toMap()` when producing such a map:
 `toMap()` is shallow and leaves nested tables as tomlj objects.
 
-### `cutoff` is the one key nesting changes
-
-`cutoff` is a Goat Rodeo knob and is accepted in a Goat Rodeo config file: standalone, Goat
-Rodeo knows nothing about Spice Passes.
-
-Nested inside `spice` or Allspice it is **rejected**. There the cutoff is the pass's
-`x-cutoff`, which constrains what the platform is willing to accept, so letting a config file
-supply it would hand a user the ability to widen a scope the platform deliberately narrowed.
-`ConfigurationToml.nestedFromToml` is the entry point that enforces this.
+Nesting changes nothing about which keys are accepted: the schema is the same either way, and
+`cutoff` is refused in both — see [`cutoff` has exactly one source](#cutoff-has-exactly-one-source).
