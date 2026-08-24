@@ -220,7 +220,9 @@ object AdaptiveMimeBuilder {
 
                 val done = completed.sum()
                 var m = milestone.get()
-                while (done >= m && milestone.compareAndSet(m, m + progressStep)) {
+                while (
+                  done >= m && milestone.compareAndSet(m, m + progressStep)
+                ) {
                   doProgress(m, adaptive.current)
                   m = milestone.get()
                 }

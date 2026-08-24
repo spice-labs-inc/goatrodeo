@@ -715,6 +715,7 @@ object ToProcess {
       CarvedCertificatesStrategy.computeCarvedCertificateFiles,
       MobileTlsStrategy.computeMobileTlsFiles,
       CryptoDependencyStrategy.computeCryptoDependencyFiles,
+      CloudKeyStrategy.computeCloudKeyFiles,
       JvmDistribution.computeJvmFiles,
       GradleLockfile.computeGradleLockfiles,
       OpenSSLConfigToProcess.computeOpenSSLConfigFiles,

@@ -201,7 +201,9 @@ object CbomEmitter {
           k.startsWith("EmbeddedKey:") ||
           k.startsWith("CryptoAlgorithms:") ||
           k.startsWith("CryptoDependency:") ||
-          k.startsWith("MobileTls:")
+          k.startsWith("MobileTls:") ||
+          k.startsWith("CloudKey:") ||
+          k.startsWith("DbEncryption:")
       )
     }
   }
@@ -579,7 +581,9 @@ object CbomEmitter {
         k.startsWith("EmbeddedKey:") ||
         k.startsWith("CryptoAlgorithms:") ||
         k.startsWith("CryptoDependency:") ||
-        k.startsWith("MobileTls:")
+        k.startsWith("MobileTls:") ||
+        k.startsWith("CloudKey:") ||
+        k.startsWith("DbEncryption:")
       ) {
         vs.map(v => JObject("name" -> JString(k), "value" -> JString(v))).toList
       } else {
@@ -804,9 +808,13 @@ object CbomEmitter {
         algs.toMap
       )
     } else if (hasServiceCrypto(extra)) {
-      val refs = extra
-        .getOrElse("ServiceCrypto:algorithms", Set())
-        .toList
+      // A single config file (e.g. my.cnf / mariadb.cnf) can carry both TLS
+      // ciphers and database-encryption algorithms; union both families'
+      // declared algorithms into one algorithm-asset set.
+      val refs = (
+        extra.getOrElse("ServiceCrypto:algorithms", Set()) ++
+          extra.getOrElse("DbEncryption:algorithms", Set())
+      ).toList
         .sorted
         .flatMap(addAlg(_, "other"))
       (
@@ -890,6 +898,26 @@ object CbomEmitter {
       val refs = extra
         .getOrElse("MobileTls:algorithms", Set())
         .toList
+        .sorted
+        .flatMap(addAlg(_, "other"))
+      (
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)
+        ),
+        algs.toMap
+      )
+    } else if (hasCloudKey(extra)) {
+      // Cloud-managed key references: identifiers (ARNs/URLs) and declared key
+      // specs surface as properties; key material is a presence flag only.
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other")),
+        algs.toMap
+      )
+    } else if (hasDbEncryption(extra)) {
+      val refs = (
+        extra.getOrElse("DbEncryption:algorithms", Set()) ++
+          extra.getOrElse("ServiceCrypto:algorithms", Set())
+      ).toList
         .sorted
         .flatMap(addAlg(_, "other"))
       (
@@ -985,6 +1013,14 @@ object CbomEmitter {
 
   private def hasMobileTls(extra: Map[String, Set[String]]): Boolean = {
     extra.keys.exists(_.startsWith("MobileTls:"))
+  }
+
+  private def hasCloudKey(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("CloudKey:"))
+  }
+
+  private def hasDbEncryption(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("DbEncryption:"))
   }
 
   private def buildCertificateProperties(

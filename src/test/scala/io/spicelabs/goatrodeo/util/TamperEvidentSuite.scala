@@ -283,40 +283,42 @@ class TamperEvidentSuite extends FunSuite {
     "T-07 .grc info records correlation id, per-file sha256, and chain head"
   ) {
     val dir = tempDir()
-    try TamperEvidentLog.sync.synchronized {
-      val chainHex =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      TamperEvidentLog.start(
-        "11111111-2222-3333-4444-555555555555",
-        () => Some(chainHex)
-      )
-      val items = Vector(
-        makeItem(
-          "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        ),
-        makeItem(
-          "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    try
+      TamperEvidentLog.sync.synchronized {
+        val chainHex =
+          "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        TamperEvidentLog.start(
+          "11111111-2222-3333-4444-555555555555",
+          () => Some(chainHex)
         )
-      )
-      val (dataAndIndex, clusterFile) =
-        GraphManager.writeEntries(dir, items.iterator)
-      val env = readClusterEnv(clusterFile)
-      assertEquals(
-        env.info("correlation_id"),
-        "11111111-2222-3333-4444-555555555555"
-      )
-      assertEquals(env.info("log_chain_head"), chainHex)
-      // sha256 JSON arrays, index-aligned with dataFiles/indexFiles
-      val sha = parse(env.info("sha256"))
-      val grd = (sha \ "grd").children.map(_.values.toString)
-      val gri = (sha \ "gri").children.map(_.values.toString)
-      assertEquals(grd.length, dataAndIndex.length)
-      assertEquals(gri.length, dataAndIndex.length)
-      dataAndIndex.zipWithIndex.foreach { case (dif, i) =>
-        assertEquals(grd(i), dif.dataFileSha256)
-        assertEquals(gri(i), dif.indexFileSha256)
+        val items = Vector(
+          makeItem(
+            "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ),
+          makeItem(
+            "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          )
+        )
+        val (dataAndIndex, clusterFile) =
+          GraphManager.writeEntries(dir, items.iterator)
+        val env = readClusterEnv(clusterFile)
+        assertEquals(
+          env.info("correlation_id"),
+          "11111111-2222-3333-4444-555555555555"
+        )
+        assertEquals(env.info("log_chain_head"), chainHex)
+        // sha256 JSON arrays, index-aligned with dataFiles/indexFiles
+        val sha = parse(env.info("sha256"))
+        val grd = (sha \ "grd").children.map(_.values.toString)
+        val gri = (sha \ "gri").children.map(_.values.toString)
+        assertEquals(grd.length, dataAndIndex.length)
+        assertEquals(gri.length, dataAndIndex.length)
+        dataAndIndex.zipWithIndex.foreach { case (dif, i) =>
+          assertEquals(grd(i), dif.dataFileSha256)
+          assertEquals(gri(i), dif.indexFileSha256)
+        }
       }
-    } finally {
+    finally {
       TamperEvidentLog.start("", () => None)
       cleanup(dir)
     }
@@ -326,21 +328,26 @@ class TamperEvidentSuite extends FunSuite {
   // THEORY: the chain head is a flag-gated, additive field.
   test("T-08 .grc info omits log_chain_head when tamper-evidence is off") {
     val dir = tempDir()
-    try TamperEvidentLog.sync.synchronized {
-      TamperEvidentLog.start("99999999-8888-7777-6666-555555555555", () => None)
-      val items = Vector(
-        makeItem(
-          "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    try
+      TamperEvidentLog.sync.synchronized {
+        TamperEvidentLog.start(
+          "99999999-8888-7777-6666-555555555555",
+          () => None
         )
-      )
-      val (_, clusterFile) = GraphManager.writeEntries(dir, items.iterator)
-      val env = readClusterEnv(clusterFile)
-      assertEquals(
-        env.info("correlation_id"),
-        "99999999-8888-7777-6666-555555555555"
-      )
-      assert(!env.info.contains("log_chain_head"))
-    } finally {
+        val items = Vector(
+          makeItem(
+            "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          )
+        )
+        val (_, clusterFile) = GraphManager.writeEntries(dir, items.iterator)
+        val env = readClusterEnv(clusterFile)
+        assertEquals(
+          env.info("correlation_id"),
+          "99999999-8888-7777-6666-555555555555"
+        )
+        assert(!env.info.contains("log_chain_head"))
+      }
+    finally {
       TamperEvidentLog.start("", () => None)
       cleanup(dir)
     }
@@ -351,43 +358,45 @@ class TamperEvidentSuite extends FunSuite {
   // run's .grc files to the chained log.
   test("T-09 checksum file shape") {
     val dir = tempDir()
-    try TamperEvidentLog.sync.synchronized {
-      TamperEvidentLog.start(
-        "abcd1234-0000-0000-0000-000000000000",
-        () =>
-          Some(
-            "feedface00000000000000000000000000000000000000000000000000000000"
-          )
-      )
-      TamperEvidentLog.addGrc(
-        "2026_01_02_03_04_05_deadbeef.grc",
-        "beefcafe0000000000000000000000000000000000000000000000000000000000"
-      )
-      val file = TamperEvidentLog.writeChecksum(
-        dir,
-        "abcd1234-0000-0000-0000-000000000000"
-      )
-      assertEquals(
-        file.getName(),
-        "goat_rodeo_abcd1234-0000-0000-0000-000000000000_checksum.json"
-      )
-      val json = parse(Files.readString(file.toPath()))
-      assertEquals(
-        (json \ "correlation_id").values.toString,
-        "abcd1234-0000-0000-0000-000000000000"
-      )
-      assertEquals(
-        (json \ "final_chain_head").values.toString,
-        "feedface00000000000000000000000000000000000000000000000000000000"
-      )
-      assertEquals(
-        (json \ "grcs")(0) \ "name" match {
-          case org.json4s.JString(s) => s
-          case other                 => fail(s"expected string, got $other")
-        },
-        "2026_01_02_03_04_05_deadbeef.grc"
-      )
-    } finally {
+    try
+      TamperEvidentLog.sync.synchronized {
+        TamperEvidentLog.start(
+          "abcd1234-0000-0000-0000-000000000000",
+          () =>
+            Some(
+              "feedface00000000000000000000000000000000000000000000000000000000"
+            )
+        )
+        TamperEvidentLog.addGrc(
+          "2026_01_02_03_04_05_deadbeef.grc",
+          "beefcafe0000000000000000000000000000000000000000000000000000000000"
+        )
+        val file = TamperEvidentLog.writeChecksum(
+          dir,
+          "abcd1234-0000-0000-0000-000000000000"
+        )
+        assertEquals(
+          file.getName(),
+          "goat_rodeo_abcd1234-0000-0000-0000-000000000000_checksum.json"
+        )
+        val json = parse(Files.readString(file.toPath()))
+        assertEquals(
+          (json \ "correlation_id").values.toString,
+          "abcd1234-0000-0000-0000-000000000000"
+        )
+        assertEquals(
+          (json \ "final_chain_head").values.toString,
+          "feedface00000000000000000000000000000000000000000000000000000000"
+        )
+        assertEquals(
+          (json \ "grcs")(0) \ "name" match {
+            case org.json4s.JString(s) => s
+            case other                 => fail(s"expected string, got $other")
+          },
+          "2026_01_02_03_04_05_deadbeef.grc"
+        )
+      }
+    finally {
       TamperEvidentLog.start("", () => None)
       cleanup(dir)
     }

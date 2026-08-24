@@ -24,10 +24,10 @@ import java.nio.file.Files
   *
   * The next batch's workers are kicked off once the current batch is down to
   * 10% of its allocated threads, and never while more than two batches are
-  * alive. THEORY: the batch tail is where the largest artifacts (single
-  * workers building multi-million-vertex ADGs) gate the whole batch, so
-  * overlapping the next batch's processing with that tail reclaims the idle
-  * time without increasing the number of live storages.
+  * alive. THEORY: the batch tail is where the largest artifacts (single workers
+  * building multi-million-vertex ADGs) gate the whole batch, so overlapping the
+  * next batch's processing with that tail reclaims the idle time without
+  * increasing the number of live storages.
   */
 class BuilderBatchOverlapSuite extends FunSuite {
 
@@ -47,7 +47,12 @@ class BuilderBatchOverlapSuite extends FunSuite {
     }
   }
 
-  private def runBuild(dir: File, out: File, ingested: File, threads: Int): Unit = {
+  private def runBuild(
+      dir: File,
+      out: File,
+      ingested: File,
+      threads: Int
+  ): Unit = {
     new GoatRodeoBuilder()
       .withPayload(dir.getAbsolutePath)
       .withOutput(out.getAbsolutePath)
@@ -108,7 +113,10 @@ class BuilderBatchOverlapSuite extends FunSuite {
         "every top-level file must be processed exactly once"
       )
       val grcCount = countBatchClusters(out)
-      assert(grcCount >= 2L, s"expected more than one batch cluster, got $grcCount")
+      assert(
+        grcCount >= 2L,
+        s"expected more than one batch cluster, got $grcCount"
+      )
     } finally {
       cleanup(in)
       cleanup(out)
@@ -135,7 +143,10 @@ class BuilderBatchOverlapSuite extends FunSuite {
         "every top-level file must be processed exactly once"
       )
       val grcCount = countBatchClusters(out)
-      assert(grcCount >= 2L, s"expected more than one batch cluster, got $grcCount")
+      assert(
+        grcCount >= 2L,
+        s"expected more than one batch cluster, got $grcCount"
+      )
     } finally {
       cleanup(in)
       cleanup(out)

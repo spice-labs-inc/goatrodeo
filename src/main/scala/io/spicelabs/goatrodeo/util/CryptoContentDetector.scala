@@ -14,9 +14,11 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 
+import io.spicelabs.goatrodeo.omnibor.strategies.CloudKeyStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.CryptoFootprintStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.CryptoTokenStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.EmbeddedPemStrategy
+import io.spicelabs.goatrodeo.omnibor.strategies.ServiceCryptoStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.ServiceTlsConfigStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.ShadowPasswordStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.UsignKeysStrategy
@@ -60,6 +62,8 @@ object CryptoContentDetector {
   val TlsConfigMime = "application/x-goatrodeo-tls-config"
   val GradleLockfileMime = "application/x-goatrodeo-gradle-lockfile"
   val JvmReleaseMime = "application/x-goatrodeo-jvm-release"
+  val CloudKeyMime = "application/x-goatrodeo-cloud-key"
+  val DbEncryptionMime = "application/x-goatrodeo-db-encryption"
 
   private val ShadowPaths: Vector[String] =
     Vector("etc/shadow", "etc/gshadow", "etc/passwd", "etc/group")
@@ -99,6 +103,7 @@ object CryptoContentDetector {
       GradleNames.contains(name) ||
         (name.endsWith(".lockfile") && path.contains("dependency-locks"))
     val jvmName = name == "release"
+    val cloudKeyName = CloudKeyStrategy.cloudKeyName(name)
 
     val text = probe(artifact)
     if (text.isEmpty) {
@@ -120,6 +125,14 @@ object CryptoContentDetector {
       jvmName &&
       (text.contains("JAVA_VERSION") || text.contains("JAVA_RUNTIME_VERSION"))
     ) out += JvmReleaseMime
+    // Cloud-managed key references: config/IaC files only, gated on the file
+    // extension and then on provider-specific signatures.
+    if (cloudKeyName && CloudKeyStrategy.detects(text)) out += CloudKeyMime
+    // SQLCipher and other content-only DB-encryption markers (PRAGMA key in
+    // code/config). Non-binary, and a cheap substring pre-guard avoids running
+    // the regexes over every text file.
+    if (!isBinary && ServiceCryptoStrategy.detectsSqlcipher(text))
+      out += DbEncryptionMime
     out
   }
 }
