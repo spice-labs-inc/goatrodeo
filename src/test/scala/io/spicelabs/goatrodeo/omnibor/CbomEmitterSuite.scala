@@ -22,7 +22,6 @@ import munit.FunSuite
 import org.everit.json.schema.ValidationException
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
-import scopt.OParser
 
 import java.io.File
 import java.nio.charset.StandardCharsets

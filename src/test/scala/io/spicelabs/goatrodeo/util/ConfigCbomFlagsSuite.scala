@@ -16,7 +16,6 @@ package io.spicelabs.goatrodeo.util
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import munit.FunSuite
-import scopt.OParser
 
 import java.io.File
 import java.nio.file.Paths

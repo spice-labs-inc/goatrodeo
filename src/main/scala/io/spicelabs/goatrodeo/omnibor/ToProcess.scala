@@ -5,13 +5,13 @@ import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.AdaptiveMimeBuilder
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.Configuration
-import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
+import io.spicelabs.goatrodeo.util.config
 
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue

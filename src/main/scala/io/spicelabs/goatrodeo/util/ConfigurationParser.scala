@@ -220,7 +220,9 @@ object ConfigurationParser {
           "Write a hash-chained, tamper-evident log of this run to the given file"
         )
         .action((x, c) =>
-          c.copy(tamperEvidentLog = ExpandFiles(x, c.runtime.homeDir).headOption)
+          c.copy(tamperEvidentLog =
+            ExpandFiles(x, c.runtime.homeDir).headOption
+          )
         ),
       opt[File]("ignore")
         .text(

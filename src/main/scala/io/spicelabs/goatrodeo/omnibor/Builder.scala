@@ -19,10 +19,10 @@ import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Configuration
-import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
+import io.spicelabs.goatrodeo.util.config
 
 import java.io.BufferedWriter
 import java.io.File
@@ -353,98 +353,98 @@ object Builder {
             // if the channel is closed/empty, `None` will be
             // returned, handle it gracefully
 
-          var toProcessOpt: Option[ToProcess] = None
-          while (
-            (cnt.get() - startedRunning) < config.maxRecords // only run so many items
-            &&
-            !dead_?.get() && {
-              toProcessOpt = Option(doPoll())
-              toProcessOpt.isDefined
-            }
-          ) {
-            val toProcess = toProcessOpt.get
-            val localStart = Instant.now()
-            try {
-              // build the package
+            var toProcessOpt: Option[ToProcess] = None
+            while (
+              (cnt.get() - startedRunning) < config.maxRecords // only run so many items
+              &&
+              !dead_?.get() && {
+                toProcessOpt = Option(doPoll())
+                toProcessOpt.isDefined
+              }
+            ) {
+              val toProcess = toProcessOpt.get
+              val localStart = Instant.now()
+              try {
+                // build the package
 
-              val byHash: Map[String, Vector[Augmentation]] =
-                if (config.useStaticMetadata) {
-                  toProcess.runStaticMetadataGather(config.mimeFilter)
-                } else {
-                  Map()
-                }
+                val byHash: Map[String, Vector[Augmentation]] =
+                  if (config.useStaticMetadata) {
+                    toProcess.runStaticMetadataGather(config.mimeFilter)
+                  } else {
+                    Map()
+                  }
 
-              toProcess.process(
-                None,
-                store = storage,
-                tag = tag,
-                parentScope =
-                  ParentScope.forAndWith(toProcess.main, None, byHash),
-                blockList = blockGitoids,
-                keepRunning = () => !dead_?.get(),
-                atEnd = (parent, _) => {
-                  if (parent.isEmpty) {
-                    val updatedCnt = cnt.addAndGet(1)
-                    val theDuration = Duration
-                      .between(localStart, Instant.now())
-                    if (
-                      theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
-                    ) {
+                toProcess.process(
+                  None,
+                  store = storage,
+                  tag = tag,
+                  parentScope =
+                    ParentScope.forAndWith(toProcess.main, None, byHash),
+                  blockList = blockGitoids,
+                  keepRunning = () => !dead_?.get(),
+                  atEnd = (parent, _) => {
+                    if (parent.isEmpty) {
+                      val updatedCnt = cnt.addAndGet(1)
+                      val theDuration = Duration
+                        .between(localStart, Instant.now())
+                      if (
+                        theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
+                      ) {
 
-                      // if we've got a temp dir and we're down to 10% free space, bail
-                      config.tempDir match {
-                        case Some(theDir) =>
-                          for {
-                            fileStore <- Try {
-                              Files.getFileStore(
-                                theDir.toPath().toAbsolutePath()
-                              )
-                            }.toOption
-                            total <- Try {
-                              fileStore.getTotalSpace().toDouble
-                            }.toOption
-                            available <- Try {
-                              fileStore.getUsableSpace().toDouble
-                            }.toOption
-                          } {
-                            val remaining = available / total
-                            if (remaining < 0.05) {
-                              val errorMsg =
-                                s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
-                              logger.error(errorMsg)
-                              dead_?.set(true)
-                              throw new Exception(errorMsg)
+                        // if we've got a temp dir and we're down to 10% free space, bail
+                        config.tempDir match {
+                          case Some(theDir) =>
+                            for {
+                              fileStore <- Try {
+                                Files.getFileStore(
+                                  theDir.toPath().toAbsolutePath()
+                                )
+                              }.toOption
+                              total <- Try {
+                                fileStore.getTotalSpace().toDouble
+                              }.toOption
+                              available <- Try {
+                                fileStore.getUsableSpace().toDouble
+                              }.toOption
+                            } {
+                              val remaining = available / total
+                              if (remaining < 0.05) {
+                                val errorMsg =
+                                  s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
+                                logger.error(errorMsg)
+                                dead_?.set(true)
+                                throw new Exception(errorMsg)
+                              }
                             }
-                          }
-                        case _ => // do nothing
-                      }
-                      val now = Instant.now()
-                      val totalDuration = Duration.between(totalStart, now)
-                      val processDuration = Duration.between(loopStart, now)
-                      val totalItems = runningCnt.get()
-                      val avgMsg = if (processDuration.getSeconds() > 0) {
-                        val itemsPerSecond =
-                          updatedCnt.toDouble / processDuration
-                            .getSeconds()
-                            .toDouble
-                        val itemsPerMinute = itemsPerSecond * 60.0d
-                        val left = totalItems.toDouble - updatedCnt.toDouble
-                        val remainingDuration = Duration.ZERO.plusSeconds(
-                          (left / itemsPerSecond).round
+                          case _ => // do nothing
+                        }
+                        val now = Instant.now()
+                        val totalDuration = Duration.between(totalStart, now)
+                        val processDuration = Duration.between(loopStart, now)
+                        val totalItems = runningCnt.get()
+                        val avgMsg = if (processDuration.getSeconds() > 0) {
+                          val itemsPerSecond =
+                            updatedCnt.toDouble / processDuration
+                              .getSeconds()
+                              .toDouble
+                          val itemsPerMinute = itemsPerSecond * 60.0d
+                          val left = totalItems.toDouble - updatedCnt.toDouble
+                          val remainingDuration = Duration.ZERO.plusSeconds(
+                            (left / itemsPerSecond).round
+                          )
+                          f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
+                        } else ""
+                        logger.info(
+                          f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
                         )
-                        f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
-                      } else ""
-                      logger.info(
-                        f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
-                      )
-                      progressNotifier.notify(
-                        updatedCnt.toLong,
-                        totalItems.toLong
-                      )
+                        progressNotifier.notify(
+                          updatedCnt.toLong,
+                          totalItems.toLong
+                        )
+                      }
                     }
                   }
-                }
-              )
+                )
 
               } catch {
                 case oom: OutOfMemoryError => {

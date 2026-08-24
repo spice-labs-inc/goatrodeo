@@ -25,10 +25,10 @@ import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.util.ChainAppender
 import io.spicelabs.goatrodeo.util.Configuration
-import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
+import io.spicelabs.goatrodeo.util.config
 import org.slf4j.LoggerFactory
 
 import java.io.File

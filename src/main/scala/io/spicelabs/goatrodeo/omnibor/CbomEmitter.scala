@@ -814,8 +814,7 @@ object CbomEmitter {
       val refs = (
         extra.getOrElse("ServiceCrypto:algorithms", Set()) ++
           extra.getOrElse("DbEncryption:algorithms", Set())
-      ).toList
-        .sorted
+      ).toList.sorted
         .flatMap(addAlg(_, "other"))
       (
         Some(
@@ -917,8 +916,7 @@ object CbomEmitter {
       val refs = (
         extra.getOrElse("DbEncryption:algorithms", Set()) ++
           extra.getOrElse("ServiceCrypto:algorithms", Set())
-      ).toList
-        .sorted
+      ).toList.sorted
         .flatMap(addAlg(_, "other"))
       (
         Some(
