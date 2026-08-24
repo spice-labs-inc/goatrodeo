@@ -67,6 +67,7 @@ Precedence, lowest to highest:
 | `progressListener` | `Option[ProgressListener]` | — (not on the CLI) | `withProgressListener` | none |
 | `runtime` | `RuntimeEnvironment` | — (captured at startup) | — | the real process |
 | `configFile` | `Option[File]` | `--config` | — | none |
+| `logging` | `Map[String, Any]` | `--log-level`, `--log-file` | — | empty |
 
 ## Not settings
 
@@ -199,6 +200,27 @@ Three rules are worth knowing:
   see — a container mount, say — so a relative path in one has no dependable meaning. It also
   keeps the `spice` wrapper's guarantee that every path it must bind-mount is visible on the
   command line, since it cannot see inside a TOML table.
+
+### The `[logging]` group
+
+How much a run says, and where:
+
+```toml
+[logging]
+level = "debug"      # error, warn, info, debug, trace
+file = "/tmp/gr.log" # in addition to the console, not instead of it
+```
+
+The same group, keys and precedence as every other Spice tool, so a level means one thing
+wherever it is set. Only this program's own loggers move: lifting Tika or the bytecode
+readers to `debug` alongside them would bury the output you asked for.
+
+Applied by `main`. Embedded through `GoatRodeoBuilder` the host owns logging and chose its
+levels deliberately, so nothing on that path touches them.
+
+Goat Rodeo carries this group rather than interpreting it, but carried does not mean
+unchecked: the three rules above apply here too, so `[logging] levl` fails the run instead of
+travelling as far as the code that applies it and being dropped there in silence.
 
 ### Embedded in another program's config file
 

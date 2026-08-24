@@ -16,6 +16,10 @@ package io.spicelabs.goatrodeo
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
+import io.spicelabs.config.LogbackLogging
+import io.spicelabs.config.Logging
+import io.spicelabs.config.Origin
+import io.spicelabs.config.Resolution
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
@@ -68,9 +72,37 @@ object Howdy {
 
     // Based on the CLI parse, make the right choices and do the right thing
     parsed match {
-      case Some(config) => run(using config)
-      case _            => Helpers.bailFail()
+      case Some(config) =>
+        // Applied here, where this program owns the process. Embedded in another program
+        // through GoatRodeoBuilder, the host owns logging and chose its levels
+        // deliberately, so nothing on that path touches them.
+        applyLogging(config)
+        run(using config)
+      case _ => Helpers.bailFail()
     }
+  }
+
+  /** Apply the resolved `[logging]` group — the same group, keys and precedence
+    * as every other Spice tool.
+    *
+    * Only the loggers this program owns are moved: a level says how much *this*
+    * program should say, and lifting Tika or the bytecode readers along with it
+    * would bury the output the person asked for.
+    */
+  private def applyLogging(config: Configuration): Unit = {
+    val defaults = Logging.defaults().get(Logging.GROUP).asScala
+    val settings = (defaults ++ config.logging).map { case (key, value) =>
+      key -> (value.asInstanceOf[Object])
+    }
+    LogbackLogging.apply(
+      Resolution.of(
+        java.util.Map.of(Logging.GROUP, settings.asJava),
+        Origin.embedded(Logging.GROUP)
+      ),
+      // Fully qualified because it names a logger, not a type: this is the
+      // package whose loggers move, and it stays right when the imports change.
+      "io.spicelabs.goatrodeo"
+    )
   }
 
   /** Run the Goat Rodeo builder with the given configuration.
