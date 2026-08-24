@@ -88,13 +88,19 @@ object Howdy {
     */
   @static
   def run(params: Config): Unit = {
-    setupTamperEvidentLogging(params)
-    try {
-      runImpl(params)
-    } finally {
-      // Guaranteed release of run-scoped logging resources (e.g. detaching the
-      // chain appender from the root logger) even if the run throws.
-      TamperEvidentLog.reset()
+    // Hold the tamper-evidence lock for the whole run: the correlation ID (and
+    // chain-head state) is process-global, and no other run or test may mutate
+    // it while this run's CBOMs and checksum are being written. Concurrent
+    // runs are serialized, which is fine — Goat Rodeo is one run per JVM.
+    TamperEvidentLog.sync.synchronized {
+      setupTamperEvidentLogging(params)
+      try {
+        runImpl(params)
+      } finally {
+        // Guaranteed release of run-scoped logging resources (e.g. detaching the
+        // chain appender from the root logger) even if the run throws.
+        TamperEvidentLog.reset()
+      }
     }
   }
 

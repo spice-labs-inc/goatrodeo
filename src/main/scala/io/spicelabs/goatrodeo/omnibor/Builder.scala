@@ -44,6 +44,19 @@ import scala.util.Try
 object Builder {
   private val logger: Logger = Logger(getClass())
 
+  /** The number of worker threads a batch may still have busy before the next
+    * batch's processing is kicked off: 10% of the allocated threads (integer
+    * division). With fewer than 10 allocated threads this is 0, so a batch is
+    * never overlapped — the next batch starts only after the current one has
+    * fully finished processing.
+    *
+    * @param threadCnt
+    *   the number of worker threads allocated per batch
+    * @return
+    *   the wind-down threshold (a live-worker count, inclusive)
+    */
+  def windDownThreshold(threadCnt: Int): Int = threadCnt / 10
+
   /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
     *
@@ -194,8 +207,18 @@ object Builder {
     var loopCnt = 0
 
     val writeThreadCnt = AtomicInteger(0)
-    while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
-      val thread = processMaxRecords(
+
+    // The next batch's workers are kicked off once the current batch is down to
+    // 10% of its allocated threads (integer division, so with fewer than 10
+    // allocated threads a batch is never overlapped — the next batch starts only
+    // after the current one fully finishes). Additionally the batch before the
+    // current one must have completed its write, so at most two batches (and
+    // therefore two storages) are ever alive at once.
+    val windDownThreshold = Builder.windDownThreshold(threadCnt)
+
+    def startNextBatch(): Option[BatchState] = {
+      loopCnt += 1
+      val ret = processMaxRecords(
         updatedDest,
         threadCnt = threadCnt,
         maxRecords = maxRecords,
@@ -214,13 +237,27 @@ object Builder {
         progressNotifier = progressNotifier,
         preWriteDB = preWriteDB
       )
-
-      loopCnt += 1
       logger.info(
-        f"Finished multi-thread consumer loop ${loopCnt}%,d at ${Duration
+        f"Starting multi-thread consumer loop ${loopCnt}%,d at ${Duration
             .between(totalStart, Instant.now())}"
       )
       updatedDest = destWithCount(dest, loopCnt)
+      ret
+    }
+
+    var olderBatch: Option[BatchState] = None
+    var currentBatch: Option[BatchState] = startNextBatch()
+
+    while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
+      currentBatch match {
+        case Some(batch)
+            if batch.liveWorkers.get() <= windDownThreshold &&
+              olderBatch.forall(_.saverDone.get()) =>
+          olderBatch = currentBatch
+          currentBatch = startNextBatch()
+        case _ =>
+          Thread.sleep(25)
+      }
     }
 
     logger.debug("Waiting for write threads")
@@ -269,8 +306,10 @@ object Builder {
       args: Config,
       progressNotifier: ProgressListener.Notifier,
       preWriteDB: Vector[Storage => Boolean] = Vector()
-  ): Option[Thread] = {
+  ): Option[BatchState] = {
 
+    val liveWorkers = AtomicInteger(0)
+    val saverDone = AtomicBoolean(false)
     val storage = MemStorage(Some(destDir))
 
 // if there's a tag, set it up
@@ -311,18 +350,20 @@ object Builder {
     val threads = for { threadNum <- 0 until threadCnt } yield {
       val t = new Thread(
         () => {
+          liveWorkers.incrementAndGet()
+          try {
 
-          @tailrec
-          def doPoll(): ToProcess = {
-            val tried = queue.poll()
-            if (tried != null || !stillWorking.get()) {
-              tried
-            } else {
-              // wait 1-32 ms
-              Thread.sleep(1 + Math.abs(Helpers.randomLong()) % 32)
-              doPoll()
+            @tailrec
+            def doPoll(): ToProcess = {
+              val tried = queue.poll()
+              if (tried != null || !stillWorking.get()) {
+                tried
+              } else {
+                // wait 1-32 ms
+                Thread.sleep(1 + Math.abs(Helpers.randomLong()) % 32)
+                doPoll()
+              }
             }
-          }
 
           // pull the files from the channel
           // if the channel is closed/empty, `None` will be
@@ -459,6 +500,9 @@ object Builder {
             }
 
           }
+          } finally {
+            liveWorkers.decrementAndGet()
+          }
         },
         f"gitoid ${batchName} ${threadNum}"
       )
@@ -466,20 +510,22 @@ object Builder {
       t
     }
 
-    // wait for the threads to complete
-    for { t <- threads } {
-      // deal with SIGKILL/ctrl-C
-      if (t.isInterrupted() || dead_?.get()) {
-        Thread.currentThread().interrupt()
-        throw InterruptedException(f"${t.getName()} was interrupted")
-      }
-      t.join()
-    }
 
     if (!dead_?.get()) {
       val thread = new Thread(
         () => {
           try {
+            // The batch must be fully analyzed before it is written: wait for
+            // every worker thread of this batch (including any still finishing
+            // a large artifact) before emitting CBOMs and GRC/GRD files.
+            for { t <- threads } {
+              if (t.isInterrupted() || dead_?.get()) {
+                Thread.currentThread().interrupt()
+                throw new InterruptedException(f"${t.getName()} was interrupted")
+              }
+              t.join()
+            }
+
             logger.info(
               f"Finished processing ${cnt.get()}%,d, vertices ${storage.size()}%,d at ${Duration
                   .between(start, Instant.now())}"
@@ -494,7 +540,12 @@ object Builder {
             args.cbomDir.foreach { cbomDir =>
               if (!dead_?.get()) {
                 CbomEmitter
-                  .emitForStorage(storage, args.cbomVersion, cbomDir) match {
+                  .emitForStorage(
+                    storage,
+                    args.cbomVersion,
+                    cbomDir,
+                    TamperEvidentLog.correlationId
+                  ) match {
                   case scala.util.Success(files) =>
                     logger.info(
                       f"Wrote ${files.length}%,d CBOM file(s) to ${cbomDir}"
@@ -521,6 +572,7 @@ object Builder {
                   .between(writeStart, Instant.now())}"
             )
           } finally {
+            saverDone.set(true)
             writeThreadCnt.decrementAndGet()
           }
         },
@@ -528,8 +580,11 @@ object Builder {
       )
       writeThreadCnt.addAndGet(1)
       thread.start()
-      Some(thread)
-    } else None
+      Some(BatchState(liveWorkers, saverDone))
+    } else {
+      saverDone.set(true)
+      None
+    }
 
   }
 
@@ -665,3 +720,13 @@ object Builder {
 }
 
 case class TagPass(gitoid: String, jsonStr: String, json: Dom.Element)
+
+/** Run-state of a single batch: how many of its worker threads are still
+  * analyzing artifacts, and whether its Saver (the write phase) has completed.
+  * Used to overlap the *next* batch's processing with the current batch's
+  * wind-down without ever having more than two batches alive.
+  */
+case class BatchState(
+    liveWorkers: AtomicInteger,
+    saverDone: AtomicBoolean
+)

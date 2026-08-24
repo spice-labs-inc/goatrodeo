@@ -52,9 +52,12 @@ object LogCapture {
   }
 
   /** Force SLF4J to bind to logback, retrying while it briefly reports a
-    * `SubstituteLoggerFactory` during initialisation.
+    * `SubstituteLoggerFactory` during initialisation. The retry window is
+    * deliberately generous (30 s): under a heavily parallel test run the
+    * logback binding can take well over a second, and failing here fails the
+    * capture spuriously.
     */
-  private def loggerContext(maxRetries: Int = 20): LoggerContext = {
+  private def loggerContext(maxRetries: Int = 600): LoggerContext = {
     var attempts = 0
     while (attempts < maxRetries) {
       LoggerFactory.getILoggerFactory match {

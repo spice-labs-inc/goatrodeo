@@ -15,7 +15,6 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
-import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.*
 import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.*
@@ -66,10 +65,11 @@ object CbomEmitter {
   def emitForStorage(
       storage: Storage,
       version: String,
-      outDir: File
+      outDir: File,
+      correlationId: String = ""
   ): Try[Seq[File]] = {
     val roots = findRoots(storage)
-    emit(storage, roots, version, outDir)
+    emit(storage, roots, version, outDir, correlationId)
   }
 
   /** Emit one CBOM file per root Item.
@@ -82,6 +82,9 @@ object CbomEmitter {
     *   CycloneDX version ("1.6" or "1.7")
     * @param outDir
     *   destination directory
+    * @param correlationId
+    *   the run's correlation ID, recorded as a top-level property (empty when
+    *   not part of a run)
     * @return
     *   the emitted files, or a failure
     */
@@ -89,7 +92,8 @@ object CbomEmitter {
       storage: Storage,
       roots: Seq[Item],
       version: String,
-      outDir: File
+      outDir: File,
+      correlationId: String = ""
   ): Try[Seq[File]] = {
     for {
       dir <- safeOutputDir(outDir)
@@ -97,7 +101,7 @@ object CbomEmitter {
         for {
           acc <- accTry
           (items, truncated) = collectCryptoItems(storage, root)
-          doc = buildDocument(root, items, version, truncated)
+          doc = buildDocument(root, items, version, truncated, correlationId)
           filename = cbomFilename(root)
           file <- atomicWrite(dir, filename, doc)
         } yield acc :+ file
@@ -207,7 +211,8 @@ object CbomEmitter {
       root: Item,
       items: Vector[(Item, Vector[Item])],
       version: String,
-      truncated: Boolean
+      truncated: Boolean,
+      correlationId: String
   ): JObject = {
     if (truncated) {
       logger.warn(
@@ -272,7 +277,7 @@ object CbomEmitter {
           )
         )
       else None,
-      Option(TamperEvidentLog.correlationId)
+      Option(correlationId)
         .filter(_.nonEmpty)
         .map(corr =>
           JObject(
