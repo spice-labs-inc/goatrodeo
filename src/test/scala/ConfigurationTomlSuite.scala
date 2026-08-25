@@ -219,6 +219,76 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     assertEquals(ConfigurationToml.displayName("cbomDir"), "emit_cbom_dir")
   }
 
+  test("every setting a config file may name is one the schema accepts") {
+    // The mirror of the test below. That one catches a key claimed by
+    // keyForField that knownKeys does not accept; this one catches a field
+    // added to Configuration that keyForField never mentions -- which is how a
+    // setting ends up with a command-line flag and no config-file or
+    // environment spelling without anyone deciding it should be flag-only.
+    //
+    // The exemptions are written out, with the reason, so that adding a field
+    // means making the choice rather than inheriting it by silence.
+    val exempt: Map[String, String] = Map(
+      "cutoff" ->
+        "an entitlement, not a preference: --cutoff only, and alwaysRejected refuses it by name",
+      "configFile" -> "how the run was started, not a setting anybody wrote",
+      "runtime" -> "the ambient process state, not a setting",
+      "logging" ->
+        "carried for another program to apply; validated against the shared [logging] schema",
+      "progressListener" -> "a callback; reachable only through the builder",
+      "componentArgs" -> "flag-only diagnostic",
+      "printComponentInfo" -> "flag-only diagnostic",
+      "printComponentArgumentInfo" -> "flag-only diagnostic",
+      "nonexistentDirectories" -> "derived while parsing, never supplied"
+    )
+
+    val unaccounted = Configuration().productElementNames.toVector
+      .filterNot(ConfigurationToml.mappedFields.contains)
+      .filterNot(exempt.contains)
+
+    assert(
+      unaccounted.isEmpty,
+      s"${unaccounted.mkString(", ")} can be set on the command line but named " +
+        "by no config-file key. Either give it one in keyForField and knownKeys, " +
+        "or add it to this test's `exempt` map with the reason it is flag-only."
+    )
+
+    // and the exemptions must stay real: a field removed or renamed should not
+    // leave a stale excuse behind.
+    val stale = exempt.keySet.diff(Configuration().productElementNames.toSet)
+    assert(
+      stale.isEmpty,
+      s"exempt names no such field: ${stale.mkString(", ")}"
+    )
+  }
+
+  test("a key refused by name is a key the schema knows about") {
+    // The point of alwaysRejected is to say "you spelled this correctly and it
+    // is deliberately unavailable" rather than "unknown key". That only works
+    // while the key is also in knownKeys -- otherwise the unknown-key check
+    // fires first and reports it as a typo. Today only `cutoff` is involved,
+    // and it was put in both sets by hand.
+    val notKnown = ConfigurationToml.rejectedKeys.filterNot(
+      ConfigurationToml.accepts
+    )
+    assert(
+      notKnown.isEmpty,
+      s"${notKnown.mkString(", ")} would be reported as a typo rather than refused by name"
+    )
+  }
+
+  test("no two fields claim the same config-file key") {
+    // Two fields sharing a key would make sourceOf report one field's origin
+    // for the other, silently, and a file setting the key would write to
+    // whichever handler `read` happens to run.
+    val keys = ConfigurationToml.fieldKeys
+    assertEquals(
+      keys.size,
+      ConfigurationToml.mappedFields.size,
+      "keyForField maps two fields onto one key"
+    )
+  }
+
   test("every field with a config-file key names a key that exists") {
     // The map is written out by hand because the relation is not mechanical;
     // this is what stops it drifting from the schema beside it.
