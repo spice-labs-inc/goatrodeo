@@ -98,7 +98,9 @@ object ConfigurationToml {
     "packageTags" -> "package_tags",
     "packageTagsShortName" -> "package_tags_short_name",
     "cbomDir" -> "emit_cbom_dir",
-    "cbomVersion" -> "cbom_version"
+    "cbomVersion" -> "cbom_version",
+    "logFilenames" -> "log_filenames",
+    "tamperEvidentLog" -> "tamper_evident_log"
   )
 
   /** How a setting should be named in a message, given the field it lives in.
@@ -156,6 +158,8 @@ object ConfigurationToml {
     "package_tags_short_name",
     "emit_cbom_dir",
     "cbom_version",
+    "log_filenames",
+    "tamper_evident_log",
     // Recognised so that it is refused by name rather than reported as a typo, but with no
     // handler below: knowing the key exists is not the same as letting a file set it.
     "cutoff"
@@ -427,6 +431,12 @@ object ConfigurationToml {
         throw Invalid(s"cbom_version must be 1.6 or 1.7, got $v")
       config = config.copy(cbomVersion = v)
     }
+    bool(table, "log_filenames").foreach(v =>
+      config = config.copy(logFilenames = v)
+    )
+    str(table, "tamper_evident_log").foreach(v =>
+      config = config.copy(tamperEvidentLog = Some(file(v)))
+    )
     config
   }
 
