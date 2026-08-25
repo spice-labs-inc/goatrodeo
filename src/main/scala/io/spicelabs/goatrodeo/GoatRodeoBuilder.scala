@@ -359,7 +359,7 @@ class GoatRodeoBuilder {
     *
     * Supported keys: payload, output, threads, maxRecords, ingested, ignore,
     * fileList, excludePattern, blockList, tempDir, tag-json, tag, mimeFilter,
-    * mimeFilterFile, emitJsonDir, emitCbomDir, cbomVersion, printFiles,
+    * mimeFilterFile, emitJsonDir, emitCbomDir, cbomVersion, logFilenames,
     * tamperEvidentLog
     *
     * @param key
@@ -396,8 +396,8 @@ class GoatRodeoBuilder {
       case "cbomVersion" =>
         config = config.copy(cbomVersion = value)
         this
-      case "printFiles" | "print-files" =>
-        withPrintFiles(value.toBoolean)
+      case "logFilenames" | "log-filenames" =>
+        withLogFilenames(value.toBoolean)
       case "tamperEvidentLog" | "tamper-evident-log" =>
         withTamperEvidentLog(value)
       case unknown =>
@@ -504,8 +504,8 @@ class GoatRodeoBuilder {
     * @return
     *   this builder
     */
-  def withPrintFiles(b: Boolean): GoatRodeoBuilder = {
-    config = config.copy(printProcessedFiles = b)
+  def withLogFilenames(b: Boolean): GoatRodeoBuilder = {
+    config = config.copy(logFilenames = b)
     this
   }
 

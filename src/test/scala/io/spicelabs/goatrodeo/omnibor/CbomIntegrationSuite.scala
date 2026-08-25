@@ -186,7 +186,7 @@ class CbomIntegrationSuite extends FunSuite {
         .withOutput(outputDir.getAbsolutePath)
         .withCbomDir(outputDir.getAbsolutePath)
         .withTamperEvidentLog(logFile.getAbsolutePath)
-        .withPrintFiles(true)
+        .withLogFilenames(true)
         .withThreads(1)
         .run()
 

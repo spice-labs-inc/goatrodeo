@@ -91,26 +91,26 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(config.cbomVersion, "1.7")
   }
 
-  // T4.5 — `--print-files` (CLI + README sync) controls the per-file
-  // progress flag. THEORY: a bare-true boolean flag that prints each top-level
-  // file after processing must parse to `printProcessedFiles = true`, default
+  // T4.5 — `--log-filenames` (CLI + README sync) controls the per-file
+  // progress flag. THEORY: a bare-true boolean flag that logs each top-level
+  // file after processing must parse to `logFilenames = true`, default
   // to `false` when omitted, and accept an explicit `false`.
-  test("T4.5 --print-files true sets printProcessedFiles") {
-    val parsed = parse("-b", "/tmp/in", "--print-files", "true")
-    assert(parsed.isDefined, "Valid --print-files flag should parse")
-    assertEquals(parsed.get.printProcessedFiles, true)
+  test("T4.5 --log-filenames true sets logFilenames") {
+    val parsed = parse("-b", "/tmp/in", "--log-filenames", "true")
+    assert(parsed.isDefined, "Valid --log-filenames flag should parse")
+    assertEquals(parsed.get.logFilenames, true)
   }
 
-  test("T4.5 --print-files defaults to false when omitted") {
+  test("T4.5 --log-filenames defaults to false when omitted") {
     val parsed = parse("-b", "/tmp/in")
     assert(parsed.isDefined)
-    assertEquals(parsed.get.printProcessedFiles, false)
+    assertEquals(parsed.get.logFilenames, false)
   }
 
-  test("T4.5 --print-files false is accepted") {
-    val parsed = parse("-b", "/tmp/in", "--print-files", "false")
+  test("T4.5 --log-filenames false is accepted") {
+    val parsed = parse("-b", "/tmp/in", "--log-filenames", "false")
     assert(parsed.isDefined)
-    assertEquals(parsed.get.printProcessedFiles, false)
+    assertEquals(parsed.get.logFilenames, false)
   }
 
   test("T4.6 --tamper-evident-log parses and defaults to None") {
@@ -122,25 +122,25 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(omitted.get.tamperEvidentLog, None)
   }
 
-  test("T4.7 GoatRodeoBuilder exposes print-files and tamper-evident-log") {
+  test("T4.7 GoatRodeoBuilder exposes log-filenames and tamper-evident-log") {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")
-      .withPrintFiles(true)
+      .withLogFilenames(true)
       .withTamperEvidentLog("/tmp/run.log")
     val config = builderConfig(builder)
-    assertEquals(config.printProcessedFiles, true)
+    assertEquals(config.logFilenames, true)
     assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
   }
 
   test(
-    "T4.7 GoatRodeoBuilder withExtraArg supports printFiles/tamperEvidentLog"
+    "T4.7 GoatRodeoBuilder withExtraArg supports logFilenames/tamperEvidentLog"
   ) {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")
-      .withExtraArg("printFiles", "true")
+      .withExtraArg("logFilenames", "true")
       .withExtraArg("tamperEvidentLog", "/tmp/run.log")
     val config = builderConfig(builder)
-    assertEquals(config.printProcessedFiles, true)
+    assertEquals(config.logFilenames, true)
     assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
   }
 }

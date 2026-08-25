@@ -168,7 +168,7 @@ object Howdy {
     val (onFileFinish: (File => Unit), onRunFinish: (Boolean => Unit)) =
       config.ingested match {
         case None =>
-          if (config.printProcessedFiles) {
+          if (config.logFilenames) {
             (
               (f: File) => logger.info(f"Processed ${f.getPath()}"),
               (good: Boolean) => {}
@@ -182,7 +182,7 @@ object Howdy {
           val sync = Object()
           (
             (f: File) => {
-              if (config.printProcessedFiles) {
+              if (config.logFilenames) {
                 logger.info(f"Processed ${f.getPath()}")
               }
               sync.synchronized {

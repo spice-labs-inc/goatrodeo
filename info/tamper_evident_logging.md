@@ -59,17 +59,17 @@ together, this requires coordinated tampering across all of them.
 | Flag | Meaning |
 |------|---------|
 | `--tamper-evident-log <file>` | Install the hash-chaining log appender writing to `<file>`. The chain head is then available to embed into `.grc` files and the checksum. |
-| `--print-files` | **Change:** log each processed top-level file as a log line (instead of stdout), so it participates in the chain. |
+| `--log-filenames` | **Change:** log each processed top-level file as a log line (instead of stdout), so it participates in the chain. |
 
-`--print-files` currently prints each finished top-level file via `println`
+`--log-filenames` currently prints each finished top-level file via `println`
 (Main.scala `onFileFinish`); this is changed to `logger.info(...)`. When
 `--tamper-evident-log` is active, each processed file therefore becomes a chained
 log line, giving a tamper-evident record of the run's inputs.
 
 Tamper-evident logging is wired through `Howdy.run` (the CLI). The programmatic
 `GoatRodeoBuilder` API routes through the same path, so it supports the feature
-via `withPrintFiles(true)` / `withTamperEvidentLog(path)` (or the
-`printFiles` / `tamperEvidentLog` extra-arg keys).
+via `withLogFilenames(true)` / `withTamperEvidentLog(path)` (or the
+`logFilenames` / `tamperEvidentLog` extra-arg keys).
 
 ## Hash-chained log
 
@@ -240,7 +240,7 @@ that produced the logs/ADGs.
    and the last-16 gitoid; deterministic across runs.
 6. **Checksum file** — one file in the base dir, correct JSON shape, lists all
    `.grc`s across batches, `final_chain_head` matches the log end.
-7. **`--print-files`** — routes through the logger (chained), not stdout; input
+7. **`--log-filenames`** — routes through the logger (chained), not stdout; input
    list present in the log.
 8. **End-to-end (integration)** — a multi-batch run (`--maxrecords` small)
    produces a valid chain + checksum; the Python verifier passes on the outputs

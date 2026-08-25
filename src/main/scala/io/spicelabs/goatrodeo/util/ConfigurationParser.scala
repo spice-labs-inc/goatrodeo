@@ -210,11 +210,11 @@ object ConfigurationParser {
         .action((x, c) =>
           c.copy(ingested = ExpandFiles(x, c.runtime.homeDir).headOption)
         ),
-      opt[Boolean]("print-files")
+      opt[Boolean]("log-filenames")
         .text(
           "Log the path of each top-level file after it is processed, one log line per file"
         )
-        .action((x, c) => c.copy(printProcessedFiles = x)),
+        .action((x, c) => c.copy(logFilenames = x)),
       opt[File]("tamper-evident-log")
         .text(
           "Write a hash-chained, tamper-evident log of this run to the given file"
