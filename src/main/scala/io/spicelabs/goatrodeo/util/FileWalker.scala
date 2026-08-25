@@ -370,16 +370,24 @@ object FileWalker {
         val path = f.toPath()
         if (isSaffronSupported(in.mimeType, path)) {
           val mimes = in.mimeType
-          val diskSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
+          // The disk's format travels with its filesystems so the label can
+          // name it. `Saffron EXT4` says which reader produced these artifacts
+          // and a bare `Saffron` does not, and the name is only reachable from
+          // the `disk` handle, which does not outlive this block.
+          val (diskSystems, diskFormat)
+              : (Vector[io.spicelabs.saffron.fs.FileSystem], Option[String]) =
             if (
               mimes.intersect(saffronMimeTypes).nonEmpty ||
               Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
             ) {
               Try {
                 val disk = DiskReader.open(path)
-                FileSystemMount.mountAll(disk).asScala.toVector
-              }.getOrElse(Vector())
-            } else Vector()
+                (
+                  FileSystemMount.mountAll(disk).asScala.toVector,
+                  Option(disk.format()).map(_.name())
+                )
+              }.getOrElse((Vector(), None))
+            } else (Vector(), None)
           val containerSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
             if (mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty) {
               Try {
@@ -416,7 +424,10 @@ object FileWalker {
                   }
                 })
                 .toVector
-              Some(artifacts -> "Saffron")
+              // Container-only mounts keep the bare name: their format is
+              // already in the MIME type, and there is no equivalent handle to
+              // ask.
+              Some(artifacts -> diskFormat.fold("Saffron")(f => s"Saffron $f"))
             }.getOrElse(None)
           }
         } else {
