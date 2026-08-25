@@ -270,13 +270,16 @@ object GraphManager {
     val writer = fileWriter.getChannel()
 
     Helpers.writeInt(writer, Consts.ClusterFileMagicNumber)
-    val grdHex = fileSet.map(_.dataFileSha256).toVector
-    val griHex = fileSet.map(_.indexFileSha256).toVector
-    def jsonArr(xs: Vector[String]): String =
-      xs.map(h => "\"" + h + "\"").mkString("[", ",", "]")
-    val sha256Json = s"""{"grd": ${jsonArr(grdHex)}, "gri": ${jsonArr(
-        griHex
-      )}}"""
+    // The envelope's `info` is a string-to-string map, so this necessarily
+    // travels as JSON text rather than as a nested object. Rendered with json4s
+    // -- which this file already uses below -- rather than concatenated, so that
+    // quoting and escaping are the library's problem and not this function's.
+    val sha256Json = org.json4s.native.JsonMethods.compact(
+      org.json4s.native.JsonMethods.render(
+        ("grd" -> fileSet.map(_.dataFileSha256).toVector) ~
+          ("gri" -> fileSet.map(_.indexFileSha256).toVector)
+      )
+    )
     val info = scala.collection.immutable.TreeMap[String, String](
       "correlation_id" -> TamperEvidentLog.correlationId,
       "sha256" -> sha256Json
