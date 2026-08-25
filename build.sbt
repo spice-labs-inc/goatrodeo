@@ -222,6 +222,19 @@ lazy val root = project
     scalaVersion := scala3Version,
     semanticdbEnabled := true, // enable SemanticDB,
     semanticdbVersion := scalafixSemanticdb.revision,
+    // TWO BUILDS: this project is built by both this file and the root pom.xml,
+    // from the same sources. A dependency, version, compiler flag or plugin
+    // changed in one must be changed in the other. This lasts until the
+    // duplication is resolved and one build is retired; which one that will be
+    // is not decided, so neither file is the authority over the other.
+    //
+    // Nothing enforces it. build_test.yml runs only `sbt test`, and
+    // publish.yml's Maven step targets maven/pom.xml -- the publish-only shim
+    // whose dependencies are injected from the sbt-produced pom at release --
+    // so the root pom is built by no CI job at all. Drift is found by whoever
+    // next runs Maven, which is how the -release 17/21 mismatch in #301 got in.
+    // Run `mvn -DskipTests package` alongside `sbt compile` before pushing a
+    // build change.
     libraryDependencies += "io.spicelabs" % "spice-bom" % "1.0.6" % Import intransitive (),
     libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
     libraryDependencies += "org.ow2.asm" % "asm" % "9.8",
@@ -242,9 +255,11 @@ lazy val root = project
     libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
-    // Config files. Kept in step with pom.xml, which declares the same two: the sbt and
-    // Maven builds compile the same sources, so a dependency added to one and not the
-    // other fails whichever build CI happens to run.
+    // Config files. Kept in step with pom.xml like everything else here -- see
+    // the TWO BUILDS note above. (This previously said that a dependency added
+    // to one build and not the other "fails whichever build CI happens to run".
+    // It does not: CI runs only sbt, which is exactly why the drift is not
+    // self-correcting.)
     libraryDependencies += "org.tomlj" % "tomlj" % "1.1.1",
     // The naming, layering and precedence rules every Spice component shares.
     libraryDependencies += "io.spicelabs" % "spice-config" % "1.0.0",
