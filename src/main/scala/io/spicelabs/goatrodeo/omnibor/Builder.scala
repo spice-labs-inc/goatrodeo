@@ -271,9 +271,12 @@ object Builder {
       case ""     => ()
       case corrId => TamperEvidentLog.writeChecksum(dest, corrId)
     }
-    // Clear run-scoped tamper-evidence state so the correlation ID does not leak
-    // into subsequent work in the same JVM.
-    TamperEvidentLog.reset()
+    // No reset here: whoever called TamperEvidentLog.start owns the teardown,
+    // and that is Howdy.run, which does it in a finally so a throw cannot skip
+    // it. Resetting from here as well detached the chain appender before
+    // Howdy.run had finished with it, leaving anything logged after buildDB
+    // returns outside the chain -- silently, since an unchained line looks no
+    // different.
   }
 
   private def processMaxRecords(

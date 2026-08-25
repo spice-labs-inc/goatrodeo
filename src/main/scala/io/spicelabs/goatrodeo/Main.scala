@@ -130,8 +130,11 @@ object Howdy {
       try {
         runImpl
       } finally {
-        // Guaranteed release of run-scoped logging resources (e.g. detaching the
-        // chain appender from the root logger) even if the run throws.
+        // The only teardown, paired with the start above: guaranteed release of
+        // run-scoped logging resources (e.g. detaching the chain appender from
+        // the root logger) even if the run throws. Nothing further down the call
+        // stack resets -- a component that did not start the log does not get to
+        // decide when it ends.
         TamperEvidentLog.reset()
       }
     }
