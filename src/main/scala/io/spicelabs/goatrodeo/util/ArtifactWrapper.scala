@@ -25,6 +25,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import scala.util.Using
+import scala.util.control.NonFatal
 
 /** In OmniBOR, everything is seen as a byte stream.
   *
@@ -214,7 +215,13 @@ object ArtifactWrapper {
         .getOrElse(MediaType.OCTET_STREAM)
       massageMimeType(fileName, rawData, detected)
     } catch {
-      case e: Exception =>
+      // NonFatal rather than Exception: this runs on the builder's worker
+      // threads, which are interrupted on shutdown, and catching Exception
+      // swallows the InterruptedException that carries the cancellation --
+      // leaving the thread to carry on as though the run were still live.
+      // NonFatal also still lets OutOfMemoryError and StackOverflowError
+      // through, which is what the earlier catch of Throwable did not.
+      case NonFatal(e) =>
         // logger.error(
         //   f"Tika failed, ${e.getMessage()}. Returning application/octet-stream",
         //   e
