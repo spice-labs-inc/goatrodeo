@@ -130,6 +130,14 @@ inline def config(using configuration: Configuration): Configuration =
   *   (CBOM) files, one per top-level input
   * @param cbomVersion
   *   CycloneDX CBOM specification version to emit ("1.6" or "1.7")
+  * @param logFilenames
+  *   log the path of each top-level file once it has been processed, one line
+  *   per file. Named for what it does: the line goes through the logger, so it
+  *   is subject to the log level and is captured by a `tamperEvidentLog`
+  * @param tamperEvidentLog
+  *   optional file to write a hash-chained, tamper-evident log of this run to.
+  *   The chain head is embedded in the run's `.grc` files and its final
+  *   checksum; see `info/tamper_evident_logging.md`
   * @param configFile
   *   the TOML file this configuration was read from, when `--config` named one
   * @param runtime
