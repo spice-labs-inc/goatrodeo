@@ -358,6 +358,113 @@ Test / testOptions += Tests.Setup(() => {
       println(err)
       throw new MessageOnlyException(err)
   }
+
+  // ===== pinned OCI parity fixtures =====
+  // Fetched from public registries (the source of truth for the pinned
+  // digests) only when the cache entry is missing. Nothing for these fixtures
+  // is hosted on public-test-data: a digest-pinned artifact is immutable, so
+  // the registry is the canonical location.
+  //
+  // Two artifacts per image, both pinned to the same digest:
+  //   1. the docker-save tar   (docker pull @digest + tag + docker save)
+  //   2. the OCI image layout  (ORAS, in a locked-down docker container)
+  //
+  // The sentinel records the expected config-blob digest; a mismatched cache
+  // is refetched. Everything is skipped when docker is unavailable or
+  // GOATRODEO_SKIP_OCI_FETCH=1 — the parity tests gate on fixture presence.
+  val ociPins: Seq[(String, String, String, String)] = Vector(
+    // (image, tag, index digest, config-blob digest)
+    (
+      "alpine",
+      "3.20.6",
+      "sha256:de4fe7064d8f98419ea6b49190df1abbf43450c1702eeb864fe9ced453c1cc5f",
+      "sha256:ff221270b9fb7387b0ad9ff8f69fbbd841af263842e62217392f18c3b5226f38"
+    ),
+    (
+      "postgres",
+      "16.4",
+      "sha256:e62fbf9d3e2b49816a32c400ed2dba83e3b361e6833e624024309c35d334b412",
+      "sha256:6b14e73a48cf2518aeb37e8b758a907473bcc72727297a7353a665afa069ef10"
+    )
+  )
+
+  // The ORAS container image is pinned by digest too: the build runs it with
+  // the repo's cache directory mounted, so what it executes matters.
+  val orasImage =
+    "ghcr.io/oras-project/oras:v1.3.0@sha256:6ce045ce069a89934d6666b8b49f9c4c0145201bd6de6dbe2aee267814c55468"
+
+  if (!sys.env.get("GOATRODEO_SKIP_OCI_FETCH").contains("1")) {
+    try {
+      if (("docker info" ! log) == 0) {
+        ociPins.foreach { case (image, tag, indexDigest, configDigest) =>
+          val short = indexDigest.substring(7, 19)
+          val ociDir = file(s"./test_data/download/oci_images/${image}")
+          val sentinel = file(s"${ociDir}/.config-digest")
+          val dockerTar = file(
+            s"./test_data/download/docker_tests/${image}_${short}_docker.tar"
+          )
+          val ref = s"${image}@${indexDigest}"
+          if (!dockerTar.exists()) {
+            log.info(f"Fetching pinned docker fixture ${ref}")
+            var pulled = false
+            var attempts = 0
+            while (!pulled && attempts < 3) {
+              pulled = (s"docker pull ${ref}" ! log) == 0
+              attempts += 1
+            }
+            if (
+              pulled &&
+              (s"docker tag ${ref} ${image}:${tag}" ! log) == 0 &&
+              (s"docker save ${image}:${tag} -o ${dockerTar.getPath()}" ! log) == 0
+            ) {
+              log.info(f"Cached ${dockerTar.getName()}")
+            }
+          }
+          if (!sentinel.exists()) {
+            ociDir.mkdirs()
+            val uid = ("id -u".!!).trim
+            val gid = ("id -g".!!).trim
+            log.info(f"Fetching pinned OCI layout for ${image}")
+            val cmd = List(
+              "docker",
+              "run",
+              "--rm",
+              "-u",
+              s"${uid}:${gid}",
+              "--cap-drop",
+              "ALL",
+              "--security-opt",
+              "no-new-privileges",
+              "--tmpfs",
+              "/tmp",
+              "-v",
+              s"${ociDir.getParentFile().getAbsolutePath()}:/data",
+              "-w",
+              "/data",
+              orasImage,
+              "copy",
+              "--recursive",
+              "--platform",
+              "linux/amd64",
+              "--to-oci-layout",
+              s"docker.io/library/${image}@${indexDigest}",
+              s"/data/${image}"
+            )
+            if (cmd.!(log) == 0) {
+              IO.write(sentinel, s"${configDigest}\n")
+            }
+          }
+        }
+      } else {
+        log.warn(
+          "docker not available; skipping OCI parity fixture fetch (the parity tests will skip)"
+        )
+      }
+    } catch {
+      case e: Exception =>
+        log.warn(f"OCI parity fixture fetch skipped: ${e.getMessage()}")
+    }
+  }
   log.info("Test data caching complete.")
 })
 

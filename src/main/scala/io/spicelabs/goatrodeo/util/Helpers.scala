@@ -276,27 +276,8 @@ object Helpers {
   private class GoatVisitor extends FileVisitor[Path] {
     // Steve says: why the switch to Files.walkFileTree?
     // Turns out that this runs between 10 and 30% faster than Files.find.
-    // I also tested using the parallel version of Files.find and some code to
-    // simplify the original code - each improved performance a little bit, but this
-    // code goes WAY faster.
-    //
-    // This is a good thing.
-    // Caveat - the visitor is not thread-safe, but it looks that that doesn't matter as
-    // walkFileTree isn't multi-threaded. If this turns out to be an issue in the future,
-    // do the vector append in synchronized context. The goal of this code is to run a walk
-    // as expediently as possible and if don't need to lock and unlock on each file that's a
-    // win. The java source that I looked at here https://github.com/JetBrains/jdk8u_jdk/blob/master/src/share/classes/java/nio/file/FileTreeWalker.java
-    // is decidedly single-threaded, so I'm not concerned.
-    //
-    // Note for future Steve (or others) - it would make sense to start with the above code and refactor
-    // it to either be an async sequence or process that runs on a thread and fires an event on each file
-    // found and a listener would receive the event and drop the resulting file into a queue that another
-    // thread is actively processing. There are several benefits to doing this, not the least of which is
-    // that since we wouldn't be accumulating the entire set of files that we're walking before processing
-    // them we significantly ease the memory pressure and if the files being walked and the output information
-    // live on different volumes then the parallelism makes a great deal of logical sense as we can saturate
-    // (at least) two different IO channels at the same time.
-
+    // The visitor is not thread-safe, but that doesn't matter as walkFileTree
+    // is single-threaded.
     var result = Vector[File]()
     private val count: AtomicLong = AtomicLong()
 
@@ -330,17 +311,17 @@ object Helpers {
     }
   }
 
-  /** Given a file root and a filter function, return a channel that contains
-    * the files found in the folder and subfolders that match the filter.
+  /** Given a file root, find the eligible files under it (and subfolders).
+    *
+    * Single-threaded `walkFileTree` with a visitor: regular files only,
+    * dot-names skipped, dot-directories descended, symlinks neither followed
+    * nor emitted, errors inside the tree skipped.
     *
     * @param root
-    *   the root directory to search
-    * @param ok
-    *   the filter function
+    *   the root directory (or file) to enumerate
     * @return
-    *   the found files
+    *   the found files, in the filesystem's readdir order
     */
-
   def findFiles(
       root: File
   ): Vector[File] = {

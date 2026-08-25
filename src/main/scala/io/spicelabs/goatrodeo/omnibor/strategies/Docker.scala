@@ -408,10 +408,14 @@ object DockerMetadataExtractor {
         adHoc("ConfigMediaType"),
         stringAt(oci, "config", "mediaType")
       )
-      metadata = metadata +? maybePair(
-        adHoc("SchemaVersion"),
-        stringAt(oci, "schemaVersion")
-      )
+      // the wild manifest carries schemaVersion as an integer
+      val schemaVersion = oci \ "schemaVersion" match {
+        case JString(s) if s.nonEmpty => Some(s)
+        case JInt(n)                  => Some(n.toString)
+        case JLong(n)                 => Some(n.toString)
+        case _                        => None
+      }
+      metadata = metadata +? maybePair(adHoc("SchemaVersion"), schemaVersion)
     }
 
     // Env variables: capture all present in the image config
@@ -483,10 +487,7 @@ case class DockerState(
   private def computePurls(info: ManifestInfo): Vector[String] = {
     val purls = for {
       // get "RepoTags" which should be an Array of tags
-      case JArray(tags) <- info.manifestConfig \ "RepoTags"
-
-      // for each of the found tags
-      case JString(tag) <- tags
+      tag <- info.effectiveRepoTags
     } yield {
       val (base, version) = tag.lastIndexOf(":") match {
         case x if x > 0 => (tag.substring(0, x), Some(tag.substring(x + 1)))
@@ -644,10 +645,7 @@ case class DockerState(
     marker match {
       case DockerMarkers.Config(info) =>
         // Extract name and version from RepoTags
-        val repoTags = for {
-          case JArray(tags) <- info.manifestConfig \ "RepoTags"
-          case JString(tag) <- tags
-        } yield tag
+        val repoTags = info.effectiveRepoTags
 
         repoTags.headOption.flatMap { tag =>
           // For Docker, the tag includes both repository and version (e.g., "bigtent:2025_03_22")
@@ -872,19 +870,357 @@ object DockerToProcess {
           "Docker"
         )
 
-      // didn't find anything, just return
-      case _ => (Vector.empty, byUUID, byName, "Docker")
+      // didn't find anything: try a pure OCI image layout (index.json).
+      // Deterministic precedence: the docker-save claim above wins when both
+      // formats are present in one corpus.
+      case _ => ociLayoutClaim(byUUID, byName)
     }
 
+  }
+
+  // ==================== OCI image layout ====================
+  //
+  // A pure OCI image layout (what `oras copy --to-oci-layout` produces) has
+  // `oci-layout`, `index.json`, and `blobs/sha256/<hex>` but no
+  // `manifest.json`. The index may be a manifest list
+  // (application/vnd.oci.image.index.v1+json, possibly nesting) or the image
+  // manifest itself (ORAS writes a bare manifest when the source is
+  // single-platform). This branch claims exactly those layouts.
+
+  /** Maximum bytes of an OCI metadata JSON blob (index, manifest, config) that
+    * will be read into memory. Untrusted blob sizes are bounded; larger blobs
+    * are skipped.
+    */
+  val MaxOciJsonBytes: Int = 16 * 1024 * 1024
+
+  /** Maximum depth of nested index references inside an OCI index. */
+  val MaxOciIndexDepth: Int = 8
+
+  /** Maximum number of manifest descriptors considered per index. */
+  val MaxOciManifestEntries: Int = 128
+
+  /** Maximum number of layers per image. */
+  val MaxOciLayers: Int = 512
+
+  private val ociIndexMediaType = "application/vnd.oci.image.index.v1+json"
+
+  private val ociImageManifestMediaTypes = Set(
+    "application/vnd.oci.image.manifest.v1+json",
+    "application/vnd.docker.distribution.manifest.v2+json"
+  )
+
+  /** The OCI annotation that, when present in the wild, carries the reference
+    * an image was pulled by. Most registries do not set it.
+    */
+  private val refNameAnnotation = "org.opencontainers.image.ref.name"
+
+  private val blobDigestPattern =
+    java.util.regex.Pattern.compile("sha256:[0-9a-f]{64}")
+
+  /** A descriptor digest is accepted only in its canonical form, so a hostile
+    * index.json cannot smuggle path components (separators, `..`, absolute
+    * paths, non-hex characters) into a blob lookup. The blob path is then
+    * constructed from the hex alone, never from the raw digest text.
+    */
+  private def validBlobDigest(digest: String): Boolean =
+    digest != null && blobDigestPattern.matcher(digest).matches()
+
+  private def blobPath(digest: String): String =
+    s"blobs/sha256/${digest.substring(7)}"
+
+  /** Read an OCI metadata blob as JSON, bounded: more than `maxBytes` bytes is
+    * refused (the blob is skipped, never partially trusted).
+    */
+  private def readJsonCapped(
+      artifact: ArtifactWrapper,
+      maxBytes: Int
+  ): Option[JValue] = {
+    Try {
+      artifact.withStream { stream =>
+        val buf = new Array[Byte](maxBytes + 1)
+        var total = 0
+        var keep = true
+        while (keep && total <= maxBytes) {
+          val n = stream.read(buf, total, maxBytes + 1 - total)
+          if (n < 0) keep = false
+          else total += n
+        }
+        if (total > maxBytes) None
+        else {
+          parseOpt(
+            new String(buf, 0, total, java.nio.charset.StandardCharsets.UTF_8)
+          )
+        }
+      }
+    }.toOption.flatten
+  }
+
+  private case class OciManifestEntry(
+      digest: String,
+      annotations: Map[String, String],
+      platform: Option[(String, String, String)]
+  )
+
+  private def descriptorAnnotations(e: JValue): Map[String, String] =
+    e \ "annotations" match {
+      case JObject(fields) =>
+        fields.collect { case (k, JString(v)) => k -> v }.toMap
+      case _ => Map.empty
+    }
+
+  private def descriptorPlatform(e: JValue): Option[(String, String, String)] =
+    e \ "platform" match {
+      case JObject(fields) =>
+        val os =
+          fields.collectFirst { case ("os", JString(s)) => s }.getOrElse("")
+        val arch = fields
+          .collectFirst { case ("architecture", JString(s)) => s }
+          .getOrElse("")
+        val variant = fields
+          .collectFirst { case ("variant", JString(s)) => s }
+          .getOrElse("")
+        if (os.isEmpty && arch.isEmpty && variant.isEmpty) None
+        else Some((os, arch, variant))
+      case _ => None
+    }
+
+  /** The `org.opencontainers.image.ref.name` value is untrusted corpus input:
+    * length-capped and control-character-free only. Anything else is dropped
+    * (no tags), never an error.
+    */
+  private def safeRefName(raw: String): Option[String] =
+    if (
+      raw.isEmpty || raw.length > 256 || raw.exists(c => c < 0x20 || c == 0x7f)
+    )
+      None
+    else Some(raw)
+
+  /** Deterministic platform selection: prefer linux/amd64; otherwise the
+    * lexicographically first (os, arch, variant). Attestation entries (no
+    * platform) are considered only when nothing carries a platform.
+    */
+  private def selectPlatformEntries(
+      entries: Vector[OciManifestEntry]
+  ): Vector[OciManifestEntry] = {
+    val withPlatform = entries.filter(_.platform.isDefined)
+    val candidates = if (withPlatform.nonEmpty) withPlatform else entries
+    val linuxAmd64 = candidates.filter(
+      _.platform.exists { case (os, arch, _) =>
+        os == "linux" && arch == "amd64"
+      }
+    )
+    if (linuxAmd64.nonEmpty) linuxAmd64.take(1)
+    else {
+      val sorted = candidates.sortBy(
+        _.platform.getOrElse(("\uffff", "\uffff", "\uffff"))
+      )
+      sorted.take(1)
+    }
+  }
+
+  /** Flatten an index's manifest descriptors (descending nested indexes,
+    * bounded depth, digest-validated) into image-manifest entries.
+    */
+  private def expandIndexEntries(
+      indexJson: JValue,
+      byName: ToProcess.ByName,
+      depth: Int
+  ): Vector[OciManifestEntry] = {
+    if (depth > MaxOciIndexDepth) Vector.empty
+    else {
+      indexJson \ "manifests" match {
+        case JArray(arr) if arr.nonEmpty =>
+          arr.take(MaxOciManifestEntries).toVector.flatMap { e =>
+            val mediaType =
+              e \ "mediaType" match {
+                case JString(s) => s
+                case _          => ""
+              }
+            val digest =
+              e \ "digest" match {
+                case JString(s) => s
+                case _          => ""
+              }
+            if (!validBlobDigest(digest)) Vector.empty
+            else if (mediaType == ociIndexMediaType) {
+              // nested index: resolve its blob (validated path) and recurse
+              byName
+                .get(blobPath(digest))
+                .flatMap(_.headOption)
+                .flatMap(art => readJsonCapped(art, MaxOciJsonBytes))
+                .toVector
+                .flatMap(nested =>
+                  expandIndexEntries(nested, byName, depth + 1)
+                )
+            } else if (ociImageManifestMediaTypes.contains(mediaType)) {
+              Vector(
+                OciManifestEntry(
+                  digest,
+                  descriptorAnnotations(e),
+                  descriptorPlatform(e)
+                )
+              )
+            } else Vector.empty
+          }
+        case _ => Vector.empty
+      }
+    }
+  }
+
+  /** Resolve the image manifests carried by an OCI index, honouring nested
+    * indexes (bounded depth), digest validation, and the blob-size cap. Returns
+    * (manifest JSON, wild `ref.name` annotation if present).
+    */
+  private def collectImageManifests(
+      indexJson: JValue,
+      byName: ToProcess.ByName,
+      depth: Int
+  ): Vector[(JValue, Option[String])] = {
+    if (depth > MaxOciIndexDepth) Vector.empty
+    else {
+      indexJson \ "manifests" match {
+        case JArray(arr) if arr.nonEmpty =>
+          val entries = expandIndexEntries(indexJson, byName, depth)
+          selectPlatformEntries(entries).flatMap { entry =>
+            byName
+              .get(blobPath(entry.digest))
+              .flatMap(_.headOption)
+              .flatMap(art => readJsonCapped(art, MaxOciJsonBytes)) match {
+              case Some(json) =>
+                Vector(
+                  json -> safeRefName(
+                    entry.annotations.getOrElse(refNameAnnotation, "")
+                  )
+                )
+              case None => Vector.empty
+            }
+          }
+        case _ =>
+          // index.json is itself a single image manifest (no manifest list)
+          val mediaType =
+            indexJson \ "mediaType" match {
+              case JString(s) => s
+              case _          => ""
+            }
+          val configDigest =
+            indexJson \ "config" \ "digest" match {
+              case JString(s) => s
+              case _          => ""
+            }
+          if (
+            ociImageManifestMediaTypes.contains(mediaType) &&
+            validBlobDigest(configDigest)
+          ) {
+            val refName = indexJson \ "annotations" match {
+              case JObject(fields) =>
+                fields.collectFirst {
+                  case (k, JString(v)) if k == refNameAnnotation => v
+                }
+              case _ => None
+            }
+            Vector(indexJson -> refName.flatMap(safeRefName))
+          } else Vector.empty
+      }
+    }
+  }
+
+  /** Claim a pure OCI image layout: `oci-layout` + `index.json` +
+    * `blobs/sha256/...`. Only runs when the docker-save claim found nothing.
+    */
+  private def ociLayoutClaim(
+      byUUID: ToProcess.ByUUID,
+      byName: ToProcess.ByName
+  ): (Vector[ToProcess], ToProcess.ByUUID, ToProcess.ByName, String) = {
+    val hasLayout = byName.contains("oci-layout")
+    val indexArt = byName.get("index.json") match {
+      case Some(Vector(art))
+          if art.mimeType.exists(_.startsWith(jsonMimeType)) =>
+        Some(art)
+      case _ => None
+    }
+
+    val maybeIndex = if (hasLayout) indexArt else None
+    maybeIndex match {
+      case None =>
+        (Vector.empty, byUUID, byName, "Docker")
+      case Some(index) =>
+        val infos = for {
+          indexJson <- readJsonCapped(index, MaxOciJsonBytes).toList
+          (manifestJson, refName) <- collectImageManifests(indexJson, byName, 0)
+          configDigest <- (manifestJson \ "config" \ "digest") match {
+            case JString(s) if validBlobDigest(s) => List(s)
+            case _                                => Nil
+          }
+          configPath = blobPath(configDigest)
+          configArt <- byName.get(configPath).flatMap(_.headOption).toList
+          configJson <- readJsonCapped(configArt, MaxOciJsonBytes).toList
+        } yield {
+          val layerPaths = (manifestJson \ "layers") match {
+            case JArray(arr) =>
+              arr.take(MaxOciLayers).toList.flatMap { l =>
+                l \ "digest" match {
+                  case JString(d)
+                      if validBlobDigest(d) &&
+                        byName.get(blobPath(d)).exists(_.length == 1) =>
+                    List(blobPath(d))
+                  case _ => Nil
+                }
+              }
+            case _ => Nil
+          }
+          val tags = refName.toVector
+          // Synthesized entry mirroring the docker-save manifest entry shape;
+          // RepoTags come from the wild ref.name annotation only.
+          val syntheticManifestConfig = JObject(
+            List(("RepoTags", JArray(tags.map(t => JString(t): JValue).toList)))
+          )
+          ManifestInfo(
+            manifest = index,
+            manifestConfig = syntheticManifestConfig,
+            configPath = configPath,
+            configFile = configArt,
+            configJson = configJson,
+            layers = layerPaths,
+            ociManifest = Some(manifestJson),
+            repoTags = Some(tags)
+          )
+        }
+
+        if (infos.isEmpty) {
+          (Vector.empty, byUUID, byName, "Docker")
+        } else {
+          val layerMap = Map(
+            (for {
+              info <- infos
+              layer <- info.layers
+              art <- byName.get(layer).flatMap(_.headOption)
+            } yield layer -> art)*
+          )
+          val claimedNames =
+            Set("index.json", "oci-layout") ++
+              infos.flatMap(i => i.configPath :: i.layers)
+          val claimedUuids =
+            Set(index.uuid) ++ infos.map(_.configFile.uuid) ++
+              layerMap.values.map(_.uuid)
+          (
+            Vector(DockerToProcess(index, infos, layerMap)),
+            byUUID -- claimedUuids,
+            byName -- claimedNames,
+            "Docker"
+          )
+        }
+    }
   }
 }
 
 /** Parsed information about a Docker image manifest entry.
   *
   * @param manifest
-  *   the manifest.json artifact
+  *   the manifest.json artifact (docker-save) or index.json artifact (OCI
+  *   layout)
   * @param manifestConfig
-  *   the JSON for this manifest entry
+  *   the JSON for this manifest entry (docker-save) or a synthesized JObject
+  *   carrying the RepoTags derived from OCI annotations
   * @param configPath
   *   the full path of the config file within the image tar (e.g.,
   *   "blobs/sha256/abc123...")
@@ -894,6 +1230,14 @@ object DockerToProcess {
   *   the parsed config JSON
   * @param layers
   *   list of layer full paths within the image tar
+  * @param ociManifest
+  *   the parsed OCI image manifest JSON, when the layout is OCI
+  * @param repoTags
+  *   explicit repository tags: `None` derives them from `manifestConfig`
+  *   (docker-save path, unchanged); `Some(tags)` carries the OCI-derived tags
+  *   (possibly empty — OCI layouts in the wild rarely carry a
+  *   `org.opencontainers.image.ref.name` annotation, so an OCI image usually
+  *   emits no pURLs; that is the wild behaviour, not a failure)
   */
 case class ManifestInfo(
     manifest: ArtifactWrapper,
@@ -902,5 +1246,22 @@ case class ManifestInfo(
     configFile: ArtifactWrapper,
     configJson: JValue,
     layers: List[String],
-    ociManifest: Option[JValue] = None
-)
+    ociManifest: Option[JValue] = None,
+    repoTags: Option[Vector[String]] = None
+) {
+
+  /** The repository tags this image is known by: the explicit OCI-derived tags
+    * when present, else the `RepoTags` array of the docker-save manifest entry
+    * (the historical behaviour).
+    */
+  def effectiveRepoTags: Vector[String] =
+    repoTags match {
+      case Some(tags) => tags
+      case None =>
+        manifestConfig \ "RepoTags" match {
+          case JArray(arr) =>
+            arr.collect { case JString(s) if s.nonEmpty => s }.toVector
+          case _ => Vector.empty
+        }
+    }
+}

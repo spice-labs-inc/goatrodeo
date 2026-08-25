@@ -138,6 +138,12 @@ How the precompute pass scales its workers to the storage device:
 - Never-raise failure accounting (`total == completed + failed`)
 - Tuning, known properties, and the claims → tests table
 
+### [OCI Image Parity](docker_oci_parity.md)
+How the Docker strategy ingests both image transports:
+- docker-save tars and pure OCI image layouts, one strategy
+- Digest-pinned public fixtures fetched with ORAS at test setup
+- Parity = maximum per-format extraction; claims → tests table
+
 ---
 
 ## Security Use Cases
@@ -247,6 +253,7 @@ How Goat Rodeo manages system resources:
 | [metadata_tags.md](metadata_tags.md) | Standard metadata field definitions |
 | [mime_types.md](mime_types.md) | MIME type detection and handling |
 | [mime_precompute_adaptive.md](mime_precompute_adaptive.md) | Adaptive MIME precompute pass |
+| [docker_oci_parity.md](docker_oci_parity.md) | OCI image parity in the Docker strategy |
 | [resource_handling.md](resource_handling.md) | Temp files, streams, and resource cleanup |
 | [tamper_evident_logging.md](tamper_evident_logging.md) | Tamper-evident run logs and ADG auditability |
 

@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerMarkers
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerState
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
@@ -568,5 +569,396 @@ class DockerSuite extends munit.FunSuite {
       case DockerMarkers.Layer(hash) => assertEquals(hash, "sha256:abc123")
       case _                         => fail("Expected Layer marker")
     }
+  }
+
+  // ==================== OCI image layout ====================
+  //
+  // WHAT: pure OCI layouts (`oci-layout` + `index.json` + `blobs/sha256/…`,
+  // as produced by `oras copy --to-oci-layout`) must be claimed by the SAME
+  // Docker strategy, with wild-world fidelity: no RepoTags unless the
+  // `org.opencontainers.image.ref.name` annotation happens to be present, and
+  // hostile descriptors never resolved.
+  //
+  // WHY: docker-save tars and OCI layouts are two transports of the same
+  // image model; the strategy extracts what each format carries. These unit
+  // tests pin the claim rules on synthetic fixtures; the wild fixtures are
+  // pinned by OciDockerParitySuite.
+  //
+  // LLM note: O-xx = test id.
+
+  private def hex(c: Char, n: Int): String = c.toString * n
+
+  private def ociArtifacts(
+      pairs: (String, String)*
+  ): (Map[String, ArtifactWrapper], Map[String, Vector[ArtifactWrapper]]) = {
+    val wrappers = pairs.map { case (name, content) =>
+      ByteWrapper(content.getBytes("UTF-8"), name, None)
+    }.toVector
+    val byUuid = wrappers.map(w => w.uuid -> w).toMap
+    val byName = wrappers.groupBy(_.path())
+    (byUuid, byName)
+  }
+
+  private def ociClaim(
+      byUuid: Map[String, ArtifactWrapper],
+      byName: Map[String, Vector[ArtifactWrapper]]
+  ) = DockerToProcess.computeDockerFiles(byUuid, byName)
+
+  private def ociManifestJson(configDigest: String, layerDigest: String) =
+    s"""{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"${configDigest}","size":2},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"${layerDigest}","size":2}]}"""
+
+  private def ociConfigJson(diffId: String) =
+    s"""{"architecture":"amd64","os":"linux","config":{"Env":["PATH=/usr/bin"],"Cmd":["/bin/sh"]},"rootfs":{"type":"layers","diff_ids":["${diffId}"]}}"""
+
+  private def ociIndexJson(entries: String) =
+    s"""{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[${entries}]}"""
+
+  // O-01 — a single-manifest index.json (ORAS writes a bare manifest when the
+  // source is single-platform) is claimed, with empty wild RepoTags.
+  test("O-01 single-manifest index.json is claimed") {
+    val configDigest = "sha256:" + hex('a', 64)
+    val layerDigest = "sha256:" + hex('b', 64)
+    val diffId = "sha256:" + hex('c', 64)
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> ociManifestJson(configDigest, layerDigest),
+      s"blobs/sha256/${hex('a', 64)}" -> ociConfigJson(diffId),
+      s"blobs/sha256/${hex('b', 64)}" -> "layer-bytes"
+    )
+    val (toProcess, uuidOut, nameOut, name) = ociClaim(byUuid, byName)
+    assertEquals(name, "Docker")
+    assertEquals(toProcess.length, 1)
+    val tp = toProcess.head.asInstanceOf[DockerToProcess]
+    assertEquals(tp.config.length, 1)
+    assertEquals(tp.config.head.effectiveRepoTags, Vector())
+    assertEquals(tp.config.head.layers, List(s"blobs/sha256/${hex('b', 64)}"))
+    assert(!nameOut.contains("index.json"))
+    assert(!nameOut.contains("oci-layout"))
+    assert(!nameOut.contains(s"blobs/sha256/${hex('a', 64)}"))
+    assert(!uuidOut.contains(byName("index.json").head.uuid))
+  }
+
+  // O-02 — a manifest list selects linux/amd64 deterministically over other
+  // platforms and skips attestation entries (no platform).
+  test("O-02 manifest list prefers linux/amd64 and skips attestations") {
+    val armManifest = "sha256:" + hex('1', 64)
+    val amdManifest = "sha256:" + hex('2', 64)
+    val armConfig = "sha256:" + hex('3', 64)
+    val amdConfig = "sha256:" + hex('4', 64)
+    val armLayer = "sha256:" + hex('5', 64)
+    val amdLayer = "sha256:" + hex('6', 64)
+    val entries =
+      s"""{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${armManifest}","size":1,"platform":{"os":"linux","architecture":"arm64"}},
+         |{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${amdManifest}","size":1,"platform":{"os":"linux","architecture":"amd64"}},
+         |{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${amdManifest}","size":1,"annotations":{"in-toto.io/predicate-type":"attestation"}}""".stripMargin
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> ociIndexJson(entries),
+      s"blobs/sha256/${hex('1', 64)}" -> ociManifestJson(armConfig, armLayer),
+      s"blobs/sha256/${hex('2', 64)}" -> ociManifestJson(amdConfig, amdLayer),
+      s"blobs/sha256/${hex('3', 64)}" -> ociConfigJson(
+        "sha256:" + hex('7', 64)
+      ),
+      s"blobs/sha256/${hex('4', 64)}" -> ociConfigJson(
+        "sha256:" + hex('8', 64)
+      ),
+      s"blobs/sha256/${hex('5', 64)}" -> "arm-layer",
+      s"blobs/sha256/${hex('6', 64)}" -> "amd-layer"
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assertEquals(toProcess.length, 1)
+    val tp = toProcess.head.asInstanceOf[DockerToProcess]
+    assertEquals(tp.config.length, 1)
+    assertEquals(tp.config.head.configPath, s"blobs/sha256/${hex('4', 64)}")
+    assertEquals(
+      tp.config.head.layers,
+      List(s"blobs/sha256/${hex('6', 64)}")
+    )
+  }
+
+  // O-03 — nested indexes resolve (bounded depth): outer index points at an
+  // inner index carrying the image manifest.
+  test("O-03 nested indexes are resolved") {
+    val innerIndex = "sha256:" + hex('a', 64)
+    val manifestD = "sha256:" + hex('b', 64)
+    val configD = "sha256:" + hex('c', 64)
+    val layerD = "sha256:" + hex('d', 64)
+    val inner =
+      ociIndexJson(
+        s"""{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${manifestD}","size":1,"platform":{"os":"linux","architecture":"amd64"}}"""
+      )
+    val outer = ociIndexJson(
+      s"""{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"${innerIndex}","size":1}"""
+    )
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> outer,
+      s"blobs/sha256/${hex('a', 64)}" -> inner,
+      s"blobs/sha256/${hex('b', 64)}" -> ociManifestJson(configD, layerD),
+      s"blobs/sha256/${hex('c', 64)}" -> ociConfigJson(
+        "sha256:" + hex('e', 64)
+      ),
+      s"blobs/sha256/${hex('d', 64)}" -> "layer"
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assertEquals(toProcess.length, 1)
+    val tp = toProcess.head.asInstanceOf[DockerToProcess]
+    assertEquals(tp.config.head.configPath, s"blobs/sha256/${hex('c', 64)}")
+  }
+
+  // O-04 — the wild ref.name annotation (descriptor level for lists, manifest
+  // level for bare manifests) becomes RepoTags; garbage is dropped.
+  test("O-04 ref.name annotation becomes RepoTags") {
+    val manifestD = "sha256:" + hex('a', 64)
+    val configD = "sha256:" + hex('b', 64)
+    val layerD = "sha256:" + hex('c', 64)
+    val entries =
+      s"""{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${manifestD}","size":1,"platform":{"os":"linux","architecture":"amd64"},"annotations":{"org.opencontainers.image.ref.name":"alpine:3.20.6"}}"""
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> ociIndexJson(entries),
+      s"blobs/sha256/${hex('a', 64)}" -> ociManifestJson(configD, layerD),
+      s"blobs/sha256/${hex('b', 64)}" -> ociConfigJson(
+        "sha256:" + hex('d', 64)
+      ),
+      s"blobs/sha256/${hex('c', 64)}" -> "layer"
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    val tp = toProcess.head.asInstanceOf[DockerToProcess]
+    assertEquals(tp.config.head.effectiveRepoTags, Vector("alpine:3.20.6"))
+
+    // manifest-level annotation (bare-manifest index.json)
+    val bareManifest =
+      s"""{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","annotations":{"org.opencontainers.image.ref.name":"busybox:1.36"},"config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"${configD}","size":2},"layers":[{"digest":"${layerD}"}]}"""
+    val (byUuid2, byName2) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> bareManifest,
+      s"blobs/sha256/${hex('b', 64)}" -> ociConfigJson(
+        "sha256:" + hex('d', 64)
+      ),
+      s"blobs/sha256/${hex('c', 64)}" -> "layer"
+    )
+    val (tp2, _, _, _) = ociClaim(byUuid2, byName2)
+    assertEquals(
+      tp2.head.asInstanceOf[DockerToProcess].config.head.effectiveRepoTags,
+      Vector("busybox:1.36")
+    )
+  }
+
+  // O-05 — hostile descriptors are never resolved: traversal paths, bad hex,
+  // wrong algorithms, and truncated digests leave the corpus unclaimed.
+  test("O-05 hostile digests are never resolved") {
+    val layerD = "sha256:" + hex('c', 64)
+    val hostileDigests = Vector(
+      "../../../etc/passwd",
+      "/etc/passwd",
+      "sha256:" + hex('Z', 64),
+      "sha256:" + hex('a', 63),
+      "sha256:short",
+      "md5:" + hex('a', 32),
+      "sha256:..%2f..%2fetc",
+      ""
+    )
+    hostileDigests.foreach { bad =>
+      val index = ociIndexJson(
+        s"""{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${bad}","size":1,"platform":{"os":"linux","architecture":"amd64"}}"""
+      )
+      val (byUuid, byName) = ociArtifacts(
+        "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+        "index.json" -> index,
+        s"blobs/sha256/${hex('c', 64)}" -> "layer"
+      )
+      val (toProcess, uuidOut, nameOut, _) = ociClaim(byUuid, byName)
+      assert(toProcess.isEmpty, s"digest must be rejected: ${bad}")
+      assertEquals(uuidOut, byUuid, s"nothing claimed for: ${bad}")
+      assertEquals(nameOut, byName, s"nothing claimed for: ${bad}")
+    }
+
+    // a config digest with traversal inside a bare manifest is also rejected
+    val bareTraversal =
+      s"""{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"../../../etc/passwd","size":2},"layers":[{"digest":"${layerD}"}]}"""
+    val (byUuid2, byName2) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> bareTraversal,
+      s"blobs/sha256/${hex('c', 64)}" -> "layer"
+    )
+    val (tp2, _, _, _) = ociClaim(byUuid2, byName2)
+    assert(tp2.isEmpty, "traversal config digest must be rejected")
+  }
+
+  // O-06 — without the spec-required oci-layout marker, index.json is NOT
+  // claimed (a stray index.json is someone else's file).
+  test("O-06 index.json without oci-layout is not claimed") {
+    val (byUuid, byName) = ociArtifacts(
+      "index.json" -> """{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}"""
+    )
+    val (toProcess, uuidOut, nameOut, _) = ociClaim(byUuid, byName)
+    assert(toProcess.isEmpty)
+    assertEquals(nameOut, byName)
+    assertEquals(uuidOut, byUuid)
+  }
+
+  // O-07 — a manifest list whose blobs are missing claims nothing and leaves
+  // the corpus untouched.
+  test("O-07 missing blobs claim nothing") {
+    val manifestD = "sha256:" + hex('a', 64)
+    val index = ociIndexJson(
+      s"""{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${manifestD}","size":1,"platform":{"os":"linux","architecture":"amd64"}}"""
+    )
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> index
+    )
+    val (toProcess, uuidOut, nameOut, _) = ociClaim(byUuid, byName)
+    assert(toProcess.isEmpty)
+    assertEquals(nameOut, byName)
+  }
+
+  // O-08 — precedence: when a docker-save manifest.json is present it wins,
+  // and the stray index.json is left alone.
+  test("O-08 docker-save manifest.json wins over index.json") {
+    val configD = "sha256:" + hex('a', 64)
+    val layerD = "sha256:" + hex('b', 64)
+    val manifestJson =
+      s"""[{"Config":"blobs/sha256/${hex(
+          'a',
+          64
+        )}","RepoTags":["dtest:1"],"Layers":["blobs/sha256/${hex(
+          'b',
+          64
+        )}"]}]"""
+    val ociManifest = ociManifestJson(configD, layerD)
+    val (byUuid, byName) = ociArtifacts(
+      "manifest.json" -> manifestJson,
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> ociManifest,
+      s"blobs/sha256/${hex('a', 64)}" -> ociConfigJson(
+        "sha256:" + hex('c', 64)
+      ),
+      s"blobs/sha256/${hex('b', 64)}" -> "layer"
+    )
+    val (toProcess, _, nameOut, _) = ociClaim(byUuid, byName)
+    assertEquals(toProcess.length, 1)
+    assertEquals(
+      toProcess.head
+        .asInstanceOf[DockerToProcess]
+        .main
+        .contains("manifest.json"),
+      true
+    )
+    assert(
+      nameOut.contains("index.json"),
+      "the OCI claim must not run when docker-save claimed"
+    )
+  }
+
+  // O-09 — an empty manifests array is not a claim.
+  test("O-09 empty manifests array is not claimed") {
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> """{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}"""
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assert(toProcess.isEmpty)
+  }
+
+  // O-10 — a non-JSON index.json is not claimed.
+  test("O-10 non-JSON index.json is not claimed") {
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> "not json at all"
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assert(toProcess.isEmpty)
+  }
+
+  // O-11 — garbage ref.name annotations (control characters, over-long) are
+  // dropped: no tags, no error, the image is still claimed.
+  test("O-11 garbage ref.name annotations are dropped") {
+    val manifestD = "sha256:" + hex('a', 64)
+    val configD = "sha256:" + hex('b', 64)
+    val layerD = "sha256:" + hex('c', 64)
+    val entries =
+      s"""{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"${manifestD}","size":1,"platform":{"os":"linux","architecture":"amd64"},"annotations":{"org.opencontainers.image.ref.name":"bad\\nname:tag"}}"""
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> ociIndexJson(entries),
+      s"blobs/sha256/${hex('a', 64)}" -> ociManifestJson(configD, layerD),
+      s"blobs/sha256/${hex('b', 64)}" -> ociConfigJson(
+        "sha256:" + hex('d', 64)
+      ),
+      s"blobs/sha256/${hex('c', 64)}" -> "layer"
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    val tp = toProcess.head.asInstanceOf[DockerToProcess]
+    assertEquals(tp.config.head.effectiveRepoTags, Vector())
+  }
+
+  // O-12 — an index.json larger than the read cap is refused entirely.
+  test("O-12 oversized index.json is refused") {
+    val big = "{\"x\":" + "\"y\"" * (DockerToProcess.MaxOciJsonBytes / 4) + "}"
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> big
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assert(toProcess.isEmpty)
+  }
+
+  // O-13 — index nesting deeper than the cap is not resolved.
+  test("O-13 index nesting beyond the cap is not resolved") {
+    val depth = DockerToProcess.MaxOciIndexDepth + 2
+    var digests = Vector[String]()
+    (0 until depth).foreach { i =>
+      digests = digests :+ ("sha256:" + hex((97 + i % 26).toChar, 64))
+    }
+    val innermost =
+      ociManifestJson("sha256:" + hex('f', 64), "sha256:" + hex('e', 64))
+    val pairs = scala.collection.mutable.ArrayBuffer[(String, String)]()
+    pairs += ("oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""")
+    pairs += ("index.json" -> ociIndexJson(
+      s"""{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"${digests(
+          0
+        )}","size":1}"""
+    ))
+    pairs += (s"blobs/sha256/${digests(0).substring(7)}" -> ociIndexJson(
+      s"""{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"${digests(
+          1
+        )}","size":1}"""
+    ))
+    (1 until depth - 1).foreach { i =>
+      pairs += (s"blobs/sha256/${digests(i).substring(7)}" -> ociIndexJson(
+        s"""{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"${digests(
+            i + 1
+          )}","size":1}"""
+      ))
+    }
+    pairs += (s"blobs/sha256/${digests.last.substring(7)}" -> innermost)
+    pairs += (s"blobs/sha256/${hex('f', 64)}" -> ociConfigJson(
+      "sha256:" + hex('d', 64)
+    ))
+    pairs += (s"blobs/sha256/${hex('e', 64)}" -> "layer")
+    val (byUuid, byName) = ociArtifacts(pairs.toSeq*)
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assert(toProcess.isEmpty, "nesting beyond the cap must not resolve")
+  }
+
+  // O-14 — a hostile layer digest inside an otherwise valid manifest is
+  // skipped without failing the claim.
+  test("O-14 hostile layer digest is skipped") {
+    val configD = "sha256:" + hex('b', 64)
+    val manifest =
+      s"""{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"${configD}","size":2},"layers":[{"digest":"../../../etc/passwd"}]}"""
+    val (byUuid, byName) = ociArtifacts(
+      "oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""",
+      "index.json" -> manifest,
+      s"blobs/sha256/${hex('b', 64)}" -> ociConfigJson("sha256:" + hex('c', 64))
+    )
+    val (toProcess, _, _, _) = ociClaim(byUuid, byName)
+    assertEquals(toProcess.length, 1)
+    assertEquals(
+      toProcess.head.asInstanceOf[DockerToProcess].config.head.layers,
+      Nil
+    )
   }
 }
