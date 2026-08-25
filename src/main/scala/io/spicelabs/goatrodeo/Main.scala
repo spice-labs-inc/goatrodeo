@@ -163,28 +163,25 @@ object Howdy {
       return
     }
 
+    // Two independent things happen when a top-level file finishes: its name may
+    // be logged, and it may be recorded for `--ingested`. They are composed here
+    // rather than every branch of the `ingested` match repeating the logging
+    // check, so that adding a third branch cannot silently drop it.
+    val logFinished: File => Unit =
+      if (config.logFilenames) f => logger.info(f"Processed ${f.getPath()}")
+      else _ => ()
+
     // if the `ingested` option was selected, build functions to
     // capture what was ingested and output it on successful run
-    val (onFileFinish: (File => Unit), onRunFinish: (Boolean => Unit)) =
+    val (recordFinished: (File => Unit), onRunFinish: (Boolean => Unit)) =
       config.ingested match {
-        case None =>
-          if (config.logFilenames) {
-            (
-              (f: File) => logger.info(f"Processed ${f.getPath()}"),
-              (good: Boolean) => {}
-            )
-          } else {
-            ((f: File) => {}, (good: Boolean) => {})
-          }
+        case None => ((f: File) => {}, (good: Boolean) => {})
         case Some(destFile) => {
           @volatile
           var success: Vector[File] = Vector()
           val sync = Object()
           (
             (f: File) => {
-              if (config.logFilenames) {
-                logger.info(f"Processed ${f.getPath()}")
-              }
               sync.synchronized {
                 success = success :+ f.getCanonicalFile()
               }; ()
@@ -216,6 +213,8 @@ object Howdy {
           )
         }
       }
+
+    val onFileFinish: File => Unit = f => { logFinished(f); recordFinished(f) }
 
     // get the set of paths to ignore
     val ignorePathSet = (
