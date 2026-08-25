@@ -11,7 +11,6 @@ import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
 
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -143,12 +142,13 @@ object GraphManager {
     )
 
     // rename the file to <sha256>.grd
-    val sha256Long = Helpers.byteArrayToLong63Bits(
-      Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
-    )
-    val dataFileSha256 = Helpers.toHex(
-      Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
-    )
+    // One pass over the file: the name wants 63 bits of the digest and the
+    // .grc envelope wants all 256, and both are the same digest. The File
+    // overload also closes its stream on failure, which the InputStream one
+    // does not.
+    val dataDigest = Helpers.computeSHA256(tempFile.toFile())
+    val sha256Long = Helpers.byteArrayToLong63Bits(dataDigest)
+    val dataFileSha256 = Helpers.toHex(dataDigest)
 
     val targetFileName =
       new File(targetDirectory, f"${Helpers.toHex(sha256Long)}.grd")
@@ -190,12 +190,9 @@ object GraphManager {
       f"Finished index write at ${Duration.between(start, Instant.now())}"
     )
 
-    val indexSha256Long = Helpers.byteArrayToLong63Bits(
-      Helpers.computeSHA256(new FileInputStream(targetIndexName))
-    )
-    val indexFileSha256 = Helpers.toHex(
-      Helpers.computeSHA256(new FileInputStream(targetIndexName))
-    )
+    val indexDigest = Helpers.computeSHA256(targetIndexName)
+    val indexSha256Long = Helpers.byteArrayToLong63Bits(indexDigest)
+    val indexFileSha256 = Helpers.toHex(indexDigest)
 
     val indexTargetFileName =
       new File(targetDirectory, f"${Helpers.toHex(indexSha256Long)}.gri")
@@ -294,9 +291,11 @@ object GraphManager {
     Helpers.writeShort(writer, envelopeBytes.length)
     writer.write(ByteBuffer.wrap(envelopeBytes))
     writer.close()
-    val sha256Long = Helpers.byteArrayToLong63Bits(
-      Helpers.computeSHA256(new FileInputStream(tempFile.toFile()))
-    )
+    // The .grc's name and its tamper-evidence receipt are the same digest of
+    // the same bytes; hashing the renamed file again would read it all twice.
+    val grcDigest = Helpers.computeSHA256(tempFile.toFile())
+    val sha256Long = Helpers.byteArrayToLong63Bits(grcDigest)
+    val grcSha256 = Helpers.toHex(grcDigest)
 
     val now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
 
@@ -315,7 +314,6 @@ object GraphManager {
       )
 
     tempFile.toFile().renameTo(targetFile)
-    val grcSha256 = Helpers.toHex(Helpers.computeSHA256(targetFile))
     logger.info(f"Wrote ADG cluster ${grcName} sha256 ${grcSha256}")
     TamperEvidentLog.addGrc(grcName, grcSha256)
     if (false) {
