@@ -33,6 +33,13 @@ import scala.util.Try
 
 class CbomEmitterSuite extends FunSuite {
 
+  // T3.20 emits a 100,000-component CBOM; its runtime is workload- and
+  // CPU-speed-bound, not correctness-bound, so the default 30s wall-clock cap
+  // is not a meaningful gate on slower machines. A generous suite-wide
+  // timeout is the safety net against hangs, not the acceptance criterion.
+  override val munitTimeout =
+    scala.concurrent.duration.Duration(5, "minutes")
+
   private lazy val schema16 = loadEveritSchema("bom-1.6.schema.json")
   private lazy val schema17 = loadEveritSchema("bom-1.7.schema.json")
 

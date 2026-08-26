@@ -204,9 +204,6 @@ resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/pub
 // pick up local Maven generated artifacts
 resolvers += Resolver.mavenLocal
 
-// Import the Spice Labs BOM for canonical dependency versions
-lazy val Import = config("import")
-
 Test / logBuffered := false
 
 lazy val root = project
@@ -216,32 +213,30 @@ lazy val root = project
     JavaAppPackaging,
     AssemblyPlugin
   )
-  .configs(Import)
   .settings(
     name := projectName,
     scalaVersion := scala3Version,
     semanticdbEnabled := true, // enable SemanticDB,
     semanticdbVersion := scalafixSemanticdb.revision,
-    libraryDependencies += "io.spicelabs" % "spice-bom" % "1.0.6" % Import intransitive (),
-    libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
-    libraryDependencies += "org.ow2.asm" % "asm" % "9.8",
-    libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.4.0",
+    libraryDependencies += "org.ow2.asm" % "asm" % "9.10.1",
+    libraryDependencies += "org.apache.bcel" % "bcel" % "6.12.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
-    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
-    libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,
-    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.5" % Test,
+    libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "1.3.0" % Test,
+    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.19.0" % Test,
     libraryDependencies += "com.github.erosb" % "everit-json-schema" % "1.14.6" % Test,
-    libraryDependencies += "org.json" % "json" % "20250107" % Test,
-    libraryDependencies += "com.google.guava" % "guava" % "33.6.0-jre" % Test,
-    libraryDependencies += "commons-io" % "commons-io" % "2.18.0",
-    libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
-    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
+    libraryDependencies += "org.json" % "json" % "20260814" % Test,
+    libraryDependencies += "com.google.guava" % "guava" % "33.7.1-jre" % Test,
+    libraryDependencies += "commons-io" % "commons-io" % "2.22.0",
+    libraryDependencies += "io.bullet" %% "borer-derivation" % "1.17.0",
+    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "1.3.0",
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.28.0",
-    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.6.3",
     libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
-    libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
+    libraryDependencies += "org.apache.tika" % "tika-core" % "3.3.2",
     // Config files. Kept in step with pom.xml, which declares the same two: the sbt and
     // Maven builds compile the same sources, so a dependency added to one and not the
     // other fails whichever build CI happens to run.
