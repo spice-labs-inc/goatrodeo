@@ -107,11 +107,22 @@ class OciDockerParitySuite extends munit.FunSuite {
         )
       files.foreach { p =>
         val rel = layoutDir.toPath().relativize(p).toString
-        val bytes = Files.readAllBytes(p)
         val entry = new TarArchiveEntry(p.toFile(), rel)
-        entry.setSize(bytes.length)
+        entry.setSize(Files.size(p))
         out.putArchiveEntry(entry)
-        out.write(bytes)
+        // stream the blob into the tar in chunks — layer blobs are tens of
+        // MB and must never be held whole in memory
+        val in = Files.newInputStream(p)
+        try {
+          val buf = new Array[Byte](64 * 1024)
+          var n = in.read(buf)
+          while (n > 0) {
+            out.write(buf, 0, n)
+            n = in.read(buf)
+          }
+        } finally {
+          in.close()
+        }
         out.closeArchiveEntry()
       }
     } finally {

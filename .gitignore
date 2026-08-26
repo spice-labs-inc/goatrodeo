@@ -4,6 +4,10 @@
 # Scratch/output cruft moved out of the project root
 /tmp
 
+# Assistant working notes and project instructions
+/workspace
+/CLAUDE.md
+
 # Surefire's `runOrder=balanced` timing cache, written to the project root
 .surefire-*
 
