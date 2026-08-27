@@ -210,6 +210,20 @@ object ConfigurationParser {
         .action((x, c) =>
           c.copy(ingested = ExpandFiles(x, c.runtime.homeDir).headOption)
         ),
+      opt[Boolean]("log-filenames")
+        .text(
+          "Log the path of each top-level file after it is processed, one log line per file"
+        )
+        .action((x, c) => c.copy(logFilenames = x)),
+      opt[File]("tamper-evident-log")
+        .text(
+          "Write a hash-chained, tamper-evident log of this run to the given file"
+        )
+        .action((x, c) =>
+          c.copy(tamperEvidentLog =
+            ExpandFiles(x, c.runtime.homeDir).headOption
+          )
+        ),
       opt[File]("ignore")
         .text(
           "A file containing paths to ignore, likely because they have been processed in the past"

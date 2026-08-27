@@ -882,7 +882,15 @@ object Helpers {
       suffix: String = ".temp"
   ): File = {
 
-    val retFile = Files.createTempFile(tempDir, "goats", suffix).toFile()
+    // Same NUL problem as an artifact name, reached by a different route:
+    // the suffix is often derived from one. See ArtifactWrapper.sanitizeName.
+    val retFile = Files
+      .createTempFile(
+        tempDir,
+        "goats",
+        ArtifactWrapper.sanitizeName(suffix.trim())
+      )
+      .toFile()
     val ret = FileOutputStream(retFile)
     val buffer = new Array[Byte](4096)
 

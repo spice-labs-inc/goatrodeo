@@ -65,10 +65,11 @@ object CbomEmitter {
   def emitForStorage(
       storage: Storage,
       version: String,
-      outDir: File
+      outDir: File,
+      correlationId: String = ""
   ): Try[Seq[File]] = {
     val roots = findRoots(storage)
-    emit(storage, roots, version, outDir)
+    emit(storage, roots, version, outDir, correlationId)
   }
 
   /** Emit one CBOM file per root Item.
@@ -81,6 +82,9 @@ object CbomEmitter {
     *   CycloneDX version ("1.6" or "1.7")
     * @param outDir
     *   destination directory
+    * @param correlationId
+    *   the run's correlation ID, recorded as a top-level property (empty when
+    *   not part of a run)
     * @return
     *   the emitted files, or a failure
     */
@@ -88,7 +92,8 @@ object CbomEmitter {
       storage: Storage,
       roots: Seq[Item],
       version: String,
-      outDir: File
+      outDir: File,
+      correlationId: String = ""
   ): Try[Seq[File]] = {
     for {
       dir <- safeOutputDir(outDir)
@@ -96,8 +101,8 @@ object CbomEmitter {
         for {
           acc <- accTry
           (items, truncated) = collectCryptoItems(storage, root)
-          doc = buildDocument(root, items, version, truncated)
-          filename = cbomFilename(root.identifier)
+          doc = buildDocument(root, items, version, truncated, correlationId)
+          filename = cbomFilename(root)
           file <- atomicWrite(dir, filename, doc)
         } yield acc :+ file
       }
@@ -109,43 +114,51 @@ object CbomEmitter {
     storage.keys().toVector.flatMap(key => storage.read(key).filter(_.isRoot()))
   }
 
-  /** Collect cryptographic Items reachable from a root via `contains` edges.
+  /** Collect cryptographic Items reachable from a root via `contains` edges,
+    * threading the full container chain (root → … → item) so each collected
+    * Item can be addressed by its traversal hierarchy.
     *
-    * Returns the collected Items and a flag indicating whether the collection
-    * was truncated to [[MaxComponentsPerRoot]].
+    * Returns the collected Items (with their ancestor chain) and a flag
+    * indicating whether the collection was truncated to
+    * [[MaxComponentsPerRoot]].
     */
   private def collectCryptoItems(
       storage: Storage,
       root: Item
-  ): (Vector[Item], Boolean) = {
-    val rootCollected =
-      if (isCryptoItem(root)) Vector(root) else Vector()
+  ): (Vector[(Item, Vector[Item])], Boolean) = {
+    val rootChain = Vector(root)
+    val rootCollected: Vector[(Item, Vector[Item])] =
+      if (isCryptoItem(root)) Vector((root, rootChain)) else Vector()
 
     @tailrec
     def loop(
-        toVisit: Vector[(String, Int)],
+        toVisit: Vector[(String, Vector[Item])],
         visited: Set[String],
-        collected: Vector[Item],
+        collected: Vector[(Item, Vector[Item])],
         truncated: Boolean
-    ): (Vector[Item], Boolean) = {
+    ): (Vector[(Item, Vector[Item])], Boolean) = {
       if (toVisit.isEmpty) {
         (collected, truncated)
       } else if (collected.length >= MaxComponentsPerRoot) {
         (collected, true)
       } else {
-        val (gitoid, depth) = toVisit.head
+        val (gitoid, parentChain) = toVisit.head
         val rest = toVisit.tail
-        if (visited.contains(gitoid) || depth > MaxTraversalDepth) {
+        if (
+          visited.contains(gitoid) ||
+          parentChain.size >= MaxTraversalDepth
+        ) {
           loop(rest, visited, collected, truncated)
         } else {
           storage.read(gitoid) match {
             case Some(item) =>
+              val childChain = parentChain :+ item
               val nextCollected =
-                if (isCryptoItem(item)) collected :+ item
+                if (isCryptoItem(item)) collected :+ (item, childChain)
                 else collected
               val children =
-                if (depth < MaxTraversalDepth)
-                  item.listContains().map(_ -> (depth + 1))
+                if (childChain.size < MaxTraversalDepth)
+                  item.listContains().map(_ -> childChain)
                 else Vector()
               loop(rest ++ children, visited + gitoid, nextCollected, truncated)
             case None =>
@@ -156,7 +169,7 @@ object CbomEmitter {
     }
 
     loop(
-      root.listContains().map(_ -> 1),
+      root.listContains().map(_ -> rootChain),
       Set(root.identifier),
       rootCollected,
       false
@@ -188,7 +201,9 @@ object CbomEmitter {
           k.startsWith("EmbeddedKey:") ||
           k.startsWith("CryptoAlgorithms:") ||
           k.startsWith("CryptoDependency:") ||
-          k.startsWith("MobileTls:")
+          k.startsWith("MobileTls:") ||
+          k.startsWith("CloudKey:") ||
+          k.startsWith("DbEncryption:")
       )
     }
   }
@@ -196,9 +211,10 @@ object CbomEmitter {
   /** Build the CycloneDX document for a root and its collected crypto Items. */
   private def buildDocument(
       root: Item,
-      items: Vector[Item],
+      items: Vector[(Item, Vector[Item])],
       version: String,
-      truncated: Boolean
+      truncated: Boolean,
+      correlationId: String
   ): JObject = {
     if (truncated) {
       logger.warn(
@@ -212,7 +228,9 @@ object CbomEmitter {
     val timestamp = Instant.now().toString()
     val toolVersion = hellogoat.BuildInfo.version
     val components = {
-      val all = items.flatMap(buildComponentsForItem)
+      val all = items.flatMap { case (item, chain) =>
+        buildComponentsForItem(item, chain)
+      }
       // Deduplicate synthetic algorithm components across the root by bom-ref,
       // preserving the first occurrence of each referenced algorithm.
       val seen = scala.collection.mutable.LinkedHashSet[String]()
@@ -252,19 +270,28 @@ object CbomEmitter {
       "components" -> JArray(components)
     )
 
-    val fields = if (truncated) {
-      baseFields :+
-        ("properties" -> JArray(
-          List(
-            JObject(
-              "name" -> JString("cbom:truncated"),
-              "value" -> JString("true")
-            )
+    val topProps: List[JObject] = List(
+      if (truncated)
+        Some(
+          JObject(
+            "name" -> JString("cbom:truncated"),
+            "value" -> JString("true")
           )
-        ))
-    } else {
-      baseFields
-    }
+        )
+      else None,
+      Option(correlationId)
+        .filter(_.nonEmpty)
+        .map(corr =>
+          JObject(
+            "name" -> JString("goatrodeo:correlation-id"),
+            "value" -> JString(corr)
+          )
+        )
+    ).flatten
+
+    val fields =
+      if (topProps.isEmpty) baseFields
+      else baseFields :+ ("properties" -> JArray(topProps))
 
     JObject(fields)
   }
@@ -334,7 +361,8 @@ object CbomEmitter {
   /** Build an `algorithm` cryptographic-asset component for an algorithm spec.
     */
   private def algorithmComponent(
-      spec: AlgorithmSpec
+      spec: AlgorithmSpec,
+      chain: Vector[Item]
   ): Option[(String, JObject)] = {
     val normalized = normalizeAlgName(spec.name)
     if (normalized.isEmpty || normalized == "unknown") return None
@@ -346,6 +374,7 @@ object CbomEmitter {
       "primitive" -> JString(spec.primitive)
     ) ++ param.map(p => "parameterSetIdentifier" -> JString(p)) ++
       spec.curve.map(c => "curve" -> JString(c))
+    val pathProp = JObject("properties" -> JArray(pathProps(chain)))
     val component = JObject(
       "type" -> JString("cryptographic-asset"),
       "bom-ref" -> JString(ref),
@@ -354,7 +383,7 @@ object CbomEmitter {
         "assetType" -> JString("algorithm"),
         "algorithmProperties" -> JObject(apFields)
       )
-    )
+    ) ~ pathProp
     Some(ref -> component)
   }
 
@@ -380,10 +409,48 @@ object CbomEmitter {
     hex.map(h => s"swh:1:cnt:${h}")
   }
 
+  /** Separator between container nodes in a traversal path. Deliberately not
+    * `/`, which is used *within* a container's own logical path.
+    */
+  private val PathSeparator: String = "|:|"
+
+  /** The name of an Item as it appears in a container path: its file name(s)
+    * (the path within its parent), falling back to its gitoid identifier.
+    */
+  private def itemName(item: Item): String =
+    item.bodyAsItemMetaData
+      .flatMap(_.fileNames.headOption)
+      .getOrElse(item.identifier)
+
+  /** The three traversal-path properties for a chain of container Items (root →
+    * … → item): the file path, the OmniBOR (`gitoid:blob:sha256`) path, and the
+    * SWHID path — each joining its nodes with [[PathSeparator]].
+    */
+  private def pathProps(chain: Vector[Item]): List[JObject] = {
+    val sep = PathSeparator
+    List(
+      JObject(
+        "name" -> JString("goatrodeo:path"),
+        "value" -> JString(chain.map(itemName).mkString(sep))
+      ),
+      JObject(
+        "name" -> JString("goatrodeo:omnibor-path"),
+        "value" -> JString(chain.map(_.identifier).mkString(sep))
+      ),
+      JObject(
+        "name" -> JString("goatrodeo:swhid-path"),
+        "value" -> JString(chain.flatMap(swhidFor).mkString(sep))
+      )
+    )
+  }
+
   /** Map a single Item to a list of CycloneDX components: the main item plus
     * any algorithm assets referenced by it.
     */
-  private def buildComponentsForItem(item: Item): List[JObject] = {
+  private def buildComponentsForItem(
+      item: Item,
+      chain: Vector[Item]
+  ): List[JObject] = {
     val extra = metaExtra(item)
 
     // Lockfile crypto dependencies → `library` components (not
@@ -413,15 +480,27 @@ object CbomEmitter {
     ).flatten
 
     val extraProps = propertiesFromExtra(extra)
-    val swhidProp = swhidFor(item).map(s =>
-      JObject("name" -> JString("swhid:core"), "value" -> JString(s))
-    )
-    val allProps = extraProps.arr ++ swhidProp.toList
+    // `swhid:core` (the SWHID content id, from the item's sha1 gitoid alias)
+    // is always emitted together with `omnibor:core` (the item's own
+    // `gitoid:blob:sha256` OmniBOR id): neither appears without the other.
+    val coreProps: List[JObject] = swhidFor(item)
+      .map { s =>
+        List(
+          JObject("name" -> JString("swhid:core"), "value" -> JString(s)),
+          JObject(
+            "name" -> JString("omnibor:core"),
+            "value" -> JString(item.identifier)
+          )
+        )
+      }
+      .toList
+      .flatten
+    val allProps = extraProps.arr ++ coreProps ++ pathProps(chain)
     val withProps =
       if (allProps.isEmpty) JObject(baseFields)
       else JObject(baseFields :+ ("properties" -> JArray(allProps)))
 
-    val (mainOpt, algs) = cryptoPropertiesFor(item, extra)
+    val (mainOpt, algs) = cryptoPropertiesFor(item, extra, chain)
     val mainComponent =
       mainOpt.map(cp => withProps ~ ("cryptoProperties" -> cp))
     mainComponent.toList ++ algs.values.toList
@@ -502,7 +581,9 @@ object CbomEmitter {
         k.startsWith("EmbeddedKey:") ||
         k.startsWith("CryptoAlgorithms:") ||
         k.startsWith("CryptoDependency:") ||
-        k.startsWith("MobileTls:")
+        k.startsWith("MobileTls:") ||
+        k.startsWith("CloudKey:") ||
+        k.startsWith("DbEncryption:")
       ) {
         vs.map(v => JObject("name" -> JString(k), "value" -> JString(v))).toList
       } else {
@@ -519,7 +600,8 @@ object CbomEmitter {
     */
   private def cryptoPropertiesFor(
       item: Item,
-      extra: Map[String, Set[String]]
+      extra: Map[String, Set[String]],
+      chain: Vector[Item]
   ): (Option[JObject], Map[String, JObject]) = {
     val algs = scala.collection.mutable.Map[String, JObject]()
 
@@ -533,7 +615,7 @@ object CbomEmitter {
       val param = size.map(_.toString)
       val spec =
         AlgorithmSpec(canonical, primitiveFor(canonical, context), param, curve)
-      algorithmComponent(spec).map { case (ref, comp) =>
+      algorithmComponent(spec, chain).map { case (ref, comp) =>
         algs += ref -> comp
         ref
       }
@@ -549,6 +631,7 @@ object CbomEmitter {
         .orElse(first(extra, "Usign:KeySize"))
         .orElse(first(extra, "SSH:KeySize"))
         .orElse(first(extra, "Certificates:KeySize"))
+        .orElse(first(extra, "Certificates:Cert:0:KeySize"))
       top.flatMap(s => Try(s.toInt).toOption)
     }
 
@@ -556,6 +639,7 @@ object CbomEmitter {
       first(extra, s"${prefix}Curve")
         .orElse(first(extra, "SSH:Curve"))
         .orElse(first(extra, "Certificates:Curve"))
+        .orElse(first(extra, "Certificates:Cert:0:Curve"))
     }
 
     def usignKeySize: Option[Int] =
@@ -724,10 +808,13 @@ object CbomEmitter {
         algs.toMap
       )
     } else if (hasServiceCrypto(extra)) {
-      val refs = extra
-        .getOrElse("ServiceCrypto:algorithms", Set())
-        .toList
-        .sorted
+      // A single config file (e.g. my.cnf / mariadb.cnf) can carry both TLS
+      // ciphers and database-encryption algorithms; union both families'
+      // declared algorithms into one algorithm-asset set.
+      val refs = (
+        extra.getOrElse("ServiceCrypto:algorithms", Set()) ++
+          extra.getOrElse("DbEncryption:algorithms", Set())
+      ).toList.sorted
         .flatMap(addAlg(_, "other"))
       (
         Some(
@@ -789,12 +876,19 @@ object CbomEmitter {
     } else if (hasCryptoAlgorithms(extra)) {
       // Binary footprint inventory → pure algorithm assets (deduped); no
       // material component is emitted.
-      extra
-        .getOrElse("CryptoAlgorithms:algorithm", Set())
-        .toList
-        .sorted
-        .foreach(a => addAlg(a, "other"))
-      (None, algs.toMap)
+      val algNames = extra.getOrElse("CryptoAlgorithms:algorithm", Set())
+      if (algNames.nonEmpty) {
+        algNames.toList.sorted.foreach(a => addAlg(a, "other"))
+        (None, algs.toMap)
+      } else {
+        // Unknown-flagged footprint (e.g. mbedTLS symbols with no canonical
+        // algorithm): the artifact is still crypto-bearing — surface it as
+        // related-crypto-material instead of silently dropping it.
+        (
+          Some(buildRelatedCryptoMaterialProperties(extra, "other")),
+          algs.toMap
+        )
+      }
     } else if (hasCryptoDependency(extra)) {
       // Lockfile crypto dependencies become `library` components (built in
       // `buildComponentsForItem`); no material / algorithm assets here.
@@ -804,6 +898,25 @@ object CbomEmitter {
         .getOrElse("MobileTls:algorithms", Set())
         .toList
         .sorted
+        .flatMap(addAlg(_, "other"))
+      (
+        Some(
+          buildRelatedCryptoMaterialProperties(extra, "other", refs.headOption)
+        ),
+        algs.toMap
+      )
+    } else if (hasCloudKey(extra)) {
+      // Cloud-managed key references: identifiers (ARNs/URLs) and declared key
+      // specs surface as properties; key material is a presence flag only.
+      (
+        Some(buildRelatedCryptoMaterialProperties(extra, "other")),
+        algs.toMap
+      )
+    } else if (hasDbEncryption(extra)) {
+      val refs = (
+        extra.getOrElse("DbEncryption:algorithms", Set()) ++
+          extra.getOrElse("ServiceCrypto:algorithms", Set())
+      ).toList.sorted
         .flatMap(addAlg(_, "other"))
       (
         Some(
@@ -898,6 +1011,14 @@ object CbomEmitter {
 
   private def hasMobileTls(extra: Map[String, Set[String]]): Boolean = {
     extra.keys.exists(_.startsWith("MobileTls:"))
+  }
+
+  private def hasCloudKey(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("CloudKey:"))
+  }
+
+  private def hasDbEncryption(extra: Map[String, Set[String]]): Boolean = {
+    extra.keys.exists(_.startsWith("DbEncryption:"))
   }
 
   private def buildCertificateProperties(
@@ -996,9 +1117,31 @@ object CbomEmitter {
   }
 
   /** Stable, filesystem-safe filename derived from a root GitOID. */
-  private def cbomFilename(rootIdentifier: String): String = {
-    val safe = rootIdentifier.replace(":", "_").replace("/", "_")
-    f"cbom_${safe}.json"
+  /** Maximum length of the escaped file-name portion of a CBOM filename. */
+  private val MaxCbomNameChars: Int = 80
+
+  /** Deterministic CBOM filename for a root Item.
+    *
+    * Format: `cbom_<escaped-first-file-name>_<last-16-of-gitoid>.json`. The
+    * full gitoid is inside the CBOM, so the filename only needs enough of it to
+    * disambiguate (16 hex chars = 64 bits). The file name is the root's first
+    * `fileNames` entry (a `TreeSet`, so deterministic sorted order), escaped by
+    * replacing every character outside `[A-Za-z0-9_-]` with `_`; full paths are
+    * truncated (keeping the tail) so filenames do not grow unboundedly.
+    */
+  private def cbomFilename(root: Item): String = {
+    val gitoidHex = root.identifier.stripPrefix("gitoid:blob:sha256:")
+    val short = gitoidHex.takeRight(16)
+    val rawName = itemName(root)
+    val escaped = rawName.map { c =>
+      val ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+        (c >= '0' && c <= '9') || c == '-' || c == '_'
+      if (ok) c else '_'
+    }
+    val name =
+      if (escaped.length > MaxCbomNameChars) escaped.takeRight(MaxCbomNameChars)
+      else escaped
+    f"cbom_${name}_${short}.json"
   }
 
   /** Validate the output directory, refuse a symlinked one, and create it

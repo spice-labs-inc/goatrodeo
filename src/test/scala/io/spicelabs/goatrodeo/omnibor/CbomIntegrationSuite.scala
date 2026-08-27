@@ -166,4 +166,61 @@ class CbomIntegrationSuite extends FunSuite {
       deleteRecursive(cbomDir)
     }
   }
+
+  // T4.3 — end-to-end via GoatRodeoBuilder with tamper-evident logging: the
+  // run writes a hash-chained log and a run-level checksum, and every CBOM
+  // carries the run's correlation ID. THEORY: the builder routes through
+  // Howdy.run, so withTamperEvidentLog must produce the tamper-evident
+  // artifacts and correlate the CBOMs to the run.
+  test(
+    "T4.3 GoatRodeoBuilder tamper-evident run produces log, checksum, correlation"
+  ) {
+    val inputDir = Files.createTempDirectory("tel-int-input").toFile()
+    val outputDir = Files.createTempDirectory("tel-int-output").toFile()
+    val logFile = new File(outputDir, "run.log")
+    try {
+      writeString(inputDir, "cert.der", "not-a-real-cert")
+
+      new GoatRodeoBuilder()
+        .withPayload(inputDir.getAbsolutePath)
+        .withOutput(outputDir.getAbsolutePath)
+        .withCbomDir(outputDir.getAbsolutePath)
+        .withTamperEvidentLog(logFile.getAbsolutePath)
+        .withLogFilenames(true)
+        .withThreads(1)
+        .run()
+
+      assert(logFile.exists(), "tamper-evident log file should exist")
+      val logLines =
+        Files.readAllLines(logFile.toPath()).toArray(new Array[String](0))
+      assert(logLines.nonEmpty, "tamper-evident log should not be empty")
+      assert(
+        logLines.exists(_.contains("Correlation ID:")),
+        "log should contain the correlation ID as the first line"
+      )
+      val checksums =
+        outputDir.listFiles(f => f.getName.endsWith("_checksum.json"))
+      assertEquals(checksums.length, 1, "exactly one checksum file")
+      val checksum =
+        org.json4s.native.JsonMethods
+          .parse(Files.readString(checksums(0).toPath()))
+      val corrId = text(checksum, "correlation_id")
+      assert(corrId.nonEmpty, "checksum should carry a correlation ID")
+      val cboms = outputDir.listFiles(f => f.getName.startsWith("cbom_"))
+      assert(cboms != null && cboms.nonEmpty, "should emit CBOMs")
+      val cbom =
+        org.json4s.native.JsonMethods.parse(Files.readString(cboms(0).toPath()))
+      val topProps = (cbom \ "properties") match {
+        case JArray(ps) =>
+          ps.collect { case o: JObject =>
+            (text(o, "name") -> text(o, "value"))
+          }.toMap
+        case _ => Map.empty[String, String]
+      }
+      assertEquals(topProps.get("goatrodeo:correlation-id"), Some(corrId))
+    } finally {
+      deleteRecursive(inputDir)
+      deleteRecursive(outputDir)
+    }
+  }
 }

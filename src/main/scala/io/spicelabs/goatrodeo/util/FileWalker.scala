@@ -5,6 +5,8 @@ import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
 import io.spicelabs.saffron.DiskReader
+import io.spicelabs.saffron.SaffronProbe
+import io.spicelabs.saffron.container.BinaryContainerMount
 import io.spicelabs.saffron.fs.FileSystemEntry
 import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
 import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
@@ -16,6 +18,7 @@ import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -23,6 +26,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
 import scala.util.Using
 
@@ -244,50 +248,193 @@ object FileWalker {
     "application/x-saffron-raw-disk"
   )
 
+  /** MIMEs that can mask a Saffron-supported disk image without carrying a
+    * Saffron disk MIME of their own: a gzip wrapper may hold a raw disk
+    * (`.img.gz`/`.raw.gz`) or a GCP image (`.tar.gz`/`.tgz`). These are probed
+    * cheaply even though they do not match [[saffronMimeTypes]].
+    */
+  private val saffronMaskMimes: Set[String] = Set("application/gzip")
+
+  /** MIMEs whose format magic lives in the tail of the artifact (VHD footer),
+    * so the probe must read a suffix too. (DMG is a container MIME; container
+    * MIMEs are trusted from the MIME pass and not re-probed — see
+    * [[asSaffronFilesystem]].)
+    */
+  private val saffronTailMimes: Set[String] = Set("application/x-vhd")
+
   private def isSaffronSupported(mime: Set[String], path: Path) = {
     // if we get some recognized mimes, succeed fast, otherwise check DiskReader
-    mime.intersect(saffronMimeTypes).nonEmpty || DiskReader.isSupported(path)
+    mime.intersect(saffronMimeTypes).nonEmpty ||
+    mime.intersect(SaffronDetector.containerMimeTypes).nonEmpty ||
+    Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
+  }
+
+  /** Read up to `n` bytes from the front of the artifact through a fresh
+    * stream. Never throws; the result may be shorter than `n`.
+    */
+  private def readStreamPrefix(in: ArtifactWrapper, n: Int): Array[Byte] =
+    in.withStream { s =>
+      val buf = new Array[Byte](n)
+      var total = 0
+      var done = false
+      while (total < n && !done) {
+        val r = s.read(buf, total, n - total)
+        if (r <= 0) done = true else total += r
+      }
+      if (total == n) buf else java.util.Arrays.copyOf(buf, total)
+    }
+
+  /** Read the last up-to-`n` bytes of the artifact through a fresh stream.
+    * Never throws; the result may be shorter than `n` (or empty).
+    */
+  private def readStreamSuffix(in: ArtifactWrapper, n: Int): Array[Byte] =
+    in.withStream { s =>
+      val size = in.size()
+      val want = math.max(0L, math.min(n.toLong, size)).toInt
+      var remaining = math.max(0L, size - n)
+      var stop = false
+      while (remaining > 0 && !stop) {
+        val skipped = s.skip(remaining)
+        if (skipped <= 0) stop = true else remaining -= skipped
+      }
+      val buf = new Array[Byte](want)
+      var total = 0
+      var done = false
+      while (total < want && !done) {
+        val r = s.read(buf, total, want - total)
+        if (r <= 0) done = true else total += r
+      }
+      if (total == want) buf else java.util.Arrays.copyOf(buf, total)
+    }
+
+  /** Cheap, spill-free probe: read bounded byte ranges via `withStream` and ask
+    * Saffron whether the artifact is a supported disk image or container. All
+    * signature knowledge lives in Saffron; nothing is written to disk.
+    */
+  private def saffronProbePasses(in: ArtifactWrapper): Boolean = {
+    val mimes = in.mimeType
+    Try {
+      val prefix = readStreamPrefix(in, SaffronProbe.MIN_PREFIX)
+      val suffix =
+        if (mimes.intersect(saffronTailMimes).nonEmpty)
+          readStreamSuffix(in, SaffronProbe.MIN_SUFFIX)
+        else Array.emptyByteArray
+      SaffronProbe.detect(prefix, suffix, in.path()).isPresent
+    }.getOrElse(false)
+  }
+
+  /** Read an ArduPilot `AP_ROMFS` embedded file store as an archive: every
+    * ROMFS file becomes an inner artifact (decompressed), so e.g. the
+    * certificate files under `etc/ssl/certs` flow through the normal
+    * certificate strategy.
+    */
+  private def asApRomfs(
+      in: ArtifactWrapper,
+      tempPath: Path
+  ): OptionalArchiveStream = {
+    ApRomfs.read(in).map { files =>
+      val wrappers = files.map { case (name, data) =>
+        ArtifactWrapper.newWrapper(
+          name,
+          data.length.toLong,
+          new ByteArrayInputStream(data),
+          in.tempDir,
+          tempPath
+        )
+      }.toVector
+      wrappers -> "ArduPilot ROMFS"
+    }
   }
 
   private def asSaffronFilesystem(
       in: ArtifactWrapper,
       tempPath: Path
   ): OptionalArchiveStream = {
-    in.withFile(f => {
-      val path = f.toPath()
-      if (isSaffronSupported(in.mimeType, path)) {
-        Try {
-          val disk = DiskReader.open(path)
-          val systems = FileSystemMount.mountAll(disk).asScala
-          val files =
-            for {
-              system <- systems
-              file <- system.walk().iterator().asScala
-            } yield file
-          val artifacts = files
-            .filter(f => f.`type`() == EntryType.REGULAR_FILE)
-            .flatMap(fileSystemEntry => {
-              fileSystemEntry match {
-                case regular: RegularFile =>
-                  Some(
-                    ArtifactWrapper.newWrapper(
-                      regular.path(),
-                      regular.size(),
-                      regular.openStream(),
-                      None,
-                      tempPath
-                    )
-                  )
-                case _ => None
-              }
-            })
-            .toVector
-          artifacts -> s"Saffron ${disk.format().name()}"
-        }.toOption
-      } else {
-        None
-      }
-    })
+    val mimes = in.mimeType
+    val diskMime = mimes.intersect(saffronMimeTypes).nonEmpty
+    val containerMime =
+      mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty
+    val maskMime = mimes.intersect(saffronMaskMimes).nonEmpty
+    // Gate the expensive `withFile` (which spills in-memory artifacts to a
+    // temp file) behind a MIME check plus, for disk-format MIMEs, a cheap
+    // byte probe done through `withStream`: only artifacts Saffron actually
+    // recognizes reach the disk/container mount. Container MIMEs are stamped
+    // by Saffron's own full-file path-based detection during the MIME pass
+    // (which also has the file name and, for some formats, the tail bytes the
+    // prefix probe cannot see), so they are trusted without a re-probe.
+    if (
+      (diskMime || containerMime || maskMime) &&
+      (containerMime || saffronProbePasses(in))
+    ) {
+      in.withFile(f => {
+        val path = f.toPath()
+        if (isSaffronSupported(in.mimeType, path)) {
+          val mimes = in.mimeType
+          // The disk's format travels with its filesystems so the label can
+          // name it. `Saffron EXT4` says which reader produced these artifacts
+          // and a bare `Saffron` does not, and the name is only reachable from
+          // the `disk` handle, which does not outlive this block.
+          val (diskSystems, diskFormat)
+              : (Vector[io.spicelabs.saffron.fs.FileSystem], Option[String]) =
+            if (
+              mimes.intersect(saffronMimeTypes).nonEmpty ||
+              Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
+            ) {
+              Try {
+                val disk = DiskReader.open(path)
+                (
+                  FileSystemMount.mountAll(disk).asScala.toVector,
+                  Option(disk.format()).map(_.name())
+                )
+              }.getOrElse((Vector(), None))
+            } else (Vector(), None)
+          val containerSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
+            if (mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty) {
+              Try {
+                BinaryContainerMount.mount(path).toScala.toVector
+              }.getOrElse(Vector())
+            } else Vector()
+          val systems = diskSystems ++ containerSystems
+          if (systems.isEmpty) None
+          else {
+            // Saffron's `walk`/`openStream` can throw while iterating a corrupt
+            // or truncated filesystem; treat that as "nothing to expand" rather
+            // than propagating the exception.
+            Try {
+              val files =
+                for {
+                  system <- systems
+                  file <- system.walk().iterator().asScala
+                } yield file
+              val artifacts = files
+                .filter(f => f.`type`() == EntryType.REGULAR_FILE)
+                .flatMap(fileSystemEntry => {
+                  fileSystemEntry match {
+                    case regular: RegularFile =>
+                      Some(
+                        ArtifactWrapper.newWrapper(
+                          regular.path(),
+                          regular.size(),
+                          regular.openStream(),
+                          None,
+                          tempPath
+                        )
+                      )
+                    case _ => None
+                  }
+                })
+                .toVector
+              // Container-only mounts keep the bare name: their format is
+              // already in the MIME type, and there is no equivalent handle to
+              // ask.
+              Some(artifacts -> diskFormat.fold("Saffron")(f => s"Saffron $f"))
+            }.getOrElse(None)
+          }
+        } else {
+          None
+        }
+      })
+    } else None
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
@@ -461,6 +608,7 @@ object FileWalker {
 
         ret
       }.orElse(asRPMWrapper(in, tempDir))
+        .orElse(asApRomfs(in, tempDir))
         .orElse(asSaffronFilesystem(in, tempDir))
         .orElse(
           asISOWrapper(in, tempDir)

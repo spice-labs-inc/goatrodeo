@@ -173,6 +173,17 @@ object CryptoFootprintStrategy {
       Some("bcrypt"),
       "symbol"
     ),
+    // mbedTLS (firmware: ArduPilot, PX4, embedded TLS). The symbols prove a
+    // crypto library is present but do not pin a single algorithm, so
+    // algorithm=None — emitted as unknown.
+    FootprintPattern("mbedtls", "mbedtls_x509_crt_parse", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_x509_crt_parse_der", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_pk_parse_key", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_pk_parse_keyfile", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_ssl_init", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_ssl_handshake", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_ctr_drbg_init", None, "symbol"),
+    FootprintPattern("mbedtls", "mbedtls_entropy_init", None, "symbol"),
     // Rust crate identifiers
     FootprintPattern("rust", "aes-gcm", Some("aes-gcm"), "identifier"),
     FootprintPattern(

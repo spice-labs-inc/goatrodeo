@@ -4,7 +4,9 @@ import org.tomlj.TomlArray
 import org.tomlj.TomlPosition
 import org.tomlj.TomlTable
 
-import java.util.{List as JList, Map as JMap, Set as JSet}
+import java.util.List as JList
+import java.util.Map as JMap
+import java.util.Set as JSet
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 

@@ -56,6 +56,8 @@ class ConfigurationTomlSuite extends munit.FunSuite {
       |package_tags = true
       |package_tags_short_name = true
       |cbom_version = "1.7"
+      |log_filenames = true
+      |tamper_evident_log = "/tmp/run.log"
       |""".stripMargin)
 
     assertEquals(config.out.map(_.getPath()), Some("/tmp/out"))
@@ -69,6 +71,11 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     assertEquals(config.packageTags, true)
     assertEquals(config.packageTagsShortName, true)
     assertEquals(config.cbomVersion, "1.7")
+    assertEquals(config.logFilenames, true)
+    assertEquals(
+      config.tamperEvidentLog.map(_.getPath()),
+      Some("/tmp/run.log")
+    )
   }
 
   test("array keys accumulate onto the base configuration") {

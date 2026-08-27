@@ -190,6 +190,11 @@ object AdaptiveMimeBuilder {
       val nextIndex = AtomicLong(0)
       val liveWorkers = AtomicInteger(0)
       val completed = LongAdder()
+      // The next progress milestone to report. Each worker atomically claims the
+      // milestone it crosses, so every progressEvery-th completion is reported
+      // exactly once even though `completed.sum()` (read after increment) can
+      // observe a value that overshoots a milestone under concurrency.
+      val milestone = AtomicLong(progressStep)
 
       // The worker body: claim the next index, force the file's mimeType, record
       // the outcome. The inner try/catch is the boundary — nothing below it can
@@ -214,8 +219,12 @@ object AdaptiveMimeBuilder {
                 completed.increment()
 
                 val done = completed.sum()
-                if (done > 0 && done % progressStep == 0) {
-                  doProgress(done, adaptive.current)
+                var m = milestone.get()
+                while (
+                  done >= m && milestone.compareAndSet(m, m + progressStep)
+                ) {
+                  doProgress(m, adaptive.current)
+                  m = milestone.get()
                 }
               }
             }

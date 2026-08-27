@@ -255,7 +255,7 @@ lazy val root = project
     // Spice Labs "readers"
     libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.2.0",
-    libraryDependencies += "io.spicelabs" % "saffron" % "0.3.1",
+    libraryDependencies += "io.spicelabs" % "saffron" % "0.4.0",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.85.2",
     libraryDependencies += "org.bouncycastle" % "bcpkix-jdk18on" % "1.85",
     libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on" % "1.85",

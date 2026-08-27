@@ -339,4 +339,34 @@ class CryptoFootprintSuite extends FunSuite {
       "only the C5-approved needle overlaps may be introduced by new needles"
     )
   }
+
+  test("T-E-11 mbedTLS needles flag firmware crypto with exact sets") {
+    val m = meta(
+      "arducopter",
+      "\u0000mbedtls_x509_crt_parse\u0000mbedtls_pk_parse_key\u0000" +
+        "mbedtls_ssl_init\u0000mbedtls_ctr_drbg_init\u0000"
+    )
+    assertEquals(
+      m(adHoc("classifier")).toVector.map(_.value).toSet,
+      Set("mbedtls")
+    )
+    assertEquals(
+      m(adHoc("value")).toVector.map(_.value).toSet,
+      Set(
+        "mbedtls_x509_crt_parse",
+        "mbedtls_pk_parse_key",
+        "mbedtls_ssl_init",
+        "mbedtls_ctr_drbg_init"
+      )
+    )
+    assertEquals(
+      m(adHoc("confidence")).toVector.map(_.value).toSet,
+      Set("symbol")
+    )
+    assertEquals(m(adHoc("unknown")).toVector.map(_.value).toSet, Set("true"))
+    assert(
+      !m.contains(adHoc("algorithm")),
+      "mbedTLS needles carry no single canonical algorithm"
+    )
+  }
 }

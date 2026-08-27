@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.omnibor.CryptoAlgorithms
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
@@ -28,8 +29,8 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CipherSuiteResolver
+import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
-import io.spicelabs.goatrodeo.util.Helpers
 
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeMap
@@ -50,6 +51,12 @@ import scala.util.Try
   */
 object ServiceCryptoStrategy {
   private val logger = Logger(getClass())
+
+  /** Bound for the strategy's text read. Service config files are small;
+    * MIME-claimed SQLCipher files may be larger, but the PRAGMA that triggered
+    * detection is always within this bound (the MIME detector reads 256 KiB).
+    */
+  val MaxReadBytes: Int = 1024 * 1024
 
   // ── Service detection ───────────────────────────────────────────────────
 
@@ -77,16 +84,39 @@ object ServiceCryptoStrategy {
     else if (fileName.startsWith("wg") && fileName.endsWith(".conf"))
       Some("wireguard")
     else if (fileName == "krb5.conf") Some("kerberos")
+    else if (fileName == "mongod.conf") Some("mongodb")
+    else if (fileName == "sqlnet.ora") Some("oracle")
+    else if (fileName == "cassandra.yaml") Some("cassandra")
     else None
   }
 
-  /** Compute service crypto config files to process at a layer. */
+  /** Cheap, content-only DB-encryption markers (SQLCipher PRAGMAs or
+    * `sqlcipher_export` in code or config). Used by the MIME pass; never emits
+    * the key value.
+    */
+  private[goatrodeo] def detectsSqlcipher(text: String): Boolean =
+    (text.contains("PRAGMA") || text.contains("sqlcipher")) && (
+      SqlcipherKey.findFirstIn(text).isDefined ||
+        SqlcipherRekey.findFirstIn(text).isDefined ||
+        text.contains("sqlcipher_export") ||
+        text.contains("PRAGMA cipher_")
+    )
+
+  /** Compute service crypto config files to process at a layer. Claims by
+    * service path, and additionally by the DB-encryption MIME (SQLCipher
+    * pragmas live in arbitrary code/config files, not a fixed path).
+    */
   def computeServiceCryptoFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val mine =
-      byUUID.values.filter(a => detectService(a.path()).isDefined).toVector
+      byUUID.values
+        .filter(a =>
+          detectService(a.path()).isDefined ||
+            a.mimeType.contains(CryptoContentDetector.DbEncryptionMime)
+        )
+        .toVector
 
     val uuids = mine.map(_.uuid).toSet
 
@@ -139,6 +169,51 @@ object ServiceCryptoStrategy {
 
   private val KrbEnctypes =
     "^\\s*(default_tkt_enctypes|default_tgs_enctypes|permitted_enctypes)\\s*=\\s*(.+)$".r
+
+  // ── Database-encryption regexes ──────────────────────────────────────────
+
+  // MySQL keyring
+  private val MyKeyringFile = "^\\s*keyring_file_data\\s*=\\s*(\\S+)".r
+  private val MyKeyringEncryptedFile =
+    "^\\s*keyring_encrypted_file_data\\s*=\\s*(\\S+)".r
+  private val MyEarlyPluginLoad = "^\\s*early-plugin-load\\s*=\\s*(\\S+)".r
+  private val MyKeyringAws = "^\\s*keyring_aws_[a-z_]+\\s*=\\s*(\\S+)".r
+  private val MyKeyringHashi =
+    "^\\s*keyring_hashicorp_[a-z_]+\\s*=\\s*(\\S+)".r
+  private val MyEncryptTables = "^\\s*innodb_encrypt_tables\\s*=\\s*(\\S+)".r
+  private val MyEncryptLog = "^\\s*innodb_encrypt_log\\s*=\\s*(\\S+)".r
+  private val MyRedoLogEncrypt =
+    "^\\s*innodb_redo_log_encrypt\\s*=\\s*(\\S+)".r
+  private val MyBinlogEncrypt = "^\\s*binlog_encryption\\s*=\\s*(\\S+)".r
+  private val MyEncryptTmpTables =
+    "^\\s*innodb_encrypt_temporary_tables\\s*=\\s*(\\S+)".r
+
+  // MariaDB file-key-management
+  private val MaKeyFile = "^\\s*file_key_management_filename\\s*=\\s*(\\S+)".r
+  private val MaKeyAlg =
+    "^\\s*file_key_management_encryption_algorithm\\s*=\\s*(\\S+)".r
+  private val MaEncryptBinlog = "^\\s*encrypt_binlog\\s*=\\s*(\\S+)".r
+  private val MaAwsPlugin = "^\\s*aws_key_management_[a-z_]+\\s*=\\s*(\\S+)".r
+
+  // SQLCipher (presence-only: the key value is NEVER emitted)
+  private val SqlcipherKey =
+    "(?i)PRAGMA\\s+key\\s*=\\s*(\"[^\"]*\"|'[^']*'|\\S+)".r
+  private val SqlcipherRekey =
+    "(?i)PRAGMA\\s+rekey\\s*=\\s*(\"[^\"]*\"|'[^']*'|\\S+)".r
+
+  // MongoDB encryption-at-rest (YAML)
+  private val MongoEnableEncryption =
+    "^\\s*enableEncryption:\\s*(true|false)".r
+  private val MongoKeyFile = "^\\s*keyFile:\\s*(\\S+)".r
+  private val MongoKmip = "^\\s*kmip:".r
+
+  // Oracle TDE
+  private val OracleWalletLocation = "ENCRYPTION_WALLET_LOCATION\\s*=".r
+  private val OracleWalletDir = "DIRECTORY\\s*=\\s*([^)\\s]+)".r
+
+  // Cassandra TDE
+  private val CassTde = "^\\s*transparent_data_encryption_options:".r
+  private val CassKeyProvider = "^\\s*key_provider:\\s*(\\S+)".r
 
   // ── Transform grammar (strongSwan proposals) ────────────────────────────
 
@@ -213,13 +288,19 @@ object ServiceCryptoStrategy {
       pskPresent: Boolean = false,
       privateKeyPresent: Boolean = false,
       authAlgorithm: Option[String] = None,
-      enctypes: Vector[String] = Vector.empty
+      enctypes: Vector[String] = Vector.empty,
+      dbMechanisms: Vector[String] = Vector.empty,
+      dbKeyFile: Option[String] = None,
+      dbAlgorithms: Vector[String] = Vector.empty,
+      dbBackend: Option[String] = None,
+      dbFlags: Vector[String] = Vector.empty
   ) {
     def isEmpty: Boolean =
       cipherValues.isEmpty && transforms.isEmpty && protocolMin.isEmpty &&
         protocolMax.isEmpty && protocolRaw.isEmpty && certFile.isEmpty &&
         keyFile.isEmpty && !pskPresent && !privateKeyPresent && authAlgorithm.isEmpty &&
-        enctypes.isEmpty
+        enctypes.isEmpty && dbMechanisms.isEmpty && dbKeyFile.isEmpty &&
+        dbAlgorithms.isEmpty && dbBackend.isEmpty && dbFlags.isEmpty
   }
 
   private[strategies] def parseText(
@@ -236,6 +317,10 @@ object ServiceCryptoStrategy {
       case "mysql"      => parseMysql(text)
       case "wireguard"  => parseWireGuard(text)
       case "kerberos"   => parseKerberos(text)
+      case "mongodb"    => parseMongoDb(text)
+      case "oracle"     => parseOracle(text)
+      case "cassandra"  => parseCassandra(text)
+      case "sqlcipher"  => parseSqlcipher(text)
       case _            => ParsedConfig()
     }
 
@@ -362,6 +447,11 @@ object ServiceCryptoStrategy {
     var cert: Option[String] = None
     var key: Option[String] = None
     var inMysqld = false
+    val mechanisms = Vector.newBuilder[String]
+    val dbAlgorithms = Vector.newBuilder[String]
+    val flags = Vector.newBuilder[String]
+    var dbKeyFile: Option[String] = None
+    var dbBackend: Option[String] = None
     text.linesIterator.foreach { line =>
       val t = line.trim
       if (t.startsWith("[")) {
@@ -374,7 +464,43 @@ object ServiceCryptoStrategy {
           case MyPaths("cert", v) => cert = Some(Option(v).getOrElse("").trim)
           case MyPaths("key", v)  => key = Some(Option(v).getOrElse("").trim)
           case MyPaths("ca", _)   => ()
-          case _                  =>
+          // database encryption: MySQL keyring + InnoDB encryption
+          case MyKeyringFile(v) =>
+            mechanisms += "keyring"
+            dbKeyFile = Some(Option(v).getOrElse("").trim)
+          case MyKeyringEncryptedFile(v) =>
+            mechanisms += "keyring-encrypted"
+            dbKeyFile = Some(Option(v).getOrElse("").trim)
+          case MyEarlyPluginLoad(v) =>
+            val p = Option(v).getOrElse("").trim
+            if (p.contains("keyring_file")) mechanisms += "keyring"
+          case MyKeyringAws(_) =>
+            mechanisms += "keyring"
+            dbBackend = Some("aws")
+          case MyKeyringHashi(_) =>
+            mechanisms += "keyring"
+            dbBackend = Some("hashicorp")
+          case MyEncryptTables(v) if isOn(v) => flags += "innodb_encrypt_tables"
+          case MyEncryptLog(v) if isOn(v)    => flags += "innodb_encrypt_log"
+          case MyRedoLogEncrypt(v) if isOn(v) =>
+            flags += "innodb_redo_log_encrypt"
+          case MyBinlogEncrypt(v) if isOn(v) => flags += "binlog_encryption"
+          case MyEncryptTmpTables(v) if isOn(v) =>
+            flags += "innodb_encrypt_temporary_tables"
+          // MariaDB file-key-management (mariadb.cnf routes here too)
+          case MaKeyFile(v) =>
+            mechanisms += "file-key-management"
+            dbKeyFile = Some(Option(v).getOrElse("").trim)
+          case MaKeyAlg(v) =>
+            mechanisms += "file-key-management"
+            dbAlgorithms += Option(v).getOrElse("").trim
+          case MaEncryptBinlog(v) if isOn(v) =>
+            mechanisms += "file-key-management"
+            flags += "encrypt_binlog"
+          case MaAwsPlugin(_) =>
+            mechanisms += "file-key-management"
+            dbBackend = Some("aws")
+          case _ =>
         }
       }
     }
@@ -390,7 +516,86 @@ object ServiceCryptoStrategy {
       protocolMax = maxV,
       protocolRaw = tlsVersion,
       certFile = cert,
-      keyFile = key
+      keyFile = key,
+      dbMechanisms = mechanisms.result().distinct,
+      dbKeyFile = dbKeyFile,
+      dbAlgorithms = dbAlgorithms.result().distinct,
+      dbBackend = dbBackend,
+      dbFlags = flags.result().distinct
+    )
+  }
+
+  /** Case-insensitive "on" for MySQL/MariaDB boolean settings. */
+  private def isOn(v: String | Null): Boolean =
+    Option(v).exists(s =>
+      s.equalsIgnoreCase("on") || s == "1" || s.equalsIgnoreCase("true")
+    )
+
+  private def parseMongoDb(text: String): ParsedConfig = {
+    val mechanisms = Vector.newBuilder[String]
+    val flags = Vector.newBuilder[String]
+    var dbKeyFile: Option[String] = None
+    text.linesIterator.foreach { line =>
+      line.trim match {
+        case MongoEnableEncryption(v)
+            if Option(v).exists(_.equalsIgnoreCase("true")) =>
+          flags += "enableEncryption"
+        case MongoKeyFile(v) =>
+          mechanisms += "keyfile"
+          dbKeyFile = Some(Option(v).getOrElse("").trim)
+        case MongoKmip() =>
+          mechanisms += "kmip"
+        case _ =>
+      }
+    }
+    ParsedConfig(
+      dbMechanisms = mechanisms.result().distinct,
+      dbKeyFile = dbKeyFile,
+      dbFlags = flags.result().distinct
+    )
+  }
+
+  private def parseOracle(text: String): ParsedConfig = {
+    // The DIRECTORY continuation may be on a later line, so scan the whole text.
+    val wallet = OracleWalletLocation.findFirstIn(text).isDefined
+    val walletDir = OracleWalletDir
+      .findFirstMatchIn(text)
+      .map(m => Option(m.group(1)).getOrElse("").trim)
+    ParsedConfig(
+      dbMechanisms = if (wallet) Vector("wallet") else Vector.empty,
+      dbKeyFile = walletDir
+    )
+  }
+
+  private def parseCassandra(text: String): ParsedConfig = {
+    var tde = false
+    var provider: Option[String] = None
+    text.linesIterator.foreach { line =>
+      line.trim match {
+        case CassTde()          => tde = true
+        case CassKeyProvider(v) => provider = Some(Option(v).getOrElse("").trim)
+        case _                  =>
+      }
+    }
+    ParsedConfig(
+      dbMechanisms = if (tde) Vector("tde") else Vector.empty,
+      dbBackend = provider
+    )
+  }
+
+  private def parseSqlcipher(text: String): ParsedConfig = {
+    var keyPresent = false
+    text.linesIterator.foreach { line =>
+      if (
+        SqlcipherKey.findFirstIn(line).isDefined ||
+        SqlcipherRekey.findFirstIn(line).isDefined ||
+        line.contains("sqlcipher_export") ||
+        line.contains("PRAGMA cipher_")
+      ) keyPresent = true
+    }
+    // Presence-only: the key VALUE is never captured.
+    ParsedConfig(
+      dbMechanisms = if (keyPresent) Vector("sqlcipher") else Vector.empty
     )
   }
 
@@ -448,6 +653,7 @@ class ServiceCryptoState(artifact: ArtifactWrapper)
 
   private val adHoc = MKC.adHoc("ServiceCrypto")
   private val krbAdHoc = MKC.adHoc("Kerberos")
+  private val dbAdHoc = MKC.adHoc("DbEncryption")
 
   override def beginProcessing(
       artifact: ArtifactWrapper,
@@ -494,10 +700,20 @@ class ServiceCryptoState(artifact: ArtifactWrapper)
       artifact: ArtifactWrapper
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val path = artifact.path()
-    val service = ServiceCryptoStrategy.detectService(path).getOrElse("")
+    val service = ServiceCryptoStrategy
+      .detectService(path)
+      .orElse(
+        if (artifact.mimeType.contains(CryptoContentDetector.DbEncryptionMime))
+          Some("sqlcipher")
+        else None
+      )
+      .getOrElse("")
     val text = Try {
       artifact.withStream { stream =>
-        new String(Helpers.slurpInput(stream), StandardCharsets.ISO_8859_1)
+        val buf = new Array[Byte](ServiceCryptoStrategy.MaxReadBytes)
+        val n = stream.read(buf, 0, ServiceCryptoStrategy.MaxReadBytes)
+        if (n <= 0) ""
+        else new String(buf, 0, n, StandardCharsets.ISO_8859_1)
       }
     }.getOrElse("")
 
@@ -566,6 +782,48 @@ class ServiceCryptoState(artifact: ArtifactWrapper)
         ))
         parsed.enctypes.distinct.foreach { e =>
           tm = tm + (krbAdHoc(s"enctype:$e") -> TreeSet(StringOrPair("true")))
+        }
+      }
+      // Database-encryption inventory (presence/paths/declared algorithms
+      // only; key material is never read or emitted).
+      if (
+        parsed.dbMechanisms.nonEmpty || parsed.dbKeyFile.nonEmpty ||
+        parsed.dbAlgorithms.nonEmpty || parsed.dbBackend.nonEmpty ||
+        parsed.dbFlags.nonEmpty
+      ) {
+        val dbName = service match {
+          case "mysql" =>
+            if (path.split('/').lastOption.contains("mariadb.cnf")) "mariadb"
+            else "mysql"
+          case "mongodb"   => "mongodb"
+          case "oracle"    => "oracle"
+          case "cassandra" => "cassandra"
+          case "sqlcipher" => "sqlite"
+          case other       => other
+        }
+        tm = tm + (dbAdHoc("db") -> TreeSet(StringOrPair(dbName)))
+        if (parsed.dbMechanisms.nonEmpty) {
+          tm = tm + (dbAdHoc("mechanism") -> TreeSet.from(
+            parsed.dbMechanisms.map(StringOrPair(_))
+          ))
+        }
+        parsed.dbKeyFile.foreach(v =>
+          tm = tm + (dbAdHoc("key_file") -> TreeSet(StringOrPair(v)))
+        )
+        parsed.dbBackend.foreach(v =>
+          tm = tm + (dbAdHoc("backend") -> TreeSet(StringOrPair(v)))
+        )
+        val registryAlgs = parsed.dbAlgorithms
+          .filter(CryptoAlgorithms.canonicalVocabulary.contains)
+          .distinct
+          .sorted
+        if (registryAlgs.nonEmpty) {
+          tm = tm + (dbAdHoc("algorithms") -> TreeSet.from(
+            registryAlgs.map(StringOrPair(_))
+          ))
+        }
+        parsed.dbFlags.foreach { f =>
+          tm = tm + (dbAdHoc(s"flag:$f") -> TreeSet(StringOrPair("true")))
         }
       }
       tm

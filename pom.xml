@@ -70,7 +70,7 @@
     <coordinates.version>1.1.0</coordinates.version>
     <baharat.version>0.1.1</baharat.version>
     <annatto.version>0.2.0</annatto.version>
-    <saffron.version>0.3.1</saffron.version>
+    <saffron.version>0.4.0</saffron.version>
     <bouncycastle.version>1.85</bouncycastle.version>
     <!-- BC publishes quick-patch releases per artifact: bcprov-jdk18on has a
          1.85.2 patch beyond the 1.85 release train used by the other modules. -->

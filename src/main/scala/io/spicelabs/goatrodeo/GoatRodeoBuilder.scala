@@ -359,7 +359,8 @@ class GoatRodeoBuilder {
     *
     * Supported keys: payload, output, threads, maxRecords, ingested, ignore,
     * fileList, excludePattern, blockList, tempDir, tag-json, tag, mimeFilter,
-    * mimeFilterFile, emitJsonDir, emitCbomDir, cbomVersion
+    * mimeFilterFile, emitJsonDir, emitCbomDir, cbomVersion, logFilenames,
+    * tamperEvidentLog
     *
     * @param key
     *   the argument name
@@ -395,6 +396,10 @@ class GoatRodeoBuilder {
       case "cbomVersion" =>
         config = config.copy(cbomVersion = value)
         this
+      case "logFilenames" | "log-filenames" =>
+        withLogFilenames(value.toBoolean)
+      case "tamperEvidentLog" | "tamper-evident-log" =>
+        withTamperEvidentLog(value)
       case unknown =>
         log.warn(s"Ignored unknown GoatRodeoBuilder arg: $unknown=$value")
         this
@@ -486,6 +491,36 @@ class GoatRodeoBuilder {
     */
   def withCbomVersion(v: String): GoatRodeoBuilder = {
     config = config.copy(cbomVersion = v)
+    this
+  }
+
+  /** Log each processed top-level file as a log line (instead of stdout).
+    *
+    * When combined with [[withTamperEvidentLog]], each processed file becomes a
+    * chained line in the tamper-evident log.
+    *
+    * @param b
+    *   true to log each processed file
+    * @return
+    *   this builder
+    */
+  def withLogFilenames(b: Boolean): GoatRodeoBuilder = {
+    config = config.copy(logFilenames = b)
+    this
+  }
+
+  /** Write a hash-chained, tamper-evident log of this run to the given file.
+    *
+    * The log's chain head is embedded into the run's `.grc` files and the
+    * run-level checksum; see `info/tamper_evident_logging.md`.
+    *
+    * @param p
+    *   the path to the tamper-evident log file
+    * @return
+    *   this builder
+    */
+  def withTamperEvidentLog(p: String): GoatRodeoBuilder = {
+    config = config.copy(tamperEvidentLog = Some(Paths.get(p).toFile()))
     this
   }
 
