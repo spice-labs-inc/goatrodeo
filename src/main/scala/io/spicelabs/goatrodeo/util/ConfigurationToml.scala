@@ -128,6 +128,22 @@ object ConfigurationToml {
     */
   def fieldKeys: Set[String] = keyForField.values.toSet
 
+  /** The [[Configuration]] fields [[keyForField]] gives a config-file key.
+    *
+    * The companion to [[fieldKeys]], and it faces the other way. `fieldKeys`
+    * catches a key claimed here that the schema does not accept; this catches a
+    * field added to [[Configuration]] that nothing here mentions -- which is
+    * how a setting comes to have a flag and no file or environment spelling
+    * without anybody deciding that it should.
+    */
+  def mappedFields: Set[String] = keyForField.keySet
+
+  /** Keys a config file may name but not set, so that they are refused by name
+    * rather than reported as a typo. Exposed so a test can hold the two lists
+    * against each other.
+    */
+  def rejectedKeys: Set[String] = alwaysRejected.keySet
+
   /** Whether the `[analysis]` table accepts this key. */
   def accepts(key: String): Boolean = knownKeys.contains(key)
 
