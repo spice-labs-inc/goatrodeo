@@ -15,8 +15,8 @@ limitations under the License. */
 import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ExpandFiles
-import io.spicelabs.goatrodeo.util.VectorOfStrings
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.io.File
 import java.nio.file.Files

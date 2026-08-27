@@ -19,9 +19,10 @@ import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Configuration
-import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
+import io.spicelabs.goatrodeo.util.config
 
 import java.io.BufferedWriter
 import java.io.File
@@ -43,6 +44,19 @@ import scala.util.Try
   */
 object Builder {
   private val logger: Logger = Logger(getClass())
+
+  /** The number of worker threads a batch may still have busy before the next
+    * batch's processing is kicked off: 10% of the allocated threads (integer
+    * division). With fewer than 10 allocated threads this is 0, so a batch is
+    * never overlapped — the next batch starts only after the current one has
+    * fully finished processing.
+    *
+    * @param threadCnt
+    *   the number of worker threads allocated per batch
+    * @return
+    *   the wind-down threshold (a live-worker count, inclusive)
+    */
+  def windDownThreshold(threadCnt: Int): Int = threadCnt / 10
 
   /** Build the OmniBOR GitOID Corpus from all the files contained in the
     * directory and its subdirectories. Put the results in Storage.
@@ -185,8 +199,18 @@ object Builder {
     var loopCnt = 0
 
     val writeThreadCnt = AtomicInteger(0)
-    while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
-      val thread = processMaxRecords(
+
+    // The next batch's workers are kicked off once the current batch is down to
+    // 10% of its allocated threads (integer division, so with fewer than 10
+    // allocated threads a batch is never overlapped — the next batch starts only
+    // after the current one fully finishes). Additionally the batch before the
+    // current one must have completed its write, so at most two batches (and
+    // therefore two storages) are ever alive at once.
+    val windDownThreshold = Builder.windDownThreshold(config.threads)
+
+    def startNextBatch(): Option[BatchState] = {
+      loopCnt += 1
+      val ret = processMaxRecords(
         updatedDest,
         queue = queue,
         stillWorking = stillWorking,
@@ -201,13 +225,27 @@ object Builder {
         progressNotifier = progressNotifier,
         preWriteDB = preWriteDB
       )
-
-      loopCnt += 1
       logger.info(
-        f"Finished multi-thread consumer loop ${loopCnt}%,d at ${Duration
+        f"Starting multi-thread consumer loop ${loopCnt}%,d at ${Duration
             .between(totalStart, Instant.now())}"
       )
       updatedDest = destWithCount(dest, loopCnt)
+      ret
+    }
+
+    var olderBatch: Option[BatchState] = None
+    var currentBatch: Option[BatchState] = startNextBatch()
+
+    while (!dead_?.get() && (stillWorking.get() || !queue.isEmpty())) {
+      currentBatch match {
+        case Some(batch)
+            if batch.liveWorkers.get() <= windDownThreshold &&
+              olderBatch.forall(_.saverDone.get()) =>
+          olderBatch = currentBatch
+          currentBatch = startNextBatch()
+        case _ =>
+          Thread.sleep(25)
+      }
     }
 
     logger.debug("Waiting for write threads")
@@ -224,6 +262,21 @@ object Builder {
     done(!dead_?.get())
 
     logger.info("Done with run")
+
+    // Write the run-level tamper-evident checksum as the final action (no
+    // chained log line follows it), so its final_chain_head is the digest of
+    // the last line of the log. Correlates the run id, the log, and every
+    // .grc written across all batch dirs.
+    TamperEvidentLog.correlationId match {
+      case ""     => ()
+      case corrId => TamperEvidentLog.writeChecksum(dest, corrId)
+    }
+    // No reset here: whoever called TamperEvidentLog.start owns the teardown,
+    // and that is Howdy.run, which does it in a finally so a throw cannot skip
+    // it. Resetting from here as well detached the chain appender before
+    // Howdy.run had finished with it, leaving anything logged after buildDB
+    // returns outside the chain -- silently, since an unchained line looks no
+    // different.
   }
 
   private def processMaxRecords(
@@ -240,8 +293,10 @@ object Builder {
       writeThreadCnt: AtomicInteger,
       progressNotifier: ProgressListener.Notifier,
       preWriteDB: Vector[Storage => Boolean] = Vector()
-  )(using Configuration): Option[Thread] = {
+  )(using Configuration): Option[BatchState] = {
 
+    val liveWorkers = AtomicInteger(0)
+    val saverDone = AtomicBoolean(false)
     val storage = MemStorage(Some(destDir))
 
 // if there's a tag, set it up
@@ -282,151 +337,159 @@ object Builder {
     val threads = for { threadNum <- 0 until config.threads } yield {
       val t = new Thread(
         () => {
+          liveWorkers.incrementAndGet()
+          try {
 
-          @tailrec
-          def doPoll(): ToProcess = {
-            val tried = queue.poll()
-            if (tried != null || !stillWorking.get()) {
-              tried
-            } else {
-              // wait 1-32 ms
-              Thread.sleep(1 + Math.abs(Helpers.randomLong()) % 32)
-              doPoll()
+            @tailrec
+            def doPoll(): ToProcess = {
+              val tried = queue.poll()
+              if (tried != null || !stillWorking.get()) {
+                tried
+              } else {
+                // wait 1-32 ms
+                Thread.sleep(1 + Math.abs(Helpers.randomLong()) % 32)
+                doPoll()
+              }
             }
-          }
 
-          // pull the files from the channel
-          // if the channel is closed/empty, `None` will be
-          // returned, handle it gracefully
+            // pull the files from the channel
+            // if the channel is closed/empty, `None` will be
+            // returned, handle it gracefully
 
-          var toProcessOpt: Option[ToProcess] = None
-          while (
-            (cnt.get() - startedRunning) < config.maxRecords // only run so many items
-            &&
-            !dead_?.get() && {
-              toProcessOpt = Option(doPoll())
-              toProcessOpt.isDefined
-            }
-          ) {
-            val toProcess = toProcessOpt.get
-            val localStart = Instant.now()
-            try {
-              // build the package
+            var toProcessOpt: Option[ToProcess] = None
+            while (
+              (cnt.get() - startedRunning) < config.maxRecords // only run so many items
+              &&
+              !dead_?.get() && {
+                toProcessOpt = Option(doPoll())
+                toProcessOpt.isDefined
+              }
+            ) {
+              val toProcess = toProcessOpt.get
+              val localStart = Instant.now()
+              try {
+                // build the package
 
-              val byHash: Map[String, Vector[Augmentation]] =
-                if (config.useStaticMetadata) {
-                  toProcess.runStaticMetadataGather(config.mimeFilter)
-                } else {
-                  Map()
-                }
+                val byHash: Map[String, Vector[Augmentation]] =
+                  if (config.useStaticMetadata) {
+                    toProcess.runStaticMetadataGather(config.mimeFilter)
+                  } else {
+                    Map()
+                  }
 
-              toProcess.process(
-                None,
-                store = storage,
-                tag = tag,
-                parentScope =
-                  ParentScope.forAndWith(toProcess.main, None, byHash),
-                blockList = blockGitoids,
-                keepRunning = () => !dead_?.get(),
-                atEnd = (parent, _) => {
-                  if (parent.isEmpty) {
-                    val updatedCnt = cnt.addAndGet(1)
-                    val theDuration = Duration
-                      .between(localStart, Instant.now())
-                    if (
-                      theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
-                    ) {
+                toProcess.process(
+                  None,
+                  store = storage,
+                  tag = tag,
+                  parentScope =
+                    ParentScope.forAndWith(toProcess.main, None, byHash),
+                  blockList = blockGitoids,
+                  keepRunning = () => !dead_?.get(),
+                  atEnd = (parent, _) => {
+                    if (parent.isEmpty) {
+                      val updatedCnt = cnt.addAndGet(1)
+                      val theDuration = Duration
+                        .between(localStart, Instant.now())
+                      if (
+                        theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
+                      ) {
 
-                      // if we've got a temp dir and we're down to 10% free space, bail
-                      config.tempDir match {
-                        case Some(theDir) =>
-                          for {
-                            fileStore <- Try {
-                              Files.getFileStore(
-                                theDir.toPath().toAbsolutePath()
-                              )
-                            }.toOption
-                            total <- Try { fileStore.getTotalSpace().toDouble }
-                            available <- Try {
-                              fileStore.getUsableSpace().toDouble
+                        // if we've got a temp dir and we're down to 10% free space, bail
+                        config.tempDir match {
+                          case Some(theDir) =>
+                            for {
+                              fileStore <- Try {
+                                Files.getFileStore(
+                                  theDir.toPath().toAbsolutePath()
+                                )
+                              }.toOption
+                              total <- Try {
+                                fileStore.getTotalSpace().toDouble
+                              }.toOption
+                              available <- Try {
+                                fileStore.getUsableSpace().toDouble
+                              }.toOption
+                            } {
+                              val remaining = available / total
+                              if (remaining < 0.05) {
+                                val errorMsg =
+                                  s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
+                                logger.error(errorMsg)
+                                dead_?.set(true)
+                                throw new Exception(errorMsg)
+                              }
                             }
-                          } {
-                            val remaining = available / total
-                            if (remaining < 0.05) {
-                              val errorMsg =
-                                s"Temp filesystem ${theDir} is more than 95% full. Total ${total} available ${available} remaining ${remaining}, terminating"
-                              logger.error(errorMsg)
-                              dead_?.set(true)
-                              throw new Exception(errorMsg)
-                            }
-                          }
-                        case _ => // do nothing
-                      }
-                      val now = Instant.now()
-                      val totalDuration = Duration.between(totalStart, now)
-                      val processDuration = Duration.between(loopStart, now)
-                      val totalItems = runningCnt.get()
-                      val avgMsg = if (processDuration.getSeconds() > 0) {
-                        val itemsPerSecond =
-                          updatedCnt.toDouble / processDuration
-                            .getSeconds()
-                            .toDouble
-                        val itemsPerMinute = itemsPerSecond * 60.0d
-                        val left = totalItems.toDouble - updatedCnt.toDouble
-                        val remainingDuration = Duration.ZERO.plusSeconds(
-                          (left / itemsPerSecond).round
+                          case _ => // do nothing
+                        }
+                        val now = Instant.now()
+                        val totalDuration = Duration.between(totalStart, now)
+                        val processDuration = Duration.between(loopStart, now)
+                        val totalItems = runningCnt.get()
+                        val avgMsg = if (processDuration.getSeconds() > 0) {
+                          val itemsPerSecond =
+                            updatedCnt.toDouble / processDuration
+                              .getSeconds()
+                              .toDouble
+                          val itemsPerMinute = itemsPerSecond * 60.0d
+                          val left = totalItems.toDouble - updatedCnt.toDouble
+                          val remainingDuration = Duration.ZERO.plusSeconds(
+                            (left / itemsPerSecond).round
+                          )
+                          f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
+                        } else ""
+                        logger.info(
+                          f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
                         )
-                        f" Items/minute ${itemsPerMinute.round}, est remaining ${remainingDuration}"
-                      } else ""
-                      logger.info(
-                        f"Processed ${updatedCnt}%,d of ${totalItems}%,d at ${totalDuration}/${processDuration}${avgMsg}. ${toProcess.main} took ${theDuration} vertices ${storage.size()}%,d"
-                      )
-                      progressNotifier.notify(
-                        updatedCnt.toLong,
-                        totalItems.toLong
-                      )
+                        progressNotifier.notify(
+                          updatedCnt.toLong,
+                          totalItems.toLong
+                        )
+                      }
                     }
                   }
-                }
-              )
-
-            } catch {
-              case oom: OutOfMemoryError => {
-                logger.error("Out of memory", oom)
-                dead_?.set(true)
-                throw oom
-              }
-              case ise: IllegalStateException => {
-                logger.error(
-                  f"Failed illegal state ${toProcess.main} -- ${toProcess.mimeType} ${ise}"
                 )
-                dead_?.set(true)
-                throw ise
-              }
-              case ioe: IOException => {
-                if (
-                  ioe.getMessage() != null && ioe
-                    .getMessage()
-                    .indexOf("Too many open files") > 0
-                ) {
+
+              } catch {
+                case oom: OutOfMemoryError => {
+                  logger.error("Out of memory", oom)
                   dead_?.set(true)
-                  throw ioe
-
+                  throw oom
                 }
-                logger.error(
-                  f"Failed IO ${toProcess.main} ${toProcess.mimeType} ${ioe}"
-                )
-              }
-              case e: Exception => {
-                logger.error(
-                  f"Failed generic ${toProcess.main} -- ${toProcess.mimeType} ${e}",
-                  e
-                )
-                // Helpers.bailFail()
+                case ise: IllegalStateException => {
+                  logger.error(
+                    f"Failed illegal state ${toProcess.main} -- ${toProcess.mimeType} ${ise}"
+                  )
+                  dead_?.set(true)
+                  throw ise
+                }
+                case ioe: IOException => {
+                  if (
+                    ioe.getMessage() != null && ioe
+                      .getMessage()
+                      .indexOf("Too many open files") > 0
+                  ) {
+                    dead_?.set(true)
+                    throw ioe
+
+                  }
+                  logger.error(
+                    f"Failed IO ${toProcess.main} ${toProcess.mimeType} ${ioe}",
+                    ioe
+                  )
+                }
+                case e: Exception => {
+                  logger.error(
+                    f"Failed generic ${toProcess.main} -- ${toProcess.mimeType} ${e}",
+                    e
+                  )
+                  // Helpers.bailFail()
+                }
+
               }
 
             }
-
+          } finally {
+            liveWorkers.decrementAndGet()
           }
         },
         f"gitoid ${batchName} ${threadNum}"
@@ -435,20 +498,23 @@ object Builder {
       t
     }
 
-    // wait for the threads to complete
-    for { t <- threads } {
-      // deal with SIGKILL/ctrl-C
-      if (t.isInterrupted() || dead_?.get()) {
-        Thread.currentThread().interrupt()
-        throw InterruptedException(f"${t.getName()} was interrupted")
-      }
-      t.join()
-    }
-
     if (!dead_?.get()) {
       val thread = new Thread(
         () => {
           try {
+            // The batch must be fully analyzed before it is written: wait for
+            // every worker thread of this batch (including any still finishing
+            // a large artifact) before emitting CBOMs and GRC/GRD files.
+            for { t <- threads } {
+              if (t.isInterrupted() || dead_?.get()) {
+                Thread.currentThread().interrupt()
+                throw new InterruptedException(
+                  f"${t.getName()} was interrupted"
+                )
+              }
+              t.join()
+            }
+
             logger.info(
               f"Finished processing ${cnt.get()}%,d, vertices ${storage.size()}%,d at ${Duration
                   .between(start, Instant.now())}"
@@ -463,7 +529,12 @@ object Builder {
             config.cbomDir.foreach { cbomDir =>
               if (!dead_?.get()) {
                 CbomEmitter
-                  .emitForStorage(storage, config.cbomVersion, cbomDir) match {
+                  .emitForStorage(
+                    storage,
+                    config.cbomVersion,
+                    cbomDir,
+                    TamperEvidentLog.correlationId
+                  ) match {
                   case scala.util.Success(files) =>
                     logger.info(
                       f"Wrote ${files.length}%,d CBOM file(s) to ${cbomDir}"
@@ -490,6 +561,7 @@ object Builder {
                   .between(writeStart, Instant.now())}"
             )
           } finally {
+            saverDone.set(true)
             writeThreadCnt.decrementAndGet()
           }
         },
@@ -497,8 +569,11 @@ object Builder {
       )
       writeThreadCnt.addAndGet(1)
       thread.start()
-      Some(thread)
-    } else None
+      Some(BatchState(liveWorkers, saverDone))
+    } else {
+      saverDone.set(true)
+      None
+    }
 
   }
 
@@ -634,3 +709,13 @@ object Builder {
 }
 
 case class TagPass(gitoid: String, jsonStr: String, json: Dom.Element)
+
+/** Run-state of a single batch: how many of its worker threads are still
+  * analyzing artifacts, and whether its Saver (the write phase) has completed.
+  * Used to overlap the *next* batch's processing with the current batch's
+  * wind-down without ever having more than two batches alive.
+  */
+case class BatchState(
+    liveWorkers: AtomicInteger,
+    saverDone: AtomicBoolean
+)

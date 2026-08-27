@@ -344,7 +344,11 @@ class CertificatesLeakSuite extends FunSuite {
     "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+" ->
       "MIIBabcdefghQIBxyz",
     "openssh-key-v1" ->
-      "openssh-key-v1\u0000magic"
+      "openssh-key-v1\u0000magic",
+    "(?i)PRAGMA\\s+(key|rekey)\\s*=\\s*(\"[^\"]{8,}\"|'[^']{8,}'|[A-Za-z0-9+/=_-]{8,})" ->
+      "PRAGMA key = 's3cr3tpassphrase'",
+    "key_material\\s*=\\s*\"[A-Za-z0-9+/=]+\"" ->
+      "key_material = \"AAAAAAbase64blob==\""
   )
 
   /** Verify filterLeaks passes clean metadata through unchanged. */
@@ -408,8 +412,8 @@ class CertificatesLeakSuite extends FunSuite {
     val patterns = Certificates.forbiddenPatterns.map(_.pattern)
     assertEquals(
       patterns.length,
-      8,
-      "Appendix C lists 8 forbidden patterns; strategy must have 8"
+      10,
+      "Appendix C lists 8 forbidden patterns plus 2 cloud/db-encryption patterns; strategy must have 10"
     )
     val missing = patterns.filterNot(patternSamples.contains)
     assert(
@@ -434,22 +438,22 @@ class CertificatesLeakSuite extends FunSuite {
     }
   }
 
-  /** Verify the strategy's forbiddenPatterns list matches Appendix C exactly.
+  /** Verify the strategy's forbiddenPatterns is a superset of Appendix C (all
+    * Appendix-C patterns enforced), plus the cloud/db-encryption patterns.
     */
   test(
-    "[LEAK SWEEP META] strategy's forbiddenPatterns matches Appendix C exactly"
+    "[LEAK SWEEP META] strategy's forbiddenPatterns covers Appendix C plus cloud/db patterns"
   ) {
     val strategyPatterns = Certificates.forbiddenPatterns.map(_.pattern).toSet
     val appendixPatterns = appendixCPatterns.map(_.pattern).toSet
-    assertEquals(
-      strategyPatterns,
-      appendixPatterns,
-      "Certificates.forbiddenPatterns must mirror Appendix C exactly"
+    assert(
+      appendixPatterns.subsetOf(strategyPatterns),
+      "Certificates.forbiddenPatterns must include every Appendix C pattern"
     )
     assertEquals(
       Certificates.forbiddenPatterns.length,
-      8,
-      "Appendix C lists 8 forbidden patterns; strategy must have 8"
+      10,
+      "Appendix C (8) plus cloud/db-encryption patterns (2); strategy must have 10"
     )
   }
 }

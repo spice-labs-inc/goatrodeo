@@ -16,7 +16,6 @@ package io.spicelabs.goatrodeo.util
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import munit.FunSuite
-import scopt.OParser
 
 import java.io.File
 import java.nio.file.Paths
@@ -90,5 +89,58 @@ class ConfigCbomFlagsSuite extends FunSuite {
     val config = builderConfig(builder)
     assertEquals(config.cbomDir, Some(Paths.get("/tmp/cbom").toFile()))
     assertEquals(config.cbomVersion, "1.7")
+  }
+
+  // T4.5 — `--log-filenames` (CLI + README sync) controls the per-file
+  // progress flag. THEORY: a bare-true boolean flag that logs each top-level
+  // file after processing must parse to `logFilenames = true`, default
+  // to `false` when omitted, and accept an explicit `false`.
+  test("T4.5 --log-filenames true sets logFilenames") {
+    val parsed = parse("-b", "/tmp/in", "--log-filenames", "true")
+    assert(parsed.isDefined, "Valid --log-filenames flag should parse")
+    assertEquals(parsed.get.logFilenames, true)
+  }
+
+  test("T4.5 --log-filenames defaults to false when omitted") {
+    val parsed = parse("-b", "/tmp/in")
+    assert(parsed.isDefined)
+    assertEquals(parsed.get.logFilenames, false)
+  }
+
+  test("T4.5 --log-filenames false is accepted") {
+    val parsed = parse("-b", "/tmp/in", "--log-filenames", "false")
+    assert(parsed.isDefined)
+    assertEquals(parsed.get.logFilenames, false)
+  }
+
+  test("T4.6 --tamper-evident-log parses and defaults to None") {
+    val parsed = parse("-b", "/tmp/in", "--tamper-evident-log", "/tmp/run.log")
+    assert(parsed.isDefined)
+    assertEquals(parsed.get.tamperEvidentLog, Some(new File("/tmp/run.log")))
+    val omitted = parse("-b", "/tmp/in")
+    assert(omitted.isDefined)
+    assertEquals(omitted.get.tamperEvidentLog, None)
+  }
+
+  test("T4.7 GoatRodeoBuilder exposes log-filenames and tamper-evident-log") {
+    val builder = new GoatRodeoBuilder()
+      .withPayload("/tmp/in")
+      .withLogFilenames(true)
+      .withTamperEvidentLog("/tmp/run.log")
+    val config = builderConfig(builder)
+    assertEquals(config.logFilenames, true)
+    assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
+  }
+
+  test(
+    "T4.7 GoatRodeoBuilder withExtraArg supports logFilenames/tamperEvidentLog"
+  ) {
+    val builder = new GoatRodeoBuilder()
+      .withPayload("/tmp/in")
+      .withExtraArg("logFilenames", "true")
+      .withExtraArg("tamperEvidentLog", "/tmp/run.log")
+    val config = builderConfig(builder)
+    assertEquals(config.logFilenames, true)
+    assertEquals(config.tamperEvidentLog, Some(new File("/tmp/run.log")))
   }
 }

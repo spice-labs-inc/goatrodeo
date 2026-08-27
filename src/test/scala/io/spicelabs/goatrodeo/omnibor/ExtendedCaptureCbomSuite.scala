@@ -475,4 +475,97 @@ class ExtendedCaptureCbomSuite extends FunSuite {
       )
     } finally cleanup(dir)
   }
+
+  test("CloudKey → related-crypto-material other, no algorithm invention") {
+    val id = "gitoid:blob:sha256:" + "b" * 64
+    val item = makeItem(
+      id,
+      extra = TreeMap(
+        "CloudKey:provider" -> TreeSet(StringOrPair("aws")),
+        "CloudKey:resource_id" -> TreeSet(
+          StringOrPair(
+            "arn:aws:kms:us-west-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab"
+          )
+        ),
+        "CloudKey:algorithm" -> TreeSet(StringOrPair("RSA_2048")),
+        "CloudKey:key_material_present" -> TreeSet(StringOrPair("true"))
+      )
+    )
+    val (json, dir) = emitCbom(List(item))
+    try {
+      val c = byBomRef(json, id).get
+      assertEquals(materialType(c), "other")
+      assert(
+        propValues(c, "CloudKey:resource_id")
+          .contains(
+            "arn:aws:kms:us-west-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab"
+          ),
+        "resource id must surface as a property"
+      )
+      assert(
+        propValues(c, "CloudKey:key_material_present").contains("true"),
+        "key material presence flag must surface"
+      )
+    } finally cleanup(dir)
+  }
+
+  test(
+    "DbEncryption → related-crypto-material other + registry algorithm asset"
+  ) {
+    val id = "gitoid:blob:sha256:" + "c" * 64
+    val item = makeItem(
+      id,
+      extra = TreeMap(
+        "DbEncryption:db" -> TreeSet(StringOrPair("mariadb")),
+        "DbEncryption:mechanism" -> TreeSet(
+          StringOrPair("file-key-management")
+        ),
+        "DbEncryption:algorithms" -> TreeSet(StringOrPair("aes-256-cbc"))
+      )
+    )
+    val (json, dir) = emitCbom(List(item))
+    try {
+      val c = byBomRef(json, id).get
+      assertEquals(materialType(c), "other")
+      val algRef = getString(
+        c,
+        "cryptoProperties",
+        "relatedCryptoMaterialProperties",
+        "algorithmRef"
+      )
+      assert(byBomRef(json, algRef).isDefined, s"dangling db algorithm $algRef")
+      assert(
+        propValues(c, "DbEncryption:algorithms").contains("aes-256-cbc"),
+        "captured db algorithm must surface as a property"
+      )
+    } finally cleanup(dir)
+  }
+
+  test("TLS + DB encryption in one config emits both algorithm families") {
+    val id = "gitoid:blob:sha256:" + "d" * 64
+    val item = makeItem(
+      id,
+      extra = TreeMap(
+        "ServiceCrypto:service" -> TreeSet(StringOrPair("mysql")),
+        "ServiceCrypto:algorithms" -> TreeSet(StringOrPair("aes-128-gcm")),
+        "DbEncryption:db" -> TreeSet(StringOrPair("mysql")),
+        "DbEncryption:mechanism" -> TreeSet(StringOrPair("keyring")),
+        "DbEncryption:algorithms" -> TreeSet(StringOrPair("aes-256-cbc"))
+      )
+    )
+    val (json, dir) = emitCbom(List(item))
+    try {
+      val c = byBomRef(json, id).get
+      assertEquals(materialType(c), "other")
+      val algNames = components(json).flatMap(x => stringOpt(x, "name")).toSet
+      assert(
+        algNames.contains("aes-128-gcm"),
+        s"TLS algorithm must surface; got $algNames"
+      )
+      assert(
+        algNames.contains("aes-256-cbc"),
+        s"DB-encryption algorithm must surface; got $algNames"
+      )
+    } finally cleanup(dir)
+  }
 }

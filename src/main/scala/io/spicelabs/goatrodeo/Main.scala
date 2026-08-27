@@ -23,13 +23,17 @@ import io.spicelabs.config.Resolution
 import io.spicelabs.goatrodeo.omnibor.Builder
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.TagInfo
+import io.spicelabs.goatrodeo.util.ChainAppender
 import io.spicelabs.goatrodeo.util.Configuration
-import io.spicelabs.goatrodeo.util.config
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
+import io.spicelabs.goatrodeo.util.config
+import org.slf4j.LoggerFactory
 
 import java.io.File
 import java.nio.file.Files
+import java.util.UUID
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Failure
@@ -117,6 +121,26 @@ object Howdy {
     */
   @static
   def run(using Configuration): Unit = {
+    // Hold the tamper-evidence lock for the whole run: the correlation ID (and
+    // chain-head state) is process-global, and no other run or test may mutate
+    // it while this run's CBOMs and checksum are being written. Concurrent
+    // runs are serialized, which is fine — Goat Rodeo is one run per JVM.
+    TamperEvidentLog.sync.synchronized {
+      setupTamperEvidentLogging
+      try {
+        runImpl
+      } finally {
+        // The only teardown, paired with the start above: guaranteed release of
+        // run-scoped logging resources (e.g. detaching the chain appender from
+        // the root logger) even if the run throws. Nothing further down the call
+        // stack resets -- a component that did not start the log does not get to
+        // decide when it ends.
+        TamperEvidentLog.reset()
+      }
+    }
+  }
+
+  private def runImpl(using Configuration): Unit = {
     startComponents
 
     val logger = Logger(getClass())
@@ -142,9 +166,17 @@ object Howdy {
       return
     }
 
+    // Two independent things happen when a top-level file finishes: its name may
+    // be logged, and it may be recorded for `--ingested`. They are composed here
+    // rather than every branch of the `ingested` match repeating the logging
+    // check, so that adding a third branch cannot silently drop it.
+    val logFinished: File => Unit =
+      if (config.logFilenames) f => logger.info(f"Processed ${f.getPath()}")
+      else _ => ()
+
     // if the `ingested` option was selected, build functions to
     // capture what was ingested and output it on successful run
-    val (onFileFinish: (File => Unit), onRunFinish: (Boolean => Unit)) =
+    val (recordFinished: (File => Unit), onRunFinish: (Boolean => Unit)) =
       config.ingested match {
         case None => ((f: File) => {}, (good: Boolean) => {})
         case Some(destFile) => {
@@ -184,6 +216,8 @@ object Howdy {
           )
         }
       }
+
+    val onFileFinish: File => Unit = f => { logFinished(f); recordFinished(f) }
 
     // get the set of paths to ignore
     val ignorePathSet = (
@@ -261,5 +295,38 @@ object Howdy {
 
       Helpers.exitZero()
     }
+  }
+
+  /** Install the tamper-evident logging appender (if requested) and initialize
+    * the run-scoped [[TamperEvidentLog]] state with a fresh correlation ID.
+    *
+    * The correlation ID is emitted as the first log line once the chain
+    * appender (if any) is installed, so it is the first chained line and
+    * anchors every later line, `.grc`, and the final checksum file to this run.
+    */
+  @static
+  private def setupTamperEvidentLogging(using Configuration): Unit = {
+    val correlationId = UUID.randomUUID().toString
+    var chainHead: () => Option[String] = () => None
+    var cleanup: () => Unit = () => ()
+    config.tamperEvidentLog.foreach { file =>
+      val lc = LoggerFactory
+        .getILoggerFactory()
+        .asInstanceOf[ch.qos.logback.classic.LoggerContext]
+      val appender = new ChainAppender()
+      appender.setContext(lc)
+      appender.setFile(file)
+      appender.start()
+      val root =
+        lc.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
+      root.addAppender(appender)
+      chainHead = () => Some(appender.currentChainHead())
+      cleanup = () => {
+        root.detachAppender(appender)
+        appender.stop()
+      }
+    }
+    TamperEvidentLog.start(correlationId, chainHead, cleanup)
+    logger.info(f"Correlation ID: ${correlationId}")
   }
 }

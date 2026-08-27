@@ -1428,7 +1428,12 @@ object Certificates {
     "MIIEvQIBADAN",
     "MIIEpAIBAAKCAQEA",
     "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
-    "openssh-key-v1"
+    "openssh-key-v1",
+    // Cloud/database key material that must never appear in metadata:
+    // a SQLCipher PRAGMA key/rekey with a value, and a Terraform key_material
+    // blob. Presence flags are the only sanctioned representation.
+    "(?i)PRAGMA\\s+(key|rekey)\\s*=\\s*(\"[^\"]{8,}\"|'[^']{8,}'|[A-Za-z0-9+/=_-]{8,})",
+    "key_material\\s*=\\s*\"[A-Za-z0-9+/=]+\""
   ).map(p => Pattern.compile(p))
 
   /** Metadata keys that may legitimately carry long lowercase-hex values. */

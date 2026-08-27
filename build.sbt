@@ -204,9 +204,6 @@ resolvers += "OW2" at "https://repository.ow2.org/nexus/content/repositories/pub
 // pick up local Maven generated artifacts
 resolvers += Resolver.mavenLocal
 
-// Import the Spice Labs BOM for canonical dependency versions
-lazy val Import = config("import")
-
 Test / logBuffered := false
 
 lazy val root = project
@@ -216,7 +213,6 @@ lazy val root = project
     JavaAppPackaging,
     AssemblyPlugin
   )
-  .configs(Import)
   .settings(
     name := projectName,
     scalaVersion := scala3Version,
@@ -275,7 +271,7 @@ lazy val root = project
     // Spice Labs "readers"
     libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.2.0",
-    libraryDependencies += "io.spicelabs" % "saffron" % "0.3.1",
+    libraryDependencies += "io.spicelabs" % "saffron" % "0.4.0",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.85.2",
     libraryDependencies += "org.bouncycastle" % "bcpkix-jdk18on" % "1.85",
     libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on" % "1.85",

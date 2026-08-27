@@ -19,6 +19,10 @@ jobs:
       id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      successor-ok: ${{ steps.version.outputs.successor_ok }}
+      auto-publish: ${{ steps.version.outputs.auto_publish }}
+      previous: ${{ steps.version.outputs.previous }}
+      expected: ${{ steps.version.outputs.expected }}
       thread-ts: ${{ steps.release-notification.outputs.thread-ts }}
       channel-id: ${{ steps.release-notification.outputs.channel_id }}
 
@@ -36,6 +40,9 @@ jobs:
         uses: actions/checkout@v5
         with:
           lfs: true
+          # Full history and tags: the successor check compares this release
+          # tag against every previously released version.
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -47,20 +54,20 @@ jobs:
       - name: Set up SBT
         uses: sbt/setup-sbt@v1
 
-      - name: Derive and validate version
+      - name: Validate the release tag
         id: version
         shell: bash
         env:
           # tag_name is "vX.Y.Z" (no refs/tags/ prefix) for the release event.
           TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          raw_version="${TAG_NAME#v}"
-          if [[ ! "$raw_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag format: $TAG_NAME. Must be v<major>.<minor>.<patch>." >&2
-            exit 1
-          fi
-          echo "projectVersion=$raw_version" >> "$GITHUB_ENV"
-          echo "version=$raw_version" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          git tag --list > /tmp/all-tags.txt
+          python3 .github/scripts/check-release-tag.py \
+            "${TAG_NAME}" /tmp/all-tags.txt > /tmp/tag-check.out
+          cat /tmp/tag-check.out >> "$GITHUB_OUTPUT"
+          # sbt reads the version from the environment further down.
+          echo "projectVersion=$(sed -n 's/^version=//p' /tmp/tag-check.out)" >> "$GITHUB_ENV"
 
       - name: Publish standard and fat JARs to GitHub Packages
         run: |
@@ -70,6 +77,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_TARGET: github
+
+      - name: Index and Upload ADG
+        uses: spice-labs-inc/action-spice-labs-surveyor@v5
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          input: "${{ github.workspace }}"
+          subject: "${{ github.event.repository.name }}"
+          cli_image_tag: "1.6.3"
 
   publish-to-central:
     name: Re-publish Goatrodeo to Maven Central
@@ -157,10 +172,11 @@ jobs:
             {print}
           ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
 
-      - name: Publish to Maven Central (staging only)
+      - name: Publish to Maven Central
         run: |
           cd maven
-          mvn --batch-mode deploy
+          mvn --batch-mode deploy \
+            -Dcentral.autoPublish=${{ needs.publish-jars.outputs.auto-publish }}
         env:
           GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}
 
@@ -229,8 +245,54 @@ jobs:
           # Save a local copy of the built image under target/release/
           outputs: type=oci,dest=target/release/goatrodeo-image.tar
 
+      - name: Index and Upload ADG
+        uses: spice-labs-inc/action-spice-labs-surveyor@v5
+        with:
+          spice_pass: "${{ secrets.SPICE_PASS }}"
+          input: "${{ github.workspace }}"
+          subject: "${{ github.event.repository.name }}"
+          cli_image_tag: "1.6.3"
+
+  # Its own job rather than a step inside publish-jars: failing there would block
+  # publish-to-central and docker-image, and the point is for the Central
+  # deployment to happen and then wait. This job exists to turn the run red --
+  # `mvn deploy` succeeds even when the deployment is only staged, so without it
+  # the run would go green with nothing published on Maven Central.
+  confirm-central-release:
+    name: Maven Central release awaiting confirmation
+    needs: [publish-jars, publish-to-central]
+    if: always() && needs.publish-jars.outputs.successor-ok == 'false'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Flag release awaiting manual confirmation
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          PREVIOUS: ${{ needs.publish-jars.outputs.previous }}
+          EXPECTED: ${{ needs.publish-jars.outputs.expected }}
+        run: |
+          {
+            echo "## :warning: Maven Central release awaiting manual confirmation"
+            echo
+            if [ -n "${PREVIOUS}" ]; then
+              echo "\`${TAG_NAME}\` is not a natural successor to \`${PREVIOUS}\`."
+              echo "Expected one of: ${EXPECTED}."
+            else
+              echo "\`${TAG_NAME}\` is lower than every existing release."
+            fi
+            echo
+            echo "The deployment was uploaded and validated, but **has not been published**."
+            echo "It is waiting in the [Central Portal](https://central.sonatype.com/publishing/deployments):"
+            echo
+            echo "- **Publish** it if this version number is deliberate."
+            echo "- **Drop** it otherwise, then delete the \`${TAG_NAME}\` release and tag and cut the correct version."
+            echo
+            echo "GitHub Packages and the Docker image already carry \`${TAG_NAME}\`; clean those up too if you drop this."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Maven Central release awaiting confirmation::${TAG_NAME} was not published automatically${PREVIOUS:+ (does not follow ${PREVIOUS})}. The deployment is parked in the Central Portal and must be published or dropped by hand."
+          exit 1
+
   notify:
-    needs: [publish-jars, publish-to-central, docker-image]
+    needs: [publish-jars, publish-to-central, docker-image, confirm-central-release]
     if: always()
     runs-on: ubuntu-24.04
     permissions:
@@ -244,11 +306,20 @@ jobs:
           JARS_STATUS="${{ needs.publish-jars.result }}"
           CENTRAL_STATUS="${{ needs.publish-to-central.result }}"
           DOCKER_STATUS="${{ needs.docker-image.result }}"
+          SUCCESSOR_OK="${{ needs.publish-jars.outputs.successor-ok }}"
 
-          # Determine overall success
-          if [ "$JARS_STATUS" == "success" ] && [ "$CENTRAL_STATUS" == "success" ] && [ "$DOCKER_STATUS" == "success" ]; then
+          # Staged, not failed: the artifacts are uploaded and validated but
+          # parked in the Central Portal pending a human decision. Reported as a
+          # failure because nothing is on Maven Central yet, but named distinctly
+          # so it is not mistaken for a broken build.
+          if [ "$SUCCESSOR_OK" == "false" ]; then
+            echo "overall_status=failure" >> $GITHUB_OUTPUT
+            echo "message=⚠️ Awaiting manual confirmation in the Maven Central Portal." >> $GITHUB_OUTPUT
+            echo "workflow_name=${{ github.workflow }} — AWAITING MANUAL CONFIRMATION in the Maven Central Portal" >> $GITHUB_OUTPUT
+          elif [ "$JARS_STATUS" == "success" ] && [ "$CENTRAL_STATUS" == "success" ] && [ "$DOCKER_STATUS" == "success" ]; then
             echo "overall_status=success" >> $GITHUB_OUTPUT
             echo "message=✅ All components published successfully!" >> $GITHUB_OUTPUT
+            echo "workflow_name=${{ github.workflow }}" >> $GITHUB_OUTPUT
           else
             echo "overall_status=failure" >> $GITHUB_OUTPUT
 
@@ -273,6 +344,7 @@ jobs:
             fi
 
             echo "message=$MESSAGE" >> $GITHUB_OUTPUT
+            echo "workflow_name=${{ github.workflow }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Notify deployment result
@@ -282,6 +354,7 @@ jobs:
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           username-mapping: ${{ vars.GH_SLACK_USERNAME_MAPPING }}
           github-token: ${{ github.token }}
+          workflow-name: ${{ steps.deployment-status.outputs.workflow_name }}
           environment: production
           thread-ts: ${{ needs.publish-jars.outputs.thread-ts }}
           channel-id: ${{ needs.publish-jars.outputs.channel-id }}

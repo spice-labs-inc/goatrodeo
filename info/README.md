@@ -99,6 +99,22 @@ Standard metadata fields attached to processed artifacts:
 - Dependencies format (JSON structure)
 - Cross-ecosystem consistency guidelines
 
+### [CBOM Emission from an ADG](cbom_enhancements.md)
+Conventions for generating CycloneDX CBOMs from an Artifact Dependency Graph
+(so other ADG-based CBOM generators can match the output):
+- Traversal-derived paths (`goatrodeo:path` / `:omnibor-path` / `:swhid-path`)
+- OmniBOR/SWHID component identity
+- The `|:|` hierarchy separator and the path semantics
+
+### [Tamper-Evident Logging](tamper_evident_logging.md)
+Design for making ADG outputs auditable against the Goat Rodeo run that produced
+them:
+- Hash-chained run logs (`--tamper-evident-log`)
+- Correlation ID tying a run, its `.grc` files, and the final checksum
+- Full SHA-256 of `.grd`/`.gri` recorded inside each `.grc`
+- CBOM filename = escaped file name + last 16 of the gitoid
+- Standalone Python verifier and a red-to-green test plan
+
 ---
 
 ## Filtering and Configuration
@@ -232,6 +248,7 @@ How Goat Rodeo manages system resources:
 | [mime_types.md](mime_types.md) | MIME type detection and handling |
 | [mime_precompute_adaptive.md](mime_precompute_adaptive.md) | Adaptive MIME precompute pass |
 | [resource_handling.md](resource_handling.md) | Temp files, streams, and resource cleanup |
+| [tamper_evident_logging.md](tamper_evident_logging.md) | Tamper-evident run logs and ADG auditability |
 
 ---
 
