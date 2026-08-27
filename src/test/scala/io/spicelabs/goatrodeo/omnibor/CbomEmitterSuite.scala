@@ -800,6 +800,80 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
+  // T3.18b — a symlink anywhere above the output directory is fine. On macOS
+  // `/tmp` and `/var` are symlinks into `/private`, so refusing them made
+  // --emit-cbom-dir unusable with the system temporary directory; on Linux the
+  // same is true of bind mounts and automounted homes.
+  test("T3.18b a symlinked ancestor of the output directory is accepted") {
+    val real = Files.createTempDirectory("cbom-real").toFile()
+    val linkParent = Files.createTempDirectory("cbom-link").toFile()
+    val link = new File(linkParent, "via-link")
+    try {
+      Files.createSymbolicLink(link.toPath(), real.toPath())
+      val dir = new File(link, "output")
+      val storage = MemStorage(None)
+      val root = makeItem(
+        id =
+          "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, root)
+      val files = CbomEmitter.emitForStorage(storage, "1.6", dir).get
+      assertEquals(files.length, 1)
+      assert(files.head.isFile(), "the CBOM must actually be written")
+      // and it lands in the real directory the link names
+      assert(
+        new File(new File(real, "output"), files.head.getName()).isFile(),
+        "the CBOM should be written through the link into the real directory"
+      )
+    } finally {
+      cleanup(real)
+      cleanup(linkParent)
+    }
+  }
+
+  // T3.18c — the property the removed ancestor check was reaching for, pinned
+  // where it actually holds. A symlink planted at the target file must be
+  // replaced, not written through: Files.move acts on the final path entry
+  // rather than following it.
+  test("T3.18c a symlink planted at the target is replaced, not followed") {
+    val dir = Files.createTempDirectory("cbom-target").toFile()
+    val victimDir = Files.createTempDirectory("cbom-victim").toFile()
+    try {
+      val storage = MemStorage(None)
+      val root = makeItem(
+        id =
+          "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, root)
+
+      // First emission tells us the filename the emitter chooses.
+      val first = CbomEmitter.emitForStorage(storage, "1.6", dir).get.head
+      assert(first.delete(), "could not clear the first emission")
+
+      // Plant a link at that exact path, aimed at a file we do not want touched.
+      val victim = new File(victimDir, "precious")
+      Files.writeString(victim.toPath(), "do not overwrite me")
+      Files.createSymbolicLink(first.toPath(), victim.toPath())
+
+      CbomEmitter.emitForStorage(storage, "1.6", dir).get
+
+      assertEquals(
+        Files.readString(victim.toPath()),
+        "do not overwrite me",
+        "the CBOM write must not follow the link to its target"
+      )
+      assert(
+        !Files.isSymbolicLink(first.toPath()),
+        "the planted symlink should have been replaced by a regular file"
+      )
+    } finally {
+      cleanup(dir)
+      cleanup(victimDir)
+    }
+  }
+
   // ----------------------------------------------------------------------
   // T3.19 private-key-marker Items are emitted faithfully (no redaction)
   // ----------------------------------------------------------------------
@@ -943,6 +1017,33 @@ class CbomEmitterSuite extends FunSuite {
       storeItem(storage, root)
       val result = CbomEmitter.emitForStorage(storage, "1.6", linkDir)
       assert(result.isFailure)
+    } finally {
+      cleanup(parent)
+    }
+  }
+
+  // T3.21b — a dangling symlink is still a symlink. The previous check guarded
+  // `isSymbolicLink` behind `Files.exists`, which follows links and is
+  // therefore false when the link's target does not exist -- so a link planted
+  // at a path before anything is created there, the usual shape of the attack,
+  // was exempt from the very check meant to catch it.
+  test("T3.21b a dangling symlink as the output directory is rejected") {
+    val parent = Files.createTempDirectory("cbom-dangling").toFile()
+    val linkDir = new File(parent, "link")
+    try {
+      Files.createSymbolicLink(
+        linkDir.toPath(),
+        new File(parent, "does-not-exist").toPath()
+      )
+      assert(!Files.exists(linkDir.toPath()), "fixture should be dangling")
+      val storage = MemStorage(None)
+      val root = makeItem(
+        id =
+          "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        fileNames = TreeSet("root")
+      )
+      storeItem(storage, root)
+      assert(CbomEmitter.emitForStorage(storage, "1.6", linkDir).isFailure)
     } finally {
       cleanup(parent)
     }
