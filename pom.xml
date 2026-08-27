@@ -18,6 +18,19 @@
     development; `maven/pom.xml` remains the publish-only shell used by the
     release workflow.
 
+    TWO BUILDS: this project is built by both this file and build.sbt, from the
+    same sources. A dependency, version, compiler flag or plugin changed in one
+    must be changed in the other. This lasts until the duplication is resolved
+    and one build is retired; which one that will be is not decided, so neither
+    file is the authority over the other.
+
+    Nothing enforces it. build_test.yml runs only `sbt test`, and publish.yml's
+    Maven step targets maven/pom.xml rather than this file, so this build runs
+    in no CI job at all, so drift is found by whoever next runs Maven. That is
+    how the `-release` 17/21 mismatch noted on maven.compiler.release below got
+    in. Run `mvn -DskipTests package` alongside `sbt compile` before pushing a
+    build change.
+
     Quick start:
       mvn -DskipTests compile     # fast: verify it compiles
       mvn test                    # runs the unit-test suite (see PreflightSuite
@@ -49,7 +62,7 @@
     <!-- The sbt version used by the sibling build.sbt build; surfaced in BuildInfo for parity -->
     <sbt.version>1.10.6</sbt.version>
 
-    <!-- Library versions, aligned with build.sbt -->
+    <!-- Library versions, aligned with build.sbt; see the TWO BUILDS note above -->
     <scala-xml.version>2.3.0</scala-xml.version>
     <asm.version>9.8</asm.version>
     <bcel.version>6.11.0</bcel.version>
