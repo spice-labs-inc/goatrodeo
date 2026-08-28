@@ -68,7 +68,7 @@ class DotnetState(
       }
 
       fileStmOpt = Some(stream)
-      val assembly = AssemblyDefinition.readAssembly(stream)
+      val assembly = AssemblyDefinition.readAssembly(stream).get
       DotnetState(Some(assembly), fileStmOpt)
     } match {
       case Failure(excpt) =>
@@ -108,9 +108,12 @@ class DotnetState(
       assemblyOpt
         .flatMap { assembly =>
           val nameOpt =
-            PURLComponentSanitizer.sanitizeGenericIdentifier(assembly.name.name)
-          val versionOpt = PURLComponentSanitizer
-            .sanitizeGenericVersion(sanitizeVersion(assembly.name.version))
+            assembly.name.flatMap(n =>
+              PURLComponentSanitizer.sanitizeGenericIdentifier(n.name)
+            )
+          val versionOpt = assembly.name
+            .map(n => sanitizeVersion(n.version))
+            .flatMap(PURLComponentSanitizer.sanitizeGenericVersion(_))
           (nameOpt, versionOpt) match {
             case (Some(name), Some(version)) =>
               // nuget purls take no namespace (the spec prohibits it).
@@ -179,7 +182,7 @@ class DotnetState(
       // for more information.
       resOption <- Try {
         assembly.customAttributes.find(at =>
-          at.attributeType.fullName == attrName
+          at.attributeType.exists(_.fullName == attrName)
         ) match {
           case Some(v) => argZeroValueAsString(v)
           case _       => None
@@ -211,7 +214,7 @@ class DotnetState(
     assemblyOpt.flatMap(assembly =>
       maybeSOP(
         MetadataKeyConstants.SIMPLE_NAME,
-        Option(assembly.name.name)
+        assembly.name.map(_.name)
       )
     )
   }
@@ -220,7 +223,7 @@ class DotnetState(
     assemblyOpt.flatMap { assembly =>
       maybeSOP(
         MetadataKeyConstants.VERSION,
-        Option(assembly.name.version.toString())
+        assembly.name.map(_.version.toString())
       )
     }
   }
@@ -229,7 +232,7 @@ class DotnetState(
     assemblyOpt.flatMap { assembly =>
       maybeSOP(
         MetadataKeyConstants.LOCALE,
-        Option(assembly.name.culture)
+        assembly.name.map(_.culture)
       )
     }
   }
@@ -237,9 +240,7 @@ class DotnetState(
   def assemblyPublicKey: Option[(String, TreeSet[StringOrPair])] = {
     assemblyOpt.flatMap { assembly =>
       val pkStr =
-        Option(assembly.name.publicKey).map(pk =>
-          toHex(assembly.name.publicKey)
-        )
+        assembly.name.map(_.publicKey).map(pk => toHex(pk))
       maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
     }
   }
@@ -272,11 +273,15 @@ class DotnetState(
     import DotnetState.formatDeps
     assemblyOpt.flatMap(assembly => {
 
-      val refs = assembly.mainModule.assemblyReferences;
-      if (refs.length == 0) None
-      else {
-        val deps = formatDeps(refs)
-        maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+      val refsOpt = assembly.mainModule.map(_.assemblyReferences)
+      refsOpt match {
+        case None => None
+        case Some(refs) =>
+          if (refs.length == 0) None
+          else {
+            val deps = formatDeps(refs)
+            maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+          }
       }
     })
 
@@ -308,15 +313,17 @@ class DotnetState(
   /** Generate per-package tag info for .NET assemblies.
     */
   override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
-    assemblyOpt.map { assembly =>
-      val name = assembly.name.name
-      val version = assembly.name.version.toString()
+    assemblyOpt.flatMap { assembly =>
+      assembly.name.map { an =>
+        val name = an.name
+        val version = an.version.toString()
 
-      PackageTagInfo(
-        name = name,
-        version = Some(version),
-        date = None // .NET assemblies don't have built-in build dates
-      )
+        PackageTagInfo(
+          name = name,
+          version = Some(version),
+          date = None // .NET assemblies don't have built-in build dates
+        )
+      }
     }
   }
 }

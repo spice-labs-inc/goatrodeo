@@ -84,9 +84,9 @@ class DotNetTesting extends munit.FunSuite {
 
   test("Can read assembly references from DLL") {
     val name = "test_data/hackproj.dll"
-    val assembly = AssemblyDefinition.readAssembly(name)
-    assert(assembly != null)
-    val deps = DotnetState.formatDeps(assembly.mainModule.assemblyReferences)
+    val assembly = AssemblyDefinition.readAssembly(name).get
+    assert(assembly.mainModule.isDefined)
+    val deps = DotnetState.formatDeps(assembly.mainModule.get.assemblyReferences)
     assertEquals(
       deps,
       Some(

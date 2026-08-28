@@ -70,8 +70,8 @@ object DotnetDetector {
       artifact.withFile(file => {
         try {
           Using.resource(FileInputStream(file)) { fis =>
-            val assembly = AssemblyDefinition.readAssembly(fis)
-            if (assembly != null && assembly.mainModule != null) {
+            val assemblyOpt = AssemblyDefinition.readAssembly(fis).toOption
+            if (assemblyOpt.exists(_.mainModule.isDefined)) {
               currentMimes + DotnetDetector.DOTNET_MIME.toString()
             } else {
               currentMimes

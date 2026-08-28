@@ -246,7 +246,9 @@ lazy val root = project
     // Still required at the boundary: the annatto/baharat readers hand back
     // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
-    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.1.17",
+    // TEMP (Phase 0 coordination): local publish of the Option-only cilantro.
+    // Bump back to a real release tag before any release build.
+    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.0.1-SNAPSHOT",
     // Canonical content identifiers (hashes + git blob ids) — the single source of
     // truth shared across Spice Labs tooling. Resolved from `Resolver.mavenLocal`.
     libraryDependencies += "io.spicelabs" % "coordinates" % "1.1.0",
