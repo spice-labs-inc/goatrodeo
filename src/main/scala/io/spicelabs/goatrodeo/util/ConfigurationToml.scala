@@ -95,6 +95,7 @@ object ConfigurationToml {
     "tagJson" -> "tag_json",
     "tagVersion" -> "tag_version",
     "tagDate" -> "tag_date",
+    "redactGitInfo" -> "redact_git_info",
     "packageTags" -> "package_tags",
     "packageTagsShortName" -> "package_tags_short_name",
     "cbomDir" -> "emit_cbom_dir",
@@ -152,32 +153,11 @@ object ConfigurationToml {
     "tag_json",
     "tag_version",
     "tag_date",
+    "redact_git_info",
     "package_tags",
     "package_tags_short_name",
     "emit_cbom_dir",
-    "cbom_version",
-    // Recognised so that it is refused by name rather than reported as a typo, but with no
-    // handler below: knowing the key exists is not the same as letting a file set it.
-    "cutoff"
-  )
-
-  /** Keys no config file may supply, in any mode.
-    *
-    * `cutoff` is an entitlement, not a preference. Embedded in `spice` or
-    * Allspice it is the pass's `x-cutoff`, which constrains what the platform
-    * will accept, and a config file supplying it would hand a user the ability
-    * to widen a scope the platform deliberately narrowed. Standalone there is
-    * no pass to contradict, but the same value read from two kinds of place is
-    * how the embedded rule gets forgotten — so it is refused there too, and
-    * `--cutoff` remains the single way to ask for one.
-    *
-    * Refusing by name rather than by omission: an unrecognised key reports a
-    * typo, which is the wrong thing to say about a key that is spelled
-    * correctly and deliberately unavailable.
-    */
-  private val alwaysRejected: Map[String, String] = Map(
-    "cutoff" ->
-      "the analysis cutoff comes from the Spice Pass, or --cutoff when standalone, and cannot be set in a config file"
+    "cbom_version"
   )
 
   private case class Invalid(message: String) extends RuntimeException(message)
@@ -311,19 +291,10 @@ object ConfigurationToml {
     val prefix = if (label.isEmpty) "" else s"[$label] "
     val keys = resolved.group(Group).keySet().asScala.toSet
     val unknown = keys.diff(knownKeys)
-    val rejected = keys.intersect(alwaysRejected.keySet)
 
     if (unknown.nonEmpty)
       Left(
         s"${prefix}unknown ${plural(unknown.size, "key")}: ${unknown.toSeq.sorted.mkString(", ")}"
-      )
-    else if (rejected.nonEmpty)
-      Left(
-        rejected.toSeq.sorted
-          .map(key =>
-            s"$prefix$key is not settable here — ${alwaysRejected(key)}"
-          )
-          .mkString("; ")
       )
     else {
       try Right(read(resolved, base))
@@ -413,6 +384,9 @@ object ConfigurationToml {
         case Left(error) => throw Invalid(s"tag_date: $error")
       }
     }
+    bool(table, "redact_git_info").foreach(v =>
+      config = config.copy(redactGitInfo = v)
+    )
     bool(table, "package_tags").foreach(v =>
       config = config.copy(packageTags = v)
     )

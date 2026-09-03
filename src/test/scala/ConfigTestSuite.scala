@@ -336,3 +336,19 @@ class ConfigTestSuite extends munit.FunSuite {
     assertEquals(config.tempDir, Some(tempDir))
   }
 }
+
+class GitRedactConfigSuite extends munit.FunSuite {
+  test("no-redact-git-info flag disables redaction") {
+    val args = Array("--no-redact-git-info")
+    val config = io.spicelabs.goatrodeo.util.ConfigurationParser.parse(args)
+    config match {
+      case Some(c) => assertEquals(c.redactGitInfo, false)
+      case None    => fail("parse failed")
+    }
+  }
+
+  test("redactGitInfo defaults to true") {
+    val config = io.spicelabs.goatrodeo.util.Configuration()
+    assertEquals(config.redactGitInfo, true)
+  }
+}

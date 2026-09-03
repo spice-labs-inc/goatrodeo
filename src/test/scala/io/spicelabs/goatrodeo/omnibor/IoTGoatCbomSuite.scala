@@ -107,7 +107,7 @@ class IoTGoatCbomSuite extends FunSuite {
   test(
     "T4.5 IoTGoat x86 CBOM contains all discovered static cryptographic material"
   ) {
-    assume(fixture.exists(), s"IoTGoat x86 fixture required: ${fixture}")
+    assert(fixture.exists(), s"IoTGoat x86 fixture required: ${fixture}")
 
     val outputDir = Files.createTempDirectory("iotgoat-cbom-output").toFile()
     val cbomDir = Files.createTempDirectory("iotgoat-cbom-cbom").toFile()

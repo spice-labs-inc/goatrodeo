@@ -104,7 +104,18 @@ sealed trait ArtifactWrapper {
 
   def isRealFile(): Boolean = false
 
-  def mimeType: Set[String] = _mimeType
+  /** The effective MIME set: the detected/augmented set UNIONED with the
+    * producer-stamped hint (spec §5). The hint is authoritative (never
+    * re-checked against content) and never produced by sniffing.
+    */
+  def mimeType: Set[String] =
+    mimeHint.fold(_mimeType)(h => _mimeType + h)
+
+  /** Optional authoritative MIME hint stamped by the producer that created
+    * this wrapper. None when no producer stamped one. Non-producers never
+    * set it; content sniffing never produces kind MIMEs.
+    */
+  def mimeHint: Option[String] = None
 
   protected def getTikaInputStream(): TikaInputStream
 
@@ -402,7 +413,8 @@ object ArtifactWrapper {
       data: InputStream,
       tempDir: Option[File],
       tempPath: Path,
-      lastModified: Option[Instant] = None
+      lastModified: Option[Instant] = None,
+      mimeHint: Option[String] = None
   ): ArtifactWrapper = {
     val name = sanitizeName(fixPath(nominalPath))
     val forceTempFile = requireTempFile(name)
@@ -420,7 +432,7 @@ object ArtifactWrapper {
           f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
         )
       }
-      ByteWrapper(bytes, name, tempDir = tempDir, lastModified = lastModified)
+      ByteWrapper(bytes, name, tempDir = tempDir, lastModified = lastModified, mimeHint = mimeHint)
     } else {
       // Preserve the original extension so MIME-type augmenters and disk-format
       // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.
@@ -436,7 +448,8 @@ object ArtifactWrapper {
         tempFile,
         name,
         tempDir = tempDir,
-        lastModified = lastModified
+        lastModified = lastModified,
+        mimeHint = mimeHint
       )
     }
   }
@@ -513,7 +526,8 @@ final case class FileWrapper(
     thePath: String,
     tempDir: Option[File],
     finishedFunc: File => Unit = f => (),
-    override val lastModified: Option[Instant] = None
+    override val lastModified: Option[Instant] = None,
+    override val mimeHint: Option[String] = None
 ) extends ArtifactWrapper {
 
   // constructor
@@ -587,7 +601,8 @@ final case class ByteWrapper(
     bytes: Array[Byte],
     fileName: String,
     tempDir: Option[File],
-    override val lastModified: Option[Instant] = None
+    override val lastModified: Option[Instant] = None,
+    override val mimeHint: Option[String] = None
 ) extends ArtifactWrapper {
 
   override protected def getTikaInputStream(): TikaInputStream = {

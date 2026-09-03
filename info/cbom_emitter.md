@@ -110,6 +110,33 @@ component `properties` (e.g., `Certificates:SigAlgorithm`,
 `Certificates:KeyAlgorithm`, `Certificates:KeySize`). — verified by
 `CbomEmitterSuite.T3.3` and `CbomEmitterSuite.T3.13`.
 
+### PKCS#7 (Authenticode) certificate blobs
+
+The Certificates strategy additionally claims artifacts carrying
+`application/pkcs7-signature` (the authoritative MIME stamped by the
+producer; content sniffing never produces it — see `mime_types.md`).
+The blob is parsed with the JDK/BC `CertificateFactory` (detached
+SignedData: Authenticode signatures do not encapsulate the signed
+content, and the certificates are what Goat Rodeo wants) into the
+embedded X.509 chain, and the item is emitted exactly like a PEM
+bundle:
+
+- bundle metadata: `Certificates:EntryCount`, `Certificates:CertCount`,
+  `Certificates:KeyEntryCount`
+- per-cert metadata: `Certificates:Cert:<i>:*` (same fields as a PEM
+  bundle's per-cert blocks)
+- CBOM: a `cryptographic-asset` component with
+  `assetType: certificate` and full `certificateProperties`, referencing
+  synthetic `alg:` components (`subjectPublicKeyRef` /
+  `signatureAlgorithmRef`)
+
+A blob that carries no certificates (or does not parse) is skipped
+cleanly: the item records no `Certificates:Cert:` metadata and never
+appears as a certificate component in the CBOM. Reserved
+`certificateType` values (anything other than 1 or 2) are never
+stamped with the certificate MIMEs — verified by `CertificatesPkcs7Suite.T6.x`
+and `Pkcs7CbomSuite.T7.x`.
+
 ### OpenSSL configuration
 
 OpenSSL config Items map to `cryptoProperties.assetType: protocol` with
@@ -185,6 +212,29 @@ When a Goat Rodeo run sets a correlation ID (see [Tamper-Evident Logging](tamper
 
 This section is the contract for a downstream system that reads a Goat Rodeo
 ADG and reproduces the CBOM output without running the Scala emitter.
+
+### ADG node contract for CBOM consumers (what to look for)
+
+Downstream CBOM builders should look for exactly these ADG nodes:
+
+| What to look for | Shape | Maps to |
+|---|---|---|
+| Artifact roots | `Item` with `bodyMimeType = "application/vnd.cc.goatrodeo"`, `identifier != "tags"`, no `alias:to`/`contained:up` edge | one CBOM per root |
+| Container children | `contained:down` edges from a root | traversal (depth 32, visited) |
+| Crypto items | `ItemMetaData.extra` keys with the family prefixes below | `cryptographic-asset` components |
+| Certificates (incl. PKCS#7/authenticode) | `Certificates:Cert:<i>:*` per-cert keys + bundle keys (`Certificates:EntryCount/CertCount/KeyEntryCount/KeystoreType`) | `assetType: certificate` + `certificateProperties` |
+| Keystore key entries | `Certificates:Entry:<alias>:Chain:<i>:*` | `related-crypto-material` `key` |
+| CRLs / public keys / SSH | `Certificates:CrlSha256` / `Certificates:KeyAlgorithm` / `SSH:*` | `related-crypto-material` |
+| Synthetic algorithms | keyed `alg:<primitive>:<name>` | `algorithm` components |
+
+**Not CBOM inputs (ignore):**
+- `gitoid:commit:` / `gitoid:tree:` Items (git provenance) — they carry
+  `ItemTagData` bodies, not `ItemMetaData`, and no crypto `extra` keys;
+  the emitter's crypto-detection set never matches them and they can
+  never surface as components (verified by
+  `GitProvenanceNotInCbomSuite`).
+- `tags` hub and run-tag Items.
+- There are **no truncation markers** anywhere in the ADG or CBOM output.
 
 ### ADG input model
 

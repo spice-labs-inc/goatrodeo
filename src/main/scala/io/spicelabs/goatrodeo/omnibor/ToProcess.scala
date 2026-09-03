@@ -370,8 +370,7 @@ trait ToProcess {
             val itemRaw =
               Item.itemFrom(
                 artifact,
-                parentId,
-                recordModified = config.cutoff.isDefined
+                parentId
               )
 
             // in blocklist do nothing

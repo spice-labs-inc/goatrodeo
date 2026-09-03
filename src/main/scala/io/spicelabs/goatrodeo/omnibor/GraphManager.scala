@@ -387,20 +387,28 @@ class GRDWalker(source: FileChannel) {
       None
     } else {
       val entryLen = Helpers.readInt(source)
-      if (entryLen == -1) {
+      if (entryLen < 0) {
         None
       } else {
-        val entryByteBuffer = ByteBuffer.allocate(entryLen)
-        source.read(entryByteBuffer)
+        val remaining = source.size() - source.position()
+        if (entryLen.toLong > remaining) {
+          // a positive length that exceeds the remaining bytes is
+          // end-of-data (a corrupt/foreign tail) — never allocate at the
+          // declared size (spec §10)
+          None
+        } else {
+          val entryByteBuffer = ByteBuffer.allocate(entryLen)
+          source.read(entryByteBuffer)
 
-        val entryBytes = entryByteBuffer.array()
-        Item.decode(entryBytes) match {
-          case scala.util.Success(entry) => Some(entry)
-          case scala.util.Failure(err) =>
-            logger.warn(
-              s"Corrupt CBOR entry at position ${source.position()}: ${err.getMessage}"
-            )
-            None
+          val entryBytes = entryByteBuffer.array()
+          Item.decode(entryBytes) match {
+            case scala.util.Success(entry) => Some(entry)
+            case scala.util.Failure(err) =>
+              logger.warn(
+                s"Corrupt CBOR entry at position ${source.position()}: ${err.getMessage}"
+              )
+              None
+          }
         }
       }
     }

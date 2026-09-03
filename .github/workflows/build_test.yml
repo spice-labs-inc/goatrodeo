@@ -48,3 +48,25 @@ jobs:
       run: SBT_OPTS="-Xmx8G -Duser.timezone=GMT" TEST_THREAD_CNT="4" sbt test
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # OSV dependency gate — independent of the build/test job (spec §2):
+  # derives the query body from the resolved dependency set and queries
+  # api.osv.dev. Fails only on concrete CVSS >= 7.0; fail-open on unscored
+  # advisories (user decision 2026-09-02).
+  osv:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'sbt'
+    - name: Set up sbt
+      uses: sbt/setup-sbt@v1
+    - name: Resolve + dump dependency set
+      run: sbt osvDumpJson
+    - name: Query OSV (fail-open)
+      run: python3 housekeeping/osv_check.py --input target/osv-dump.json

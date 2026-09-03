@@ -5,7 +5,6 @@ import io.spicelabs.goatrodeo.ProgressListener
 
 import java.io.File
 import java.nio.file.Files
-import java.time.Instant
 import java.util.Date
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
@@ -119,12 +118,6 @@ inline def config(using configuration: Configuration): Configuration =
   *   processing loop. Set via
   *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]]; not
   *   exposed on the command line.
-  * @param cutoff
-  *   refuse to analyze internal files modified after this instant; dependents
-  *   are dropped too. Set only via `--cutoff` or
-  *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withCutoff]] — there is
-  *   deliberately no system-property or environment channel, so the CLI and
-  *   library paths behave identically.
   * @param cbomDir
   *   optional directory to emit CycloneDX cryptographic bill-of-materials
   *   (CBOM) files, one per top-level input
@@ -161,8 +154,11 @@ case class Configuration(
     packageTagsShortName: Boolean = false,
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
+    // Git provenance redaction (spec §6): on by default (pseudonymous
+    // email digests + relativized repo roots); `--no-redact-git-info` / TOML
+    // `redact_git_info = false` disables for raw capture.
+    redactGitInfo: Boolean = true,
     progressListener: Option[ProgressListener] = None,
-    cutoff: Option[Instant] = None,
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6",
     printProcessedFiles: Boolean = false,

@@ -178,7 +178,7 @@ class MavenPhase4Suite extends FunSuite {
   // ==================== 4.3: pqc_jars Corpus ====================
 
   test("MavenToProcess - pqc_jars generates 4 distinct pURLs") {
-    assume(new File("test_data/pqc_jars").exists(), "pqc_jars test data exists")
+    assert(new File("test_data/pqc_jars").exists(), "pqc_jars test data exists")
 
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)
@@ -232,7 +232,7 @@ class MavenPhase4Suite extends FunSuite {
   }
 
   test("MavenToProcess - pqc_jars pairs each JAR with its POM") {
-    assume(new File("test_data/pqc_jars").exists(), "pqc_jars test data exists")
+    assert(new File("test_data/pqc_jars").exists(), "pqc_jars test data exists")
 
     val source = new File("test_data/pqc_jars")
     val strategies = ToProcess.strategyForDirectory(source, false, None)

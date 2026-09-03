@@ -53,6 +53,9 @@ Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects
 * `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
 * `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
   Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
+* `--no-redact-git-info` : Do not redact git provenance metadata (author/committer emails stored raw and repo paths absolute). Git provenance is
+  captured for tagged runs (see `git_provenance.md`); by default emails are replaced by a pseudonymous `sha256:` digest and repo roots are
+  relativized. `--tag-date` and a user JSON `date` override are carried verbatim into the git provenance Items.
 * `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet, JDK/JRE). Each package gets a tag Item
   with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
   is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.

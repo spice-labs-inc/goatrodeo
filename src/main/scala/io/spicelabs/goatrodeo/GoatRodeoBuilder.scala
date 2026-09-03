@@ -274,40 +274,6 @@ class GoatRodeoBuilder {
     }
   }
 
-  /** Refuse to analyze internal files modified after `cutoff`. Any archive
-    * entry whose modification time is after this instant is dropped from the
-    * ADG, along with everything that transitively contains it or is built from
-    * it (they must be at least as new), so no dangling references remain.
-    * Entries with no/unknown modification time are always kept.
-    *
-    * @param cutoff
-    *   the cutoff instant
-    * @return
-    *   this builder
-    */
-  def withCutoff(cutoff: Instant): GoatRodeoBuilder = {
-    config = config.copy(cutoff = Some(cutoff))
-    this
-  }
-
-  /** String form of [[withCutoff]] parsing a flexible date (e.g. "2026-01-01",
-    * "today").
-    *
-    * @param d
-    *   the date string
-    * @return
-    *   Right(this builder) if parsed successfully, Left(errorMessage) otherwise
-    */
-  def withCutoff(d: String): Either[String, GoatRodeoBuilder] = {
-    io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
-      case Right(date) =>
-        config = config.copy(cutoff = Some(date.toInstant()))
-        Right(this)
-      case Left(error) =>
-        Left(error)
-    }
-  }
-
   /** Add a MIME type filter predicate.
     *
     * @param filter
@@ -421,9 +387,6 @@ class GoatRodeoBuilder {
     * (`withPayload`, `withIgnore`, `withFileList`, `withExcludePattern`,
     * `withMimeFilter`) appends to it. A caller that wants to replace a list the
     * table supplied cannot do it through this builder.
-    *
-    * `cutoff` is refused here: embedded, the analysis cutoff comes from the
-    * Spice Pass, which constrains what the platform will accept.
     *
     * @param table
     *   the settings, keyed as in a Goat Rodeo config file

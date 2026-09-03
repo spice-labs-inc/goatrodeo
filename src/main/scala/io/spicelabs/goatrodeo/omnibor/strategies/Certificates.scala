@@ -77,6 +77,12 @@ import scala.util.Using
   * keys/certs, PGP keys, and private keys.
   */
 object Certificates {
+  /** The certificate blob MIME constants, owned by this module (spec §4.4).
+    * Other modules that stamp certificate blobs refer to these constants.
+    */
+  val CertPkixMime: String = "application/pkix-cert"
+  val CertPkcs7Mime: String = "application/pkcs7-signature"
+
 
   private val logger = Logger(getClass())
 
@@ -231,7 +237,8 @@ object Certificates {
     mimes.contains(opensshPrivateKeyMime) || mimes.contains(
       pemPrivateKeyMime
     ) ||
-    mimes.contains(pgpKeysMime) || isSingleCertCandidate(mimes)
+    mimes.contains(pgpKeysMime) || mimes.contains(CertPkcs7Mime) ||
+    isSingleCertCandidate(mimes)
   }
 
   def computeCertificateFiles(
@@ -281,9 +288,37 @@ object Certificates {
     else if (mimes.contains(pemPrivateKeyMime))
       parsePemPrivateKey(artifact)
     else if (mimes.contains(pgpKeysMime)) parsePgpKeyOrSecretKeyRing(artifact)
+    else if (mimes.contains(CertPkcs7Mime)) parsePkcs7(artifact)
     else if (isSingleCertCandidate(mimes)) {
       parseSingleCert(artifact).map(SingleCert.apply)
     } else None
+  }
+
+  /** Parse a PKCS#7 SignedData blob (Authenticode's detached form) or a
+    * bare DER X.509 into the embedded certificate chain, using the JDK/BC
+    * `CertificateFactory` (never CMSSignedData — Authenticode signatures
+    * are detached and do not encapsulate the signed content; the
+    * certificates are what we want).
+    *
+    * Returns None (clean skip) when the blob contains no certificates or
+    * cannot be parsed; never throws.
+    */
+  private[strategies] def parsePkcs7(
+      artifact: ArtifactWrapper
+  ): Option[Bundle] = {
+    Try {
+      artifact.withStream { f =>
+        val bytes = Helpers.slurpInput(f)
+        val cf = CertificateFactory.getInstance("X.509", "BC")
+        val certs =
+          cf.generateCertificates(new ByteArrayInputStream(bytes)).asScala.toVector.collect {
+            case c: X509Certificate => c
+          }
+        certs
+      }
+    }.toOption
+      .filter(_.nonEmpty)
+      .map(Bundle(_))
   }
 
   /** True if the artifact's MIME set indicates a single X.509 cert. Excludes

@@ -346,12 +346,6 @@ case class Item(
 object Item {
   protected val logger: Logger = Logger(getClass())
 
-  /** `ItemMetaData.extra` key under which an internal file's modification time
-    * (epoch milliseconds) is recorded. Populated only when an cutoff cutoff is
-    * configured, and consumed by the cutoff filter in the graph writer.
-    */
-  val FileModifiedKey = "file_modified_epoch_millis"
-
   /** Given an ArtifactWrapper, create an `Item` based on the hashes/gitoids for
     * the artifact
     *
@@ -365,21 +359,10 @@ object Item {
     */
   def itemFrom(
       artifact: ArtifactWrapper,
-      container: Option[GitOID],
-      recordModified: Boolean = false
+      container: Option[GitOID]
   ): Item = {
     val (id, hashes) = GitOIDUtils.computeAllHashes(artifact)
-    val extra: TreeMap[String, TreeSet[StringOrPair]] =
-      if (recordModified) artifact.lastModified match {
-        case Some(t) =>
-          TreeMap(
-            Item.FileModifiedKey -> TreeSet[StringOrPair](
-              StringOf(t.toEpochMilli().toString)
-            )
-          )
-        case None => TreeMap.empty
-      }
-      else TreeMap.empty
+    val extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap.empty
     Item(
       id,
       // Item.noopLocationReference,

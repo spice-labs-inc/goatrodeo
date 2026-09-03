@@ -133,8 +133,39 @@ testFatJar := {
   }
 }
 
-// Hook fat JAR tests into `sbt test`
-Test / test := (Test / test).dependsOn(verifyJarContents, testFatJar).value
+// Hook fat JAR tests into `sbt test` (the osvDump task feeds the OSV gate
+// script + the dump suite)
+Test / test := (Test / test)
+  .dependsOn(verifyJarContents, testFatJar, osvDumpJson)
+  .value
+
+// Writes target/osv-dump.json — the resolved dependency set (every
+// configuration of the product's own update reports) as JSON. The OSV gate
+// script (`housekeeping/osv_check.py`) filters this raw dump to the product
+// configurations and builds the batch query. The build tool is the single
+// source of truth; nothing is hand-maintained (spec §2).
+val osvDumpJson = taskKey[File]("Writes target/osv-dump.json — the resolved dependency set for the OSV gate script")
+
+osvDumpJson := {
+  val reports = Seq((Test / update).value, (Compile / update).value)
+  val rows = for {
+    rep <- reports
+    conf <- rep.configurations
+    mod <- conf.modules if !mod.evicted
+  } yield (conf.configuration.name, mod.module.organization, mod.module.name, mod.module.revision)
+  val distinct = rows.distinct.sortBy { case (c, o, n, r) => (c, o, n, r) }
+  def esc(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
+  val json = distinct
+    .map { case (c, o, n, r) =>
+      s"""{"configuration":"${esc(c)}","organization":"${esc(o)}","name":"${esc(n)}","revision":"${esc(r)}"}"""
+    }
+    .mkString("[", ",", "]")
+  val out = target.value / "osv-dump.json"
+  IO.write(out, json)
+  val log = streams.value.log
+  log.info(s"Wrote ${distinct.size} resolved modules to $out")
+  out
+}
 
 publishMavenStyle := true
 publish / packagedArtifacts += (Artifact(
@@ -246,18 +277,22 @@ lazy val root = project
     // Still required at the boundary: the annatto/baharat readers hand back
     // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
-    // TEMP (Phase 0 coordination): local publish of the Option-only cilantro.
-    // Bump back to a real release tag before any release build.
-    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.0.1-SNAPSHOT",
+    // Spice Labs readers — current Maven Central releases (spec §1).
+    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.2.1",
     // Canonical content identifiers (hashes + git blob ids) — the single source of
-    // truth shared across Spice Labs tooling. Resolved from `Resolver.mavenLocal`.
-    libraryDependencies += "io.spicelabs" % "coordinates" % "1.1.0",
+    // truth shared across Spice Labs tooling (spec §1 pins 1.2.1). Plain Java jar:
+    libraryDependencies += "io.spicelabs" % "coordinates" % "1.2.1",
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
-    // Spice Labs "readers"
-    libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
-    libraryDependencies += "io.spicelabs" % "annatto" % "0.2.0",
-    libraryDependencies += "io.spicelabs" % "saffron" % "0.4.0",
+    // Spice Labs "readers" — current Maven Central releases (spec §1).
+    libraryDependencies += "io.spicelabs" % "baharat" % "0.2.1",
+    libraryDependencies += "io.spicelabs" % "annatto" % "0.3.0",
+    libraryDependencies += "io.spicelabs" % "saffron" % "0.5.0",
+    // Direct pins (spec §1):
+    libraryDependencies += "org.eclipse.jgit" % "org.eclipse.jgit" % "7.3.0.202506031305-r",
+    libraryDependencies += "org.xerial" % "sqlite-jdbc" % "3.53.4.0", // baharat's optional dep, opted in explicitly
+    libraryDependencies += "io.airlift" % "aircompressor" % "2.0.3",
+    libraryDependencies += "at.yawk.lz4" % "lz4-java" % "1.11.2",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.85.2",
     libraryDependencies += "org.bouncycastle" % "bcpkix-jdk18on" % "1.85",
     libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on" % "1.85",
@@ -367,8 +402,8 @@ Test / testOptions += Tests.Setup(() => {
   //   2. the OCI image layout  (ORAS, in a locked-down docker container)
   //
   // The sentinel records the expected config-blob digest; a mismatched cache
-  // is refetched. Everything is skipped when docker is unavailable or
-  // GOATRODEO_SKIP_OCI_FETCH=1 — the parity tests gate on fixture presence.
+  // is refetched. OCI parity fixtures are mandatory: if they cannot be
+  // fetched, the build FAILS (the parity tests must run; never skip).
   val ociPins: Seq[(String, String, String, String)] = Vector(
     // (image, tag, index digest, config-blob digest)
     (
@@ -453,14 +488,21 @@ Test / testOptions += Tests.Setup(() => {
           }
         }
       } else {
-        log.warn(
-          "docker not available; skipping OCI parity fixture fetch (the parity tests will skip)"
+        throw new MessageOnlyException(
+          "docker is required to fetch the OCI parity fixtures (the parity tests must run)"
         )
       }
     } catch {
+      case e: MessageOnlyException => throw e
       case e: Exception =>
-        log.warn(f"OCI parity fixture fetch skipped: ${e.getMessage()}")
+        throw new MessageOnlyException(
+          f"OCI parity fixture fetch failed: ${e.getMessage()} (the parity tests must run)"
+        )
     }
+  } else {
+    throw new MessageOnlyException(
+      "GOATRODEO_SKIP_OCI_FETCH must not be set: the OCI parity tests must run"
+    )
   }
   log.info("Test data caching complete.")
 })

@@ -110,7 +110,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Maven JAR Tests ====================
 
   test("Maven JARs - package tags created for pqc_jars") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true, packageTagsShortName = false)
     val source = new File("test_data/pqc_jars")
@@ -149,7 +149,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Maven JARs - short names use artifactId only") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true, packageTagsShortName = true)
     val source = new File("test_data/pqc_jars")
@@ -172,7 +172,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Maven JARs - tag edges point to correct artifacts") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true)
     val source = new File("test_data/pqc_jars")
@@ -200,7 +200,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Linux Package Tests (.deb) ====================
 
   test("Debian packages - tags created with name and version") {
-    assume(
+    assert(
       checkTestFile("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"),
       "Debian test data exists"
     )
@@ -229,7 +229,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Debian with metadata - extracts build date") {
-    assume(
+    assert(
       checkTestFile("test_data/debwithmetadata.deb"),
       "Debian with metadata test data exists"
     )
@@ -259,7 +259,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Linux Package Tests (.rpm) ====================
 
   test("RPM packages - tags created with name and version") {
-    assume(
+    assert(
       checkTestFile("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm"),
       "RPM test data exists"
     )
@@ -287,7 +287,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Docker Tests ====================
 
   test("Docker images - package tags created with repository, tag, and date") {
-    assume(
+    assert(
       DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
       ),
@@ -324,7 +324,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Docker complex image - multiple tags created") {
-    assume(
+    assert(
       DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
       ),
@@ -357,7 +357,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       )
     ).filter { case (path, _, _) => checkTestFile(path) }
 
-    assume(testCases.nonEmpty, "At least one test file exists")
+    assert(testCases.nonEmpty, "At least one test file exists")
 
     val config = Configuration(packageTags = true)
 
@@ -401,7 +401,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Tags index - contains package tags when package-tags enabled") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true)
     val source = new File("test_data/pqc_jars")
@@ -420,7 +420,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Tags index - no package tag edges when package-tags disabled") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = false)
     val source = new File("test_data/pqc_jars")

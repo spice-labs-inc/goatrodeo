@@ -1,126 +1,472 @@
-# How Goat Rodeo Works (LLM)
+# How Goat Rodeo Works
 
-> **Navigation:** [Docs](README.md) | [API](goat_rodeo_api.md) | [Architecture](architecture.md)
+> **Navigation:** [Documentation Index](README.md) | [API Reference](goat_rodeo_api.md) | [Architecture](architecture.md)
 
-## Overview
-Pipeline: File Discovery → Strategy Determination → ADG Building.
+When Goat Rodeo builds a set of Artifact Dependency Graphs (ADGs) from
+a series of files, it goes through a series of steps and each step
+has certain operational characteristics.
+
+This document describes how Goat Rodeo works and how to tune parameters.
 
 ## Tags
-- **Survey Tag** (`--tag`): single run anchor.
-- **Sub-Tag** (`--package-tags`): per-package tag created by strategies (Maven, Docker, Baharat, Annatto, Dotnet, JVM/JDK, Gradle). Keys: `tag`, `version`, `date`. JSON marker `"package_tag": true`.
-- **Short names** (`--package-tags-short-name`): uses `artifactId` instead of full groupId/artifactId/version for Maven; short name for other strategies where applicable.
 
-## CLI Flags
-- `-b, --build`, `-o, --out`, `-t, --threads`, `--maxrecords`, `--block`, `--tempdir`
-- `--tag`, `--tag-version`, `--tag-date`
-- `--package-tags`, `--package-tags-short-name`
-- `--ingested`, `--ignore`, `--file-list`, `--exclude-pattern`
-- `--emit-cbom-dir <dir>` — emit one CycloneDX CBOM JSON file per top-level input.
-- `--cbom-version <1.6|1.7>` — CycloneDX version, default `1.6`.
+Goat Rodeo supports two kinds of tags, which serve different purposes:
 
-## Operation Phases
-1. **File Discovery** — recursive walk, ignore `.`-prefixed. Assign MIME via Tika; MIME augmenters add types like `application/x-openssl-config` and `application/x-java-security-properties`.
-2. **Strategy Determination** — ordered vector of processors. `GenericFile` always last.
-   - `MavenToProcess` — groups `pom`+`jar`+`sources`+`javadocs`.
-   - `DockerToProcess` — Docker image manifests and layers.
-   - `Debian` — `.deb` packages.
-   - `DotnetFile` — .NET assemblies.
-   - `Annatto` — Bun JS bundler outputs.
-   - `BaharatStrategy` — Saffron-flagged outputs.
-   - `JvmDistribution` — JDK/JRE `release` file detection.
-   - `GradleLockfile` — Gradle lockfile dependency parsing.
-   - `Certificates` — X.509/CRL/keystore/SSH/PGP/private keys.
-   - `OpenSSLConfig` — OpenSSL `.cnf` configs (MIME `application/x-openssl-config`).
-   - `JavaSecurity` — Java `java.security` policy files (MIME or path triggered).
-3. **ADG Building** — gitoid per artifact. Block list pruning. Container recursion. `MemStorage` node-level locking + immutable read.
-4. **Optional CBOM Output** — after ADG write, `Builder` invokes `CbomEmitter.emitForStorage`. One CBOM per root, walking `contains` edges, collecting crypto Items, redacting private keys, mapping to CycloneDX `cryptographic-asset` components.
+### Survey Tags (top-level)
 
-## Maven Identity Resolution (5-layer chain)
-First complete `(groupId, artifactId, version)` wins:
-1. Embedded `pom.properties` inside JAR.
-2. External sibling `.pom`.
-3. Embedded `pom.xml` inside JAR.
-4. MANIFEST.MF — OSGi headers, `Implementation-Title`, `Bundle-Version`, etc.
-5. Filename heuristic — `groupId.artifactId-version.jar` or `artifactId-version.jar`. Scala suffix `_2.13` stays in artifactId.
+Tags as they were initially conceived represented an **entire survey** — a single Goat Rodeo run. A survey tag provides an anchor, a connection point for the whole run.
 
-## Enhanced JAR Metadata (Phase 5)
-`MavenState` detects structural JAR types and emits metadata keys:
-- **Spring Boot fat JAR**: `JarType=spring-boot-fat-jar`, `NestedJars`, `SpringBootMainClass`, `LayersIdx`, `ClasspathIdx`
-- **Shaded JAR**: `JarType=shaded-jar` (marker file or `Created-By: Apache Maven Shade Plugin`)
-- **WAR**: `JarType=war`, `WarLibJars`
-- **EAR**: `JarType=ear`, `EarModules`
-- **Multi-Release JAR**: `JarType=multi-release`, `MultiReleaseVersions`
-- **Signed JAR**: `JarSigned=true`, `SignatureFiles`
-- **ServiceLoader**: `ServiceProviders` JSON map
-- **JPMS**: `AutomaticModuleName`, `ModuleRequires`, `ModuleExports`, `ModuleOpens`, `ModuleProvides`, `ModuleUses`
-- **GraalVM**: `GraalNativeImage` properties
-- **Jenkins Plugin**: `JenkinsPlugin=true`
-- **OSGi**: full header extraction (`osgi:BundleName`, `BundleDescription`, `BundleVendor`, `BundleDocURL`, `ExportPackage`, `ImportPackage`, `RequireCapability`, `ProvideCapability`, `FragmentHost`)
+Survey tags are created with `--tag` and can optionally include `--tag-version` and `--tag-date`.
 
-## JVM/JDK Detection (Phase 6)
-- Claims files named `release` containing `JAVA_VERSION` or `JAVA_RUNTIME_VERSION`.
-- Parses 14+ fields: `JAVA_VERSION`, `JAVA_RUNTIME_VERSION`, `IMPLEMENTOR`, `IMAGE_TYPE`, `OS_ARCH`, `OS_NAME`, `LIBC`, `JVM_VARIANT`, `SEMANTIC_VERSION`, `FULL_VERSION`, `SOURCE_REPO`, `BUILD_SOURCE_REPO`, `JAVA_VERSION_DATE`.
-- Generates `pkg:generic/<vendor>/<product>@<version>` pURL with `repository_url` qualifier.
-- Vendor mapping: Eclipse Adoptium → `eclipse/temurin`, Oracle → `oracle/jdk`, Azul → `azul/zulu`, Amazon → `amazon/corretto`, IBM → `ibm/jdk`, Microsoft → `microsoft/jdk`, default → `openjdk/jdk`.
-- JDK vs JRE detection: `IMAGE_TYPE` authoritative; fallback checks for sibling `bin/javac`.
+### Sub-Tags (per-package)
 
-## Gradle Lockfile (Phase 7)
-- Claims `gradle.lockfile`, `buildscript-gradle.lockfile`, and `dependency-locks/*.lockfile`.
-- Modern format: `group:artifact:version=config1,config2,...`
-- Legacy format: `group:artifact:version` with config derived from filename.
-- Generates `pkg:maven/...` pURL for each locked dependency.
-- Emits `Dependencies` JSON with Gradle configuration names stored in `scope`.
+As we start working on surveying in bulk (downloading hundreds of artifacts from Docker Hub, etc.), we need a more granular meaning of "tag" — in this case the individual artifact that's being tagged rather than the whole survey. A **sub-tag** is a tag associated with a single artifact (a Docker image, a JAR file, etc.) so that for bulk operations, there might be many sub-tags.
 
-## POM Parsing (Phase 2)
-`PomParser` (hardened, no `scala.xml.XML`):
-- groupId/artifactId/version with parent fallback for missing child fields.
-- Property interpolation (`${key}`) with 10-level depth cap and cycle detection.
-- Secure XML parser: DTD, external entities, entity expansion, XInclude all disabled.
+Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects a package (Maven JAR, Docker image, Linux package, .NET assembly). Each sub-tag captures the package name, version, and build date from the artifact's own metadata.
 
-## Dependency Metadata (Phase 3)
-- Stored as JSON under `adHoc("maven")("DEPENDENCIES")` and `adHoc("maven")("RuntimeDependencies")`.
-- No new edge types.
-- Default scope = `compile` when omitted.
-- `RuntimeDependencies` subset filters out `test` and `provided`.
+### Relationship
 
-## Certificates Strategy Key Behaviors
-- **Keystore = single flat Item** with aggregated pURLs/metadata, not one Item per entry.
-- **Encrypted material is opaque** — envelope metadata only, no decryption, no password guessing.
-- **Private key filtering** (`Certificates.filterLeaks`) drops private-key-containing entries silently (no exception).
-- **SSH key format** returns `Option` for all parse failures.
+| | Survey Tag | Sub-Tag |
+|---|---|---|
+| Scope | Entire run | Single package |
+| Source | CLI (`--tag`) | Artifact metadata (`--package-tags`) |
+| Index item | `tags` | `tags` (same root) |
+| Edge type | `tag:from` → `tags` | `tag:from` → `tags` |
+| JSON marker | — | `"package_tag": true` |
 
-## MemStorage
-Low-lock immutable map. Node-level atomic updates. Size scales with `--maxrecords`.
+## CLI parameters:
 
-## Threads & Memory
-- Default threads = 4.
-- Use RAM disk for `--tempdir` (25G+) to avoid NVMe/SSD/HDD writes.
-- Memory pressure rises with threads + in-memory `ArtifactWrapper` count.
+     
+* `-b`, `--build`: the directory that contains the files to build ADGs for
+* `-o`, `--out`: the directory to place the computed ADGs
+* `-t`, `--threads`: the number of CPU threads to use to simultaneously build ADGs
+* `--maxrecords` : the maximum number of files to process in a single batch. If more
+   than this number of files are contained in the build directory, a separate set of ADGs
+   will be emitted when `maxrecords` is hit and the balance of the records will then be processed.
+* `--block` : a list of gitoids not to process. These are typically common and not useful gitoids such as
+   common configuration files, common license files, etc.
+* `--tempdir` : a temporary directory to store artifacts (e.g., a zip file contained in a tar file) during
+  processing. By default Goat Rodeo uses `/tmp`. But to improve performance, create a RAM disk and
+  use the RAM disk as the `tempdir`
+* `--tag` : create a `tags` Item and link to `{iso 8601 date}/{text after tag param}` Item and link each Item representing a found file
+  to that Item. This allows for the identification of all the top level files in a Goat Rodeo run on a particular day.
+* `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
+* `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
+  Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
+* `--no-redact-git-info` : Do not redact git provenance metadata (author/committer emails stored raw and repo paths absolute). Git provenance is
+  captured for tagged runs (see `git_provenance.md`); by default emails are replaced by a pseudonymous `sha256:` digest and repo roots are
+  relativized. `--tag-date` and a user JSON `date` override are carried verbatim into the git provenance Items.
+* `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet, JDK/JRE). Each package gets a tag Item
+  with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
+  is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.
+* `--package-tags-short-name` : Use short package names (e.g., `artifactId` for Maven) instead of fully qualified names
+  (e.g., `groupId:artifactId`). Applies when `--package-tags` is enabled.
+* `--ingested` : Append all the ingested files to this file on successful completion
+* `--ignore` : A file containing paths to ignore, likely because they have been processed in the past. This can be used in conjunction
+  with `--ingested` (they can point to the same file) to record the files that were processed by Goat Rodeo such that those files
+  can be ignored in a the current run.
+* `--file-list` : A file containing a list of files to process. This may be used in conjunction with the `-b` (build) flag and this list may be
+   generated by an external process. For example, using the Linux shell command [`find`](https://www.man7.org/linux/man-pages/man1/find.1.html)
+   to generate a list of files to process (e.g., exclude html files that may have been downloaded as part of a site crawl)
+* `--exclude-pattern` : A regular expression pattern that can be used to exclude files, for example `html$` will exclude all files that end in `html`
+* `--emit-cbom-dir <dir>` : Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input file into this directory. The directory is created if it does not exist. CBOM emission is disabled when this flag is omitted.
+* `--cbom-version <1.6|1.7>` : CycloneDX CBOM specification version to emit when `--emit-cbom-dir` is set. Accepts only `1.6` (default) or `1.7`.
+* `-V` or `--version`: Print the version and exit
 
-## OpenSSL Configuration Capture
-- MIME augmenter `OpenSSLConfigDetector` adds `application/x-openssl-config` after reading at most 4 KB.
-- Strategy bundles all matching `.cnf` files at a layer; parser reads at most 1 MB per file.
-- Extracts sections, key/value pairs, `.include` references, and `oid_section` references.
-- Dependency ordering: breadth-first from the broadest `.include` source, depth capped at 8, cycles broken and warned.
-- Cross-file references stored as `openssl.cnf:associated_files = containerGitOID:referencedFileGitOID`.
-- Verified by `OpenSSLMimeDetectionSuite`, `OpenSSLConfigDetectorSuite`, `OpenSSLConfigParserSuite`, `OpenSSLConfigSuite`.
+## Operation
 
-## Java `java.security` Capture
-- MIME augmenter `JavaSecurityDetector` adds `application/x-java-security-properties`.
-- Strategy also claims `java.security` files in known JDK/JRE security directories.
-- Bundles all security files at a layer; parser reads at most 1 MB per file.
-- Extracts disabled algorithms, legacy algorithms, named groups, ephemeral DH key size, and included-file references.
-- Cross-file references stored as `java.security:associated_files = containerGitOID:referencedFileGitOID`.
-- Verified by `JavaSecurityDetectorSuite`, `JavaSecurityParserSuite`, `JavaSecuritySuite`.
+Goat Rodeo has the following phases of operation:
 
-## CBOM Output
-- Triggered by `--emit-cbom-dir`; version set by `--cbom-version` (`1.6` or `1.7`).
-- Emits one JSON file per root Item with a deterministic filename derived from the root GitOID.
-- Traverses `contains` edges transitively (depth ≤ 32), de-duplicates GitOIDs, drops private-key Items.
-- Maps to CycloneDX components: certificates → `certificate`, OpenSSL configs → `protocol`, Java security/keys/CRLs → `related-crypto-material`.
-- Capped at 100,000 components per root; truncated CBOMs tagged with `cbom:truncated`.
-- Atomic writes with `0640` permissions; failures are logged but do not stop the main ADG write.
-- Verified by `CbomEmitterSuite`.
+* File Discovery
+* Determining Processing Strategies for the discovered files
+* Building ADGs based on the strategies
 
-## pURL Examples
-See `goat_rodeo_operation.md` for the full list of pURL patterns generated by the Certificates strategy.
+### File Discovery
+
+Goat Rodeo traverses all the files and directories from the `build` directory down
+making a list of all the files that do not begin with `.` in all the directories that
+do not begin with `.`.
+
+Each file is wrapped in an `ArtifactWrapper`.
+
+Using Scala's [parallel collections](https://docs.scala-lang.org/overviews/parallel-collections/overview.html)
+and [Apache Tika](https://tika.apache.org/), Goat Rodeo assigns a [mime type](https://en.wikipedia.org/wiki/MIME)
+to each file/artifact.
+
+### Strategy Determination
+
+With the collection of all files, Goat Rodeo hands the set of files to different
+handlers to choose which of the files the handler chooses to process.
+
+The list is in the `ToProcess` object and it's currently:
+
+```scala
+    Vector(
+      MavenToProcess.computeMavenFiles,
+      DockerToProcess.computeDockerFiles,
+      Debian.computeDebianFiles,
+      DotnetFile.computeDotnetFiles,
+      Annatto.computeAnnattoFiles,
+      BaharatStrategy.computeBaharatFiles,
+      JvmDistribution.computeJvmFiles,
+      GradleLockfile.computeGradleLockfiles,
+      Certificates.computeCertificateFiles,
+      OpenSSLConfigToProcess.computeOpenSSLConfigFiles,
+      JavaSecurityToProcess.computeJavaSecurityFiles,
+      GenericFile.computeGenericFiles
+    )
+```
+
+As there are additional modules that can handle file processing, they can
+be added to this list. For example, an RPM processor.
+
+These functions create a list to `ToProcess` for its types.
+
+Also note that `GenericFile` should always be last. It takes whatever files the
+others did not select.
+
+The `MavenToProcess` looks for groupings of `pom`, `jar`, `sources`, and `javadocs`. It processes
+these as a unit so that it can pull metadata from the pom file to insert into the `jar`'s ADG,
+associates a source file with a` `.class` file based on the class file's debug information, etc.
+
+The `Certificates` strategy is notable for two design choices that
+differ from Maven/Docker:
+
+- **Keystores produce a single flat Item** with all contained pURLs
+  and metadata aggregated, not one Item per entry. Maven groups
+  `(pom, jar, sources, javadocs)` into one Item-with-children;
+  Certificates aggregates all entries in a JKS / PKCS#12 / etc.
+  into one Item with no children.
+- **Encrypted material is opaque.** Encrypted private keys and
+  encrypted keystores produce envelope-only metadata (KDF, cipher,
+  salt) and no pURL. The strategy never attempts decryption, never
+  guesses passwords, never logs encrypted content. 
+
+In the future, there may be ways to group files together (e.g., a yaml file associated with an ISO
+that describes the contents of the ISO, a `Dockerfile` associated with a Docker image, etc.)
+
+As each `ToProcess` is yielded from the determination groups, the `ToProcess` items are
+enqueued.
+
+### Building ADGs
+
+The gitoid and other hash information is computed for each `ArtifactWrapper`. If the gitoid is on
+the block list (see `--block`), it is discarded. Otherwise it is added to the in-memory `MemStorage`
+instance. If there's already a node for the gitoid, the current gitoid is merged into that node.
+The additional hashes are treated as aliases to the node with is identified by it's `gitoid:sha256`.
+
+Each `ArtifactWrapper` itself is a container is "opened". Containers include `tar`, `zip`, `jar`,
+`ISO`, etc. If the `ArtifactWrapper` is compressed (e.g. a `gzipped` file), it is uncompressed and the
+uncompressed file is tested to see if it's a container.
+
+For containers and smaller artifacts, an in-memory `ArtifactWrapper` is created, and for larger artifacts,
+the artifact is copied to a temporary file.
+
+**IMPORTANT** If you specify `--tempdir` the size threshold for in-memory vs. temp file is much lower. Using
+a `--tempdir` reduces memory pressure. Using a RAM disk also radically improves performance because writing
+to real media (NVMe, SSD, HDD) is a slow process. Writing to RAM is a fast process. Allocating a 25G RAM
+disk will make all the performance difference in the world. Note that processing will fail and the Goat Rodeo
+run will be terminated if `tempdir` exceeds 95% full.
+
+For each "container", the list of files in the container is made and the process starts at the top (determine
+MIME type, determine strategy, build gitoid for each artifact). This process is recursive. Thus, an ISO that
+contains a tar file that contains a zip file that contains a tar file that contains an ISO that contains a JAR
+file will be processed and the correct strategy will be chosen for each file at each level.
+
+As a practical matter, this means the a `.deb` file that contains a JVM distribution will initially be processed
+with the Debian strategy, but when the JAR file is encountered, it will be processed with the Maven strategy which
+is particularly helpful if the pom and sources file is in the `.deb` file in addition to the JAR.
+
+On a system that has fast disk IO (e.g., NVMe or SSD), choosing a thread count that's roughly equal to the number
+of logical CPUs will maximize processing. The only shared resource among the threads (other than the `ToProcess`
+queue) is the `MemStorage` instance.
+
+#### Maven Identity Resolution
+
+The Maven strategy extracts identity metadata (groupId, artifactId, version) using a strict five-layer priority chain. The first layer that produces a complete tuple wins:
+
+1. **Embedded `pom.properties`** — parsed from `META-INF/maven/<groupId>/<artifactId>/pom.properties` inside the JAR. If multiple properties files exist (fat JAR), the one whose embedded `artifactId` matches the JAR filename is chosen.
+2. **External sibling `.pom`** — a `pom.xml` file sitting next to the JAR on disk.
+3. **Embedded `pom.xml`** — the `pom.xml` bundled inside the JAR itself.
+4. **MANIFEST.MF** — OSGi headers (`Bundle-SymbolicName` / `Implementation-Title`) and version headers (`Bundle-Version` / `Implementation-Version`), with further fallbacks to `bundle-name` and `specification-version`.
+5. **Filename** — heuristic parsing of `groupId.artifactId-version.jar` or `artifactId-version.jar`. Dots before the final artifactId are treated as groupId segments, except when the trailing segment is purely numeric (a Scala binary suffix like `_2.13`), in which case it stays in the artifactId.
+
+The extracted identity is used to generate a pURL (`pkg:maven/<groupId>/<artifactId>@<version>`) and to populate metadata keys such as:
+- `("tag","package")` — the pURL
+- `("tag","package tag group id")` — the groupId (or `artifactId` when short names are requested)
+- `("tag","repo URL")` — SHA-256 of the Maven Central URL
+- `("maven","Timestamp")` — the parsed build timestamp
+
+#### `MemStorage` 
+
+The "graph" of artifacts is kept in `MemStorage`, and in-memory data structure that stores all the nodes in the graph.
+
+`MemStorage` is a low-lock structure that uses node-level locking to avoid write contention and an immutable
+representation of the data for lock-free reading.
+
+When a node is created/modified, there's an atomically executed block that reads the current node value, passes
+that to a function that merges additional node information, and then merges the changed node back into the immutable
+`Map`
+
+Thus, most ADG building will not be processing the same node at the same time and there will be little to no
+lock contention.
+
+The size of `MemStorage` will increase with the number of `ArtifactsWapper` instances processed. Thus,
+choosing `--maxrecords` number (the default is 50,000) that will comfortably fit in memory is a tuning.
+
+#### Threads
+
+Threads consume CPU, but there are also intermediate data structures (e.g., in-memory `ArtifactWrappers`) that
+consume memory. In terms of choosing the number of threads, it's not simply the number of logical CPUs, it's
+also the amount of RAM.
+
+## Cryptographic Configuration Capture and CBOM Output
+
+Goat Rodeo captures three kinds of cryptographic material as ADG metadata and can emit a CycloneDX Cryptographic Bill of Materials (CBOM) for each top-level input.
+
+### OpenSSL Configuration Capture
+
+OpenSSL configuration files (`.cnf`) are normally classified as `text/plain` by Apache Tika, which is too broad for routing. Goat Rodeo registers `OpenSSLConfigDetector` as a MIME augmenter in `ArtifactWrapper`. The detector reads at most 4 KB, looks for INI-style section headers plus OpenSSL-specific markers, and adds `application/x-openssl-config` to the MIME set when the content looks like an OpenSSL config.
+
+The `OpenSSLConfig` strategy then claims every file that carries `application/x-openssl-config`. All config files discovered at the same archive layer are bundled into one `OpenSSLConfigToProcess`, because OpenSSL configs can reference each other via `.include` directives and the intended semantics depend on the combined set.
+
+`OpenSSLConfigParser` reads at most 1 MB per file and extracts:
+- top-level key/value pairs,
+- section headers and their key/value pairs,
+- `.include` and `=.include` references to sibling files,
+- `oid_section` references that pull extra object-identifier definitions into the file's effective namespace.
+
+#### Dependency ordering
+
+Config fragments are ordered before metadata is emitted so that defaults in the main `openssl.cnf` are applied before included files override them. The ordering algorithm (in `OpenSSLConfigParser`) is:
+1. Start with the file that has the broadest `.include` fan-out (usually the main `openssl.cnf`).
+2. Recursively place directly `.include`-d files after their parent.
+3. Stop recursion at depth 8 to prevent runaway chains or cycles.
+4. Break cycles by treating the cycle as a single strongly-connected group; a warning is logged.
+
+#### Disambiguated cross-file references
+
+Because the same OpenSSL config file can appear in many images with different companion files, cross-file references are encoded as `openssl.cnf:associated_files` metadata values. Each value has the form `containerGitOID:referencedFileGitOID`, so downstream tools can tell which container the reference was observed in. The same scheme is used for Java security `include` references under `java.security:associated_files`.
+
+### Java `java.security` Capture
+
+Java runtime security policy files are captured by the `JavaSecurity` strategy. It is triggered in two ways:
+- MIME type `application/x-java-security-properties`, added by `JavaSecurityDetector` for included/sibling security properties files.
+- Path: a file named `java.security` inside `/conf/security/`, `/lib/security/`, or `/jre/lib/security/`.
+
+All Java security files at the same archive layer are bundled into a single `JavaSecurityToProcess` because `java.security` files frequently reference additional properties files via `include` directives. `JavaSecurityParser` reads at most 1 MB per file and extracts:
+- `jdk.tls.disabledAlgorithms`
+- `jdk.certpath.disabledAlgorithms`
+- `jdk.tls.legacyAlgorithms`
+- `jdk.tls.namedGroups`
+- `jdk.tls.ephemeralDHKeySize`
+
+These are emitted under metadata keys prefixed with `java.security:`.
+
+### CycloneDX CBOM Emission
+
+CBOM output is an optional post-processing stage. When `--emit-cbom-dir` is set, `Builder` calls `CbomEmitter.emitForStorage(storage, version, dir)` after the ADG is written. The emitter:
+1. Finds every root Item (`Item.isRoot()`).
+2. Walks `contains` edges transitively from each root, tracking visited GitOIDs to avoid cycles and duplicates, up to a maximum depth of 32.
+3. Collects Items whose metadata contains `Certificates:`, `openssl.cnf:`, or `java.security:` keys.
+4. Omits private-key Items (those with `Certificates:DerivedFromPrivateKey == true` or a description containing "private key").
+5. Maps the remaining Items to CycloneDX `cryptographic-asset` components:
+   - X.509 certificates → `certificate` with `certificateProperties`.
+   - OpenSSL configs → `protocol` with `protocolProperties.type: tls`.
+   - Java security policies, keystores, keys, CRLs → `related-crypto-material`.
+6. Writes one JSON file per root with a deterministic filename derived from the root GitOID.
+
+If a root has no cryptographic material, the emitter still writes a valid CBOM with an empty `components` array. CBOMs are capped at 100,000 components per root; if the cap is exceeded, the file is marked with `cbom:truncated` and a warning is logged. Files are written atomically (temp file + rename) with `0640` permissions.
+
+**Verified by:**
+- `OpenSSLMimeDetectionSuite` — OpenSSL config MIME detection corpus rate.
+- `OpenSSLConfigDetectorSuite` — detector registration, read budget, additive property.
+- `OpenSSLConfigParserSuite` — parsing, dependency ordering, cycle handling.
+- `OpenSSLConfigSuite` — end-to-end claiming and metadata emission.
+- `JavaSecurityDetectorSuite` — detector behavior and path claiming.
+- `JavaSecurityParserSuite` — property parsing and read budget.
+- `JavaSecuritySuite` — end-to-end claiming and metadata emission.
+- `CbomEmitterSuite` — CLI parsing, mapping, traversal, private-key redaction, atomic writes, schema validation.
+
+## Certificates Strategy pURL Examples
+
+The Certificates strategy generates pURLs (package URLs) for various cryptographic artifacts. Below are examples of every pURL type generated:
+
+### X.509 Certificates
+
+Each X.509 certificate generates two pURLs - one for the full certificate and one for the Subject Public Key Info (SPKI):
+
+**RSA Certificate:**
+```
+pkg:generic/x509/cert-sha256@568d6905a2c88708a4b3025190edcfedb1974a606a13c6e5290fcb2ae63edab5?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=2048&version=3
+pkg:generic/x509/spki-sha256@2b071c59a0a0ae76b0eadb2bad23bad4580b69c3601b630c2eaf0613afa83f92?alg=rsa&size=2048&version=3
+```
+
+**EC Certificate (with curve):**
+```
+pkg:generic/x509/cert-sha256@02ed0eb28c14da45165c566791700d6451d7fb56f0b2ab1d3b8eb070e56edff5?alg=ec&curve=p-384&self-signed=true&sig-alg=sha384-ecdsa&version=3
+pkg:generic/x509/spki-sha256@fea2b7d645fba73d753c1ec9a7870c40e1f7b0c561e927b985bf711866e36f22?alg=ec&curve=p-384&version=3
+```
+
+### X.509 Certificate Revocation Lists (CRL)
+
+```
+pkg:generic/x509/crl-sha256@d33aac05c6677837a6028d87dae34ef5229bac5f208acea95bd622c1a0dca030?sig-alg=sha256-rsa
+```
+
+### SSH Public Keys
+
+**Ed25519:**
+```
+pkg:generic/ssh/sha256@Db31CxoP8DzjW%2FD7VJgyGO2ASZA%2FcxUQJBf7odnoEt0?alg=ed25519
+```
+
+**RSA (with size):**
+```
+pkg:generic/ssh/sha256@9VAjeg9jcVjGFn2jX77k4h6DzFJf5UXz351tT1njVqo?alg=rsa&size=4096
+```
+
+**DSA (fixed 1024-bit):**
+```
+pkg:generic/ssh/sha256@JpoF3tGwEESWo4cE6FJuyaD2oX8S9uElv2msJyFk6V4?alg=dsa&size=1024
+```
+
+**EC (with curve):**
+```
+pkg:generic/ssh/sha256@<base64-sha256>?alg=ec&curve=p-256
+```
+
+**Security Key variants:**
+```
+pkg:generic/ssh/sha256@<base64-sha256>?alg=ed25519&sk=true
+pkg:generic/ssh/sha256@<base64-sha256>?alg=ec&curve=p-256&sk=true
+```
+
+### SSH Certificates
+
+Each SSH certificate generates two pURLs - one for the certificate and one for the signed key:
+
+**User Certificate (Ed25519):**
+```
+pkg:generic/ssh/cert-sha256@00fd5a4b2b78a98b85d8a84c4b4f098e8afc66aad4c02604195ebed2eecc77c3?alg=ed25519&cert-type=user&sig-alg=ssh-ed25519
+pkg:generic/ssh/sha256@kVSaQnN01FoMK0pdLrpUff7WML%2BtVX0Rk8TaQacCq9U?alg=ed25519
+```
+
+**Host Certificate (Ed25519):**
+```
+pkg:generic/ssh/cert-sha256@580bec3021c054f9866890d2ef224ce3ed4ce52385db1759f2405cb7eb730203?alg=ed25519&cert-type=host&sig-alg=ssh-ed25519
+pkg:generic/ssh/sha256@U8UZmmHxykCOTqkPSfY7w%2BRXjZbXDljK12KMOma39iA?alg=ed25519
+```
+
+### PGP Keys
+
+**RSA:**
+```
+pkg:generic/pgp/fingerprint@9dc858229fc7dd38854ae2d88d81803c0ebfcd88?alg=rsa&size=4096&version=4
+```
+
+**Ed25519:**
+```
+pkg:generic/pgp/fingerprint@6046c53c8df8c522076f8cd76d7faae796abc62e?alg=ed25519&curve=ed25519&version=4
+```
+
+**EC (X25519 for encryption):**
+```
+pkg:generic/pgp/fingerprint@59915a0a243d30d5002d6aa58ed81ea8adfb3a65?alg=ec&curve=curve25519&version=4
+```
+
+### Private Keys (Unencrypted)
+
+Unencrypted private keys generate pURLs for the derived public key material:
+
+**PKCS#8 PEM (RSA):**
+```
+pkg:generic/x509/spki-sha256@f43c197f37e71d23d15b686d6453947883c79011d766fc6433d58bb9815125c4?alg=rsa&size=2048
+```
+
+**OpenSSH format (RSA):**
+```
+pkg:generic/ssh/sha256@t0%2FkOgTYoKNs5SqVqWSLJPoXV2gsRUIlrprl3Osdlfc?alg=rsa&size=2048
+```
+
+**PGP Secret Key Ring (unencrypted):**
+```
+pkg:generic/pgp/fingerprint@6046c53c8df8c522076f8cd76d7faae796abc62e?alg=ed25519&curve=ed25519&version=4
+pkg:generic/pgp/fingerprint@59915a0a243d30d5002d6aa58ed81ea8adfb3a65?alg=ec&curve=curve25519&version=4
+```
+
+### Encrypted Material (No pURLs)
+
+Encrypted keystores, encrypted private keys (PKCS#8, OpenSSH, PGP), and encrypted PEM files produce **no pURLs** - only envelope metadata:
+
+- Encrypted PKCS#12/JKS/JCEKS keystores: No pURLs
+- Encrypted PKCS#8 private keys: No pURLs
+- Encrypted OpenSSH private keys: No pURLs
+- Encrypted PGP secret keys: No pURLs
+- Legacy PEM encrypted private keys: No pURLs
+
+### PEM Bundles and Keystores
+
+PEM bundles and keystores generate pURLs for each certificate they contain:
+
+**PEM Bundle (2 certificates):**
+```
+pkg:generic/x509/spki-sha256@4fc37b22c260f844c74e055259986a6c8ab2e90df82ea4dae330e47bc354f553?alg=rsa&size=2048&version=3
+pkg:generic/x509/cert-sha256@11c1096ec324244d2dac18cea1131f20981580fb61b50e4cfb1a17f742fa949e?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=2048&version=3
+pkg:generic/x509/spki-sha256@868110e436376a748166ecb7a511ada64c7d7a9b9ffc4a0b7fa85bbb8587020f?alg=rsa&size=2048&version=3
+pkg:generic/x509/cert-sha256@d49630047cf9a19fb479d261dbd392fad25ce034f504f7a4cf76372bc57d8169?alg=rsa&self-signed=false&sig-alg=sha256-rsa&size=2048&version=3
+```
+
+**Unencrypted PKCS#12 (null-password):**
+```
+pkg:generic/x509/spki-sha256@0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a39dad301c5afc3?alg=rsa&size=4096&version=3
+pkg:generic/x509/cert-sha256@96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=4096&version=3
+```
+
+## Tuning for performance
+
+If you're processing a few hundred artifacts, don't worry. Goat Rodeo will do the right thing.
+
+If you are processing thousands or millions of artifacts (Goat Rodeo has been tested against 2M mixed
+Maven and Debian artifacts), tuning becomes important.
+
+### Use a RAM Disk
+
+Create a RAM disk:
+
+```shell
+sudo mkdir /tmp/ramdisk
+sudo mount -t tmpfs -o size=10G myramdisk /tmp/ramdisk
+```
+
+The size of the RAM disk matters. When processing using 60 threads, a 50G RAM disk
+was necessary. The fewer the number of threads, the smaller the RAM disk.
+
+### Tune the number of threads
+
+On a system that is not I/O constrained (NVMe, SSD), at most use the number of logical CPUs in the system.
+However, the more CPUs, the more RAM pressure, especially if you're not using `--tempdir`.
+
+For I/O constrained systems (e.g. HDD-based), choosing more threads than the number of logic CPUs may
+improve performance.
+
+Using tools like [iotop](https://www.geeksforgeeks.org/iotop-command-in-linux-with-examples/) will allow you
+to see the way the system is reading/writing to/from disk.
+
+Monitoring memory use with [top](https://www.man7.org/linux/man-pages/man1/top.1.html) will allow you to
+see how the JVM is using memory as seen by the OS.
+
+If you find your system is RAM constrained, reduce the number of threads and reduce `--maxrecords`.
+
+If your system is I/O constrained and it's looking like there's contention across threads, reduce the
+number of threads.
+
+### Concrete
+
+* Set up and use the RAM disk unless there's a solid reason not to (e.g., you've got 16GB of RAM total)
+* Run 50,000+ files using the default configuration.
+     * If this works, increase the number of threads to the number of logical CPUs
+     * If this doesn't work (out of memory)
+         * First try reducing `--maxrecords` to 25,000 then 10,000
+         * If that doesn't work, reduce the number of threads
+

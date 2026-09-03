@@ -40,7 +40,7 @@ import scala.sys.process.*
   *     fixture's DER bytes
   *
   * If the script is missing or `bash` cannot be invoked the test is marked
-  * `assume(... && !ignored)` so non-Linux dev machines do not fail-spuriously.
+  * `assert(... && !ignored)` so non-Linux dev machines do not fail-spuriously.
   *
   * ## Traceability
   *
@@ -59,11 +59,11 @@ class ComputeExpectedToolTests extends FunSuite {
   )
 
   override def beforeAll(): Unit = {
-    assume(
+    assert(
       script.exists() && script.canExecute(),
       s"compute-expected.sh missing or not executable at ${script.getPath}"
     )
-    assume(
+    assert(
       sampleFixture.exists(),
       s"sample fixture missing at ${sampleFixture.getPath}"
     )

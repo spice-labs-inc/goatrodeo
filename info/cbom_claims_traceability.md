@@ -125,3 +125,21 @@ Claims in `info/cbom_enhancements.md`:
 | ArduPilot `AP_ROMFS` is treated as an archive: its embedded files become inner artifacts (read via `withStream` only, bounded). | `ApRomfsSuite.AR-1`, `AR-2`, `AR-3` |
 | The Surveyor-OT-Demo trust-store certs (RSA-1024) surface in the CBOM with `KeySize 1024` and `goatrodeo:path`. | `CbomEmitterSuite.T3.43` |
 | Corpus: ArduPilot + PX4 images under `test_data/firmware-images/`. | fixture presence + AR-1 |
+
+## Phase 2 (2026-09-02) — MIME hints + PKCS#7 certificates
+
+| Claim | Verified By |
+|-------|-------------|
+| Wrappers may carry an authoritative producer-stamped MIME hint, unioned into the effective MIME set; never sniffed; authoritative; survives spill | `MimeHintSuite.T5.1–T5.8` |
+| The Certificates strategy claims `application/pkcs7-signature` (and not `application/pkcs7-mime`); exactly one non-terminal strategy claims it | `CertificatesPkcs7Suite.T6.1, T6.2`, `SingleCertificatesStrategySuite.T6.8` |
+| Detached PKCS#7 SignedData parses to the embedded X.509 chain; bare DER shares the path; invalid/empty blobs skip cleanly | `CertificatesPkcs7Suite.T6.3–T6.6` |
+| Cert MIME constants owned by the Certificates module | `CertificatesPkcs7Suite.T6.7` |
+| PKCS#7 certs surface in the CBOM as cryptographic-asset/certificate with bundle + per-cert metadata; invalid blobs never appear as cert components; component-equivalent to a PEM bundle | `Pkcs7CbomSuite.T7.1–T7.4` |
+
+## Phase 4/5 (2026-09-02) — GRD EOF, `.user-ready`, git-provenance not in CBOM
+
+| Claim | Verified By |
+|-------|-------------|
+| Any negative GRD entry length is EOF (incl. −65536, min-int); positive past EOF is end-of-data; real round-trip unchanged | `GrdEofSuite.T13.1–T13.3` |
+| `.user-ready` marker tolerated: discovery skips dot-names by name (readable or not); deletion never throws on un-deletable marker; never pollutes captured git trees | `UserReadyToleranceSuite.T14.1, T14.2, T14.4`, `GitRunInfoSuite.T14.3` |
+| Git provenance Items (gitoid:commit:/tree:) are ItemTagData, never CBOM crypto inputs | `GitProvenanceNotInCbomSuite` |

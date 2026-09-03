@@ -275,7 +275,7 @@ class Phase6MetadataParityRegularBestPurlSuite extends FunSuite {
       test(
         s"Test 6.3: $testName — canonical pURL groupId from POM (not filename)"
       ) {
-        assume(jarFile.exists(), s"JAR not found: $jarPath")
+        assert(jarFile.exists(), s"JAR not found: $jarPath")
 
         val store = processCorpusJar(jarFile)
         val canonicalPurlOpt = extractCanonicalPurl(store, jarFile)
@@ -389,7 +389,7 @@ class Phase6MetadataParityRegularBestPurlSuite extends FunSuite {
       val expectedPurl = s"pkg:maven/$expectedG/$expectedA@$expectedV"
 
       test(s"Test 6.4: $testName — canonical pURL matches Maven Central") {
-        assume(jarFile.exists(), s"JAR not found: $jarPath")
+        assert(jarFile.exists(), s"JAR not found: $jarPath")
 
         val store = processCorpusJar(jarFile)
         val canonicalPurlOpt = extractCanonicalPurl(store, jarFile)
@@ -452,8 +452,8 @@ class Phase6MetadataParityRegularBestPurlSuite extends FunSuite {
       test(
         s"Test 6.6: $testName — canonical pURL from companion POM in pipeline"
       ) {
-        assume(jarFile.exists(), s"JAR not found: $jarPath")
-        assume(pomFile.isDefined, s"Companion POM not found for: $jarPath")
+        assert(jarFile.exists(), s"JAR not found: $jarPath")
+        assert(pomFile.isDefined, s"Companion POM not found for: $jarPath")
 
         // Parse the companion POM to get expected coordinates
         val parsedPom = parseCompanionPom(pomFile.get)

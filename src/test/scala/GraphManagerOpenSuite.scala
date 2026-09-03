@@ -179,7 +179,7 @@ class GraphManagerOpenSuite extends FunSuite {
       val (_, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
 
       val grdFiles = tempDir.listFiles().filter(_.getName.endsWith(".grd"))
-      assume(grdFiles.nonEmpty, "writeEntries should produce a .grd file")
+      assert(grdFiles.nonEmpty, "writeEntries should produce a .grd file")
       val grdFile = grdFiles.head
 
       val channel = new FileInputStream(grdFile).getChannel()

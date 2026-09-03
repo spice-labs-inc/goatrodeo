@@ -239,7 +239,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   // else in this suite is meaningful.
   // ---------------------------------------------------------------------
   test("P-01 both transports carry the pinned config digest") {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     for {
       (name, layoutDir, dockerTar) <- Seq(
         ("alpine", alpineLayoutDir, alpineDockerTar),
@@ -263,7 +263,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   // strategy extracts is identical across the two transports.
   // ---------------------------------------------------------------------
   test("P-02 config-derived metadata is identical across transports") {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     for {
       (name, layoutDir, dockerTar) <- Seq(
         ("alpine", alpineLayoutDir, alpineDockerTar),
@@ -322,7 +322,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   // of contains edges from the config item, despite differing blob digests.
   // ---------------------------------------------------------------------
   test("P-03 layer graph parity holds despite differing blob digests") {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     for {
       (name, layoutDir, dockerTar) <- Seq(
         ("alpine", alpineLayoutDir, alpineDockerTar),
@@ -356,7 +356,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   test(
     "P-04 docker-save adds the RepoTags pURL; wild OCI emits no docker pURL"
   ) {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     val docker = dockerStorage(alpineDockerTar)
     assert(
       docker.purls().exists(_.contains("pkg:docker/alpine@3.20.6")),
@@ -386,7 +386,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   // field its value must agree; absence on the docker side is fine.
   // ---------------------------------------------------------------------
   test("P-05 OCI manifest fields are extracted from the OCI layout") {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     val docker = dockerStorage(alpineDockerTar)
     val oci = ociStorage(alpineLayoutDir)
 
@@ -413,7 +413,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   // identical because the config blob is byte-identical.
   // ---------------------------------------------------------------------
   test("P-06 rootfs diff_ids are identical across transports") {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     for {
       (name, layoutDir, dockerTar) <- Seq(
         ("alpine", alpineLayoutDir, alpineDockerTar),
@@ -511,7 +511,7 @@ class OciDockerParitySuite extends munit.FunSuite {
   // with relative paths) is claimed by the Docker strategy.
   // ---------------------------------------------------------------------
   test("P-08 an OCI layout directory is claimed via relative paths") {
-    assume(fixturesPresent, "OCI parity fixtures are not fetched")
+    assert(fixturesPresent, "OCI parity fixtures are not fetched")
     val dir = alpineLayoutDir
     val wrappers = Helpers
       .findFiles(dir)

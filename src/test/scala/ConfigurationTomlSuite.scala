@@ -120,28 +120,6 @@ class ConfigurationTomlSuite extends munit.FunSuite {
 
   // ==================== nesting ====================
 
-  test("cutoff is refused in Goat Rodeo's own config file too") {
-    // An entitlement, not a preference: --cutoff is the only way to ask for one when
-    // standalone, so that the embedded rule has no second spelling to be forgotten by.
-    val error = read("""cutoff = "2026-01-01"""").left
-      .getOrElse(fail("expected an error"))
-    assert(error.contains("cutoff"), error)
-    assert(error.contains("not settable here"), error)
-  }
-
-  test("cutoff is refused in a table nested inside another program's config") {
-    // Embedded, the cutoff is the Spice Pass's `x-cutoff`: it constrains what the
-    // platform will accept, so a config file must not be able to widen it.
-    val result = ConfigurationToml.nestedFromToml(
-      parse("""cutoff = "2026-01-01""""),
-      Configuration(),
-      "registry.analysis"
-    )
-    val error = result.left.getOrElse(fail("expected an error"))
-    assert(error.contains("Spice Pass"), error)
-    assert(error.contains("registry.analysis"), error)
-  }
-
   test("errors name the table the user wrote, not an internal component") {
     val error = ConfigurationToml
       .nestedFromToml(
@@ -504,6 +482,16 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     } finally { Files.deleteIfExists(path); () }
   }
 
+  test("redact_git_info = false is honored from TOML") {
+    withConfigFile("[analysis]\nredact_git_info = false\n") { path =>
+      ConfigurationToml
+        .fromSources(Some(path), Configuration(), environment = Map.empty, report = _ => ()) match {
+        case Right((resolved, _)) => assertEquals(resolved.redactGitInfo, false)
+        case Left(err)            => fail(s"toml parse failed: $err")
+      }
+    }
+  }
+
   // ==================== the map-backed adapter ====================
 
   test("a table survives the round trip through a plain map") {
@@ -586,18 +574,6 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     val applied = builderConfig(builder)
     assertEquals(applied.threads, 11)
     assertEquals(applied.maxRecords, 4242)
-  }
-
-  test("the builder refuses a cutoff from an embedding program's config file") {
-    val error = intercept[IllegalArgumentException] {
-      io.spicelabs.goatrodeo.GoatRodeo
-        .builder()
-        .withConfiguration(
-          TomlTables.toPlainMap(parse("cutoff = \"2026-01-01\"")),
-          "survey.inventory.analysis"
-        )
-    }
-    assert(error.getMessage().contains("Spice Pass"), error.getMessage())
   }
 
   test("the builder rejects an unknown key rather than ignoring it") {

@@ -61,7 +61,7 @@ class PreflightSuite extends munit.FunSuite {
     "downloaded test data is present (run bin/fetch-test-data.sh if this fails)"
   ) {
     val marker = new File("test_data/download/iso_tests/simple.iso")
-    assume(
+    assert(
       new File("test_data/download").isDirectory,
       // Only assert the contents if someone has started provisioning; a totally
       // absent dir means the data-dependent suites simply weren't set up.

@@ -124,7 +124,7 @@ class DockerSuite extends munit.FunSuite {
   // ==================== Single-traversal bigtent tests ====================
 
   test("bigtent image - full validation") {
-    assume(
+    assert(
       DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
       ),
@@ -285,7 +285,7 @@ class DockerSuite extends munit.FunSuite {
   // ==================== Single-traversal grinder/postgres tests ====================
 
   test("grinder/postgres complex image - full validation") {
-    assume(
+    assert(
       DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
       ),

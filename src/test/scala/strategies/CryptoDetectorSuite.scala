@@ -409,7 +409,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sampleDer = new File(
       "test_data/certificates/x509/synthetic/ed25519-selfsigned-der.der"
     )
-    assume(sampleDer.exists(), s"fixture missing: ${sampleDer.getPath}")
+    assert(sampleDer.exists(), s"fixture missing: ${sampleDer.getPath}")
     val bytes = Files.readAllBytes(sampleDer.toPath)
     val out = detect(bytes, "ed25519-selfsigned-der.der")
     assert(
@@ -425,7 +425,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sampleDer = new File(
       "test_data/certificates/crls/synthetic/small-crl.der"
     )
-    assume(sampleDer.exists(), s"fixture missing: ${sampleDer.getPath}")
+    assert(sampleDer.exists(), s"fixture missing: ${sampleDer.getPath}")
     val bytes = Files.readAllBytes(sampleDer.toPath)
     val out = detect(bytes, "small-crl.der")
     assert(
@@ -572,11 +572,11 @@ class CryptoDetectorSuite extends FunSuite {
     "[FIXTURE] every Mozilla PEM cert in the corpus is detected as PEM + x509-ca-cert"
   ) {
     val mozillaDir = new File("test_data/certificates/x509/mozilla")
-    assume(mozillaDir.exists() && mozillaDir.isDirectory(), "corpus missing")
+    assert(mozillaDir.exists() && mozillaDir.isDirectory(), "corpus missing")
     val pems = Option(mozillaDir.listFiles((_, n) => n.endsWith(".pem")))
       .map(_.toVector)
       .getOrElse(Vector.empty)
-    assume(pems.nonEmpty, "no Mozilla PEM fixtures present")
+    assert(pems.nonEmpty, "no Mozilla PEM fixtures present")
     val sample = pems.take(5)
     for (pem <- sample) {
       val out = CryptoDetector.detect(
@@ -597,7 +597,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/pem-bundles/mozilla-ca-bundle.pem"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -611,11 +611,11 @@ class CryptoDetectorSuite extends FunSuite {
     "[FIXTURE] real Github SSH pubkey detected as application/x-openssh-public-key"
   ) {
     val sshDir = new File("test_data/certificates/ssh/github")
-    assume(sshDir.exists(), "corpus ssh/github missing")
+    assert(sshDir.exists(), "corpus ssh/github missing")
     val pubs = Option(sshDir.listFiles((_, n) => n.endsWith(".pub")))
       .map(_.toVector)
       .getOrElse(Vector.empty)
-    assume(pubs.nonEmpty, "no github ssh pubkey fixtures present")
+    assert(pubs.nonEmpty, "no github ssh pubkey fixtures present")
     val sample = pubs.head
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
@@ -632,7 +632,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/pgp/synthetic/v4-rsa4096-pub.asc"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -646,7 +646,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/keystores/synthetic/encrypted-jks.jks"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -660,7 +660,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/keystores/synthetic/encrypted-p12.p12"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -672,7 +672,7 @@ class CryptoDetectorSuite extends FunSuite {
 
   test("[FIXTURE] edge-cases/empty.pem stays out of every crypto MIME set") {
     val sample = new File("test_data/certificates/edge-cases/empty.pem")
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -687,7 +687,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/edge-cases/pem-typo-header.pem"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -712,7 +712,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/x509/pqc/slh-dsa/slh-dsa-sha2-192f.der"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -726,7 +726,7 @@ class CryptoDetectorSuite extends FunSuite {
     val sample = new File(
       "test_data/certificates/x509/pqc/ml-dsa/ml-dsa-87.der"
     )
-    assume(sample.exists(), s"fixture missing: ${sample.getPath}")
+    assert(sample.exists(), s"fixture missing: ${sample.getPath}")
     val out = CryptoDetector.detect(
       FileWrapper(sample, sample.getName, None)
     )
@@ -768,7 +768,7 @@ class CryptoDetectorSuite extends FunSuite {
     val src = new File(
       "test_data/certificates/keystores/synthetic/encrypted-p12.p12"
     )
-    assume(src.exists(), s"fixture missing: ${src.getPath}")
+    assert(src.exists(), s"fixture missing: ${src.getPath}")
     val tmp = File.createTempFile("pkcs12-no-ext-", ".bin")
     Files.copy(
       src.toPath,
@@ -795,7 +795,7 @@ class CryptoDetectorSuite extends FunSuite {
     val src = new File(
       "test_data/certificates/x509/synthetic/ed25519-selfsigned-der.der"
     )
-    assume(src.exists(), s"fixture missing: ${src.getPath}")
+    assert(src.exists(), s"fixture missing: ${src.getPath}")
     val bytes = Files.readAllBytes(src.toPath)
     val art = ByteWrapper(bytes, "fake.p12", None)
     val out = CryptoDetector.detect(art)
@@ -855,7 +855,7 @@ class CryptoDetectorSuite extends FunSuite {
     val src = new File(
       "test_data/certificates/x509/synthetic/ed25519-selfsigned-der.der"
     )
-    assume(src.exists(), s"fixture missing: ${src.getPath}")
+    assert(src.exists(), s"fixture missing: ${src.getPath}")
     val bytes = Files.readAllBytes(src.toPath)
     val out = detect(bytes, "real.der")
     assert(

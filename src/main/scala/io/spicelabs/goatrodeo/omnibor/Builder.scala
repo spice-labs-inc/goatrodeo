@@ -20,6 +20,8 @@ import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.GitRunInfo
+import io.spicelabs.goatrodeo.util.GitRunItem
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import io.spicelabs.goatrodeo.util.config
@@ -78,7 +80,7 @@ object Builder {
     * @param done
     *   when the processing is done, true success, false failure
     *
-    * Thread count, block list, record cap, temp directory and cutoff all come
+    * Thread count, block list, record cap and temp directory all come
     * from the contextual [[Configuration]] (reached as `config`) rather than
     * being passed separately.
     */
@@ -154,6 +156,28 @@ object Builder {
     TagPass(GitOIDUtils.urlForString(jsonString), jsonString, json)
     }
 
+    // Git provenance capture (spec §6): tagged runs only, JGit-only,
+    // never fails the run. Captured once, written per batch alongside the
+    // tag. The run-tag date is carried verbatim into the git items so tag
+    // and provenance always agree on the run date (spec §7).
+    val gitItems: Vector[GitRunItem] = fullTag match {
+      case None => Vector.empty
+      case Some(tagPass) =>
+        val runDate = tagPass.json match {
+          case m: Dom.MapElem => m.members.collectFirst {
+            case (Dom.StringElem("date"), Dom.StringElem(d)) => d
+          }.getOrElse(Helpers.currentDate8601())
+          case _ => Helpers.currentDate8601()
+        }
+        val redact = config.redactGitInfo
+        GitRunInfo.capture(
+          config.build,
+          runDate,
+          redact = redact,
+          scanRoot = config.build.headOption
+        )
+    }
+
     // Get the gitoids to block
     val blockGitoids: Set[String] = config.blockList match {
       case None => Set()
@@ -223,7 +247,8 @@ object Builder {
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
         progressNotifier = progressNotifier,
-        preWriteDB = preWriteDB
+        preWriteDB = preWriteDB,
+        gitItems = gitItems
       )
       logger.info(
         f"Starting multi-thread consumer loop ${loopCnt}%,d at ${Duration
@@ -289,7 +314,8 @@ object Builder {
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
       progressNotifier: ProgressListener.Notifier,
-      preWriteDB: Vector[Storage => Boolean] = Vector()
+      preWriteDB: Vector[Storage => Boolean] = Vector(),
+      gitItems: Vector[GitRunItem] = Vector()
   )(using Configuration): Option[BatchState] = {
 
     val liveWorkers = AtomicInteger(0)
@@ -321,6 +347,28 @@ object Builder {
             ),
           x => "tags"
         )
+        gitItems.foreach { gi =>
+          storage.write(
+            gi.gitoid,
+            item =>
+              Some(
+                Item(
+                  gi.gitoid,
+                  TreeSet(EdgeType.tagFrom -> tag.gitoid),
+                  Some(ItemTagData.mimeType),
+                  Some(ItemTagData(gi.json))
+                )
+              ),
+            _ => "git provenance item"
+          )
+          // tag -> git item edge (merge-style so multiple batches merge)
+          storage.write(
+            tag.gitoid,
+            itemOpt =>
+              itemOpt.map(item => item.withConnection(EdgeType.tagTo, gi.gitoid)),
+            _ => "git provenance tagTo"
+          )
+        }
     }
 
     // start time
@@ -548,7 +596,7 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                writeGoatRodeoFiles(lf, config.cutoff)
+                writeGoatRodeoFiles(lf)
               case _ => logger.error("Didn't write"); None
             }
 
@@ -574,70 +622,8 @@ object Builder {
 
   }
 
-  /** Enforce an cutoff cutoff on the fully-assembled graph: drop every node
-    * whose recorded file-modification time is after `cutoff`, plus every node
-    * that transitively contains it or is built from it (they must be at least
-    * as new), then strip any resulting dangling edges so no references to
-    * removed nodes remain. Nodes without a recorded modification time are
-    * always kept.
-    */
-  def pruneExpired(items: Vector[Item], cutoff: Instant): Vector[Item] = {
-    def earliestModified(item: Item): Option[Instant] = item.body match {
-      case Some(m: ItemMetaData) =>
-        m.extra
-          .get(Item.FileModifiedKey)
-          .flatMap { values =>
-            values.iterator
-              .collect { case StringOf(s) => s }
-              .flatMap(s => Try(Instant.ofEpochMilli(s.toLong)).toOption)
-              .minByOption(_.toEpochMilli())
-          }
-      case _ => None
-    }
-
-    val pastCutoff: Set[String] =
-      items.iterator
-        .filter(i => earliestModified(i).exists(_.isAfter(cutoff)))
-        .map(_.identifier)
-        .toSet
-
-    if (pastCutoff.isEmpty) items
-    else {
-      val byId = items.iterator.map(i => i.identifier -> i).toMap
-      val removed = scala.collection.mutable.Set.from(pastCutoff)
-      val queue = scala.collection.mutable.Queue.from(pastCutoff)
-      while (queue.nonEmpty) {
-        byId.get(queue.dequeue()).foreach { item =>
-          item.connections.foreach { case (edgeType, target) =>
-            // A removed node's dependents: its containers, artifacts built from it, its aliases.
-            val dependent =
-              EdgeType.isContainedByUp(edgeType) || EdgeType
-                .isBuildsTo(edgeType) ||
-                EdgeType.isAliasFrom(edgeType) || EdgeType.isAliasTo(edgeType)
-            if (dependent && removed.add(target)) queue.enqueue(target)
-          }
-        }
-      }
-
-      val survivors = items.filterNot(i => removed.contains(i.identifier))
-      val cleaned = survivors.map { i =>
-        val kept =
-          i.connections.filterNot { case (_, target) =>
-            removed.contains(target)
-          }
-        if (kept.size == i.connections.size) i
-        else i.copy(connections = kept)
-      }
-      logger.info(
-        f"Cutoff ${cutoff}: removed ${removed.size}%,d nodes (${pastCutoff.size}%,d modified after cutoff, ${removed.size - pastCutoff.size}%,d dependents)"
-      )
-      cleaned
-    }
-  }
-
   def writeGoatRodeoFiles(
-      store: ListFileNames & Storage,
-      cutoff: Option[Instant] = None
+      store: ListFileNames & Storage
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
@@ -675,10 +661,7 @@ object Builder {
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
 
-        val finalItems = cutoff match {
-          case Some(cutoff) => pruneExpired(sorted, cutoff)
-          case None         => sorted
-        }
+        val finalItems = sorted
 
         finalItems.par.foreach(_.cachedCBOR)
 
