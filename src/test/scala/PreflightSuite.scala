@@ -19,9 +19,10 @@ import java.nio.file.Files
   * of a pile of cryptic "not a valid zip" / FileNotFound failures scattered
   * across the suite.
   *
-  * The sbt build used to `git lfs pull` and download fixtures automatically in
-  * a `Tests.Setup` hook. Under Maven the build tool stays out of provisioning;
-  * this check tells you exactly what to run instead.
+  * The sbt build provisions the fixtures automatically in a `Tests.Setup`
+  * hook (download + git lfs pull). This check turns missing prerequisites
+  * into one clear, actionable message instead of a pile of cryptic
+  * "not a valid zip" / FileNotFound failures scattered across the suite.
   */
 class PreflightSuite extends munit.FunSuite {
 
@@ -58,19 +59,19 @@ class PreflightSuite extends munit.FunSuite {
   }
 
   test(
-    "downloaded test data is present (run bin/fetch-test-data.sh if this fails)"
+    "downloaded test data is present (sbt provisions it automatically)"
   ) {
     val marker = new File("test_data/download/iso_tests/simple.iso")
     assert(
       new File("test_data/download").isDirectory,
-      // Only assert the contents if someone has started provisioning; a totally
-      // absent dir means the data-dependent suites simply weren't set up.
-      "test_data/download not present — skipping (data-dependent suites will not run)"
+      // The sbt Tests.Setup hook downloads the fixtures before the suite
+      // runs; a totally absent dir means the hook did not run.
+      "test_data/download not present — the sbt test-data provisioning hook did not run"
     )
     assert(
       marker.exists(),
       s"test_data/download exists but ${marker.getPath} is missing.\n" +
-        "Fetch the remote test fixtures with:\n\n    bin/fetch-test-data.sh\n"
+        "The sbt Tests.Setup hook downloads the remote test fixtures automatically before tests run."
     )
   }
 }

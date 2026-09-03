@@ -1,14 +1,9 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
-
-import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData, SingleMarker, ToProcess}
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import munit.FunSuite
 
 import java.io.File
-import java.nio.file.Files
-import scala.collection.immutable.TreeMap
-import scala.collection.immutable.TreeSet
 import scala.util.Try
 
 /** Phase 2 — Certificates PKCS#7 claim + parse (spec §4, T6.x).

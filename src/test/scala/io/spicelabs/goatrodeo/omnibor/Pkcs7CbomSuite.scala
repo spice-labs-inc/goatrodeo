@@ -1,7 +1,9 @@
 package io.spicelabs.goatrodeo.omnibor
 
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
-import io.spicelabs.goatrodeo.util.{ArtifactWrapper, ByteWrapper, Configuration}
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.ByteWrapper
+import io.spicelabs.goatrodeo.util.Configuration
 import munit.FunSuite
 
 import java.io.File

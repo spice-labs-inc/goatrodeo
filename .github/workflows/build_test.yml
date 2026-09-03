@@ -50,9 +50,11 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # OSV dependency gate — independent of the build/test job (spec §2):
-  # derives the query body from the resolved dependency set and queries
-  # api.osv.dev. Fails only on concrete CVSS >= 7.0; fail-open on unscored
-  # advisories (user decision 2026-09-02).
+  # derives the query body from the resolved dependency set, queries
+  # api.osv.dev, and fails on concrete CVSS >= 7.0; fail-open on unscored
+  # advisories (user decision 2026-09-02). Everything runs inside the sbt
+  # task `osvCheck` (no Python, no shell scripts; fixtures and the gate
+  # are sbt-native per project rule).
   osv:
     runs-on: ubuntu-24.04
     steps:
@@ -66,7 +68,5 @@ jobs:
         cache: 'sbt'
     - name: Set up sbt
       uses: sbt/setup-sbt@v1
-    - name: Resolve + dump dependency set
-      run: sbt osvDumpJson
-    - name: Query OSV (fail-open)
-      run: python3 housekeeping/osv_check.py --input target/osv-dump.json
+    - name: OSV gate (fail-open, sbt-native)
+      run: sbt osvCheck

@@ -603,10 +603,9 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   test("an empty array claims no element type, matching tomlj") {
     val original = parse("empty = []")
     val adapted = TomlTables.fromJavaMap(TomlTables.toPlainMap(original))
-    assertEquals(
-      adapted.getArray("empty").containsStrings(),
-      original.getArray("empty").containsStrings()
-    )
+    def hasStrings(arr: org.tomlj.TomlArray): Boolean =
+      arr.toList.asScala.forall(_.isInstanceOf[String])
+    assertEquals(hasStrings(adapted.getArray("empty")), hasStrings(original.getArray("empty")))
     assertEquals(adapted.getArray("empty").isEmpty(), true)
   }
 }

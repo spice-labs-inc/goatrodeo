@@ -1,6 +1,4 @@
 package io.spicelabs.goatrodeo.util
-
-import io.spicelabs.goatrodeo.util.GitRunInfo.*
 import munit.FunSuite
 import org.eclipse.jgit.api.Git
 

@@ -1,11 +1,10 @@
 package io.spicelabs.goatrodeo
 
 import munit.FunSuite
-
-import java.io.File
-import scala.util.Try
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
+
+import java.io.File
 
 /** Phase 1 — OSV raw dump validation (spec §2, T2.x).
   *

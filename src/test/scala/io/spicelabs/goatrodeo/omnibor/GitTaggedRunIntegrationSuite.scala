@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import io.spicelabs.goatrodeo.util.{Configuration, GitRunInfo}
+import io.spicelabs.goatrodeo.util.Configuration
 import munit.FunSuite
 import org.eclipse.jgit.api.Git
 

@@ -134,17 +134,19 @@ testFatJar := {
 }
 
 // Hook fat JAR tests into `sbt test` (the osvDump task feeds the OSV gate
-// script + the dump suite)
+// + the dump suite)
 Test / test := (Test / test)
   .dependsOn(verifyJarContents, testFatJar, osvDumpJson)
   .value
 
 // Writes target/osv-dump.json — the resolved dependency set (every
 // configuration of the product's own update reports) as JSON. The OSV gate
-// script (`housekeeping/osv_check.py`) filters this raw dump to the product
-// configurations and builds the batch query. The build tool is the single
-// source of truth; nothing is hand-maintained (spec §2).
-val osvDumpJson = taskKey[File]("Writes target/osv-dump.json — the resolved dependency set for the OSV gate script")
+// runs directly against this dump; the dump suite reads it too. The build
+// tool (sbt) is the single source of truth for the resolved set: nothing is
+// hand-maintained and no test reads java.class.path (spec §2).
+val osvDumpJson = taskKey[File](
+  "Writes target/osv-dump.json — the resolved dependency set for the OSV gate"
+)
 
 osvDumpJson := {
   val reports = Seq((Test / update).value, (Compile / update).value)
@@ -152,12 +154,19 @@ osvDumpJson := {
     rep <- reports
     conf <- rep.configurations
     mod <- conf.modules if !mod.evicted
-  } yield (conf.configuration.name, mod.module.organization, mod.module.name, mod.module.revision)
+  } yield (
+    conf.configuration.name,
+    mod.module.organization,
+    mod.module.name,
+    mod.module.revision
+  )
   val distinct = rows.distinct.sortBy { case (c, o, n, r) => (c, o, n, r) }
   def esc(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
   val json = distinct
     .map { case (c, o, n, r) =>
-      s"""{"configuration":"${esc(c)}","organization":"${esc(o)}","name":"${esc(n)}","revision":"${esc(r)}"}"""
+      s"""{"configuration":"${esc(c)}","organization":"${esc(o)}","name":"${esc(
+          n
+        )}","revision":"${esc(r)}"}"""
     }
     .mkString("[", ",", "]")
   val out = target.value / "osv-dump.json"
@@ -165,6 +174,62 @@ osvDumpJson := {
   val log = streams.value.log
   log.info(s"Wrote ${distinct.size} resolved modules to $out")
   out
+}
+
+// ===== OSV dependency gate (sbt-native) =====
+//
+// DO NOT MOVE THIS CODE OUT OF sbt. Shelling out and/or using bash or
+// python is forbidden. sbt's own dependency resolution is the single
+// source of truth for the resolved set; the gate runs entirely inside
+// the build tool. The implementation lives in
+// src/main/scala/io/spicelabs/goatrodeo/util/OsvGate.scala (compiled
+// with the product, stdlib HTTP only — no new dependencies); this task
+// loads it from the compiled classes via the project's own scala
+// instance and invokes it.
+//
+// Exit semantics (user decision 2026-09-02):
+//   - FAIL-OPEN on unscored advisories: an advisory without a resolvable
+//     CVSS score is reported (warn) but never fails the gate.
+//   - Transport/malformed-response errors are a distinct infrastructure
+//     failure (throws) — never a silent pass and never a dependency verdict.
+//   - The build-tool-only configurations (scala-tool, scala-doc-tool,
+//     scala-repl-tool) are excluded: the gate covers what the product
+//     ships, builds, and tests.
+val osvCheck = taskKey[Unit](
+  "Runs the OSV dependency gate (fail-open, sbt-native; POSTs the resolved set to api.osv.dev, fails on CVSS >= 7.0)"
+)
+
+osvCheck := {
+  val dumpFile = osvDumpJson.value
+  val log = streams.value.log
+  // Load the product's gate implementation from the compiled project
+  // classes, using the project's OWN scala instance as the parent
+  // loader (the sbt build's Scala 2.12 loader cannot link Scala 3
+  // classes). Parent = project scala instance; child = project classpath.
+  val cp = (Compile / fullClasspath).value
+  val loader = new java.net.URLClassLoader(
+    cp.map(_.data.toURI.toURL).toArray,
+    scalaInstance.value.loader
+  )
+  val cls = loader.loadClass("io.spicelabs.goatrodeo.util.OsvGate")
+  val meth = cls.getMethod("check", classOf[java.io.File], classOf[String])
+  val endpoint = sys.props
+    .get("osv.endpoint")
+    .orElse(sys.env.get("OSV_ENDPOINT"))
+    .getOrElse("https://api.osv.dev")
+  val outcome =
+    meth.invoke(null, dumpFile, endpoint).asInstanceOf[String]
+  if (outcome.startsWith("INFRA")) {
+    throw new MessageOnlyException(
+      s"OSV gate infrastructure failure: ${outcome.stripPrefix("INFRA:")}"
+    )
+  } else if (outcome.startsWith("FAIL")) {
+    throw new MessageOnlyException(
+      s"OSV gate FAILED: ${outcome.stripPrefix("FAIL:")}"
+    )
+  } else {
+    log.info(s"OSV gate ${outcome.stripPrefix("PASS:")}")
+  }
 }
 
 publishMavenStyle := true

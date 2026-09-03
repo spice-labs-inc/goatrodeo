@@ -1,17 +1,17 @@
 package io.spicelabs.goatrodeo
 
 import munit.FunSuite
+import org.yaml.snakeyaml.Yaml
 
 import java.io.File
 import java.util
-import org.yaml.snakeyaml.Yaml
 import scala.jdk.CollectionConverters.*
 
 /** Phase 1 — CI wiring (spec §2, T4.1).
   *
   * WHAT: asserts the OSV gate runs as its own CI job, independent of the
-  * build/test job (no `needs:`), and that the job runs the dump task and
-  * the standalone gate script.
+  * build/test job (no `needs:`), and that the job runs the sbt `osvCheck`
+  * task (which dumps the resolved set and runs the gate in-process).
   *
   * WHY: spec §2 — "The gate runs as a CI job, independent of the
   * test/build job." Read as YAML data (not text grep) so the assertion is
@@ -44,14 +44,13 @@ class OsvCiWiringSuite extends FunSuite {
     assert(!osv.containsKey("needs"), "osv job must not depend on the build/test job (independent CI job)")
   }
 
-  test("T4.1c osv job runs the dump task and the gate script") {
+  test("T4.1c osv job runs the osvCheck sbt task") {
     val osv = jobs().get("osv").asInstanceOf[util.Map[String, Any]]
     val steps = osv.get("steps").asInstanceOf[util.List[util.Map[String, Any]]]
     val runs = steps.asScala.toList.flatMap(s => Option(s.get("run")).map(_.toString))
-    assert(runs.exists(_.contains("osvDumpJson")), s"osv job must run osvDumpJson; got $runs")
     assert(
-      runs.exists(_.contains("osv_check.py")),
-      s"osv job must run housekeeping/osv_check.py; got $runs"
+      runs.exists(_.contains("osvCheck")),
+      s"osv job must run the sbt osvCheck task; got $runs"
     )
   }
 }

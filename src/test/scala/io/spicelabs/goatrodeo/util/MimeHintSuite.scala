@@ -2,7 +2,7 @@ package io.spicelabs.goatrodeo.util
 
 import munit.FunSuite
 
-import java.io.{ByteArrayInputStream, File}
+import java.io.ByteArrayInputStream
 import java.nio.file.Files
 
 /** Phase 2 — Artifact MIME hints (spec §5, T5.x).

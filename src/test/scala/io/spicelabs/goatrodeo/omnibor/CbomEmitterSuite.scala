@@ -75,7 +75,7 @@ class CbomEmitterSuite extends FunSuite {
     org.everit.json.schema.loader.SchemaLoader
       .builder()
       .schemaJson(new org.json.JSONObject(schemaResource(name)))
-      .httpClient(client)
+      .schemaClient(client)
       .build()
       .load()
       .build()
