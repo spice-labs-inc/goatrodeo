@@ -11,21 +11,20 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 /** Hard invariant: Goat Rodeo NEVER modifies git files. Scanned repositories
-  * are strictly read-only — provenance capture computes content-addressed
-  * ids without inserting objects, and no code path may write, flush, or sign
+  * are strictly read-only — provenance capture computes content-addressed ids
+  * without inserting objects, and no code path may write, flush, or sign
   * anything into a repository's `.git`.
   *
   * WHAT: two black-box tests (at the two layers that touch git) plus one
-  *   white-box test:
+  * white-box test:
   *   1. `GitRunInfo.capture` over a fixture repo leaves `.git` byte-for-byte
-  *      untouched (same entries, sizes, and mtimes).
-  *   2. A tagged `Builder.buildDB` run (the full product path that drives
-  *      provenance capture) leaves the scanned repository's `.git`
-  *      byte-for-byte untouched — and does produce git provenance Items, so
-  *      the capture path demonstrably ran.
-  *   3. `GitRunInfo.readOnlyInserter` pins the canonical git blob hash via
-  *      `idFor` and throws `UnsupportedOperationException` on every
-  *      write-capable entry point (`flush`, `insert`, `newPackParser`,
+  *      untouched (same entries, sizes, and mtimes). 2. A tagged
+  *      `Builder.buildDB` run (the full product path that drives provenance
+  *      capture) leaves the scanned repository's `.git` byte-for-byte untouched
+  *      — and does produce git provenance Items, so the capture path
+  *      demonstrably ran. 3. `GitRunInfo.readOnlyInserter` pins the canonical
+  *      git blob hash via `idFor` and throws `UnsupportedOperationException` on
+  *      every write-capable entry point (`flush`, `insert`, `newPackParser`,
   *      `newReader`) — so reverting to a real, writable repository inserter
   *      fails the suite.
   *
@@ -37,10 +36,10 @@ import java.nio.file.Files
   * any other repository mutation.
   *
   * LLM note: the fixture repo is created with JGit commits (test setup only —
-  * temp dirs, never a real repo). The snapshot records every entry under
-  * `.git` — relative path, kind (file/directory), size, and mtime; a
-  * modified, added, or removed entry fails the equality assert. Reading
-  * never changes mtimes; only writes do.
+  * temp dirs, never a real repo). The snapshot records every entry under `.git`
+  * — relative path, kind (file/directory), size, and mtime; a modified, added,
+  * or removed entry fails the equality assert. Reading never changes mtimes;
+  * only writes do.
   */
 class GitReadOnlyInvariantSuite extends FunSuite {
 
@@ -53,8 +52,8 @@ class GitReadOnlyInvariantSuite extends FunSuite {
     Files.write(f.toPath, content.getBytes(StandardCharsets.UTF_8))
   }
 
-  /** A small real git repository: a regular file, a nested file, and a
-    * symlink (so the symlink-blob id computation path is exercised).
+  /** A small real git repository: a regular file, a nested file, and a symlink
+    * (so the symlink-blob id computation path is exercised).
     */
   private def fixtureRepo(): File = {
     val root = tempDir("gri")
@@ -72,7 +71,8 @@ class GitReadOnlyInvariantSuite extends FunSuite {
     // signing setup) makes JGit throw UnsupportedSigningFormatException
     // because JGit has no SSH signer. setSign(false) pins signing off
     // regardless of any environment config.
-    git.commit()
+    git
+      .commit()
       .setSign(false)
       .setAuthor(ident)
       .setCommitter(ident)
@@ -88,8 +88,11 @@ class GitReadOnlyInvariantSuite extends FunSuite {
     * before/after a run proves no modification — including newly created
     * directories (e.g. a future flush creating `objects/pack`).
     */
-  private def gitSnapshot(gitDir: File): Vector[(String, String, Long, Long)] = {
-    val out = scala.collection.mutable.ArrayBuffer[(String, String, Long, Long)]()
+  private def gitSnapshot(
+      gitDir: File
+  ): Vector[(String, String, Long, Long)] = {
+    val out =
+      scala.collection.mutable.ArrayBuffer[(String, String, Long, Long)]()
     def walk(dir: File, prefix: String): Unit = {
       val children = Option(dir.listFiles()).getOrElse(Array.empty[File])
       children.sortBy(_.getName).foreach { f =>
@@ -131,7 +134,11 @@ class GitReadOnlyInvariantSuite extends FunSuite {
     // a revert to a real repository inserter would fail these assertions.
     intercept[UnsupportedOperationException](ins.flush())
     intercept[UnsupportedOperationException](
-      ins.insert(Constants.OBJ_BLOB, 1L, new java.io.ByteArrayInputStream(Array.empty[Byte]))
+      ins.insert(
+        Constants.OBJ_BLOB,
+        1L,
+        new java.io.ByteArrayInputStream(Array.empty[Byte])
+      )
     )
     intercept[UnsupportedOperationException](
       ins.newPackParser(new java.io.ByteArrayInputStream(Array.empty[Byte]))

@@ -9,9 +9,9 @@ import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import scala.util.Try
 
-/** Cilantro 0.4.0 PDB-as-container (handoff §2.4; user design: a PDB is just
-  * a container; embedded sources become ArtifactWrappers; contain:up
-  * connections happen automatically in the graph).
+/** Cilantro 0.4.0 PDB-as-container (handoff §2.4; user design: a PDB is just a
+  * container; embedded sources become ArtifactWrappers; contain:up connections
+  * happen automatically in the graph).
   *
   * Fixtures are REAL portable PDBs (BSJB root) with embedded sources from the
   * committed NuGet packages in test_data/dotnet/:
@@ -19,19 +19,19 @@ import scala.util.Try
   *     #EmbeddedSource GUID and opens via PortablePdbFile.withPdb).
   *
   * WHAT verifies:
-  *   - A wrapper whose MIME is `pe/debug; format=mpdb` (the MIME the
-  *     assembly walk stamps on a type-17 debug blob) is treated by FileWalker
-  *     as a PDB container: inside a single withFile, PortablePdbFile.withPdb
-  *     parses it, and view.sources become ArtifactWrappers (the embedded
-  *     source files) with their names and content.
-  *   - A `pe/debug; format=mpdb` wrapper that is NOT a parseable portable
-  *     PDB is rejected as a container (no children, no throw).
+  *   - A wrapper whose MIME is `pe/debug; format=mpdb` (the MIME the assembly
+  *     walk stamps on a type-17 debug blob) is treated by FileWalker as a PDB
+  *     container: inside a single withFile, PortablePdbFile.withPdb parses it,
+  *     and view.sources become ArtifactWrappers (the embedded source files)
+  *     with their names and content.
+  *   - A `pe/debug; format=mpdb` wrapper that is NOT a parseable portable PDB
+  *     is rejected as a container (no children, no throw).
   *
   * LLM note: on 0.4.0 the PDB readers are callback-owned and the walk itself
-  * creates no temp state; the spool dir is a uniquely-named subdir of the
-  * walk temp dir that GR cleans up at scope exit. This suite pins the
-  * container contract (MIME key, withFile + withPdb, wrap sources inside the
-  * callback, reject-without-throw).
+  * creates no temp state; the spool dir is a uniquely-named subdir of the walk
+  * temp dir that GR cleans up at scope exit. This suite pins the container
+  * contract (MIME key, withFile + withPdb, wrap sources inside the callback,
+  * reject-without-throw).
   */
 class DotnetPdbContainerSuite extends FunSuite {
 

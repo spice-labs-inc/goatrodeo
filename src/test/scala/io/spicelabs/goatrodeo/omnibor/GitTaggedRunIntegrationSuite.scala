@@ -42,7 +42,8 @@ class GitTaggedRunIntegrationSuite extends FunSuite {
     // git config, and `commit.gpgsign=true` with `gpg.format=ssh` (a common
     // SSH-key signing setup) makes JGit throw UnsupportedSigningFormatException
     // because JGit has no SSH signer. setSign(false) pins signing off.
-    git.commit()
+    git
+      .commit()
       .setSign(false)
       .setAuthor(ident)
       .setCommitter(ident)

@@ -47,11 +47,11 @@ final case class GitRunItem(gitoid: String, json: Dom.MapElem)
   *   - Redaction: emails digested (`sha256:<hex>`, deterministic), repo root
   *     relativized, scan dir omitted. `redact = false` keeps raw emails and
   *     absolute paths.
-  *   - Hard invariant: scanned git repositories are STRICTLY read-only.
-  *     Object ids are computed with a read-only `ObjectInserter` that throws
-  *     on every write-capable entry point (`idFor` only hashes; it never
-  *     stages, flushes, or persists). Goat Rodeo never modifies, signs, or
-  *     writes anything into a scanned repository.
+  *   - Hard invariant: scanned git repositories are STRICTLY read-only. Object
+  *     ids are computed with a read-only `ObjectInserter` that throws on every
+  *     write-capable entry point (`idFor` only hashes; it never stages,
+  *     flushes, or persists). Goat Rodeo never modifies, signs, or writes
+  *     anything into a scanned repository.
   */
 object GitRunInfo {
 
@@ -339,14 +339,14 @@ object GitRunInfo {
 
   /** Read-only object id computation for git provenance.
     *
-    * Goat Rodeo's hard invariant: scanned git repositories are never
-    * modified. JGit's `ObjectInserter` is a write-capable API; this instance
-    * keeps only the pure content-addressing half (`idFor`, which is SHA-1
-    * over the canonical object bytes and touches no repository state) and
-    * throws on every entry point that could stage, flush, or persist an
-    * object. `idFor` yields exactly the ids a real insert would produce
-    * (they differ only in that nothing is ever written), so all gitoid
-    * values are unchanged from a write-based computation.
+    * Goat Rodeo's hard invariant: scanned git repositories are never modified.
+    * JGit's `ObjectInserter` is a write-capable API; this instance keeps only
+    * the pure content-addressing half (`idFor`, which is SHA-1 over the
+    * canonical object bytes and touches no repository state) and throws on
+    * every entry point that could stage, flush, or persist an object. `idFor`
+    * yields exactly the ids a real insert would produce (they differ only in
+    * that nothing is ever written), so all gitoid values are unchanged from a
+    * write-based computation.
     */
   private[goatrodeo] def readOnlyInserter: ObjectInserter =
     new ObjectInserter() {

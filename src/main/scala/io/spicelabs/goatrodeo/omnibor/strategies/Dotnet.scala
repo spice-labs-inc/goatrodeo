@@ -57,9 +57,9 @@ class DotnetState(
 ) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
 
-  /** Accumulates the canonical type JSON harvested from `cilantro/type`
-    * class children during child processing (Maven analog: class-derived
-    * structural metadata accumulated via accumulateInfo).
+  /** Accumulates the canonical type JSON harvested from `cilantro/type` class
+    * children during child processing (Maven analog: class-derived structural
+    * metadata accumulated via accumulateInfo).
     */
   private var typeJsonAccum: Vector[String] = Vector()
   def beginProcessing(
@@ -132,22 +132,20 @@ class DotnetState(
 
   /** Harvest the canonical type JSON from a `cilantro/type` class child.
     *
-    * Called via the assembly's ParentScope.accumulateInfo for each child
-    * (the Maven analog: accumulateInfo reads child wrappers during child
+    * Called via the assembly's ParentScope.accumulateInfo for each child (the
+    * Maven analog: accumulateInfo reads child wrappers during child
     * processing). Only children whose MIME is `cilantro/type` contribute.
     *
     * @param artifact
-    *   the child artifact wrapper (a class whose payload is the canonical
-    *   type JSON)
+    *   the child artifact wrapper (a class whose payload is the canonical type
+    *   JSON)
     */
   def accumulateTypeJson(artifact: ArtifactWrapper): Unit = {
     if (artifact.mimeType.contains("cilantro/type")) {
       val json = Try(
         artifact.withStream(Helpers.slurpInputToString(_))
       ).toOption
-      json.foreach(j =>
-        typeJsonAccum = typeJsonAccum :+ j
-      )
+      json.foreach(j => typeJsonAccum = typeJsonAccum :+ j)
     }
   }
 
@@ -370,9 +368,9 @@ class DotnetState(
   /** Generate the parent scope for the assembly's children.
     *
     * Overrides accumulateInfo so that every child (which includes the
-    * `cilantro/type` class entries) is offered to DotnetState to harvest
-    * the canonical type JSON — the Maven analog of reading child
-    * wrappers during child processing.
+    * `cilantro/type` class entries) is offered to DotnetState to harvest the
+    * canonical type JSON — the Maven analog of reading child wrappers during
+    * child processing.
     */
   override def generateParentScope(
       artifact: ArtifactWrapper,

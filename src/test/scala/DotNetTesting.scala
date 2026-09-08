@@ -79,7 +79,9 @@ class DotNetTesting extends munit.FunSuite {
       .orElse {
         // alias may be on an item under a different key: search items
         // whose connections aliasFrom include the sha1
-        store1.keys().iterator
+        store1
+          .keys()
+          .iterator
           .flatMap(k => store1.read(k))
           .find(item =>
             item.connections.exists(_._2 == smokeSha1) ||

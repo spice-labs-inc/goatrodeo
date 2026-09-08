@@ -13,28 +13,27 @@ import java.io.File
 
 /** Cilantro 0.3.1 canonical-type JSON surfaced as Item metadata (GRW-6).
   *
-  * WHAT: Cilantro's walk yields a `cilantro/type` class entry whose payload
-  * is the canonical per-class JSON (`"cilantro-type"` v1). This suite pins
-  * that Goat Rodeo surfaces that canonical JSON as metadata on the assembly
-  * Item, in the same shape Maven surfaces class-derived structure metadata
-  * (module-info etc.) on the JAR Item: accumulated during child processing,
-  * stored whole, under a dedicated key.
+  * WHAT: Cilantro's walk yields a `cilantro/type` class entry whose payload is
+  * the canonical per-class JSON (`"cilantro-type"` v1). This suite pins that
+  * Goat Rodeo surfaces that canonical JSON as metadata on the assembly Item, in
+  * the same shape Maven surfaces class-derived structure metadata (module-info
+  * etc.) on the JAR Item: accumulated during child processing, stored whole,
+  * under a dedicated key.
   *
   * The key is `cilantro:TypeJson` via MetadataKeyConstants.adHoc("cilantro")
-  * ("TypeJson"). The value(s) are the canonical JSON strings (one per class
-  * in the assembly), stored whole (no budget, no truncation) as
+  * ("TypeJson"). The value(s) are the canonical JSON strings (one per class in
+  * the assembly), stored whole (no budget, no truncation) as
   * TreeSet[StringOrPair] under that key in ItemMetaData.extra.
   *
-  * WHY: the canonical JSON is a deterministic fingerprint of each .NET
-  * type. Making it readable on the assembly's Item means a consumer can
-  * query "what types does this assembly define" and compare type identity
-  * across assemblies — which is not possible from the raw blob children
-  * alone.
+  * WHY: the canonical JSON is a deterministic fingerprint of each .NET type.
+  * Making it readable on the assembly's Item means a consumer can query "what
+  * types does this assembly define" and compare type identity across assemblies
+  * — which is not possible from the raw blob children alone.
   *
-  * LLM note: the assembly Item is the one whose connections include the
-  * nuget pURL / is the DotnetFile top-level item. We locate it by finding
-  * the Item whose metadata has the canonical JSON key. Fixtures are the
-  * real assemblies in test_data/ (Smoke.dll, hackproj.dll).
+  * LLM note: the assembly Item is the one whose connections include the nuget
+  * pURL / is the DotnetFile top-level item. We locate it by finding the Item
+  * whose metadata has the canonical JSON key. Fixtures are the real assemblies
+  * in test_data/ (Smoke.dll, hackproj.dll).
   */
 class DotnetTypeMetadataSuite extends FunSuite {
 
@@ -55,7 +54,9 @@ class DotnetTypeMetadataSuite extends FunSuite {
     val store = ToProcess.buildGraphFromArtifactWrapper(wrapper)
     // Find the Item that carries the cilantro:TypeJson metadata (the
     // assembly item after accumulation).
-    store.keys().iterator
+    store
+      .keys()
+      .iterator
       .flatMap(k => store.read(k))
       .find(item =>
         item.bodyAsItemMetaData.exists(_.extra.contains(typeJsonKey))
@@ -77,7 +78,9 @@ class DotnetTypeMetadataSuite extends FunSuite {
     )
   }
 
-  test("type-2 each canonical JSON is the whole class payload (no truncation)") {
+  test(
+    "type-2 each canonical JSON is the whole class payload (no truncation)"
+  ) {
     val itemOpt = buildAndFindAssembly("test_data/Smoke.dll")
     val jsonValues = itemOpt.get.bodyAsItemMetaData
       .flatMap(_.extra.get(typeJsonKey))
@@ -99,14 +102,15 @@ class DotnetTypeMetadataSuite extends FunSuite {
     val path = "test_data/Smoke.dll"
     val wrapper = FileWrapper(new File(path), path, None)
     val store = ToProcess.buildGraphFromArtifactWrapper(wrapper)
-    val assembly = store.keys().iterator
+    val assembly = store
+      .keys()
+      .iterator
       .flatMap(k => store.read(k))
       .find(item =>
         item.bodyAsItemMetaData.exists(_.extra.contains(typeJsonKey))
       )
       .get
-    val stored = assembly.bodyAsItemMetaData
-      .get
+    val stored = assembly.bodyAsItemMetaData.get
       .extra(typeJsonKey)
       .map(_.value)
 
@@ -130,8 +134,7 @@ class DotnetTypeMetadataSuite extends FunSuite {
 
     // The stored value is the \n-joined, sorted canonical JSONs — the
     // whole set of the assembly's class payloads, stored whole.
-    val storedValues = assembly.bodyAsItemMetaData
-      .get
+    val storedValues = assembly.bodyAsItemMetaData.get
       .extra(typeJsonKey)
       .map(_.value)
     assertEquals(storedValues.size, 1)

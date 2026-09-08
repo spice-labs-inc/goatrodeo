@@ -20,12 +20,12 @@ import scala.util.Try
   *
   * WHAT: verifies Cilantro 0.3.1's streaming interface is wired into Goat
   * Rodeo's .NET detection and processing:
-  *   - GRW-1: DotnetDetector uses Cilantro's DotnetAssemblyProbe (no
-  *     GR-side PE-offset mark/reset sniffing); genuine assemblies are
-  *     detected, non-PE/corrupt/truncated input is not, with no exceptions.
-  *   - GRW-2: AssemblyWalker.withinAssemblyStream enumerates every kind
-  *     with a correct name/kind/mimeHint, and processStream yields the
-  *     exact bytes (zero-copy).
+  *   - GRW-1: DotnetDetector uses Cilantro's DotnetAssemblyProbe (no GR-side
+  *     PE-offset mark/reset sniffing); genuine assemblies are detected,
+  *     non-PE/corrupt/truncated input is not, with no exceptions.
+  *   - GRW-2: AssemblyWalker.withinAssemblyStream enumerates every kind with a
+  *     correct name/kind/mimeHint, and processStream yields the exact bytes
+  *     (zero-copy).
   *   - GRW-3: walked entries can be wrapped with ArtifactWrapper.newWrapper
   *     carrying the entry's mimeHint, with GR-side MIME ownership.
   *   - GRW-4: the deterministic order and the never-throws guarantee of the
@@ -38,8 +38,8 @@ import scala.util.Try
   * zero-copy streams and no size-limit constants.
   *
   * LLM note: these tests pin the Cilantro-facing wiring behaviors. Corpus
-  * fixtures are the real assemblies in test_data/ (Smoke.dll,
-  * hackproj.dll). Hostile inputs are inline bytes.
+  * fixtures are the real assemblies in test_data/ (Smoke.dll, hackproj.dll).
+  * Hostile inputs are inline bytes.
   */
 class DotnetStreamingSuite extends FunSuite {
 
@@ -69,7 +69,10 @@ class DotnetStreamingSuite extends FunSuite {
 
   test("GRW-1b probe: non-PE bytes are not dotnet, no exception") {
     val notPe = "this is not a PE file at all, just text".getBytes("UTF-8")
-    assertEquals(DotnetAssemblyProbe.isDotnetAssembly(new ByteArrayInputStream(notPe)), false)
+    assertEquals(
+      DotnetAssemblyProbe.isDotnetAssembly(new ByteArrayInputStream(notPe)),
+      false
+    )
     // truncated/corrupt PE magic (MZ only)
     val mzOnly = Array[Byte](0x4d, 0x5a)
     assertEquals(
@@ -77,7 +80,10 @@ class DotnetStreamingSuite extends FunSuite {
       false
     )
     // empty
-    assertEquals(DotnetAssemblyProbe.isDotnetAssembly(new ByteArrayInputStream(Array())), false)
+    assertEquals(
+      DotnetAssemblyProbe.isDotnetAssembly(new ByteArrayInputStream(Array())),
+      false
+    )
   }
 
   test("GRW-1c probe: dotnetHeader returns Some for a real assembly") {
@@ -133,7 +139,8 @@ class DotnetStreamingSuite extends FunSuite {
             buf.size()
           }
         }
-      }.get
+      }
+      .get
     assert(lens.forall(_ >= 0), "processStream on every entry should read")
   }
 
@@ -155,7 +162,10 @@ class DotnetStreamingSuite extends FunSuite {
       AssemblyWalker
         .withinAssemblyStream(new File("test_data/Smoke.dll")) { entries =>
           entries.foreach { e =>
-            assert(e.length >= 0, s"entry.length must be non-negative for ${e.name}")
+            assert(
+              e.length >= 0,
+              s"entry.length must be non-negative for ${e.name}"
+            )
             val wrapped = e.processStream { stream =>
               ArtifactWrapper.newWrapper(
                 nominalPath = e.name,
@@ -168,7 +178,8 @@ class DotnetStreamingSuite extends FunSuite {
             }
             assert(wrapped != null, s"wrapper for ${e.name} should construct")
           }
-        }.get
+        }
+        .get
     } finally Helpers.deleteDirectory(tempDir)
   }
 
@@ -198,7 +209,10 @@ class DotnetStreamingSuite extends FunSuite {
   test("GRW-5a FileWalker walks a dotnet assembly as a container") {
     val asm = fileWrapper("test_data/Smoke.dll")
     val kids = containerChildren(asm)
-    assert(kids.isDefined, "FileWalker must treat a dotnet assembly as a container")
+    assert(
+      kids.isDefined,
+      "FileWalker must treat a dotnet assembly as a container"
+    )
     assert(
       kids.exists(_.nonEmpty),
       "the assembly container must yield child wrappers"
@@ -225,23 +239,23 @@ class DotnetStreamingSuite extends FunSuite {
     )
   }
 
-  test("GRW-5c children are full ArtifactWrappers readable through withStream") {
+  test(
+    "GRW-5c children are full ArtifactWrappers readable through withStream"
+  ) {
     val asm = fileWrapper("test_data/Smoke.dll")
     val kids = containerChildren(asm).get
     kids.foreach { k =>
       assert(k.path().nonEmpty, "child must have a name")
-      val len = k.withStream(s =>
-        {
-          var n = 0L
-          val buf = new Array[Byte](4096)
-          var r = s.read(buf)
-          while (r >= 0) {
-            n += r
-            r = s.read(buf)
-          }
-          n
+      val len = k.withStream(s => {
+        var n = 0L
+        val buf = new Array[Byte](4096)
+        var r = s.read(buf)
+        while (r >= 0) {
+          n += r
+          r = s.read(buf)
         }
-      )
+        n
+      })
       assert(len >= 0, s"child ${k.path()} must be readable")
     }
   }

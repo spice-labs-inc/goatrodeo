@@ -51,7 +51,8 @@ class GitRunInfoSuite extends FunSuite {
     // git config, and `commit.gpgsign=true` with `gpg.format=ssh` makes JGit
     // throw UnsupportedSigningFormatException (no SSH signer). setSign(false)
     // pins signing off regardless of environment config.
-    git.commit()
+    git
+      .commit()
       .setSign(false)
       .setAuthor(author)
       .setCommitter(author)

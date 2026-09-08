@@ -43,9 +43,8 @@ object DotnetDetector {
   ): Set[String] = {
     if (currentMimes.contains(DOTNET_MIME_STRING)) currentMimes
     else {
-      val isDotnet = artifact.withStream(s =>
-        DotnetAssemblyProbe.isDotnetAssembly(s)
-      )
+      val isDotnet =
+        artifact.withStream(s => DotnetAssemblyProbe.isDotnetAssembly(s))
       if (isDotnet) currentMimes + DOTNET_MIME_STRING else currentMimes
     }
   }

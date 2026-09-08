@@ -351,24 +351,23 @@ object FileWalker {
 
   /** Try to construct an `OptionalArchiveStream` from a .NET assembly.
     *
-    * The new Cilantro (0.3.1) exposes a .NET assembly as an ordinary
-    * container: probe, then walk, then wrap. The container walk mirrors the
-    * zip/saffron pattern: a cheap MIME gate (the dotnet MIME) then a cheap
-    * probe (`DotnetAssemblyProbe.isDotnetAssembly`, bounded, no withFile),
-    * then the walk (`AssemblyWalker.withinAssemblyStream`) which yields
-    * entries (classes, embedded resources, certificates, win32 resources,
-    * debug blobs — but NOT the PDB-as-container, which awaits a Cilantro
-    * enhancement). Each entry is wrapped into an ArtifactWrapper carrying
-    * the entry's mimeHint, inside the walk callback (entries are usable
-    * only while the walk is open).
+    * The new Cilantro (0.3.1) exposes a .NET assembly as an ordinary container:
+    * probe, then walk, then wrap. The container walk mirrors the zip/saffron
+    * pattern: a cheap MIME gate (the dotnet MIME) then a cheap probe
+    * (`DotnetAssemblyProbe.isDotnetAssembly`, bounded, no withFile), then the
+    * walk (`AssemblyWalker.withinAssemblyStream`) which yields entries
+    * (classes, embedded resources, certificates, win32 resources, debug blobs —
+    * but NOT the PDB-as-container, which awaits a Cilantro enhancement). Each
+    * entry is wrapped into an ArtifactWrapper carrying the entry's mimeHint,
+    * inside the walk callback (entries are usable only while the walk is open).
     *
     * @param in
     *   the artifact; only acted on when its MIME is the dotnet MIME
     * @param tempDir
     *   the walk temp dir
     * @return
-    *   Some(Vector[ArtifactWrapper]) of the assembly's entries, or None if
-    *   the artifact is not a parseable assembly.
+    *   Some(Vector[ArtifactWrapper]) of the assembly's entries, or None if the
+    *   artifact is not a parseable assembly.
     */
   private def asDotnetAssemblyContainer(
       in: ArtifactWrapper,
@@ -489,14 +488,14 @@ object FileWalker {
 
   /** Try to construct an `OptionalArchiveStream` from a portable PDB.
     *
-    * A PDB is an ordinary container of embedded source files. The assembly
-    * walk stamps a type-17 debug-blob wrapper with the `pe/debug; format=mpdb`
-    * MIME (cilantro-owned); this branch is keyed on that MIME only. Inside a
-    * single `withFile`, `PortablePdbFile.withPdb` spools/parses the PDB and
-    * the callback wraps `view.sources` into ArtifactWrappers (their name and
-    * content). The spool dir is a uniquely-named subdir of the walk's temp
-    * dir; cilantro never creates/owns/deletes the caller's dir, and GR's
-    * scope-exit delete removes the tree.
+    * A PDB is an ordinary container of embedded source files. The assembly walk
+    * stamps a type-17 debug-blob wrapper with the `pe/debug; format=mpdb` MIME
+    * (cilantro-owned); this branch is keyed on that MIME only. Inside a single
+    * `withFile`, `PortablePdbFile.withPdb` spools/parses the PDB and the
+    * callback wraps `view.sources` into ArtifactWrappers (their name and
+    * content). The spool dir is a uniquely-named subdir of the walk's temp dir;
+    * cilantro never creates/owns/deletes the caller's dir, and GR's scope-exit
+    * delete removes the tree.
     *
     * A PDB that is not a portable PDB (withPdb -> Success(None)) or a hostile
     * one (Failure) is rejected as a container: no children, no throw.
@@ -506,8 +505,8 @@ object FileWalker {
     * @param tempDir
     *   the walk temp dir (spool location for the decompressed PDB)
     * @return
-    *   Some(Vector[ArtifactWrapper]) of the PDB's source files, or None if
-    *   the artifact is not a parseable portable PDB.
+    *   Some(Vector[ArtifactWrapper]) of the PDB's source files, or None if the
+    *   artifact is not a parseable portable PDB.
     */
   private def asPdbContainer(
       in: ArtifactWrapper,
@@ -527,35 +526,34 @@ object FileWalker {
             PortablePdbFile.withPdb[Option[(Vector[ArtifactWrapper], String)]](
               file,
               Some(spoolDir)
-            ) {
-              (outcome: Try[Option[io.spicelabs.cilantro.PDBView]]) =>
-                outcome match {
-                  case scala.util.Success(Some(view)) =>
-                    val wrappers = view.sources.map { src =>
-                      val name = src.name
-                      val bytes = src.processStream { stream =>
-                        val bos = new java.io.ByteArrayOutputStream()
-                        Helpers.copy(stream, bos)
-                        bos.toByteArray()
-                      }
-                      ArtifactWrapper.newWrapper(
-                        nominalPath = name,
-                        size = bytes.length.toLong,
-                        data = new java.io.ByteArrayInputStream(bytes),
-                        tempDir = in.tempDir,
-                        tempPath = tempDir,
-                        mimeHint = Some("text/plain")
-                      )
+            ) { (outcome: Try[Option[io.spicelabs.cilantro.PDBView]]) =>
+              outcome match {
+                case scala.util.Success(Some(view)) =>
+                  val wrappers = view.sources.map { src =>
+                    val name = src.name
+                    val bytes = src.processStream { stream =>
+                      val bos = new java.io.ByteArrayOutputStream()
+                      Helpers.copy(stream, bos)
+                      bos.toByteArray()
                     }
-                    Some(wrappers.toVector -> "Portable PDB")
-                  case _ =>
-                    // Not a portable PDB, or hostile: not a container.
-                    None
-                }
+                    ArtifactWrapper.newWrapper(
+                      nominalPath = name,
+                      size = bytes.length.toLong,
+                      data = new java.io.ByteArrayInputStream(bytes),
+                      tempDir = in.tempDir,
+                      tempPath = tempDir,
+                      mimeHint = Some("text/plain")
+                    )
+                  }
+                  Some(wrappers.toVector -> "Portable PDB")
+                case _ =>
+                  // Not a portable PDB, or hostile: not a container.
+                  None
+              }
             }
           result match {
             case scala.util.Success(Some(inner)) => inner
-            case _                              => None
+            case _                               => None
           }
         } catch {
           case _: Exception => None
