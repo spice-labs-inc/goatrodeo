@@ -254,6 +254,7 @@ How Goat Rodeo manages system resources:
 | [mime_types.md](mime_types.md) | MIME type detection and handling |
 | [mime_precompute_adaptive.md](mime_precompute_adaptive.md) | Adaptive MIME precompute pass |
 | [docker_oci_parity.md](docker_oci_parity.md) | OCI image parity in the Docker strategy |
+| [dotnet_integration.md](dotnet_integration.md) | Cilantro 0.4.0 .NET assembly/PDB container integration |
 | [resource_handling.md](resource_handling.md) | Temp files, streams, and resource cleanup |
 | [tamper_evident_logging.md](tamper_evident_logging.md) | Tamper-evident run logs and ADG auditability |
 

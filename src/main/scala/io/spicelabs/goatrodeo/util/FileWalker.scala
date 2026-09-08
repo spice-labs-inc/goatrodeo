@@ -6,6 +6,7 @@ import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.cilantro.DotnetAssemblyProbe
+import io.spicelabs.cilantro.PortablePdbFile
 import io.spicelabs.saffron.DiskReader
 import io.spicelabs.saffron.SaffronProbe
 import io.spicelabs.saffron.container.BinaryContainerMount
@@ -373,7 +374,7 @@ object FileWalker {
       in: ArtifactWrapper,
       tempDir: Path
   ): OptionalArchiveStream = {
-    val dotnetMime = "application/x-msdownload; format=pe32-dotnet"
+    val dotnetMime = DotnetDetector.DOTNET_MIME_STRING
     val isDotnetMime = in.mimeType.contains(dotnetMime)
     if (!isDotnetMime) None
     else {
@@ -387,13 +388,10 @@ object FileWalker {
             .withinAssemblyStream(in.withFile(f => f.toPath)) { entries =>
               val wrappers = entries.map { e =>
                 e.processStream { stream =>
-                  val bos = new java.io.ByteArrayOutputStream()
-                  Helpers.copy(stream, bos)
-                  val bytes = bos.toByteArray()
                   ArtifactWrapper.newWrapper(
                     nominalPath = e.name,
-                    size = bytes.length.toLong,
-                    data = new java.io.ByteArrayInputStream(bytes),
+                    size = e.length,
+                    data = stream,
                     tempDir = in.tempDir,
                     tempPath = tempDir,
                     mimeHint = e.mimeHint
@@ -401,7 +399,7 @@ object FileWalker {
                 }
               }
               wrappers.toVector -> "Cilantro .NET assembly"
-            }(Some(tempDir))
+            }
         } catch {
           case _: Exception => None
         }
@@ -487,6 +485,83 @@ object FileWalker {
         }
       })
     } else None
+  }
+
+  /** Try to construct an `OptionalArchiveStream` from a portable PDB.
+    *
+    * A PDB is an ordinary container of embedded source files. The assembly
+    * walk stamps a type-17 debug-blob wrapper with the `pe/debug; format=mpdb`
+    * MIME (cilantro-owned); this branch is keyed on that MIME only. Inside a
+    * single `withFile`, `PortablePdbFile.withPdb` spools/parses the PDB and
+    * the callback wraps `view.sources` into ArtifactWrappers (their name and
+    * content). The spool dir is a uniquely-named subdir of the walk's temp
+    * dir; cilantro never creates/owns/deletes the caller's dir, and GR's
+    * scope-exit delete removes the tree.
+    *
+    * A PDB that is not a portable PDB (withPdb -> Success(None)) or a hostile
+    * one (Failure) is rejected as a container: no children, no throw.
+    *
+    * @param in
+    *   the ArtifactWrapper whose MIME is `pe/debug; format=mpdb` (a PDB)
+    * @param tempDir
+    *   the walk temp dir (spool location for the decompressed PDB)
+    * @return
+    *   Some(Vector[ArtifactWrapper]) of the PDB's source files, or None if
+    *   the artifact is not a parseable portable PDB.
+    */
+  private def asPdbContainer(
+      in: ArtifactWrapper,
+      tempDir: Path
+  ): OptionalArchiveStream = {
+    val pdbMime = "pe/debug; format=mpdb"
+    val isPdbMime = in.mimeType.contains(pdbMime)
+    if (!isPdbMime) None
+    else {
+      in.withFile { file =>
+        try {
+          val spoolDir =
+            Files.createTempDirectory(tempDir, "cilantro")
+          val result: Try[
+            Option[Option[(Vector[ArtifactWrapper], String)]]
+          ] =
+            PortablePdbFile.withPdb[Option[(Vector[ArtifactWrapper], String)]](
+              file,
+              Some(spoolDir)
+            ) {
+              (outcome: Try[Option[io.spicelabs.cilantro.PDBView]]) =>
+                outcome match {
+                  case scala.util.Success(Some(view)) =>
+                    val wrappers = view.sources.map { src =>
+                      val name = src.name
+                      val bytes = src.processStream { stream =>
+                        val bos = new java.io.ByteArrayOutputStream()
+                        Helpers.copy(stream, bos)
+                        bos.toByteArray()
+                      }
+                      ArtifactWrapper.newWrapper(
+                        nominalPath = name,
+                        size = bytes.length.toLong,
+                        data = new java.io.ByteArrayInputStream(bytes),
+                        tempDir = in.tempDir,
+                        tempPath = tempDir,
+                        mimeHint = Some("text/plain")
+                      )
+                    }
+                    Some(wrappers.toVector -> "Portable PDB")
+                  case _ =>
+                    // Not a portable PDB, or hostile: not a container.
+                    None
+                }
+            }
+          result match {
+            case scala.util.Success(Some(inner)) => inner
+            case _                              => None
+          }
+        } catch {
+          case _: Exception => None
+        }
+      }
+    }
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
@@ -662,6 +737,7 @@ object FileWalker {
       }.orElse(asRPMWrapper(in, tempDir))
         .orElse(asApRomfs(in, tempDir))
         .orElse(asDotnetAssemblyContainer(in, tempDir))
+        .orElse(asPdbContainer(in, tempDir))
         .orElse(asSaffronFilesystem(in, tempDir))
         .orElse(
           asISOWrapper(in, tempDir)

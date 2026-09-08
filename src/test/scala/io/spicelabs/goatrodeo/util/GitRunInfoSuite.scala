@@ -47,7 +47,16 @@ class GitRunInfoSuite extends FunSuite {
     git.add().addFilepattern(".").call()
     val author =
       new org.eclipse.jgit.lib.PersonIdent("Tester", "tester@example.com")
-    git.commit().setAuthor(author).setCommitter(author).setMessage(msg).call()
+    // Fixture commits must never sign: JGit inherits the developer's global
+    // git config, and `commit.gpgsign=true` with `gpg.format=ssh` makes JGit
+    // throw UnsupportedSigningFormatException (no SSH signer). setSign(false)
+    // pins signing off regardless of environment config.
+    git.commit()
+      .setSign(false)
+      .setAuthor(author)
+      .setCommitter(author)
+      .setMessage(msg)
+      .call()
   }
 
   private def captureOf(root: File, scanRoot: File): Vector[GitRunItem] =

@@ -4,6 +4,7 @@ import io.bullet.borer.Dom
 import org.eclipse.jgit.lib.*
 import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
+import org.eclipse.jgit.transport.PackParser
 import org.eclipse.jgit.treewalk.FileTreeIterator
 import org.eclipse.jgit.treewalk.TreeWalk
 
@@ -46,6 +47,11 @@ final case class GitRunItem(gitoid: String, json: Dom.MapElem)
   *   - Redaction: emails digested (`sha256:<hex>`, deterministic), repo root
   *     relativized, scan dir omitted. `redact = false` keeps raw emails and
   *     absolute paths.
+  *   - Hard invariant: scanned git repositories are STRICTLY read-only.
+  *     Object ids are computed with a read-only `ObjectInserter` that throws
+  *     on every write-capable entry point (`idFor` only hashes; it never
+  *     stages, flushes, or persists). Goat Rodeo never modifies, signs, or
+  *     writes anything into a scanned repository.
   */
 object GitRunInfo {
 
@@ -302,11 +308,9 @@ object GitRunInfo {
                   )
                   .toString
                   .getBytes(StandardCharsets.UTF_8)
-                val inserter = repository.newObjectInserter()
-                try {
-                  val blobId = inserter.insert(Constants.OBJ_BLOB, target)
-                  formatter.append(name, FileMode.SYMLINK, blobId)
-                } finally inserter.close()
+                val blobId =
+                  readOnlyInserter.idFor(Constants.OBJ_BLOB, target)
+                formatter.append(name, FileMode.SYMLINK, blobId)
                 entries += 1
               case FileMode.GITLINK =>
                 formatter.append(name, FileMode.GITLINK, walk.getObjectId(0))
@@ -316,10 +320,7 @@ object GitRunInfo {
           }
         }
       }
-      val inserter = repository.newObjectInserter()
-      val treeId =
-        try formatter.insertTo(inserter)
-        finally inserter.close()
+      val treeId = readOnlyInserter.idFor(formatter)
       val json = treeItemWithId(
         treeId.name,
         runDate,
@@ -335,6 +336,42 @@ object GitRunInfo {
 
   private def gitoid(objectId: AnyObjectId, kind: String): String =
     s"gitoid:$kind:sha1:${objectId.name}"
+
+  /** Read-only object id computation for git provenance.
+    *
+    * Goat Rodeo's hard invariant: scanned git repositories are never
+    * modified. JGit's `ObjectInserter` is a write-capable API; this instance
+    * keeps only the pure content-addressing half (`idFor`, which is SHA-1
+    * over the canonical object bytes and touches no repository state) and
+    * throws on every entry point that could stage, flush, or persist an
+    * object. `idFor` yields exactly the ids a real insert would produce
+    * (they differ only in that nothing is ever written), so all gitoid
+    * values are unchanged from a write-based computation.
+    */
+  private[goatrodeo] def readOnlyInserter: ObjectInserter =
+    new ObjectInserter() {
+      private def forbidden(operation: String): Nothing =
+        throw new UnsupportedOperationException(
+          s"Goat Rodeo treats git repositories as read-only: ${operation} must never be called"
+        )
+
+      override def insert(
+          tpe: Int,
+          length: Long,
+          in: java.io.InputStream
+      ): ObjectId = forbidden("ObjectInserter.insert")
+
+      override def newPackParser(in: java.io.InputStream): PackParser =
+        forbidden("ObjectInserter.newPackParser")
+
+      override def newReader(): ObjectReader =
+        forbidden("ObjectInserter.newReader")
+
+      override def flush(): Unit =
+        forbidden("ObjectInserter.flush")
+
+      override def close(): Unit = ()
+    }
 
   // ----- item JSON builders (redaction-aware) -----
 

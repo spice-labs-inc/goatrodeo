@@ -98,9 +98,7 @@ class DotnetStreamingSuite extends FunSuite {
 
   test("GRW-2a withinAssemblyStream yields Class entries with type names") {
     val entries = AssemblyWalker
-      .withinAssemblyStream(
-        new File("test_data/Smoke.dll")
-      )(identity)(None)
+      .withinAssemblyStream(new File("test_data/Smoke.dll"))(identity)
     assert(entries.isDefined, "walk should succeed on Smoke.dll")
     val classes = entries.get.filter(_.kind.toString == "Class")
     assert(classes.nonEmpty, "expected at least one Class entry")
@@ -112,9 +110,7 @@ class DotnetStreamingSuite extends FunSuite {
 
   test("GRW-2b entries carry kind and a mimeHint") {
     val entries = AssemblyWalker
-      .withinAssemblyStream(
-        new File("test_data/hackproj.dll")
-      )(identity)(None)
+      .withinAssemblyStream(new File("test_data/hackproj.dll"))(identity)
       .get
     assert(entries.nonEmpty)
     entries.foreach { e =>
@@ -137,16 +133,13 @@ class DotnetStreamingSuite extends FunSuite {
             buf.size()
           }
         }
-      }(None)
-      .get
+      }.get
     assert(lens.forall(_ >= 0), "processStream on every entry should read")
   }
 
   test("GRW-2d deterministic order across two walks") {
     def names(): Vector[String] = AssemblyWalker
-      .withinAssemblyStream(new File("test_data/Smoke.dll"))(_.map(_.name))(
-        None
-      )
+      .withinAssemblyStream(new File("test_data/Smoke.dll"))(_.map(_.name))
       .get
     assertEquals(names(), names())
   }
@@ -155,21 +148,19 @@ class DotnetStreamingSuite extends FunSuite {
 
   test("GRW-3a entries wrap into ArtifactWrappers with mimeHint") {
     // Wrapping must happen inside the walk callback, per entry, while the
-    // walk is open. newWrapper needs the real size, so copy the stream to a
-    // buffer first (the bytes are the payload to wrap), then wrap with the
-    // correct size + mimeHint.
+    // walk is open. Cilantro 0.4.0 gives entry.length (the exact byte
+    // count), so newWrapper gets the real size without copying to learn it.
     val tempDir = Files.createTempDirectory("grw3")
     try {
       AssemblyWalker
         .withinAssemblyStream(new File("test_data/Smoke.dll")) { entries =>
           entries.foreach { e =>
+            assert(e.length >= 0, s"entry.length must be non-negative for ${e.name}")
             val wrapped = e.processStream { stream =>
-              val buf = new java.io.ByteArrayOutputStream()
-              val size = Helpers.copy(stream, buf)
               ArtifactWrapper.newWrapper(
                 nominalPath = e.name,
-                size = size,
-                data = new ByteArrayInputStream(buf.toByteArray()),
+                size = e.length,
+                data = stream,
                 tempDir = Some(tempDir.toFile),
                 tempPath = tempDir,
                 mimeHint = e.mimeHint
@@ -177,8 +168,7 @@ class DotnetStreamingSuite extends FunSuite {
             }
             assert(wrapped != null, s"wrapper for ${e.name} should construct")
           }
-        }(None)
-        .get
+        }.get
     } finally Helpers.deleteDirectory(tempDir)
   }
 
@@ -189,7 +179,7 @@ class DotnetStreamingSuite extends FunSuite {
     try {
       Files.write(nonAsm, "garbage not a PE".getBytes("UTF-8"))
       val res = Try(
-        AssemblyWalker.withinAssemblyStream(nonAsm.toFile)(identity)(None)
+        AssemblyWalker.withinAssemblyStream(nonAsm.toFile)(identity)
       )
       assert(
         res.isSuccess,

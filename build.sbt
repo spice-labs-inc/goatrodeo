@@ -249,7 +249,7 @@ lazy val root = project
     // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     // Spice Labs readers — current Maven Central releases (spec §1).
-    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.3.1",
+    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.4.0",
     // Canonical content identifiers (hashes + git blob ids) — the single source of
     // truth shared across Spice Labs tooling (spec §1 pins 1.2.1). Plain Java jar:
     libraryDependencies += "io.spicelabs" % "coordinates" % "1.2.1",

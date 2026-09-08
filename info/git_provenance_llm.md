@@ -70,3 +70,4 @@ builders should ignore `gitoid:commit:`/`gitoid:tree:` nodes.
 | Tagged runs produce git items; untagged produce none; run-tag date verbatim | `GitTaggedRunIntegrationSuite.T10.1, T10.2`, `T12.x` |
 | `--no-redact-git-info` flag + TOML `redact_git_info` | `ConfigTestSuite`, `ConfigurationTomlSuite` |
 | Git items never CBOM crypto inputs | `GitProvenanceNotInCbomSuite` |
+| Goat Rodeo NEVER modifies git files: `.git` is byte-for-byte untouched (same entries, sizes, mtimes) by `GitRunInfo.capture` and by a tagged `buildDB` run; object ids are computed read-only | `GitReadOnlyInvariantSuite` |

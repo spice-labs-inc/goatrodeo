@@ -45,7 +45,7 @@ class DotnetNestedAssemblySuite extends FunSuite {
           entries
             .filter(_.kind.toString == "EmbeddedResource")
             .map(_.name)
-      }(None)
+      }
       .get
     assert(innerNames.nonEmpty, "OuterApp must have embedded resources")
     innerNames.foreach { n =>

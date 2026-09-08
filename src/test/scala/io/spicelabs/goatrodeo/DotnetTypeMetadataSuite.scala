@@ -2,8 +2,8 @@ package io.spicelabs.goatrodeo
 
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
-import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
@@ -124,7 +124,7 @@ class DotnetTypeMetadataSuite extends FunSuite {
               new String(bos.toByteArray(), "UTF-8")
             }
           }
-      }(None)
+      }
       .get
       .toSet
 

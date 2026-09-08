@@ -1,5 +1,42 @@
-# This repository does NOT use git-lfs. Everything is stored as regular,
-# non-LFS content. Do not add `filter=lfs`/`diff=lfs`/`merge=lfs` lines.
+# This repository does NOT use git-lfs for new files. Everything new is stored as
+# regular, non-LFS content. Do NOT add `filter=lfs`/`diff=lfs`/`merge=lfs` lines for
+# any new path, and do NOT run `git lfs track`. Large new test objects must go to the
+# public download host (test_data/download), provisioned by the sbt Tests.Setup hook.
+#
+# The lines below are the LEGACY LFS ALLOWLIST: fixtures that were committed to Git
+# LFS before this policy existed. They stay in LFS permanently (old versions of the
+# code reference them, GitHub caps normal files at ~50MB, and the storage is already
+# paid for). Do NOT extend this list — the ban on new LFS files is absolute.
 #
 # Force non-LFS even if a global git-lfs filter would otherwise apply:
 * -filter -diff -merge -text
+
+# --- legacy LFS allowlist (fixed; do not extend) ---
+test_data/bdinfo.tar filter=lfs diff=lfs merge=lfs
+test_data/central/de/rub/nds/tls/attacker/tls-core/7.5.2/tls-core-7.5.2.jar filter=lfs diff=lfs merge=lfs
+test_data/central/de/rub/nds/tls/attacker/tls-core/7.5.2/tls-core-7.5.2-javadoc.jar filter=lfs diff=lfs merge=lfs
+test_data/central/de/rub/nds/tls/attacker/tls-core/7.5.2/tls-core-7.5.2-sources.jar filter=lfs diff=lfs merge=lfs
+test_data/firmware-images/px4/romfs_files.tar filter=lfs diff=lfs merge=lfs
+test_data/graalvm-jar/graal.jar filter=lfs diff=lfs merge=lfs
+test_data/hidden1.jar filter=lfs diff=lfs merge=lfs
+test_data/hidden2.jar filter=lfs diff=lfs merge=lfs
+test_data/hidden.tar filter=lfs diff=lfs merge=lfs
+test_data/ics_test.tar filter=lfs diff=lfs merge=lfs
+test_data/jar_test/librarymanagement-ivy_2.12-1.9.3.jar filter=lfs diff=lfs merge=lfs
+test_data/jar_test/librarymanagement-ivy_2.12-1.9.3-sources.jar filter=lfs diff=lfs merge=lfs
+test_data/jar_test/slf4j-simple-1.6.1.jar filter=lfs diff=lfs merge=lfs
+test_data/jar_test/slf4j-simple-1.6.1-sources.jar filter=lfs diff=lfs merge=lfs
+test_data/log4j-core-2.22.1.jar filter=lfs diff=lfs merge=lfs
+test_data/multi-release-jar/mr.jar filter=lfs diff=lfs merge=lfs
+test_data/nested.tar filter=lfs diff=lfs merge=lfs
+test_data/newrelic-weave/weave.jar filter=lfs diff=lfs merge=lfs
+test_data/osgi-bundle/bundle.jar filter=lfs diff=lfs merge=lfs
+test_data/pqc_jars/ps-059-patient-matching-service/v1.0.0/ps-059-patient-matching-service-v1.0.0.jar filter=lfs diff=lfs merge=lfs
+test_data/pqc_jars/ps-059-patient-matching-service/v2.0.0/ps-059-patient-matching-service-v2.0.0.jar filter=lfs diff=lfs merge=lfs
+test_data/pqc_jars/ps-059-patient-matching-service/v3.0.0/ps-059-patient-matching-service-v3.0.0.jar filter=lfs diff=lfs merge=lfs
+test_data/pqc_jars/ps-059-patient-matching-service/v4.0.0/ps-059-patient-matching-service-v4.0.0.jar filter=lfs diff=lfs merge=lfs
+test_data/shaded-jar/shaded.jar filter=lfs diff=lfs merge=lfs
+test_data/signed-jar/signed.jar filter=lfs diff=lfs merge=lfs
+test_data/spring-boot-fat-jar/app.jar filter=lfs diff=lfs merge=lfs
+test_data/wps_war_test/wps-demo-1.3.0-javadoc.jar filter=lfs diff=lfs merge=lfs
+test_data/wps_war_test/wps-demo-1.3.0-sources.jar filter=lfs diff=lfs merge=lfs

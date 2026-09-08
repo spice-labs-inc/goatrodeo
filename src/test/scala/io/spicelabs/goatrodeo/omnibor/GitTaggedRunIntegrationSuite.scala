@@ -38,7 +38,16 @@ class GitTaggedRunIntegrationSuite extends FunSuite {
     val git = Git.init().setDirectory(root).setInitialBranch("main").call()
     val ident = new org.eclipse.jgit.lib.PersonIdent("T", "t@example.com")
     git.add().addFilepattern(".").call()
-    git.commit().setAuthor(ident).setCommitter(ident).setMessage("c1").call()
+    // Fixture commits must never sign: JGit inherits the developer's global
+    // git config, and `commit.gpgsign=true` with `gpg.format=ssh` (a common
+    // SSH-key signing setup) makes JGit throw UnsupportedSigningFormatException
+    // because JGit has no SSH signer. setSign(false) pins signing off.
+    git.commit()
+      .setSign(false)
+      .setAuthor(ident)
+      .setCommitter(ident)
+      .setMessage("c1")
+      .call()
     git.close()
     root
   }
