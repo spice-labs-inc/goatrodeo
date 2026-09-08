@@ -7,15 +7,14 @@ import java.security.MessageDigest
 /** Phase 1 — RPM payload streaming through the archive walker (spec §1,
   * functional consequence of baharat 0.2.1).
   *
-  * WHAT: a real RPM fixture is expanded by `FileWalker.withinArchiveStream`
-  * and every payload file entry yields a correct, fully-readable content
-  * stream whose bytes hash to the known fixture value.
+  * WHAT: a real RPM fixture is expanded by `FileWalker.withinArchiveStream` and
+  * every payload file entry yields a correct, fully-readable content stream
+  * whose bytes hash to the known fixture value.
   *
-  * WHY: baharat 0.2.1's RPM payload streaming works end to end; the spec
-  * pins that the archive walker expands RPM files with correct per-entry
-  * content streams. Without this test a regression in payload streaming
-  * (e.g. truncated content, wrong offsets) would silently corrupt
-  * extracted children.
+  * WHY: baharat 0.2.1's RPM payload streaming works end to end; the spec pins
+  * that the archive walker expands RPM files with correct per-entry content
+  * streams. Without this test a regression in payload streaming (e.g. truncated
+  * content, wrong offsets) would silently corrupt extracted children.
   *
   * LLM note: the fixture is a real RPM (busybox aarch64, sqlite-rpmdb-era
   * format option). The known-hash entry is the payload's LICENSE file.
@@ -23,7 +22,11 @@ import java.security.MessageDigest
 class RpmStreamingSuite extends FunSuite {
 
   private def sha256(bytes: Array[Byte]): String =
-    MessageDigest.getInstance("SHA-256").digest(bytes).map("%02x".format(_)).mkString
+    MessageDigest
+      .getInstance("SHA-256")
+      .digest(bytes)
+      .map("%02x".format(_))
+      .mkString
 
   test("T1.5 rpmPayloadStreamsEndToEnd — entries stream correct bytes") {
     val rpm = new File("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm")

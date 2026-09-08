@@ -8,18 +8,18 @@ import java.nio.file.Files
 
 /** Phase 3 — Git provenance capture engine (spec §6; T8.x, T9.x).
   *
-  * WHAT: pins discovery (containing repo only, dedupe, no nested repos),
-  * item counts per repo shape, gitoid identifiers, and metadata body
-  * fields — all JGit-only, on JGit-init'd fixture repos (no shell).
+  * WHAT: pins discovery (containing repo only, dedupe, no nested repos), item
+  * counts per repo shape, gitoid identifiers, and metadata body fields — all
+  * JGit-only, on JGit-init'd fixture repos (no shell).
   *
-  * WHY: spec §6; user decision 4 (JGit only, never shell out in product
-  * or test oracles) and 5 (containing repo only).
+  * WHY: spec §6; user decision 4 (JGit only, never shell out in product or test
+  * oracles) and 5 (containing repo only).
   *
-  * LLM note: fixtures are created with JGit's `Git` API (init/commit).
-  * The worktree-tree oracle is JGit `TreeFormatter` over the working
-  * tree via the same building blocks the product uses — the tests assert
-  * the capture's behavior (counts, identifiers, fields), not byte-parity
-  * of tree ids against a fictional ground truth.
+  * LLM note: fixtures are created with JGit's `Git` API (init/commit). The
+  * worktree-tree oracle is JGit `TreeFormatter` over the working tree via the
+  * same building blocks the product uses — the tests assert the capture's
+  * behavior (counts, identifiers, fields), not byte-parity of tree ids against
+  * a fictional ground truth.
   */
 class GitRunInfoSuite extends FunSuite {
 
@@ -40,14 +40,23 @@ class GitRunInfoSuite extends FunSuite {
     Git.init().setDirectory(root).setInitialBranch("main").call()
   }
 
-  private def commitAll(git: Git, msg: String): org.eclipse.jgit.revwalk.RevCommit = {
+  private def commitAll(
+      git: Git,
+      msg: String
+  ): org.eclipse.jgit.revwalk.RevCommit = {
     git.add().addFilepattern(".").call()
-    val author = new org.eclipse.jgit.lib.PersonIdent("Tester", "tester@example.com")
+    val author =
+      new org.eclipse.jgit.lib.PersonIdent("Tester", "tester@example.com")
     git.commit().setAuthor(author).setCommitter(author).setMessage(msg).call()
   }
 
   private def captureOf(root: File, scanRoot: File): Vector[GitRunItem] =
-    GitRunInfo.capture(Seq(root), runDate = "2026-09-02T00:00:00Z", redact = true, scanRoot = Some(scanRoot))
+    GitRunInfo.capture(
+      Seq(root),
+      runDate = "2026-09-02T00:00:00Z",
+      redact = true,
+      scanRoot = Some(scanRoot)
+    )
 
   private def jsonOf(item: GitRunItem, key: String): Option[String] =
     item.json.members.collectFirst {
@@ -67,8 +76,12 @@ class GitRunInfoSuite extends FunSuite {
     // base dir is nested below the repo root
     val nested = new File(root, "sub/dir")
     nested.mkdirs()
-    val items = GitRunInfo.capture(Seq(nested), "d", redact = true, scanRoot = Some(root))
-    assert(items.nonEmpty, "containing repo must be discovered from a nested base")
+    val items =
+      GitRunInfo.capture(Seq(nested), "d", redact = true, scanRoot = Some(root))
+    assert(
+      items.nonEmpty,
+      "containing repo must be discovered from a nested base"
+    )
   }
 
   test("T8.2 basesInSameRepoDedupeToOneSet") {
@@ -79,12 +92,23 @@ class GitRunInfoSuite extends FunSuite {
     git.close()
     val baseA = new File(root, "d1"); baseA.mkdirs()
     val baseB = new File(root, "d2"); baseB.mkdirs()
-    val items = GitRunInfo.capture(Seq(baseA, baseB), "d", redact = true, scanRoot = Some(root))
+    val items = GitRunInfo.capture(
+      Seq(baseA, baseB),
+      "d",
+      redact = true,
+      scanRoot = Some(root)
+    )
     // one repo -> one set of items; no duplication
-    def kinds(item: GitRunItem): String = item.json.members.collectFirst {
-      case (io.bullet.borer.Dom.StringElem("kinds"), io.bullet.borer.Dom.ArrayElem.Unsized(v)) =>
-        v.collect { case io.bullet.borer.Dom.StringElem(s) => s }.mkString(",")
-    }.getOrElse("")
+    def kinds(item: GitRunItem): String = item.json.members
+      .collectFirst {
+        case (
+              io.bullet.borer.Dom.StringElem("kinds"),
+              io.bullet.borer.Dom.ArrayElem.Unsized(v)
+            ) =>
+          v.collect { case io.bullet.borer.Dom.StringElem(s) => s }
+            .mkString(",")
+      }
+      .getOrElse("")
     val commitCount = items.count(i => kinds(i).split(",").contains("commit"))
     assertEquals(commitCount, 1)
   }
@@ -104,13 +128,17 @@ class GitRunInfoSuite extends FunSuite {
     assert(items.nonEmpty)
     // the marker must not be part of any item body
     val allJson = items.map(_.json.toString).mkString
-    assert(!allJson.contains("user-ready"), s"marker must not appear in captured tree:\n$allJson")
+    assert(
+      !allJson.contains("user-ready"),
+      s"marker must not appear in captured tree:\n$allJson"
+    )
   }
 
   test("T8.4 notARepoYieldsZeroItems") {
     val root = tempDir("gr8")
     write(root, "a.txt", "x")
-    val items = GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
+    val items =
+      GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
     assertEquals(items, Vector.empty)
   }
 
@@ -123,9 +151,19 @@ class GitRunInfoSuite extends FunSuite {
     val items = captureOf(root, root)
     // clean repo: commit + tree (+worktree merged) + parent — but a root
     // commit has NO parent, so 2 items (commit + tree/worktree).
-    assertEquals(items.size, 2, s"root-commit clean repo should yield 2 items; got ${items.map(_.gitoid)}")
-    assert(items.exists(_.gitoid.startsWith("gitoid:commit:sha1:")), "commit item present")
-    assert(items.exists(_.gitoid.startsWith("gitoid:tree:sha1:")), "tree item present")
+    assertEquals(
+      items.size,
+      2,
+      s"root-commit clean repo should yield 2 items; got ${items.map(_.gitoid)}"
+    )
+    assert(
+      items.exists(_.gitoid.startsWith("gitoid:commit:sha1:")),
+      "commit item present"
+    )
+    assert(
+      items.exists(_.gitoid.startsWith("gitoid:tree:sha1:")),
+      "tree item present"
+    )
   }
 
   test("T9.2 identifiersAreGitoids") {
@@ -153,7 +191,10 @@ class GitRunInfoSuite extends FunSuite {
     assertEquals(jsonOf(commitItem, "message"), Some("the message"))
     assertEquals(jsonOf(commitItem, "author_name"), Some("Tester"))
     val email = jsonOf(commitItem, "author_email").get
-    assert(email.startsWith("sha256:") && email.length > 7, s"digested email expected; got $email")
+    assert(
+      email.startsWith("sha256:") && email.length > 7,
+      s"digested email expected; got $email"
+    )
     assertEquals(jsonOf(commitItem, "date"), Some("2026-09-02T00:00:00Z"))
     assertEquals(jsonOf(commitItem, "object_format"), Some("sha1"))
   }
@@ -172,7 +213,10 @@ class GitRunInfoSuite extends FunSuite {
     assert(!commitItem.gitoid.contains("tester@example.com"))
     // the whole emitted JSON must not contain the raw email
     val allJson = items.map(_.json.toString).mkString
-    assert(!allJson.contains("tester@example.com"), "raw email leaked into body")
+    assert(
+      !allJson.contains("tester@example.com"),
+      "raw email leaked into body"
+    )
   }
 
   test("T11.2 redactionOverridable — raw emails when redact=false") {
@@ -181,7 +225,8 @@ class GitRunInfoSuite extends FunSuite {
     val git = initRepo(root)
     commitAll(git, "m")
     git.close()
-    val items = GitRunInfo.capture(Seq(root), "d", redact = false, scanRoot = Some(root))
+    val items =
+      GitRunInfo.capture(Seq(root), "d", redact = false, scanRoot = Some(root))
     val commitItem = items.find(_.gitoid.startsWith("gitoid:commit:sha1:")).get
     assertEquals(jsonOf(commitItem, "author_email"), Some("tester@example.com"))
     assertEquals(jsonOf(commitItem, "repo_root"), Some(root.getAbsolutePath))
@@ -202,11 +247,22 @@ class GitRunInfoSuite extends FunSuite {
       case _: UnsupportedOperationException | _: java.io.IOException =>
         fail("symlinks are required for this test")
     }
-    val items = GitRunInfo.capture(Seq(link), "d", redact = true, scanRoot = Some(scanRoot))
-    assertEquals(items, Vector.empty, "symlink to a repo outside the scan tree must be refused")
+    val items = GitRunInfo.capture(
+      Seq(link),
+      "d",
+      redact = true,
+      scanRoot = Some(scanRoot)
+    )
+    assertEquals(
+      items,
+      Vector.empty,
+      "symlink to a repo outside the scan tree must be refused"
+    )
   }
 
-  test("T11.5 captureCaps — caps drop the worktree item without failing the run") {
+  test(
+    "T11.5 captureCaps — caps drop the worktree item without failing the run"
+  ) {
     val root = tempDir("gr9")
     // make a repo with many files to trip the entry cap quickly is slow;
     // instead pin the never-fail contract with a malformed repo: corrupt
@@ -216,8 +272,13 @@ class GitRunInfoSuite extends FunSuite {
       // corrupt: write junk into the HEAD ref file
       val head = new File(root, ".git/HEAD")
       Files.writeString(head.toPath, "ref: refs/heads/main\n")
-      val items = GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
-      assertEquals(items, Vector.empty, "corrupt repo must yield zero items, never throw")
+      val items =
+        GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
+      assertEquals(
+        items,
+        Vector.empty,
+        "corrupt repo must yield zero items, never throw"
+      )
     }
   }
 
@@ -230,10 +291,16 @@ class GitRunInfoSuite extends FunSuite {
     // corrupt the object db
     val objDir = new File(root, ".git/objects/pack")
     if (objDir.exists()) {
-      objDir.listFiles().foreach(f => Files.write(f.toPath, Array[Byte](1, 2, 3)))
+      objDir
+        .listFiles()
+        .foreach(f => Files.write(f.toPath, Array[Byte](1, 2, 3)))
     }
-    val items = GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
-    assert(items.isEmpty || items.nonEmpty, "capture must never throw; may degrade to zero or partial")
+    val items =
+      GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
+    assert(
+      items.isEmpty || items.nonEmpty,
+      "capture must never throw; may degrade to zero or partial"
+    )
   }
 
   test("T11.3 containment — repo outside scan root is refused") {
@@ -243,7 +310,16 @@ class GitRunInfoSuite extends FunSuite {
     commitAll(git, "m")
     git.close()
     val scanRoot = tempDir("gr-scan")
-    val items = GitRunInfo.capture(Seq(outside), "d", redact = true, scanRoot = Some(scanRoot))
-    assertEquals(items, Vector.empty, "repo outside the scan root must be refused")
+    val items = GitRunInfo.capture(
+      Seq(outside),
+      "d",
+      redact = true,
+      scanRoot = Some(scanRoot)
+    )
+    assertEquals(
+      items,
+      Vector.empty,
+      "repo outside the scan root must be refused"
+    )
   }
 }

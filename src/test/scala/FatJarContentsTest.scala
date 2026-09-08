@@ -23,11 +23,11 @@ import scala.jdk.CollectionConverters.*
   * `META-INF/services/java.sql.Driver` service entry exists, and no JAR
   * signature files are bundled.
   *
-  * WHY: sqlite-jdbc (baharat's opt-in dep) bundles native `.so`/`.dll`
-  * files and a JDBC driver service entry; the fat jar must keep exactly
-  * one driver (no duplicates from multiple jars) and no signature files
-  * (which would break loading). The `--help` execution is covered by the
-  * existing FatJarExecutionTest.
+  * WHY: sqlite-jdbc (baharat's opt-in dep) bundles native `.so`/`.dll` files
+  * and a JDBC driver service entry; the fat jar must keep exactly one driver
+  * (no duplicates from multiple jars) and no signature files (which would break
+  * loading). The `--help` execution is covered by the existing
+  * FatJarExecutionTest.
   */
 class FatJarContentsTest extends munit.FunSuite {
 
@@ -44,7 +44,9 @@ class FatJarContentsTest extends munit.FunSuite {
     try {
       val entries = jar.entries().asScala.map(_.getName).toList
       val natives = entries.filter(n =>
-        n.startsWith("org/sqlite/native/") && (n.endsWith(".so") || n.endsWith(".dll"))
+        n.startsWith("org/sqlite/native/") && (n.endsWith(".so") || n.endsWith(
+          ".dll"
+        ))
       )
       assert(natives.nonEmpty, "sqlite natives must be bundled")
       assert(
@@ -57,13 +59,23 @@ class FatJarContentsTest extends munit.FunSuite {
   test("T1.4b exactly one java.sql.Driver service entry") {
     val jar = fatJar()
     try {
-      val drivers = jar.entries().asScala
+      val drivers = jar
+        .entries()
+        .asScala
         .map(_.getName)
-        .filter(n => n.startsWith("META-INF/services/") && n.endsWith("java.sql.Driver"))
+        .filter(n =>
+          n.startsWith("META-INF/services/") && n.endsWith("java.sql.Driver")
+        )
         .toList
       assertEquals(drivers, List("META-INF/services/java.sql.Driver"))
-      val in = jar.getInputStream(jar.getJarEntry("META-INF/services/java.sql.Driver"))
-      val lines = scala.io.Source.fromInputStream(in).getLines().map(_.trim).filter(_.nonEmpty).toList
+      val in =
+        jar.getInputStream(jar.getJarEntry("META-INF/services/java.sql.Driver"))
+      val lines = scala.io.Source
+        .fromInputStream(in)
+        .getLines()
+        .map(_.trim)
+        .filter(_.nonEmpty)
+        .toList
       in.close()
       assertEquals(lines, List("org.sqlite.JDBC"))
     } finally jar.close()
@@ -77,7 +89,9 @@ class FatJarContentsTest extends munit.FunSuite {
         val name = e.getName
         name.startsWith("META-INF/") && (
           name.endsWith(".SF") || name.endsWith(".DSA") ||
-            name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith("SIG-")
+            name.endsWith(".RSA") || name.endsWith(".EC") || name.startsWith(
+              "SIG-"
+            )
         )
       }
       assert(

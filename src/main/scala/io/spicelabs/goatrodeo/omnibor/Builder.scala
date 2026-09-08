@@ -80,9 +80,9 @@ object Builder {
     * @param done
     *   when the processing is done, true success, false failure
     *
-    * Thread count, block list, record cap and temp directory all come
-    * from the contextual [[Configuration]] (reached as `config`) rather than
-    * being passed separately.
+    * Thread count, block list, record cap and temp directory all come from the
+    * contextual [[Configuration]] (reached as `config`) rather than being
+    * passed separately.
     */
   def buildDB(
       dest: File,
@@ -164,9 +164,12 @@ object Builder {
       case None => Vector.empty
       case Some(tagPass) =>
         val runDate = tagPass.json match {
-          case m: Dom.MapElem => m.members.collectFirst {
-            case (Dom.StringElem("date"), Dom.StringElem(d)) => d
-          }.getOrElse(Helpers.currentDate8601())
+          case m: Dom.MapElem =>
+            m.members
+              .collectFirst {
+                case (Dom.StringElem("date"), Dom.StringElem(d)) => d
+              }
+              .getOrElse(Helpers.currentDate8601())
           case _ => Helpers.currentDate8601()
         }
         val redact = config.redactGitInfo
@@ -365,7 +368,9 @@ object Builder {
           storage.write(
             tag.gitoid,
             itemOpt =>
-              itemOpt.map(item => item.withConnection(EdgeType.tagTo, gi.gitoid)),
+              itemOpt.map(item =>
+                item.withConnection(EdgeType.tagTo, gi.gitoid)
+              ),
             _ => "git provenance tagTo"
           )
         }

@@ -268,20 +268,20 @@ class GraphManagerReadNextSuite extends FunSuite {
 
 /** Phase 4 — GRD EOF semantics (spec §10; user decision 6; T13.x).
   *
-  * WHAT: pins that ANY negative entry length is treated as end-of-file
-  * (not just −1), and that a positive length exceeding the remaining
-  * bytes is end-of-data (no giant allocation). Real entries are never
-  * negative; truncated/foreign files read correctly instead of erroring.
+  * WHAT: pins that ANY negative entry length is treated as end-of-file (not
+  * just −1), and that a positive length exceeding the remaining bytes is
+  * end-of-data (no giant allocation). Real entries are never negative;
+  * truncated/foreign files read correctly instead of erroring.
   *
-  * WHY: the GRD writer terminates the entry stream with a −1 marker then
-  * a back-pointer long; reading past the marker can yield other negative
-  * 4-byte values (e.g. −65536) which the old `== -1` check missed and
-  * fed to `ByteBuffer.allocate(negative)` → crash. The fix treats any
-  * negative length as EOF.
+  * WHY: the GRD writer terminates the entry stream with a −1 marker then a
+  * back-pointer long; reading past the marker can yield other negative 4-byte
+  * values (e.g. −65536) which the old `== -1` check missed and fed to
+  * `ByteBuffer.allocate(negative)` → crash. The fix treats any negative length
+  * as EOF.
   *
-  * LLM note: builds raw GRD-shaped byte streams directly (magic + empty
-  * entry list + EOF marker + back-pointer tail) so each negative value is
-  * exercised exactly. Real round-trips via `GraphManager.writeEntries`.
+  * LLM note: builds raw GRD-shaped byte streams directly (magic + empty entry
+  * list + EOF marker + back-pointer tail) so each negative value is exercised
+  * exactly. Real round-trips via `GraphManager.writeEntries`.
   */
 class GrdEofSuite extends FunSuite {
 
@@ -331,7 +331,11 @@ class GrdEofSuite extends FunSuite {
 
   test("T13.1 anyNegativeEntryLengthIsEof") {
     Seq(-1, -2, -3, -65536, Int.MinValue).foreach { neg =>
-      assertEquals(readFirst(validGrdWithFirstEntryLength(neg)), None, s"negative length $neg must be EOF")
+      assertEquals(
+        readFirst(validGrdWithFirstEntryLength(neg)),
+        None,
+        s"negative length $neg must be EOF"
+      )
     }
   }
 
@@ -344,7 +348,8 @@ class GrdEofSuite extends FunSuite {
   test("T13.3 realEntriesAreNeverNegative — round-trip unchanged") {
     val tempDir = Files.createTempDirectory("grdeof").toFile()
     try {
-      val id = "gitoid:blob:sha256:abcdef0000000000000000000000000000000000000000000000000000000000"
+      val id =
+        "gitoid:blob:sha256:abcdef0000000000000000000000000000000000000000000000000000000000"
       val item = new Item(
         id,
         TreeSet(),

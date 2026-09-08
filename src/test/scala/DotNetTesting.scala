@@ -67,10 +67,28 @@ class DotNetTesting extends munit.FunSuite {
     val wrapper = FileWrapper(File(name), name, None)
     val store1 =
       ToProcess.buildGraphFromArtifactWrapper(wrapper)
-    val gitoid = store1.keys().find(key => key.startsWith("gitoid"))
-    assertEquals(
-      "gitoid:blob:sha1:4b71d999259c4f7b593a13df83c4f5d3bbf760a0",
-      gitoid.get
+    // With the Cilantro 0.3.1 assembly-as-container integration, the
+    // graph contains both Smoke.dll's own item and its container children
+    // (classes, resources, debug blobs). The assembly item itself is the
+    // one whose aliases include Smoke.dll's sha1 blob. Find it by that
+    // alias rather than by "first gitoid key" (child order is not
+    // significant).
+    val smokeSha1 = "gitoid:blob:sha1:4b71d999259c4f7b593a13df83c4f5d3bbf760a0"
+    val assemblyItem = store1
+      .read(smokeSha1)
+      .orElse {
+        // alias may be on an item under a different key: search items
+        // whose connections aliasFrom include the sha1
+        store1.keys().iterator
+          .flatMap(k => store1.read(k))
+          .find(item =>
+            item.connections.exists(_._2 == smokeSha1) ||
+              item.identifier == smokeSha1
+          )
+      }
+    assert(
+      assemblyItem.isDefined,
+      s"Smoke.dll item (sha1 $smokeSha1) must exist in the graph"
     )
   }
 
@@ -86,7 +104,8 @@ class DotNetTesting extends munit.FunSuite {
     val name = "test_data/hackproj.dll"
     val assembly = AssemblyDefinition.readAssembly(name).get
     assert(assembly.mainModule.isDefined)
-    val deps = DotnetState.formatDeps(assembly.mainModule.get.assemblyReferences)
+    val deps =
+      DotnetState.formatDeps(assembly.mainModule.get.assemblyReferences)
     assertEquals(
       deps,
       Some(

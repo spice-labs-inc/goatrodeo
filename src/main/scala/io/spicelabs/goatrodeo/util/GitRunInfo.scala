@@ -15,37 +15,37 @@ import java.time.Instant
 import scala.collection.mutable
 import scala.util.Try
 
-/** One captured git provenance record: the gitoid identifier and its
-  * metadata body (spec §6).
+/** One captured git provenance record: the gitoid identifier and its metadata
+  * body (spec §6).
   */
 final case class GitRunItem(gitoid: String, json: Dom.MapElem)
 
 /** Git provenance capture for tagged runs (spec §6, user decisions 4 & 5).
   *
-  * WHAT: for each unique containing repository discovered beneath the
-  * base directories, capture the HEAD commit, the HEAD tree, the worktree
-  * tree, and the parent commit(s) as content-addressed Items (gitoid of
-  * the hash itself), with the git metadata as the body.
+  * WHAT: for each unique containing repository discovered beneath the base
+  * directories, capture the HEAD commit, the HEAD tree, the worktree tree, and
+  * the parent commit(s) as content-addressed Items (gitoid of the hash itself),
+  * with the git metadata as the body.
   *
-  * WHY: spec §6 — tagged runs record provenance; untagged runs do
-  * nothing; capture never fails the run; redaction on by default.
+  * WHY: spec §6 — tagged runs record provenance; untagged runs do nothing;
+  * capture never fails the run; redaction on by default.
   *
   * LLM notes:
-  * - JGit ONLY: no process spawning (product code). sha256 repos are
-  *   skipped with a warning (JGit limitation). Fixtures may use git CLI.
-  * - Discovery: only the *containing* repo per base; nested repos are
-  *   gitlinks. Dedupe by canonical worktree path.
-  * - The worktree tree is built with a JGit TreeWalk honoring ignore
-  *   rules (repo-local config only), symlinks recorded as symlink
-  *   entries (never followed), FIFOs skipped, submodules as gitlinks.
-  * - Caps: entry count, depth, blob size, parent count, message length,
-  *   capture deadline. A cap hit drops the worktree item (or truncates
-  *   the message) without failing the run.
-  * - Containment: gitdir/commondir/alternates must live inside the scan
-  *   tree; violations skip the repo.
-  * - Redaction: emails digested (`sha256:<hex>`, deterministic),
-  *   repo root relativized, scan dir omitted. `redact = false` keeps raw
-  *   emails and absolute paths.
+  *   - JGit ONLY: no process spawning (product code). sha256 repos are skipped
+  *     with a warning (JGit limitation). Fixtures may use git CLI.
+  *   - Discovery: only the *containing* repo per base; nested repos are
+  *     gitlinks. Dedupe by canonical worktree path.
+  *   - The worktree tree is built with a JGit TreeWalk honoring ignore rules
+  *     (repo-local config only), symlinks recorded as symlink entries (never
+  *     followed), FIFOs skipped, submodules as gitlinks.
+  *   - Caps: entry count, depth, blob size, parent count, message length,
+  *     capture deadline. A cap hit drops the worktree item (or truncates the
+  *     message) without failing the run.
+  *   - Containment: gitdir/commondir/alternates must live inside the scan tree;
+  *     violations skip the repo.
+  *   - Redaction: emails digested (`sha256:<hex>`, deterministic), repo root
+  *     relativized, scan dir omitted. `redact = false` keeps raw emails and
+  *     absolute paths.
   */
 object GitRunInfo {
 
@@ -82,8 +82,8 @@ object GitRunInfo {
     seen.toVector
   }
 
-  /** Capture provenance for all discovered repos. Never throws; on any
-    * failure the repo is skipped.
+  /** Capture provenance for all discovered repos. Never throws; on any failure
+    * the repo is skipped.
     */
   def capture(
       bases: Seq[File],
@@ -139,8 +139,11 @@ object GitRunInfo {
       // jgit 7.x doesn't surface ObjectFormat on the reader; the repo
       // config knob `extensions.objectformat` is the documented detector.
       val objectFormat: String =
-        Try(Option(repository.getConfig.getString("extensions", null, "objectformat")))
-          .toOption.flatten.getOrElse("sha1")
+        Try(
+          Option(
+            repository.getConfig.getString("extensions", null, "objectformat")
+          )
+        ).toOption.flatten.getOrElse("sha1")
       if (objectFormat != "sha1") {
         log.warn(
           s"Git provenance: SHA-256 repositories not supported (JGit limitation) — skipping ${repoRoot}"
@@ -158,11 +161,26 @@ object GitRunInfo {
               val base: Vector[GitRunItem] = Vector(
                 GitRunItem(
                   gitoid(commit.getId, "commit"),
-                  commitItem(commit.getId.name, runDate, redact, repoRoot, scanRoot, commit)
+                  commitItem(
+                    commit.getId.name,
+                    runDate,
+                    redact,
+                    repoRoot,
+                    scanRoot,
+                    commit
+                  )
                 ),
                 GitRunItem(
                   gitoid(commit.getTree.getId, "tree"),
-                  treeItem(commit.getTree.getId.name, runDate, redact, repoRoot, scanRoot, head.name, commit)
+                  treeItem(
+                    commit.getTree.getId.name,
+                    runDate,
+                    redact,
+                    repoRoot,
+                    scanRoot,
+                    head.name,
+                    commit
+                  )
                 )
               )
               val parents: Vector[GitRunItem] =
@@ -171,20 +189,33 @@ object GitRunInfo {
                     val pCommit = rw.parseCommit(p)
                     GitRunItem(
                       gitoid(p.getId, "commit"),
-                      parentItem(p.getId.name, idx, runDate, redact, repoRoot, scanRoot, commit.getId.name)
+                      parentItem(
+                        p.getId.name,
+                        idx,
+                        runDate,
+                        redact,
+                        repoRoot,
+                        scanRoot,
+                        commit.getId.name
+                      )
                     )
                 }
-              val withWorktree = worktreeTree(repository, runDate, redact, scanRoot) match {
-                case Some(wtItem) if wtItem.gitoid == gitoid(commit.getTree.getId, "tree") =>
-                  // clean repo: merge the worktree kind into the tree item
-                  base.map {
-                    case ref if ref.gitoid == wtItem.gitoid =>
-                      mergeWorktreeKind(ref)
-                    case ref => ref
-                  }
-                case Some(wtItem) => base :+ wtItem
-                case None         => base
-              }
+              val withWorktree =
+                worktreeTree(repository, runDate, redact, scanRoot) match {
+                  case Some(wtItem)
+                      if wtItem.gitoid == gitoid(
+                        commit.getTree.getId,
+                        "tree"
+                      ) =>
+                    // clean repo: merge the worktree kind into the tree item
+                    base.map {
+                      case ref if ref.gitoid == wtItem.gitoid =>
+                        mergeWorktreeKind(ref)
+                      case ref => ref
+                    }
+                  case Some(wtItem) => base :+ wtItem
+                  case None         => base
+                }
               withWorktree ++ parents
             } finally rw.close()
         }
@@ -193,12 +224,16 @@ object GitRunInfo {
 
   /** Add the `worktree_tree` kind to a tree Item's kinds array. */
   private def mergeWorktreeKind(ref: GitRunItem): GitRunItem = {
-    val newKinds = ref.json.members.collectFirst {
-      case (Dom.StringElem("kinds"), Dom.ArrayElem.Unsized(items)) =>
-        Dom.ArrayElem.Unsized(items :+ Dom.StringElem(KindWorktreeTree))
-    }.getOrElse(
-      Dom.ArrayElem.Unsized(Vector(Dom.StringElem(KindTree), Dom.StringElem(KindWorktreeTree)))
-    )
+    val newKinds = ref.json.members
+      .collectFirst {
+        case (Dom.StringElem("kinds"), Dom.ArrayElem.Unsized(items)) =>
+          Dom.ArrayElem.Unsized(items :+ Dom.StringElem(KindWorktreeTree))
+      }
+      .getOrElse(
+        Dom.ArrayElem.Unsized(
+          Vector(Dom.StringElem(KindTree), Dom.StringElem(KindWorktreeTree))
+        )
+      )
     val newJson = Dom.MapElem.Unsized(
       ref.json.members.toVector.map {
         case (Dom.StringElem("kinds"), _) => Dom.StringElem("kinds") -> newKinds
@@ -235,10 +270,14 @@ object GitRunInfo {
       // `stopped` and halts the walk without early-returning.
       while (walk.next() && !stopped) {
         if (Instant.now().isAfter(deadline)) {
-          log.warn(s"Git provenance: capture deadline exceeded for ${repository.getWorkTree}")
+          log.warn(
+            s"Git provenance: capture deadline exceeded for ${repository.getWorkTree}"
+          )
           stopped = true
         } else if (entries >= MaxEntries || depth >= MaxDepth) {
-          log.warn(s"Git provenance: caps exceeded for ${repository.getWorkTree}")
+          log.warn(
+            s"Git provenance: caps exceeded for ${repository.getWorkTree}"
+          )
           stopped = true
         } else {
           val name = walk.getNameString
@@ -258,7 +297,9 @@ object GitRunInfo {
                 // record the symlink target via the file attributes
                 val path = walk.getPathString
                 val target = Files
-                  .readSymbolicLink(new File(repository.getWorkTree, path).toPath)
+                  .readSymbolicLink(
+                    new File(repository.getWorkTree, path).toPath
+                  )
                   .toString
                   .getBytes(StandardCharsets.UTF_8)
                 val inserter = repository.newObjectInserter()
@@ -324,7 +365,9 @@ object GitRunInfo {
 
   private def digestEmail(email: String): String = {
     val norm = email.trim.toLowerCase(java.util.Locale.ROOT)
-    val digest = MessageDigest.getInstance("SHA-256").digest(norm.getBytes(StandardCharsets.UTF_8))
+    val digest = MessageDigest
+      .getInstance("SHA-256")
+      .digest(norm.getBytes(StandardCharsets.UTF_8))
     s"sha256:${Helpers.toHex(digest)}"
   }
 
@@ -348,14 +391,19 @@ object GitRunInfo {
       "kinds" -> Dom.ArrayElem.Unsized(Vector(Dom.StringElem(KindCommit))),
       "object_format" -> Dom.StringElem("sha1"),
       "author_name" -> Dom.StringElem(author.getName),
-      "author_email" -> Dom.StringElem(emailField(redact, author.getEmailAddress)),
+      "author_email" -> Dom.StringElem(
+        emailField(redact, author.getEmailAddress)
+      ),
       "author_date" -> Dom.StringElem(author.getWhenAsInstant.toString),
       "committer_name" -> Dom.StringElem(committer.getName),
-      "committer_email" -> Dom.StringElem(emailField(redact, committer.getEmailAddress)),
+      "committer_email" -> Dom.StringElem(
+        emailField(redact, committer.getEmailAddress)
+      ),
       "commit_time" -> Dom.StringElem(committer.getWhenAsInstant.toString),
       "parents" -> Dom.ArrayElem.Unsized(parents.map(p => Dom.StringElem(p))),
       "message" -> Dom.StringElem(msg)
-    ) ++ (if (truncated) Vector("message_truncated" -> Dom.BooleanElem(true)) else Vector())
+    ) ++ (if (truncated) Vector("message_truncated" -> Dom.BooleanElem(true))
+          else Vector())
     Dom.MapElem.Unsized(fields*)
   }
 
@@ -405,7 +453,9 @@ object GitRunInfo {
       head: String
   ): Dom.MapElem = {
     val fields = baseFields(runDate, redact, repoRoot, scanRoot) ++ Vector(
-      "kinds" -> Dom.ArrayElem.Unsized(Vector(Dom.StringElem(KindParentCommit))),
+      "kinds" -> Dom.ArrayElem.Unsized(
+        Vector(Dom.StringElem(KindParentCommit))
+      ),
       "object_format" -> Dom.StringElem("sha1"),
       "parent_index" -> Dom.IntElem(idx),
       "head_commit" -> Dom.StringElem(head)
@@ -414,7 +464,8 @@ object GitRunInfo {
   }
 
   private def truncateMessage(msg: String): (String, Boolean) = {
-    if (msg == null || msg.length <= MaxMessageLen) (Option(msg).getOrElse(""), false)
+    if (msg == null || msg.length <= MaxMessageLen)
+      (Option(msg).getOrElse(""), false)
     else (msg.substring(0, MaxMessageLen), true)
   }
 }

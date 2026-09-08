@@ -7,26 +7,27 @@ import munit.FunSuite
 /** Phase 2 — single Certificates strategy entry (spec §4, user decision 3;
   * T6.8).
   *
-  * WHAT: exactly ONE non-terminal dispatch function claims the
-  * pkcs7-signature MIME (the Certificates claim). The terminal catch-all
-  * (GenericFile, last in the dispatch) necessarily receives every
-  * unclaimed artifact — it is not a cert claimer and is excluded by
-  * position (it is the last entry).
+  * WHAT: exactly ONE non-terminal dispatch function claims the pkcs7-signature
+  * MIME (the Certificates claim). The terminal catch-all (GenericFile, last in
+  * the dispatch) necessarily receives every unclaimed artifact — it is not a
+  * cert claimer and is excluded by position (it is the last entry).
   *
-  * WHY: user decision — one strategy entry, one place to look for cert
-  * code. A future second registration stealing the claim fails this test.
+  * WHY: user decision — one strategy entry, one place to look for cert code. A
+  * future second registration stealing the claim fails this test.
   *
-  * LLM note: behavioral — runs each dispatch function against a
-  * pkcs7-hinted artifact and counts the non-terminal claimers. Dispatch
-  * positions are pinned by construction (GenericFile is always last).
+  * LLM note: behavioral — runs each dispatch function against a pkcs7-hinted
+  * artifact and counts the non-terminal claimers. Dispatch positions are pinned
+  * by construction (GenericFile is always last).
   */
 class SingleCertificatesStrategySuite extends FunSuite {
 
   private def nonTerminalClaimers(hint: String): Vector[Int] = {
-    val wrapper = ByteWrapper("x".getBytes("UTF-8"), "b.p7b", None, mimeHint = Some(hint))
+    val wrapper =
+      ByteWrapper("x".getBytes("UTF-8"), "b.p7b", None, mimeHint = Some(hint))
     val byUUID: Map[String, io.spicelabs.goatrodeo.util.ArtifactWrapper] =
       Map(wrapper.uuid -> wrapper)
-    val byName: Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
+    val byName
+        : Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
       Map(wrapper.path() -> Vector(wrapper))
     val total = ToProcess.computeToProcess.size
     // GenericFile is always the last entry (see ToProcess); exclude it.
@@ -49,6 +50,10 @@ class SingleCertificatesStrategySuite extends FunSuite {
     // sanity: the single Certificates claimer also handles the existing
     // pem-bundle family (no second claimer exists for it either)
     val claimers = nonTerminalClaimers("application/x-pem-bundle")
-    assertEquals(claimers, Vector(6), s"pem-bundle claimed by exactly Certificates; got $claimers")
+    assertEquals(
+      claimers,
+      Vector(6),
+      s"pem-bundle claimed by exactly Certificates; got $claimers"
+    )
   }
 }

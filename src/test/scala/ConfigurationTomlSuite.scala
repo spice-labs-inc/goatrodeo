@@ -485,7 +485,12 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   test("redact_git_info = false is honored from TOML") {
     withConfigFile("[analysis]\nredact_git_info = false\n") { path =>
       ConfigurationToml
-        .fromSources(Some(path), Configuration(), environment = Map.empty, report = _ => ()) match {
+        .fromSources(
+          Some(path),
+          Configuration(),
+          environment = Map.empty,
+          report = _ => ()
+        ) match {
         case Right((resolved, _)) => assertEquals(resolved.redactGitInfo, false)
         case Left(err)            => fail(s"toml parse failed: $err")
       }
@@ -605,7 +610,10 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     val adapted = TomlTables.fromJavaMap(TomlTables.toPlainMap(original))
     def hasStrings(arr: org.tomlj.TomlArray): Boolean =
       arr.toList.asScala.forall(_.isInstanceOf[String])
-    assertEquals(hasStrings(adapted.getArray("empty")), hasStrings(original.getArray("empty")))
+    assertEquals(
+      hasStrings(adapted.getArray("empty")),
+      hasStrings(original.getArray("empty"))
+    )
     assertEquals(adapted.getArray("empty").isEmpty(), true)
   }
 }

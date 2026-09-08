@@ -4,6 +4,8 @@ import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
+import io.spicelabs.cilantro.AssemblyWalker
+import io.spicelabs.cilantro.DotnetAssemblyProbe
 import io.spicelabs.saffron.DiskReader
 import io.spicelabs.saffron.SaffronProbe
 import io.spicelabs.saffron.container.BinaryContainerMount
@@ -346,6 +348,67 @@ object FileWalker {
     }
   }
 
+  /** Try to construct an `OptionalArchiveStream` from a .NET assembly.
+    *
+    * The new Cilantro (0.3.1) exposes a .NET assembly as an ordinary
+    * container: probe, then walk, then wrap. The container walk mirrors the
+    * zip/saffron pattern: a cheap MIME gate (the dotnet MIME) then a cheap
+    * probe (`DotnetAssemblyProbe.isDotnetAssembly`, bounded, no withFile),
+    * then the walk (`AssemblyWalker.withinAssemblyStream`) which yields
+    * entries (classes, embedded resources, certificates, win32 resources,
+    * debug blobs — but NOT the PDB-as-container, which awaits a Cilantro
+    * enhancement). Each entry is wrapped into an ArtifactWrapper carrying
+    * the entry's mimeHint, inside the walk callback (entries are usable
+    * only while the walk is open).
+    *
+    * @param in
+    *   the artifact; only acted on when its MIME is the dotnet MIME
+    * @param tempDir
+    *   the walk temp dir
+    * @return
+    *   Some(Vector[ArtifactWrapper]) of the assembly's entries, or None if
+    *   the artifact is not a parseable assembly.
+    */
+  private def asDotnetAssemblyContainer(
+      in: ArtifactWrapper,
+      tempDir: Path
+  ): OptionalArchiveStream = {
+    val dotnetMime = "application/x-msdownload; format=pe32-dotnet"
+    val isDotnetMime = in.mimeType.contains(dotnetMime)
+    if (!isDotnetMime) None
+    else {
+      // Cheap probe: bounded, never throws, no withFile.
+      val probeOk =
+        in.withStream(s => DotnetAssemblyProbe.isDotnetAssembly(s))
+      if (!probeOk) None
+      else {
+        try {
+          AssemblyWalker
+            .withinAssemblyStream(in.withFile(f => f.toPath)) { entries =>
+              val wrappers = entries.map { e =>
+                e.processStream { stream =>
+                  val bos = new java.io.ByteArrayOutputStream()
+                  Helpers.copy(stream, bos)
+                  val bytes = bos.toByteArray()
+                  ArtifactWrapper.newWrapper(
+                    nominalPath = e.name,
+                    size = bytes.length.toLong,
+                    data = new java.io.ByteArrayInputStream(bytes),
+                    tempDir = in.tempDir,
+                    tempPath = tempDir,
+                    mimeHint = e.mimeHint
+                  )
+                }
+              }
+              wrappers.toVector -> "Cilantro .NET assembly"
+            }(Some(tempDir))
+        } catch {
+          case _: Exception => None
+        }
+      }
+    }
+  }
+
   private def asSaffronFilesystem(
       in: ArtifactWrapper,
       tempPath: Path
@@ -598,6 +661,7 @@ object FileWalker {
         ret
       }.orElse(asRPMWrapper(in, tempDir))
         .orElse(asApRomfs(in, tempDir))
+        .orElse(asDotnetAssemblyContainer(in, tempDir))
         .orElse(asSaffronFilesystem(in, tempDir))
         .orElse(
           asISOWrapper(in, tempDir)

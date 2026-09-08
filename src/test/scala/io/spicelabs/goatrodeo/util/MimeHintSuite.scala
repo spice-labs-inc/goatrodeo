@@ -8,18 +8,17 @@ import java.nio.file.Files
 /** Phase 2 — Artifact MIME hints (spec §5, T5.x).
   *
   * WHAT: pins the optional authoritative MIME hint on artifact wrappers:
-  * default None; unioned into the effective MIME set when present;
-  * survives both wrapper kinds and the spill path; never produced by
-  * content sniffing; authoritative (not validated against content);
-  * effective set is a superset of the detected set.
+  * default None; unioned into the effective MIME set when present; survives
+  * both wrapper kinds and the spill path; never produced by content sniffing;
+  * authoritative (not validated against content); effective set is a superset
+  * of the detected set.
   *
-  * WHY: the .NET walker (Cilantro handoff) and other producers stamp kind
-  * MIMEs (e.g. application/pkcs7-signature) that content sniffing must
-  * never fabricate. The hint is the producer-stamped channel.
+  * WHY: the .NET walker (Cilantro handoff) and other producers stamp kind MIMEs
+  * (e.g. application/pkcs7-signature) that content sniffing must never
+  * fabricate. The hint is the producer-stamped channel.
   *
-  * LLM note: uses the public ArtifactWrapper API only. The hint parameter
-  * on newWrapper defaults to None so all existing call sites are
-  * unchanged (T5.6).
+  * LLM note: uses the public ArtifactWrapper API only. The hint parameter on
+  * newWrapper defaults to None so all existing call sites are unchanged (T5.6).
   */
 class MimeHintSuite extends FunSuite {
 
@@ -51,7 +50,10 @@ class MimeHintSuite extends FunSuite {
       mimeHint = Some(hint)
     )
     assertEquals(w.mimeHint, Some(hint))
-    assert(w.mimeType.contains(hint), s"hint must be in the effective set: ${w.mimeType}")
+    assert(
+      w.mimeType.contains(hint),
+      s"hint must be in the effective set: ${w.mimeType}"
+    )
     assert(
       w.mimeType.contains("text/plain"),
       s"detected set must still be present: ${w.mimeType}"
@@ -98,7 +100,10 @@ class MimeHintSuite extends FunSuite {
       None,
       Files.createTempDirectory("mh").toAbsolutePath
     )
-    assert(!w.mimeType.contains(hint), s"content sniffing must not stamp the hint MIME: ${w.mimeType}")
+    assert(
+      !w.mimeType.contains(hint),
+      s"content sniffing must not stamp the hint MIME: ${w.mimeType}"
+    )
     assertEquals(w.mimeHint, None)
   }
 
@@ -120,7 +125,9 @@ class MimeHintSuite extends FunSuite {
     )
   }
 
-  test("T5.6 newWrapperConstructorCompat — default None, existing callers unchanged") {
+  test(
+    "T5.6 newWrapperConstructorCompat — default None, existing callers unchanged"
+  ) {
     val dir = Files.createTempDirectory("mh").toAbsolutePath
     val w = ArtifactWrapper.newWrapper(
       "x.txt",
@@ -135,8 +142,14 @@ class MimeHintSuite extends FunSuite {
   test("T5.7 property hintUnionIsMonotonic") {
     import org.scalacheck.Prop.forAll
     import org.scalacheck.Gen
-    val genMime = Gen.oneOf("text/plain", "application/octet-stream", "application/json", "application/xml")
-    val genHint = Gen.option(Gen.oneOf(hint, "pe/resource", "pe/debug", "cilantro/type"))
+    val genMime = Gen.oneOf(
+      "text/plain",
+      "application/octet-stream",
+      "application/json",
+      "application/xml"
+    )
+    val genHint =
+      Gen.option(Gen.oneOf(hint, "pe/resource", "pe/debug", "cilantro/type"))
     val prop = forAll(genMime, genHint) { (detected, hintOpt) =>
       val bytes = "z".getBytes("UTF-8")
       val w = ArtifactWrapper.newWrapper(
@@ -151,8 +164,12 @@ class MimeHintSuite extends FunSuite {
       // the hint, when present, is always in the effective set:
       hintOpt.forall(h => w.mimeType.contains(h)) &&
       // the detected content MIME is always present:
-      w.mimeType.contains(detected) || detected == "application/json" // JSON may be misdetected as octet-stream for 1 byte
+      w.mimeType.contains(
+        detected
+      ) || detected == "application/json" // JSON may be misdetected as octet-stream for 1 byte
     }
-    prop.check(org.scalacheck.Test.Parameters.default.withMinSuccessfulTests(50))
+    prop.check(
+      org.scalacheck.Test.Parameters.default.withMinSuccessfulTests(50)
+    )
   }
 }

@@ -8,23 +8,27 @@ import java.nio.file.Files
 
 /** Phase 4 — `.user-ready` fixture tolerance (spec §10; T14.x).
   *
-  * WHAT: pins that fixture listing and deletion tolerate an externally
-  * planted `.user-ready` marker file (possibly root-owned/un-deletable):
-  * discovery skips dot-names by NAME (readable or not), recursive
-  * deletion never throws on an un-deletable marker and never follows it
-  * out of the tree, and git fixtures exclude it from cleanliness.
+  * WHAT: pins that fixture listing and deletion tolerate an externally planted
+  * `.user-ready` marker file (possibly root-owned/un-deletable): discovery
+  * skips dot-names by NAME (readable or not), recursive deletion never throws
+  * on an un-deletable marker and never follows it out of the tree, and git
+  * fixtures exclude it from cleanliness.
   *
-  * WHY: test fixtures may carry an externally planted, root-owned marker;
-  * Goat Rodeo's own discovery/cleanup must not choke on it.
+  * WHY: test fixtures may carry an externally planted, root-owned marker; Goat
+  * Rodeo's own discovery/cleanup must not choke on it.
   *
-  * LLM note: the marker matrix pins that the skip is name-based (the
-  * `.` prefix), not permission-based: a readable `.user-ready` is skipped,
-  * an unreadable one is skipped, and a readable non-dot root-owned file
-  * is discovered (unchanged).
+  * LLM note: the marker matrix pins that the skip is name-based (the `.`
+  * prefix), not permission-based: a readable `.user-ready` is skipped, an
+  * unreadable one is skipped, and a readable non-dot root-owned file is
+  * discovered (unchanged).
   */
 class UserReadyToleranceSuite extends FunSuite {
 
-  private def treeWithMarker(root: File, markerName: String, readable: Boolean): File = {
+  private def treeWithMarker(
+      root: File,
+      markerName: String,
+      readable: Boolean
+  ): File = {
     val f = new File(root, markerName)
     Files.write(f.toPath, "marker".getBytes(StandardCharsets.UTF_8))
     if (!readable) {
@@ -49,7 +53,11 @@ class UserReadyToleranceSuite extends FunSuite {
       Files.write(normal.toPath, "x".getBytes)
 
       val found = discovered(root).map(_.getName)
-      assertEquals(found, Vector("payload.txt"), s"dot-names must never be discovered; got $found")
+      assertEquals(
+        found,
+        Vector("payload.txt"),
+        s"dot-names must never be discovered; got $found"
+      )
       assert(!found.contains(".user-ready"))
       assert(!found.contains(".user-ready2"))
     } finally Helpers.deleteDirectory(root.toPath)
@@ -69,7 +77,8 @@ class UserReadyToleranceSuite extends FunSuite {
   test("T14.4 property_discoveryUnchangedByMarker") {
     import org.scalacheck.Prop.forAll
     import org.scalacheck.Gen
-    val names = Gen.listOf(Gen.oneOf("a.txt", "b.txt", "c.bin", ".user-ready", ".keep"))
+    val names =
+      Gen.listOf(Gen.oneOf("a.txt", "b.txt", "c.bin", ".user-ready", ".keep"))
     val prop = forAll(names) { fnames =>
       val root = Files.createTempDirectory("urp").toFile
       try {
@@ -82,6 +91,8 @@ class UserReadyToleranceSuite extends FunSuite {
         !found.exists(_.startsWith("."))
       } finally Helpers.deleteDirectory(root.toPath)
     }
-    prop.check(org.scalacheck.Test.Parameters.default.withMinSuccessfulTests(50))
+    prop.check(
+      org.scalacheck.Test.Parameters.default.withMinSuccessfulTests(50)
+    )
   }
 }

@@ -8,19 +8,18 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-/** Phase 3 — tagged-run provenance integration + tag date (spec §6, §7;
-  * T10.x, T12.x).
+/** Phase 3 — tagged-run provenance integration + tag date (spec §6, §7; T10.x,
+  * T12.x).
   *
-  * WHAT: a tagged `Builder.buildDB` over a git fixture repo produces the
-  * git provenance Items in the ADG (identified by gitoid, connected to
-  * the run tag), with the run-tag date carried verbatim; untagged runs
-  * produce none.
+  * WHAT: a tagged `Builder.buildDB` over a git fixture repo produces the git
+  * provenance Items in the ADG (identified by gitoid, connected to the run
+  * tag), with the run-tag date carried verbatim; untagged runs produce none.
   *
-  * WHY: spec §6 (tagged runs only) and §7 (tag + provenance always agree
-  * on the run date).
+  * WHY: spec §6 (tagged runs only) and §7 (tag + provenance always agree on the
+  * run date).
   *
-  * LLM note: exercises the real Builder path with a JGit-created fixture
-  * repo; reads the written GRD/GRC via GraphManager to inspect Items.
+  * LLM note: exercises the real Builder path with a JGit-created fixture repo;
+  * reads the written GRD/GRC via GraphManager to inspect Items.
   */
 class GitTaggedRunIntegrationSuite extends FunSuite {
 
@@ -67,7 +66,9 @@ class GitTaggedRunIntegrationSuite extends FunSuite {
     val config = Configuration(
       build = Vector(repo),
       tag = Some("run-1"),
-      tagDate = Some(java.util.Date.from(java.time.Instant.parse("2026-09-02T00:00:00Z"))),
+      tagDate = Some(
+        java.util.Date.from(java.time.Instant.parse("2026-09-02T00:00:00Z"))
+      ),
       out = Some(out)
     )
     Builder.buildDB(
@@ -82,15 +83,24 @@ class GitTaggedRunIntegrationSuite extends FunSuite {
 
     val items = readItems(out)
     val gitItems = items.filter(i =>
-      i.identifier.startsWith("gitoid:commit:sha1:") || i.identifier.startsWith("gitoid:tree:sha1:")
+      i.identifier.startsWith("gitoid:commit:sha1:") || i.identifier.startsWith(
+        "gitoid:tree:sha1:"
+      )
     )
-    assert(gitItems.nonEmpty, "git provenance items must be written for a tagged run")
-    val commitItem = gitItems.find(_.identifier.startsWith("gitoid:commit:sha1:")).get
+    assert(
+      gitItems.nonEmpty,
+      "git provenance items must be written for a tagged run"
+    )
+    val commitItem =
+      gitItems.find(_.identifier.startsWith("gitoid:commit:sha1:")).get
     val json = commitItem.body match {
       case Some(td: ItemTagData) => td.tag.toString
-      case other                   => fail(s"expected ItemTagData body, got $other")
+      case other => fail(s"expected ItemTagData body, got $other")
     }
-    assert(json.contains("2026-09-02T00:00:00Z"), s"git item must carry the run-tag date verbatim: $json")
+    assert(
+      json.contains("2026-09-02T00:00:00Z"),
+      s"git item must carry the run-tag date verbatim: $json"
+    )
   }
 
   test("T10.2 untagged run produces no git items") {
@@ -113,8 +123,14 @@ class GitTaggedRunIntegrationSuite extends FunSuite {
     )(using config)
     val items = readItems(out)
     val gitItems = items.filter(i =>
-      i.identifier.startsWith("gitoid:commit:sha1:") || i.identifier.startsWith("gitoid:tree:sha1:")
+      i.identifier.startsWith("gitoid:commit:sha1:") || i.identifier.startsWith(
+        "gitoid:tree:sha1:"
+      )
     )
-    assertEquals(gitItems, Vector.empty, "untagged run must not capture git provenance")
+    assertEquals(
+      gitItems,
+      Vector.empty,
+      "untagged run must not capture git provenance"
+    )
   }
 }

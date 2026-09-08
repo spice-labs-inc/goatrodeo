@@ -111,9 +111,9 @@ sealed trait ArtifactWrapper {
   def mimeType: Set[String] =
     mimeHint.fold(_mimeType)(h => _mimeType + h)
 
-  /** Optional authoritative MIME hint stamped by the producer that created
-    * this wrapper. None when no producer stamped one. Non-producers never
-    * set it; content sniffing never produces kind MIMEs.
+  /** Optional authoritative MIME hint stamped by the producer that created this
+    * wrapper. None when no producer stamped one. Non-producers never set it;
+    * content sniffing never produces kind MIMEs.
     */
   def mimeHint: Option[String] = None
 
@@ -432,7 +432,13 @@ object ArtifactWrapper {
           f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
         )
       }
-      ByteWrapper(bytes, name, tempDir = tempDir, lastModified = lastModified, mimeHint = mimeHint)
+      ByteWrapper(
+        bytes,
+        name,
+        tempDir = tempDir,
+        lastModified = lastModified,
+        mimeHint = mimeHint
+      )
     } else {
       // Preserve the original extension so MIME-type augmenters and disk-format
       // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.

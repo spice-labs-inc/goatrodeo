@@ -19,10 +19,10 @@ import java.nio.file.Files
   * of a pile of cryptic "not a valid zip" / FileNotFound failures scattered
   * across the suite.
   *
-  * The sbt build provisions the fixtures automatically in a `Tests.Setup`
-  * hook (download + git lfs pull). This check turns missing prerequisites
-  * into one clear, actionable message instead of a pile of cryptic
-  * "not a valid zip" / FileNotFound failures scattered across the suite.
+  * The sbt build provisions the fixtures automatically in a `Tests.Setup` hook
+  * (download + git lfs pull). This check turns missing prerequisites into one
+  * clear, actionable message instead of a pile of cryptic "not a valid zip" /
+  * FileNotFound failures scattered across the suite.
   */
 class PreflightSuite extends munit.FunSuite {
 
