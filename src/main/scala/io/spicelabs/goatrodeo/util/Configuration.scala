@@ -154,7 +154,7 @@ case class Configuration(
     packageTagsShortName: Boolean = false,
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
-    // Git provenance redaction (spec §6): on by default (pseudonymous
+    // Git provenance redaction : on by default (pseudonymous
     // email digests + relativized repo roots); `--no-redact-git-info` / TOML
     // `redact_git_info = false` disables for raw capture.
     redactGitInfo: Boolean = true,

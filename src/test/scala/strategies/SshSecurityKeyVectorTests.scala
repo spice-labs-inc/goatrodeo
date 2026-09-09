@@ -82,7 +82,7 @@ class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
     tmp
   }
 
-  test("parseSshPubkey: sk-ssh-ed25519@openssh.com vector parses (G4)") {
+  test("parseSshPubkey: sk-ssh-ed25519@openssh.com vector parses") {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ssh-ed25519@openssh.com")
     writeSshString(out, Array.fill[Byte](32)(0x42)) // dummy 32-byte pk
@@ -99,7 +99,7 @@ class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
     assertEquals(pk.get.algName, "sk-ssh-ed25519@openssh.com")
   }
 
-  test("purlForSshPubkey: sk-ed25519 emits sk=true qualifier (G4)") {
+  test("purlForSshPubkey: sk-ed25519 emits sk=true qualifier") {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ssh-ed25519@openssh.com")
     writeSshString(out, Array.fill[Byte](32)(0x42))
@@ -118,7 +118,7 @@ class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
     assert(purl.contains("alg=ed25519"), s"expected alg=ed25519, got $purl")
   }
 
-  test("sshPubkeyMetadata: sk-ed25519 emits SshIsSecurityKey=true (G4)") {
+  test("sshPubkeyMetadata: sk-ed25519 emits SshIsSecurityKey=true") {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ssh-ed25519@openssh.com")
     writeSshString(out, Array.fill[Byte](32)(0x42))
@@ -139,7 +139,7 @@ class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "parseSshPubkey: sk-ecdsa-sha2-nistp256@openssh.com vector parses (G4)"
+    "parseSshPubkey: sk-ecdsa-sha2-nistp256@openssh.com vector parses "
   ) {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ecdsa-sha2-nistp256@openssh.com")

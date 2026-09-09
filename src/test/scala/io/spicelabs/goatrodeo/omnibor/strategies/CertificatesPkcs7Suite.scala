@@ -6,7 +6,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import java.io.File
 import scala.util.Try
 
-/** Phase 2 — Certificates PKCS#7 claim + parse (spec §4, T6.x).
+/** Certificates PKCS#7 claim + parse .
   *
   * WHAT: pins that the single Certificates strategy claims artifacts carrying
   * `application/pkcs7-signature`, parses detached PKCS#7 SignedData blobs
@@ -18,7 +18,7 @@ import scala.util.Try
   * WHY: Authenticode cert blobs are detached SignedData; the product wants the
   * embedded certs surfaced (ADG + CBOM). The claim is MIME- driven, so the test
   * drives it via the wrapper's MIME set directly (the producer-stamped hint
-  * path is exercised in T6.1).
+  * path is exercised here).
   *
   * LLM note: `classifyAndParse` is the internal dispatch; the suite also checks
   * the public claim path via ToProcess/strategies when feasible.
@@ -59,7 +59,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
   private def parse(w: ArtifactWrapper): Option[Certificates.ClaimedContent] =
     Certificates.classifyAndParse(w)
 
-  test("T6.1 pkcs7SignatureMimeIsClaimed") {
+  test("pkcs7SignatureMimeIsClaimed") {
     val w = wrapperFor("x".getBytes, "b.p7b", Set(), Some(pkcs7Mime))
     assert(
       Certificates.isCertificateCandidate(w.mimeType),
@@ -67,7 +67,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T6.2 pkcs7MimeLegacyIsNotClaimed") {
+  test("pkcs7MimeLegacyIsNotClaimed") {
     // The PEM/CMS mime (application/pkcs7-mime) is NOT the claim target;
     // only the authoritative pkcs7-signature MIME triggers the claim.
     val w = wrapperFor("x".getBytes, "b.p7b", Set(), Some(pkcs7MimeLegacy))
@@ -77,7 +77,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T6.3 detachedSignedDataParsesToChain") {
+  test("detachedSignedDataParsesToChain") {
     val f = new File("test_data/certificates/pkcs7/detached.p7b.der")
     assert(f.exists(), "detached.p7b.der fixture missing")
     val w = FileWrapper(f, f.getName, None)
@@ -96,7 +96,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T6.4 bareDerSingleCertSharesPath") {
+  test("bareDerSingleCertSharesPath") {
     val f = new File(
       "test_data/certificates/x509/leaves/scala-lang.org__scala-lang.org__c1468f350c.der"
     )
@@ -111,7 +111,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T6.5 invalidBlobNeverClaimed") {
+  test("invalidBlobNeverClaimed") {
     // a random, non-DER non-X509 blob carrying the pkcs7-signature hint is
     // claimed (the MIME authoritatively says so), but parsing yields None
     // (clean skip) — never mislabeled as a certificate.
@@ -125,7 +125,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T6.6 zeroCertOrUnparseablePkcs7IsSkipped") {
+  test("zeroCertOrUnparseablePkcs7IsSkipped") {
     // An empty/truncated DER blob must skip cleanly (no exception).
     val bad = Array[Byte](
       0x30,
@@ -141,7 +141,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T6.7 certMimeConstantsOwnedByCertificates") {
+  test("certMimeConstantsOwnedByCertificates") {
     // The constants live in the Certificates module and are the exact
     // MIME strings from the spec.
     assertEquals(pkcs7Mime, "application/pkcs7-signature")

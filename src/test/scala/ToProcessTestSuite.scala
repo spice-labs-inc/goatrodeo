@@ -313,13 +313,12 @@ class ToProcessTestSuite extends GoatRodeoFunSuite {
   test(
     "computeToProcess - registers each required strategy and keeps Generic last"
   ) {
-    // Refactored from a hardcoded count assertion to a structural one
-    // (per invariant #4 discussion / user-approved option 2 of the
-    // Phase 1 invariant-#4 stop): assert the dispatch chain CONTAINS
+    // Refactored from a hardcoded count assertion to a structural one:
+    // assert the dispatch chain CONTAINS
     // each strategy the project depends on, and that Generic is the
     // terminal entry. This is resilient to new strategies being added
     // without churning a brittle integer.
-    //
+
     // Closure-identity equality on eta-expanded ProcessFuncs is
     // unreliable across Scala 3 eta-expansions, so we invoke each
     // registered fn with empty inputs and compare the dispatch-label

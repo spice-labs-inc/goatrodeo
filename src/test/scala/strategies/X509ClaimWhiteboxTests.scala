@@ -20,8 +20,8 @@ import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import java.io.File
 import java.security.Security
 
-/** Phase 3-4 white-box tests with **independent ground truth** for
-  * `SingleCert`, `Bundle`, `Keystore`, and `Crl` claim types.
+/** White-box tests with **independent ground truth** for `SingleCert`,
+  * `Bundle`, `Keystore`, and `Crl` claim types.
   *
   * ## Why this exists
   *
@@ -33,11 +33,10 @@ import java.security.Security
   * `parseKeystore` / `parseCrl` would re-emit the bug into the sidecar and the
   * test would still pass.
   *
-  * The Phase 5+ work introduced independent ground truth (ssh-keygen, gpg,
-  * openssl) for SSH/PGP/private-key paths. Phase 3-4 lacked the equivalent.
-  * This suite closes the cross-phase gap (P5 in the Phases-1-7 review): each
-  * white-box test pins values computed by `openssl`/`keytool` *outside* the
-  * strategy.
+  * Independent ground truth (ssh-keygen, gpg, openssl) exists for the
+  * SSH/PGP/private-key paths. This suite supplies the equivalent for the X.509
+  * paths: each white-box test pins values computed by `openssl`/`keytool`
+  * *outside* the strategy.
   *
   * ## Ground-truth recipes
   *
@@ -65,7 +64,7 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)
 
-  // ===== SingleCert (Phase 3) =============================================
+  // ===== SingleCert  =============================================
 
   test(
     "parseSingleCert + purlsForCert: ISRG Root X1 SPKI hash matches openssl"
@@ -126,7 +125,7 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
     )
   }
 
-  // ===== Bundle (Phase 4) ================================================
+  // ===== Bundle  ================================================
 
   test("parseBundle: goatrodeo-test-chain first-cert hash matches openssl") {
     // awk '/BEGIN CERT/,/END CERT/{print; if (/END CERT/) exit}' <fixture>
@@ -161,7 +160,7 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
     )
   }
 
-  // ===== Keystore (Phase 4) ==============================================
+  // ===== Keystore  ==============================================
 
   test("parseKeystore: trust-only-null-password.p12 loads with null password") {
     val w = wrap(
@@ -230,7 +229,7 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
     assertEquals(ks.entryCount, 0)
   }
 
-  // ===== CRL (Phase 4) ===================================================
+  // ===== CRL  ===================================================
 
   test("parseCrl: digicert-global-root-g2.crl DER hash matches sha256sum") {
     // sha256sum <fixture>

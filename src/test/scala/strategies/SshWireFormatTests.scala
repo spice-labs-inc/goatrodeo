@@ -18,8 +18,7 @@ import io.spicelabs.goatrodeo.util.SshWireReader
 
 /** Unit tests for the RFC 4251 SSH wire-format reader.
   *
-  * Updated for Phase 0.9: SshWireReader methods now return Option instead of
-  * throwing on short reads. Tests adapted accordingly.
+  * SshWireReader methods return Option instead of throwing on short reads.
   *
   * ## What these tests test
   *

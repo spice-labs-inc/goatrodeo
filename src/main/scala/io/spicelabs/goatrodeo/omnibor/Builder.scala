@@ -156,27 +156,15 @@ object Builder {
     TagPass(GitOIDUtils.urlForString(jsonString), jsonString, json)
     }
 
-    // Git provenance capture (spec §6): tagged runs only, JGit-only,
+    // Git provenance capture : tagged runs only, JGit-only,
     // never fails the run. Captured once, written per batch alongside the
-    // tag. The run-tag date is carried verbatim into the git items so tag
-    // and provenance always agree on the run date (spec §7).
+    // tag.
     val gitItems: Vector[GitRunItem] = fullTag match {
       case None => Vector.empty
-      case Some(tagPass) =>
-        val runDate = tagPass.json match {
-          case m: Dom.MapElem =>
-            m.members
-              .collectFirst {
-                case (Dom.StringElem("date"), Dom.StringElem(d)) => d
-              }
-              .getOrElse(Helpers.currentDate8601())
-          case _ => Helpers.currentDate8601()
-        }
-        val redact = config.redactGitInfo
+      case Some(_) =>
         GitRunInfo.capture(
           config.build,
-          runDate,
-          redact = redact,
+          redact = config.redactGitInfo,
           scanRoot = config.build.headOption
         )
     }

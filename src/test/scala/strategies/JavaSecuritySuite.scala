@@ -14,7 +14,7 @@ import io.spicelabs.goatrodeo.util.JavaSecurityParser
 
 import scala.collection.immutable.TreeSet
 
-/** Phase 2 — Tests for the Java `java.security` capture strategy.
+/** Tests for the Java `java.security` capture strategy.
   *
   * These tests verify MIME-based and path-based claiming, bundling, metadata
   * emission, strategy-level `include` resolution, and coexistence with other
@@ -44,7 +44,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
       |jdk.tls.ephemeralDHKeySize=2048
       |""".stripMargin
 
-  // ==================== T2.1 / T2.10 Claiming by path and MIME type ====================
+  // ==================== Claiming by path and MIME type ====================
 
   test("strategy claims java.security in lib/security by path") {
     val sec = securityArtifact("lib/security/java.security", basicSecurity)
@@ -105,7 +105,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
     assertEquals(bundle.files.size, 1)
   }
 
-  // ==================== T2.2 / R2.5 Metadata ====================
+  // ==================== Metadata ====================
 
   test("metadata contains parsed security values") {
     val artifact = securityArtifact("lib/security/java.security", basicSecurity)
@@ -131,7 +131,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
     assert(meta.contains(adHoc("ephemeral_dh_key_size")))
   }
 
-  // ==================== T2.11 Include directive ====================
+  // ==================== Include directive ====================
 
   test("strategy resolves include directives within the selected set") {
     val main = securityArtifact(
@@ -173,7 +173,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
     assertEquals(disabled.get.map(_.value), TreeSet("RC4", "SSLv3"))
   }
 
-  // ==================== T2.8 Nested archive discovery ====================
+  // ==================== Nested archive discovery ====================
 
   test("java.security inside nested archive is discovered") {
     import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -225,7 +225,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
     assert(extra.contains(adHoc("disabled_algorithms")))
   }
 
-  // ==================== T2.9 No false metadata ====================
+  // ==================== No false metadata ====================
 
   test("non-Java-security files do not receive java.security metadata") {
     val text = ByteWrapper("hello".getBytes("UTF-8"), "readme.txt", None)

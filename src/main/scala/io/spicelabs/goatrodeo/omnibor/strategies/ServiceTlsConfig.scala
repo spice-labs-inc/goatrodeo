@@ -220,7 +220,7 @@ class ServiceTlsConfigState(artifact: ArtifactWrapper)
     redirect.foreach(r =>
       tm = tm + (adHoc("RedirectHttps") -> TreeSet(StringOrPair(r)))
     )
-    // Phase A — cipher-suite decomposition for service TLS configs.
+    // Cipher-suite decomposition for service TLS configs.
     cipherText.foreach(c =>
       tm = tm + (adHoc("CipherString") -> TreeSet(StringOrPair(c)))
     )

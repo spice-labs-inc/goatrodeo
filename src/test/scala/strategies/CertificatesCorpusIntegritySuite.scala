@@ -22,10 +22,9 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   * These tests do NOT run the pipeline. They check the shape of
   * `test_data/certificates/`:
   *
-  *   - **`corpus contains at least 200 fixtures`** — traces to Phase 0's
-  *     sub-goal #2 in `certificates-strategy/phase-0-corpus.md`, which declares
-  *     200 fixtures as the floor. Fails loudly when the corpus is smaller so
-  *     Phase 0 cannot silently ship understaffed.
+  *   - **`corpus contains at least 200 fixtures`** — the corpus floor is 200
+  *     fixtures. Fails loudly when the corpus is smaller so the strategy cannot
+  *     silently ship under-tested.
   *
   *   - **`no orphan sidecars`** — every `.expected.json` must have a matching
   *     fixture file beside it. An orphan sidecar usually means a fixture was
@@ -57,7 +56,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   *     (phase-0-corpus.md).
   *   - Test `no orphan sidecars` → phase-0-corpus.md task #4 sourcing protocol.
   *   - Test `no orphan fixtures` → phase-0-corpus.md task #4 sourcing protocol.
-  *   - Test `every sidecar parses` → phase-0-corpus.md sub-goal #1 (schema).
+  *   - Test `every sidecar parses` → schema conformance.
   */
 class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
 
@@ -65,8 +64,8 @@ class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
     assert(
       CertificatesFixtureInventory.corpusRoot.exists(),
       s"Fixture corpus root ${CertificatesFixtureInventory.corpusRoot.getPath} " +
-        s"does not exist. Phase 0 requires this directory to be created with " +
-        s"category subdirectories — see certificates-strategy/phase-0-corpus.md."
+        s"does not exist. The corpus requires this directory to be created with " +
+        s"category subdirectories."
     )
     assert(
       CertificatesFixtureInventory.corpusRoot.isDirectory(),

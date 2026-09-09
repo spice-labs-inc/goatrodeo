@@ -20,7 +20,7 @@ import org.scalacheck.Prop.forAll
 
 import java.nio.charset.StandardCharsets
 
-/** Phase 0 — Unit tests for `OpenSSLConfigDetector`.
+/** Unit tests for `OpenSSLConfigDetector`.
   *
   * These tests verify that the augmenter:
   *   - detects OpenSSL configs with section headers and security keywords,

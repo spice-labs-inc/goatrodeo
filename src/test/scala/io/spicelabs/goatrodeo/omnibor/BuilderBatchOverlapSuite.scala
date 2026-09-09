@@ -85,10 +85,10 @@ class BuilderBatchOverlapSuite extends GoatRodeoFunSuite {
       .toLong
   }
 
-  // T-BO-01 — the wind-down threshold is 10% of the allocated threads (integer
+  // the wind-down threshold is 10% of the allocated threads (integer
   // division), and 0 below 10 threads (so a batch is never overlapped when
   // fewer than 10 threads are allocated).
-  test("T-BO-01 windDownThreshold is 10% of threads, zero below 10") {
+  test("windDownThreshold is 10% of threads, zero below 10") {
     assertEquals(Builder.windDownThreshold(50), 5)
     assertEquals(Builder.windDownThreshold(100), 10)
     assertEquals(Builder.windDownThreshold(10), 1)
@@ -96,10 +96,10 @@ class BuilderBatchOverlapSuite extends GoatRodeoFunSuite {
     assertEquals(Builder.windDownThreshold(4), 0)
   }
 
-  // T-BO-02 — a multi-batch run with >= 10 threads (overlap enabled) still
+  // a multi-batch run with >= 10 threads (overlap enabled) still
   // processes every top-level file exactly once and writes one ADG cluster per
   // batch.
-  test("T-BO-02 overlap-enabled multi-batch run processes every file") {
+  test("overlap-enabled multi-batch run processes every file") {
     val in = Files.createTempDirectory("bo-in").toFile()
     val out = Files.createTempDirectory("bo-out").toFile()
     val ingested = new File(out, "ingested.txt")
@@ -127,9 +127,9 @@ class BuilderBatchOverlapSuite extends GoatRodeoFunSuite {
     }
   }
 
-  // T-BO-03 — with fewer than 10 threads the wind-down overlap is disabled
+  // with fewer than 10 threads the wind-down overlap is disabled
   // (batches are strictly sequential), and the run still processes every file.
-  test("T-BO-03 below-10-threads multi-batch run processes every file") {
+  test("below-10-threads multi-batch run processes every file") {
     val in = Files.createTempDirectory("bo-in").toFile()
     val out = Files.createTempDirectory("bo-out").toFile()
     val ingested = new File(out, "ingested.txt")

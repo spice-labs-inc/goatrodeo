@@ -34,13 +34,9 @@ import scala.jdk.CollectionConverters.*
   * Run via: `sbt "Test/runMain
   * io.spicelabs.goatrodeo.omnibor.strategies.MaterializeSidecars"`
   *
-  * Equivalent to Phase 0b's `cert_sidecar.py` canonicalization step but sourced
+  * Equivalent to the legacy `cert_sidecar.py` canonicalization step but sourced
   * from the strategy's own emitters so the sidecars match what the strategy
   * produces by construction.
-  *
-  * Originally `MaterializePhase4Sidecars`; renamed in Phase 5 (gap G8) once it
-  * grew to cover SSH. Will continue to grow with Phase 6 (PGP) and Phase 7
-  * (private keys).
   */
 object MaterializeSidecars {
 

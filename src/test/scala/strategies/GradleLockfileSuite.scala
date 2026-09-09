@@ -12,7 +12,7 @@ import java.io.File
 import java.nio.file.Files
 import scala.collection.immutable.TreeSet
 
-/** Phase 7 — Gradle Lockfile Parsing Strategy test suite.
+/** Gradle Lockfile Parsing Strategy test suite.
   *
   * Tests GradleLockfile parsing for modern and legacy lockfile formats, pURL
   * generation, metadata emission, and robustness.

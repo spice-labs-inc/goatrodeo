@@ -14,7 +14,7 @@ import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
 
 import scala.collection.immutable.TreeSet
 
-/** Phase 1 — Tests for the OpenSSL config capture strategy.
+/** Tests for the OpenSSL config capture strategy.
   *
   * These tests verify MIME-based claiming, bundling, dependency ordering,
   * metadata emission, cross-file reference tracking, and coexistence with other
@@ -42,7 +42,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
       |MinProtocol = TLSv1.2
       |""".stripMargin
 
-  // ==================== T1.1 MIME-based claim ====================
+  // ==================== MIME-based claim ====================
 
   test("strategy claims OpenSSL configs by MIME type") {
     val openssl = configArtifact("openssl.cnf", basicConfig)
@@ -80,7 +80,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     assert(strategies.forall(!_.isInstanceOf[OpenSSLConfigToProcess]))
   }
 
-  // ==================== T1.2 Bundle grouping ====================
+  // ==================== Bundle grouping ====================
 
   test("multiple OpenSSL files at a layer are bundled into one ToProcess") {
     val a = configArtifact("a.cnf", basicConfig)
@@ -100,7 +100,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     assertEquals(openSslStrategies.head.files.size, 3)
   }
 
-  // ==================== T1.3 Dependency ordering ====================
+  // ==================== Dependency ordering ====================
 
   test("files are ordered with dependencies first") {
     val a = configArtifact("a.cnf", basicConfig)
@@ -145,7 +145,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     assertEquals(elements.map(_._1.path()), Vector("a.cnf", "b.cnf", "c.cnf"))
   }
 
-  // ==================== T1.4 / T1.5 Metadata ====================
+  // ==================== Metadata ====================
 
   test("metadata contains parsed security values") {
     val artifact = configArtifact("openssl.cnf", basicConfig)
@@ -188,7 +188,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     assert(data.sections.contains("system_default_sect"))
   }
 
-  // ==================== T1.6 Cross-file references ====================
+  // ==================== Cross-file references ====================
 
   test("cross-file references include container and file GitOIDs") {
     val a = configArtifact("a.cnf", basicConfig)
@@ -235,7 +235,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     assertEquals(encoded, s"$containerGitOID:$aGitOID")
   }
 
-  // ==================== T1.10 No false metadata ====================
+  // ==================== No false metadata ====================
 
   test("non-OpenSSL files do not receive openssl.cnf metadata") {
     val text = ByteWrapper("hello".getBytes("UTF-8"), "readme.txt", None)
@@ -250,7 +250,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     assert(!extra.keys.exists(_.startsWith("openssl.cnf")))
   }
 
-  // ==================== T1.11 Cycles ====================
+  // ==================== Cycles ====================
 
   test("self-reference cycle does not cause infinite processing") {
     val a = configArtifact(
@@ -326,7 +326,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     )
   }
 
-  // ==================== T1.14 Strategy coexistence ====================
+  // ==================== Strategy coexistence ====================
 
   test("OpenSSL config inside nested archive is discovered") {
     import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -403,7 +403,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
 
   // ==================== Phase A — cipher-suite decomposition ====================
 
-  test("Phase A metadata contains resolved algorithms and per-suite entries") {
+  test("metadata contains resolved algorithms and per-suite entries") {
     val text =
       """[ssl_default]
         |CipherString = ECDHE-RSA-AES128-GCM-SHA256:!aNULL
@@ -453,7 +453,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("Phase A decomposition metadata is deterministic across calls") {
+  test("decomposition metadata is deterministic across calls") {
     val text =
       """[ssl_default]
         |CipherString = DEFAULT@SECLEVEL=2

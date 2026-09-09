@@ -4,7 +4,7 @@
 >
 > **Handoff:** this document is the specification for a system that generates
 > CBOMs from a Goat Rodeo Artifact Dependency Graph (ADG). See
-> [Handoff: generating CBOMs from the ADG](#handoff-generating-cboms-from-the-adg)
+> [Generating CBOMs from the ADG](#generating-cboms-from-the-adg)
 > for the input data model and the exact algorithm to reproduce.
 
 ## Overview
@@ -208,7 +208,7 @@ Malformed sha1 aliases (non-hex, wrong length, uppercase) are ignored rather tha
 
 When a Goat Rodeo run sets a correlation ID (see [Tamper-Evident Logging](tamper_evident_logging.md)), each CBOM additionally carries a top-level `goatrodeo:correlation-id` property, linking the CBOM to the run that produced it and to its tamper-evident log. — verified by `CbomEmitterSuite` (correlation-id omitted when no run is active).
 
-## Handoff: generating CBOMs from the ADG
+## Generating CBOMs from the ADG
 
 This section is the contract for a downstream system that reads a Goat Rodeo
 ADG and reproduces the CBOM output without running the Scala emitter.

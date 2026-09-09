@@ -44,7 +44,8 @@ import scala.util.Try
   *   - JDK `crypto.policy` (`crypto.policy=unlimited`).
   *
   * Emits `MobileTls:` flags and `java.security:crypto_policy`. Policy files
-  * carry no secrets; T-F-10 asserts no private-key/base64 material.
+  * carry no secrets; the leak-sweep tests assert no private-key/base64
+  * material.
   */
 object MobileTlsStrategy {
   private val logger = Logger(getClass())

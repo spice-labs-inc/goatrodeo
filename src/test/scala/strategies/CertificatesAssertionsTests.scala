@@ -340,7 +340,7 @@ class CertificatesAssertionsTests extends GoatRodeoFunSuite {
   }
 
   // --- extended leak-pattern coverage per Appendix C ---
-  //
+
   // The Appendix C list includes three PKCS#8 base64 prefixes and a
   // full PEM-body regex that guard against the strategy accidentally
   // serializing private-key DER bytes (either as base64 text or as

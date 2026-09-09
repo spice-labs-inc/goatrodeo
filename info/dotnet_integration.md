@@ -35,7 +35,7 @@ arrays by the walk.
    dotnet MIME. No `withFile`, no full parse.
 
 Goat Rodeo has **no PE-offset math of its own** — the probe lives in
-Cilantro (per the handoff; GR deleted its old `isPE32` sniff).
+Cilantro (GR deleted its old `isPE32` sniff).
 
 Verified by `DotnetStreamingSuite.GRW-1a..d`.
 

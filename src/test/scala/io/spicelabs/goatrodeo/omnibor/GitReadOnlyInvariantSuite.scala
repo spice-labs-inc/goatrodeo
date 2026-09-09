@@ -3,36 +3,27 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.GitRunInfo
 import org.eclipse.jgit.api.Git
-import org.eclipse.jgit.lib.Constants
 
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 /** Hard invariant: Goat Rodeo NEVER modifies git files. Scanned repositories
-  * are strictly read-only — provenance capture computes content-addressed ids
-  * without inserting objects, and no code path may write, flush, or sign
-  * anything into a repository's `.git`.
+  * are strictly read-only — provenance capture reads the HEAD commit and HEAD
+  * tree ids from the repository itself and computes no object ids of its own,
+  * so there is no write-capable API left in the product path to regress.
   *
-  * WHAT: two black-box tests (at the two layers that touch git) plus one
-  * white-box test:
+  * WHAT: two black-box tests, at the two layers that touch git:
   *   1. `GitRunInfo.capture` over a fixture repo leaves `.git` byte-for-byte
   *      untouched (same entries, sizes, and mtimes). 2. A tagged
   *      `Builder.buildDB` run (the full product path that drives provenance
   *      capture) leaves the scanned repository's `.git` byte-for-byte untouched
   *      — and does produce git provenance Items, so the capture path
-  *      demonstrably ran. 3. `GitRunInfo.readOnlyInserter` pins the canonical
-  *      git blob hash via `idFor` and throws `UnsupportedOperationException` on
-  *      every write-capable entry point (`flush`, `insert`, `newPackParser`,
-  *      `newReader`) — so reverting to a real, writable repository inserter
-  *      fails the suite.
+  *      demonstrably ran.
   *
   * WHY: user directive — JGit may never make any modifications to git files,
-  * and Goat Rodeo must always read. This is enforced by construction in
-  * `GitRunInfo` (a read-only `ObjectInserter` that throws on every
-  * write-capable entry point); these tests are the regression gate in case a
-  * future change reintroduces an inserter with a `flush`, an object write, or
-  * any other repository mutation.
+  * and Goat Rodeo must always read. These tests are the regression gate in case
+  * a future change reintroduces any repository mutation.
   *
   * LLM note: the fixture repo is created with JGit commits (test setup only —
   * temp dirs, never a real repo). The snapshot records every entry under `.git`
@@ -121,36 +112,11 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
     items.toVector
   }
 
-  test("read-only inserter throws on every write-capable entry point") {
-    val ins = GitRunInfo.readOnlyInserter
-    // The pure content-addressing half must work (canonical git blob hash
-    // for content "x": sha1 of "blob 1\0x" — a pinned oracle).
-    assertEquals(
-      ins.idFor(Constants.OBJ_BLOB, "x".getBytes(StandardCharsets.UTF_8)).name,
-      "c1b0730e0133447badcfd47fd144e254807b06e1"
-    )
-    // Every entry point that could stage, flush, or persist an object throws:
-    // a revert to a real repository inserter would fail these assertions.
-    intercept[UnsupportedOperationException](ins.flush())
-    intercept[UnsupportedOperationException](
-      ins.insert(
-        Constants.OBJ_BLOB,
-        1L,
-        new java.io.ByteArrayInputStream(Array.empty[Byte])
-      )
-    )
-    intercept[UnsupportedOperationException](
-      ins.newPackParser(new java.io.ByteArrayInputStream(Array.empty[Byte]))
-    )
-    intercept[UnsupportedOperationException](ins.newReader())
-  }
-
   test("GitRunInfo.capture never modifies the repository .git directory") {
     val repo = fixtureRepo()
     val before = gitSnapshot(new File(repo, ".git"))
     val items = GitRunInfo.capture(
       Seq(repo),
-      "2026-09-02T00:00:00Z",
       redact = true,
       scanRoot = Some(repo)
     )

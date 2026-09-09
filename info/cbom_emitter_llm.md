@@ -4,7 +4,7 @@
 >
 > **Handoff:** this document is the specification for a system that generates
 > CBOMs from a Goat Rodeo Artifact Dependency Graph (ADG). See
-> [Handoff: generating CBOMs from the ADG](#handoff-generating-cboms-from-the-adg)
+> [Generating CBOMs from the ADG](#generating-cboms-from-the-adg)
 > for the input data model and the exact algorithm to reproduce.
 
 ## Decision
@@ -39,17 +39,17 @@ Two new command-line flags control the emitter:
 | `--emit-cbom-dir <dir>` | Output directory for CBOM files. Disabled when omitted. | None |
 | `--cbom-version <1.6\|1.7>` | CycloneDX specification version to emit. | `1.6` |
 
-Only `"1.6"` and `"1.7"` are accepted; other values are a parse error. — verified by `CbomEmitterSuite.T3.1` and `CbomEmitterSuite.T3.17`.
+Only `"1.6"` and `"1.7"` are accepted; other values are a parse error. — verified by ``CbomEmitterSuite` `CLI flags parse correctly`` and ``CbomEmitterSuite` `invalid --cbom-version rejected``.
 
 ## One CBOM per root
 
-For every Item where `Item.isRoot()` is true, the emitter writes a single CBOM file. The filename is derived deterministically from the root GitOID, so rerunning the emitter on the same ADG produces the same filenames. — verified by `CbomEmitterSuite.T3.14` and `CbomEmitterSuite.T3.8`.
+For every Item where `Item.isRoot()` is true, the emitter writes a single CBOM file. The filename is derived deterministically from the root GitOID, so rerunning the emitter on the same ADG produces the same filenames. — verified by ``CbomEmitterSuite` `two roots produce two CBOM files`` and ``CbomEmitterSuite` `CBOM filenames are stable across runs``.
 
-If a root contains no cryptographic material, the emitter still writes a valid CBOM with an empty `components` array. — verified by `CbomEmitterSuite.T3.2`.
+If a root contains no cryptographic material, the emitter still writes a valid CBOM with an empty `components` array. — verified by ``CbomEmitterSuite` `empty CBOM emitted for root with no crypto material``.
 
 ## Traversal
 
-The emitter follows `contains` edges (`EdgeType.contains`) transitively from each root. Cycles are detected with an immutable visited `Set` and a maximum depth of 32. The same GitOID reached through multiple paths appears only once in the CBOM. — verified by `CbomEmitterSuite.T3.7`, `CbomEmitterSuite.T3.15`, and `CbomEmitterSuite.T3.16`.
+The emitter follows `contains` edges (`EdgeType.contains`) transitively from each root. Cycles are detected with an immutable visited `Set` and a maximum depth of 32. The same GitOID reached through multiple paths appears only once in the CBOM. — verified by ``CbomEmitterSuite` `crypto material inside nested archives appears in root CBOM``, ``CbomEmitterSuite` `cyclic contains graph does not hang the emitter``, and ``CbomEmitterSuite` `duplicate GitOID reached via multiple paths appears once``.
 
 ## Component mapping
 
@@ -127,7 +127,7 @@ Certificate Items map to `cryptoProperties.assetType: certificate` with
 Signature algorithm, public key algorithm, and key size are preserved as
 component `properties` (e.g., `Certificates:SigAlgorithm`,
 `Certificates:KeyAlgorithm`, `Certificates:KeySize`). — verified by
-`CbomEmitterSuite.T3.3` and `CbomEmitterSuite.T3.13`.
+``CbomEmitterSuite` `single certificate produces a valid CBOM component`` and `CbomEmitterSuite.T3.13`.
 
 ### PKCS#7 (Authenticode) certificate blobs
 
@@ -161,13 +161,13 @@ and `Pkcs7CbomSuite.T7.x`.
 OpenSSL config Items map to `cryptoProperties.assetType: protocol` with
 `protocolProperties.type: tls`. The captured `min_protocol`, `max_protocol`, and
 `cipher_string` values are emitted as `version` and `cipherSuites`. — verified
-by `CbomEmitterSuite.T3.4`.
+by ``CbomEmitterSuite` `OpenSSL config produces a protocol component``.
 
 ### Java security policy
 
 Java `java.security` Items map to `cryptoProperties.assetType: related-crypto-material`.
 Disabled algorithms, legacy algorithms, named groups, and other captured values
-are emitted as component `properties`. — verified by `CbomEmitterSuite.T3.5`.
+are emitted as component `properties`. — verified by ``CbomEmitterSuite` `Java security produces a component with disabled algorithms``.
 
 ### Keys, keystores, CRLs, and other material
 
@@ -185,19 +185,19 @@ enter ADG metadata, so they cannot appear in any CBOM. Because of this, every
 ADG field that maps to a valid CBOM field is included — including private-key
 marker flags such as `Certificates:DerivedFromPrivateKey` and
 `SSH:MaterialType`. An item that carries these markers is emitted faithfully
-(with the marker flags as properties), not dropped. — verified by `CbomEmitterSuite.T3.19`.
+(with the marker flags as properties), not dropped. — verified by ``CbomEmitterSuite` `private-key-marker Items are emitted faithfully``.
 
 ## Security boundaries
 
-- The output directory itself must not be a symlink (`0750` permissions when POSIX is available). Symlinked *ancestors* are accepted (on macOS `/tmp` and `/var` are symlinks into `/private`), so `--emit-cbom-dir /tmp/cbom` works everywhere. — verified by `CbomEmitterSuite.T3.18b`, `CbomEmitterSuite.T3.21`.
-- CBOM files are written atomically (temp file + rename) with `0640` permissions and no leftover `.tmp` files. — verified by `CbomEmitterSuite.T3.22`.
-- Traversal is bounded: depth ≤ 32, and each root is capped at 100,000 components. If the cap is exceeded, a partial CBOM is emitted with a `cbom:truncated` top-level property and a warning is logged. — verified by `CbomEmitterSuite.T3.20`.
-- I/O failures are captured in `Try` and logged; they do not crash the main build. — verified by `CbomEmitterSuite.T3.10`.
-- Private-key bytes never enter the ADG (capture-time enforcement); marker flags are emitted faithfully. — `CbomEmitterSuite.T3.19`.
+- The output directory itself must not be a symlink (`0750` permissions when POSIX is available). Symlinked *ancestors* are accepted (on macOS `/tmp` and `/var` are symlinks into `/private`), so `--emit-cbom-dir /tmp/cbom` works everywhere. — verified by the `CbomEmitterSuite` tests `a symlinked ancestor of the output directory is accepted` and `symlink refusal of the output directory itself`.
+- CBOM files are written atomically (temp file + rename) with `0640` permissions and no leftover `.tmp` files. — verified by ``CbomEmitterSuite` `CBOM write is atomic and leaves no temp files``.
+- Traversal is bounded: depth ≤ 32, and each root is capped at 100,000 components. If the cap is exceeded, a partial CBOM is emitted with a `cbom:truncated` top-level property and a warning is logged. — verified by ``CbomEmitterSuite` `oversized CBOM is truncated to 100,000 components``.
+- I/O failures are captured in `Try` and logged; they do not crash the main build. — verified by ``CbomEmitterSuite` `CBOM write failure is captured in Try``.
+- Private-key bytes never enter the ADG (capture-time enforcement); marker flags are emitted faithfully. — ``CbomEmitterSuite` `private-key-marker Items are emitted faithfully``.
 
 ## Schema validation
 
-Emitted CBOMs are validated against the official CycloneDX 1.6 and 1.7 JSON schemas using a JSON schema validator in the test suite. — verified by `CbomEmitterSuite.T3.2`, `CbomEmitterSuite.T3.3`, `CbomEmitterSuite.T3.6`, and `CbomEmitterSuite.T3.15`.
+Emitted CBOMs are validated against the official CycloneDX 1.6 and 1.7 JSON schemas using a JSON schema validator in the test suite. — verified by ``CbomEmitterSuite` `empty CBOM emitted for root with no crypto material``, ``CbomEmitterSuite` `single certificate produces a valid CBOM component``, ``CbomEmitterSuite` `--cbom-version 1.7 emits a valid 1.7 CBOM``, and ``CbomEmitterSuite` `cyclic contains graph does not hang the emitter``.
 
 ### 1.7 support note
 
@@ -212,13 +212,13 @@ Algorithm assets (`cryptoProperties.assetType: algorithm`) are classified and pa
 
 The registry's hash family includes `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `sha3-224`, `sha3-256`, `sha3-384`, `sha3-512`, `sha512-224`, `sha512-256`, `blake2b`, `blake2s`, `blake2b-256`, `blake2b-512`, `blake2s-256`, `blake3`, `shake128`, `shake256`, `whirlpool`, `ripemd160`, `sm3`, `streebog`, `sha-3`, `md4`, `mdc2`, `tiger192`, `haval`, `double-sha`, `bcrypt`, `scrypt`, `yescrypt`, `argon2`, `argon2d`, `argon2i`, `argon2id`, `nt-hash`, and `apr1` — all classify as primitive `hash`. — verified by `CryptoAlgorithmsSuite.R-T-02`.
 
-`parameterSetIdentifier` uses an explicit per-name table (`sha512-224 → "224"`, `blake2b-512 → "512"`, `sha3-256 → "256"`, `sha3-512 → "512"`) and omits the parameter entirely for names whose digits are version/family digits (`argon2*`, `shake*`, `blake3`, `sm3`, `md4`, …). — verified by `CryptoAlgorithmsSuite.R-T-03`, `CbomEmitterSuite.T3.30`.
+`parameterSetIdentifier` uses an explicit per-name table (`sha512-224 → "224"`, `blake2b-512 → "512"`, `sha3-256 → "256"`, `sha3-512 → "512"`) and omits the parameter entirely for names whose digits are version/family digits (`argon2*`, `shake*`, `blake3`, `sm3`, `md4`, …). — verified by `CryptoAlgorithmsSuite.R-T-03`, ``CbomEmitterSuite` `parameterSetIdentifier correctness for new hash names``.
 
 Every canonical name a discovery strategy can emit is a member of the registry vocabulary (`CryptoAlgorithms.canonicalVocabulary`); no strategy can emit a name the classifier never registered. — verified by `CryptoAlgorithmsSuite.R-T-01`, `ServiceCryptoSuite.T-B-11`.
 
-Pre-existing behavior is preserved: classification and parameter extraction for all pre-phase names is unchanged except the explicitly approved deltas (ADR Consequences). — verified by `CryptoAlgorithmsSuite.R-T-04`, `CbomEmitterSuite.T3.33` (byte-identical golden snapshots for 15 metadata families, CycloneDX 1.6 and 1.7).
+Pre-existing behavior is preserved: classification and parameter extraction for all pre-phase names is unchanged except the explicitly approved deltas (ADR Consequences). — verified by `CryptoAlgorithmsSuite.R-T-04`, ``CbomEmitterSuite` `pre-existing fixture families are byte-identical (golden)`` (byte-identical golden snapshots for 15 metadata families, CycloneDX 1.6 and 1.7).
 
-JWT `alg` values are attacker-controlled; they are emitted with the `signature` context, never via free-text classification, so a crafted `alg` such as `md4` cannot mint a `hash` asset. — verified by `CbomEmitterSuite.T3.34`.
+JWT `alg` values are attacker-controlled; they are emitted with the `signature` context, never via free-text classification, so a crafted `alg` such as `md4` cannot mint a `hash` asset. — verified by ``CbomEmitterSuite` `crafted JWT alg never mints a hash asset``.
 
 ## OmniBOR, SWHID, and traversal-path identifiers
 
@@ -226,16 +226,16 @@ Every artifact-backed cryptographic-asset component is keyed by the artifact's O
 
 - `swhid:core` — `swh:1:cnt:<sha1>`, the Software Heritage content identifier derived from the Item's `alias:from` `gitoid:blob:sha1:<hex>` edge (same sha1 bytes, SWHID prefix — no re-hashing).
 - `omnibor:core` — the Item's own `gitoid:blob:sha256:<hex>` OmniBOR id (equals `bom-ref`).
-- `swhid:core` and `omnibor:core` are **always emitted together**: neither appears without the other, and each equals the final (leaf) node of its corresponding `goatrodeo:*:path`. — verified by `CbomEmitterSuite.T3.35`, `CbomEmitterSuite.T3.44`.
+- `swhid:core` and `omnibor:core` are **always emitted together**: neither appears without the other, and each equals the final (leaf) node of its corresponding `goatrodeo:*:path`. — verified by ``CbomEmitterSuite` `artifact-backed component carries its SWHID and OmniBOR core``, ``CbomEmitterSuite` `swhid:core/omnibor:core pair always agree with the path leaf``.
 - `goatrodeo:path` — the chain of container names (each node's first `fileNames`, falling back to its gitoid) joined by `|:|`. Example: `firmware.img|:|romfs|:|etc/ssl/certs/root-ca.crt`.
 - `goatrodeo:omnibor-path` — the same chain as `gitoid:blob:sha256:<hex>` identifiers.
 - `goatrodeo:swhid-path` — the same chain as `swh:1:cnt:<sha1>` identifiers (nodes without a sha1 alias are omitted, best-effort).
 
-Malformed sha1 aliases (non-hex, wrong length, uppercase) are ignored rather than emitted as bogus identifiers, and items without a well-formed alias emit neither `swhid:core` nor `omnibor:core`. — verified by `CbomEmitterSuite.T3.36`, `CbomEmitterSuite.T3.37`. Traversal-path emission is verified by `CbomEmitterSuite.T3.42`.
+Malformed sha1 aliases (non-hex, wrong length, uppercase) are ignored rather than emitted as bogus identifiers, and items without a well-formed alias emit neither `swhid:core` nor `omnibor:core`. — verified by ``CbomEmitterSuite` `no SWHID property without a sha1 alias``, ``CbomEmitterSuite` `malformed sha1 aliases are ignored``. Traversal-path emission is verified by ``CbomEmitterSuite` `nested components carry traversal-derived paths``.
 
 When a Goat Rodeo run sets a correlation ID (see [Tamper-Evident Logging](tamper_evident_logging.md)), each CBOM additionally carries a top-level `goatrodeo:correlation-id` property, linking the CBOM to the run that produced it and to its tamper-evident log. — verified by `CbomEmitterSuite` (correlation-id omitted when no run is active).
 
-## Handoff: generating CBOMs from the ADG
+## Generating CBOMs from the ADG
 
 This section is the contract for a downstream system that reads a Goat Rodeo
 ADG and reproduces the CBOM output without running the Scala emitter.
@@ -305,20 +305,20 @@ Cryptographic material lives in `ItemMetaData.extra`, whose keys use a
 
 1. **Roots.** One CBOM per Item where `isRoot()` holds: `bodyMimeType ==
    "application/vnd.cc.goatrodeo"`, `identifier != "tags"`, and no `alias:to`
-   or `contained:up` edge. — `CbomEmitterSuite.T3.14`.
+   or `contained:up` edge. — ``CbomEmitterSuite` `two roots produce two CBOM files``.
 2. **Traversal.** Breadth-first over `contained:down` edges from each root.
    Track a visited `Set` of gitoids and the chain root → … → item. Depth is
    capped at 32; nodes beyond depth and already-visited nodes are skipped.
-   The same gitoid reached by multiple paths appears once. — `T3.7`, `T3.15`,
-   `T3.16`.
+   The same gitoid reached by multiple paths appears once. — `crypto material inside nested archives appears in root CBOM`, `cyclic contains graph does not hang the emitter`,
+   `duplicate GitOID reached via multiple paths appears once`.
 3. **Crypto detection.** An Item is cryptographic when any `extra` key starts
    with one of: `Certificates:`, `openssl.cnf:`, `java.security:`,
    `PasswordHash:`, `Usign:`, `SSH:`, `TLSConfig:`, `EmbeddedCertificates:`,
    `ServiceCrypto:`, `Kerberos:`, `JWT:`, `JWK:`, `EmbeddedKey:`,
    `CryptoAlgorithms:`, `CryptoDependency:`, `MobileTls:`, `CloudKey:`,
-   `DbEncryption:`. — `T3.3`–`T3.5`, `T3.38`–`T3.43`.
+   `DbEncryption:`. — `single certificate produces a valid CBOM component`–`Java security produces a component with disabled algorithms`, `keystore-detected keys emit algorithm assets`–`ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024`.
 4. **Cap.** Per root, at most 100,000 collected components; beyond that the CBOM
-   is emitted with a `cbom:truncated` top-level property. — `T3.20`.
+   is emitted with a `cbom:truncated` top-level property. — `oversized CBOM is truncated to 100,000 components`.
 5. **Map.** For each collected Item, derive `name`/`description` from `Name` /
    `Description` (empty name → skip the Item), then apply the
    [family dispatch table](#family-dispatch-evaluated-in-this-order-first-match-wins)
@@ -328,52 +328,52 @@ Cryptographic material lives in `ItemMetaData.extra`, whose keys use a
    synthetic `algorithm` components keyed `alg:<primitive>:<name>`. Algorithm
    names use the per-branch context (`pke`, `signature`, `hash`, `other`);
    `ServiceCrypto` and `DbEncryption` branches union both families'
-   `algorithms` sets. — `T3.3`, `T3.23`–`T3.28`, `T3.41`–`T3.43`.
+   `algorithms` sets. — `single certificate produces a valid CBOM component`, `public key material emits algorithmRef and size`–`md5 password hash emits hash algorithmRef`, `carved RSA-1024 cert in an ELF surfaces in the CBOM`–`ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024`.
 6. **Identifiers.** See the identifiers section above: emit `swhid:core` +
    `omnibor:core` together (from the item's sha1 alias and its own id), and the
    three `goatrodeo:*:path` traversal properties.
 7. **Filename.** `cbom_<escaped-first-file-name>_<last-16-of-gitoid>.json` —
    the root's first `fileNames` entry escaped (`[A-Za-z0-9_-]` kept, everything
    else → `_`, truncated to 80 chars keeping the tail) plus the last 16 hex
-   chars of the root gitoid. — `T3.8`, `TamperEvidentSuite.T-05`.
+   chars of the root gitoid. — `CBOM filenames are stable across runs`, `TamperEvidentSuite.T-05`.
 8. **Schema.** `specVersion` = `1.6` or `1.7`; `serialNumber` =
    `urn:uuid:` + UUID v5 name-based on the root identifier's UTF-8 bytes;
    `metadata.tools` = `{type: application, name: goatrodeo, version:
    <BuildInfo.version>}`; `metadata.timestamp` is the emit-time instant (the
    only non-deterministic field). Output must validate against the official
-   CycloneDX 1.6/1.7 JSON schemas. — `T3.6`.
+   CycloneDX 1.6/1.7 JSON schemas. — `--cbom-version 1.7 emits a valid 1.7 CBOM`.
 
 ### Notes and edge cases
 
 - The root Item itself is checked for cryptographic metadata and, if crypto,
   included in the CBOM with chain `[root]`.
 - Synthetic `algorithm` components are deduplicated across the whole CBOM by
-  `bom-ref`, keeping the first occurrence. — `T3.16`.
+  `bom-ref`, keeping the first occurrence. — `duplicate GitOID reached via multiple paths appears once`.
 - `CryptoDependency:` items become `library` components (`bom-ref`
   `dep-<name>`), not cryptographic-asset components; their `CryptoDependency:`
   values become `crypto-family` properties plus a joined `algorithms` property.
 - JWT `none` never becomes an algorithm; JWT algorithms use the `signature`
-  context (attacker-controlled input). — `T3.34`.
+  context (attacker-controlled input). — `crafted JWT alg never mints a hash asset`.
 - SSH `private-key-placeholder` maps to CycloneDX `private-key` material type;
   the original marker is preserved as a property. — `ExtendedCaptureCbomSuite`.
 - An Item whose derived `name` is empty emits no component at all.
 - No whole-image or whole-graph loads are required; the traversal reads Items by
   key. Cryptographic items and containers may be embedded in AP_ROMFS and other
-  nested containers (ArduPilot `AP_ROMFS`, PX4 tar ROMFS). — `T3.41`, `T3.43`.
+  nested containers (ArduPilot `AP_ROMFS`, PX4 tar ROMFS). — `carved RSA-1024 cert in an ELF surfaces in the CBOM`, `ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024`.
 
 ## Verification
 
-- `CbomEmitterSuite` (47 tests), with the coverage map:
-  - `T3.1`/`T3.17` — CLI parsing and validation; `T3.9` — no CBOM when disbled.
-  - `T3.2` — empty CBOM; `T3.10` — I/O failure handling; `T3.14` — multi-root; `T3.15` — cyclic `contains`; `T3.16` — duplicate GitOID dedup.
-  - `T3.3`/`T3.13` — certificate components; `T3.4` — OpenSSL config; `T3.5` — Java security.
-  - `T3.6` — CycloneDX 1.7 emission + schema validation; `T3.7` — nested-archive traversal; `T3.8` — filename stability.
-  - `T3.18` — output-directory auto-creation; `T3.18b` — symlinked ancestor accepted; `T3.19` — private-key markers; `T3.20` — 100,000-component truncation; `T3.21`/`T3.22` — symlink refusal of the dir itself / atomic writes.
-  - `T3.23`–`T3.30` — algorithm refs (keys, CRLs, EC curves, password hashes, usign, `parameterSetIdentifier`); `T3.29` — new hash names.
-  - `T3.31` — PasswordHash argon2id/nt-hash/apr1 → hash assets; `T3.32` — ServiceCrypto blake2b/sha3 → hash assets; `T3.33` — golden byte-identity; `T3.34` — hostile JWT `alg` guard.
-  - `T3.35`–`T3.37` — `swhid:core`/`omnibor:core` pair, no-alias refusal, malformed-alias tolerance.
-  - `T3.41` — carved RSA-1024 cert in an ELF; `T3.42` — nested container path chain; `T3.43` — AP_ROMFS trust-store certs; `T3.44` — core/path-leaf agreement.
-- `CbomEmitterSuite` (summary) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private-key-marker fidelity, size limits, the opt-out behavior, expanded hash classification/parameters (T3.29–T3.32), golden byte-identity (T3.33), the hostile-JWT guard (T3.34), SWHID/OmniBOR core emission (T3.35–T3.37), carved certs (T3.41), traversal paths (T3.42), AP_ROMFS certs (T3.43), and the core/path-leaf agreement (T3.44).
+- `CbomEmitterSuite`, with the coverage map:
+  - `CLI flags parse correctly`/`invalid --cbom-version rejected` — CLI parsing and validation; `no CBOM files are written without --emit-cbom-dir` — no CBOM when disbled.
+  - `empty CBOM emitted for root with no crypto material` — empty CBOM; `CBOM write failure is captured in Try` — I/O failure handling; `two roots produce two CBOM files` — multi-root; `cyclic contains graph does not hang the emitter` — cyclic `contains`; `duplicate GitOID reached via multiple paths appears once` — duplicate GitOID dedup.
+  - `single certificate produces a valid CBOM component`/`T3.13` — certificate components; `OpenSSL config produces a protocol component` — OpenSSL config; `Java security produces a component with disabled algorithms` — Java security.
+  - `--cbom-version 1.7 emits a valid 1.7 CBOM` — CycloneDX 1.7 emission + schema validation; `crypto material inside nested archives appears in root CBOM` — nested-archive traversal; `CBOM filenames are stable across runs` — filename stability.
+  - `non-existent CBOM output directory is created` — output-directory auto-creation; `a symlinked ancestor of the output directory is accepted` — symlinked ancestor accepted; `private-key-marker Items are emitted faithfully` — private-key markers; `oversized CBOM is truncated to 100,000 components` — 100,000-component truncation; `symlink in CBOM output path is rejected`/`CBOM write is atomic and leaves no temp files` — symlink refusal of the dir itself / atomic writes.
+  - `public key material emits algorithmRef and size`–`parameterSetIdentifier correctness for new hash names` — algorithm refs (keys, CRLs, EC curves, password hashes, usign, `parameterSetIdentifier`); `new hash names classify as hash and validate in 1.6 and 1.7` — new hash names.
+  - `PasswordHash argon2id/nt-hash/apr1 flow into hash assets` — PasswordHash argon2id/nt-hash/apr1 → hash assets; `ServiceCrypto blake2b/sha3 algorithms classify as hash assets` — ServiceCrypto blake2b/sha3 → hash assets; `pre-existing fixture families are byte-identical (golden)` — golden byte-identity; `crafted JWT alg never mints a hash asset` — hostile JWT `alg` guard.
+  - `artifact-backed component carries its SWHID and OmniBOR core`–`malformed sha1 aliases are ignored` — `swhid:core`/`omnibor:core` pair, no-alias refusal, malformed-alias tolerance.
+  - `carved RSA-1024 cert in an ELF surfaces in the CBOM` — carved RSA-1024 cert in an ELF; `nested components carry traversal-derived paths` — nested container path chain; `ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024` — AP_ROMFS trust-store certs; `swhid:core/omnibor:core pair always agree with the path leaf` — core/path-leaf agreement.
+- `CbomEmitterSuite` (summary) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private-key-marker fidelity, size limits, the opt-out behavior, expanded hash classification/parameters (`new hash names classify as hash and validate in 1.6 and 1.7`–`ServiceCrypto blake2b/sha3 algorithms classify as hash assets`), golden byte-identity (`pre-existing fixture families are byte-identical (golden)`), the hostile-JWT guard (`crafted JWT alg never mints a hash asset`), SWHID/OmniBOR core emission (`artifact-backed component carries its SWHID and OmniBOR core`–`malformed sha1 aliases are ignored`), carved certs (`carved RSA-1024 cert in an ELF surfaces in the CBOM`), traversal paths (`nested components carry traversal-derived paths`), AP_ROMFS certs (`ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024`), and the core/path-leaf agreement (`swhid:core/omnibor:core pair always agree with the path leaf`).
 - `CryptoAlgorithmsSuite` (6 tests) pins the shared registry: producer-vocabulary totality (R-T-01), new-name classification (R-T-02), parameter rules (R-T-03), behavior regression (R-T-04), canonical-form hygiene (R-T-05), and substring-collision safety (R-T-06).
 
 ## Related

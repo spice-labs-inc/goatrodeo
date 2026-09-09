@@ -19,7 +19,7 @@ import io.spicelabs.goatrodeo.util.Configuration
 
 import java.util.Date
 
-/** Phase 1 TDD Tests: PackageTagInfo data structure and CLI parsing
+/** PackageTagInfo data structure and CLI parsing
   *
   * These tests verify:
   *   - PackageTagInfo case class with Option types
@@ -29,9 +29,9 @@ import java.util.Date
   *   - GoatRodeoBuilder API methods
   *
   * Requirement Traceability:
-  *   - R1: --package-tags CLI option
-  *   - R2: --package-tags-short-name CLI option
-  *   - R3: Per-package tag JSON structure with optional version
+  *   - --package-tags CLI option
+  *   - --package-tags-short-name CLI option
+  *   - Per-package tag JSON structure with optional version
   */
 class PackageTagInfoSuite extends GoatRodeoFunSuite {
 

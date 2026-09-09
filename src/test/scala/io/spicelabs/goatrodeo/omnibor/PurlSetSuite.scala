@@ -62,8 +62,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   *
   * ==Requirements covered==
   *
-  * Plan Part 1: PurlSet type — all 10 tests from the plan's "PurlSet unit
-  * tests" section.
+  * PurlSet type — the "PurlSet unit tests" cases.
   */
 class PurlSetSuite extends GoatRodeoFunSuite {
 
@@ -91,8 +90,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 1: Empty PurlSet ----
-  //
-  // Requirement: Plan Part 1, test 1 — "Empty PurlSet"
+
+  // Requirement: "Empty PurlSet"
   // Theory: `PurlSet.empty` is the zero element. It must have no canonical,
   // no purls, and produce empty string output. This verifies the `empty`
   // factory method and the base case for all string conversion methods.
@@ -106,8 +105,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 2: Single pURL ----
-  //
-  // Requirement: Plan Part 1, test 2 — "Single pURL"
+
+  // Requirement: "Single pURL"
   // Theory: `PurlSet.single(p)` should set canonical to `Some(p)` and purls
   // to `Vector(p)`. The canonical pURL must be a member of purls (by
   // reference, since Purl does not override equals). Both `canonicalString`
@@ -123,8 +122,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 3: Build with canonical + secondary ----
-  //
-  // Requirement: Plan Part 1, test 3 — "Canonical + secondary"
+
+  // Requirement: "Canonical + secondary"
   // Theory: `PurlSet.build(Some(canonical), Vector(secondary))` should produce
   // a PurlSet where the canonical pURL is in the purls vector (by reference),
   // the secondary pURL is present, and both string conversion methods work.
@@ -150,8 +149,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 4: Deduplication via build ----
-  //
-  // Requirement: Plan Part 1, test 4 — "Deduplication"
+
+  // Requirement: "Deduplication"
   // Theory: `PurlSet.build(Some(p), Vector(p))` should not produce duplicate
   // entries in purls. Since Purl uses reference equality, `distinct` removes
   // the duplicate by identity. The resulting purls vector should have length 1.
@@ -174,13 +173,13 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 5: Direct construction does NOT throw ----
-  //
-  // Requirement: Plan Part 1, test 5 — "Direct construction does NOT throw"
+
+  // Requirement: "Direct construction does NOT throw"
   // Theory: The project policy is that code must not throw exceptions for
   // expected, recoverable conditions. A PurlSet with a canonical pURL not
   // in the purls vector is a data inconsistency, not an unrecoverable
   // failure. Direct construction must succeed without throwing.
-  //
+
   // This test replaces the old `require` check that threw
   // `IllegalArgumentException`.
 
@@ -202,8 +201,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 6: canonicalStrings includes canonical even when not in purls ----
-  //
-  // Requirement: Plan Part 1, test 6 — "canonicalStrings includes canonical
+
+  // Requirement: "canonicalStrings includes canonical
   // pURL even when not in purls"
   // Theory: When a PurlSet is constructed directly (bypassing factory methods)
   // with a canonical pURL that is not a member of the purls vector,
@@ -228,8 +227,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 7: canonicalString returns None when canonical is None ----
-  //
-  // Requirement: Plan Part 1, test 7 — "canonicalString returns None when
+
+  // Requirement: "canonicalString returns None when
   // canonical is None"
   // Theory: `canonicalString` is an `Option[String]` — it returns `None` when
   // there is no canonical pURL. This verifies the Option-based design (no
@@ -243,8 +242,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 8: canonicalStrings drops malformed pURLs ----
-  //
-  // Requirement: Plan Part 1, test 8 — "canonicalStrings drops failures"
+
+  // Requirement: "canonicalStrings drops failures"
   // Theory: `toCanonical()` can throw `Purl.PurlException` for malformed
   // pURLs (e.g., a Maven pURL with a null namespace). Each call is wrapped
   // in `Try` so one malformed pURL does not prevent the others from being
@@ -284,8 +283,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 9: Property-based — single round-trip ----
-  //
-  // Requirement: Plan Part 1, test 9 — "Property-based: single round-trip"
+
+  // Requirement: "Property-based: single round-trip"
   // Theory: For any valid pURL string `s`, `PurlSet.single(Purl.parse(s))
   // .canonicalStrings` must contain `s`. This verifies that the `single`
   // factory preserves the pURL through string conversion.
@@ -309,8 +308,8 @@ class PurlSetSuite extends GoatRodeoFunSuite {
   }
 
   // ---- Test 10: Property-based — build round-trip ----
-  //
-  // Requirement: Plan Part 1, test 10 — "Property-based: build round-trip"
+
+  // Requirement: "Property-based: build round-trip"
   // Theory: For any `Option[Purl]` (canonical) and `Vector[Purl]` (secondary,
   // all valid), `PurlSet.build(canonical, secondary).canonicalStrings` must
   // contain the canonical string (if canonical is present and valid) and all
@@ -329,9 +328,9 @@ class PurlSetSuite extends GoatRodeoFunSuite {
     assert(strings.contains("pkg:maven/org.secondary/second@3.0"))
   }
 
-  // ---- Test 11: canonicalStrings deduplicates at string level ----
-  //
-  // Requirement: Plan Part 1, implied by test 4 and test 6
+  // ---- canonicalStrings deduplicates at string level ----
+
+  // Requirement: implied by the deduplication and canonical-strings cases above
   // Theory: Purl does not override equals, so `Vector.distinct` on Purl
   // objects uses reference equality. But `canonicalStrings` converts to
   // String first, then calls `.distinct`. String has proper equals/hashCode,
@@ -356,9 +355,9 @@ class PurlSetSuite extends GoatRodeoFunSuite {
     )
   }
 
-  // ---- Test 12: build with None canonical and empty secondary ----
-  //
-  // Requirement: Plan Part 1, implied by factory method coverage
+  // ---- build with None canonical and empty secondary ----
+
+  // Requirement: implied by the factory-method coverage above
   // Theory: `PurlSet.build(None, Vector.empty)` should be equivalent to
   // `PurlSet.empty`. This verifies the edge case of the build factory.
 

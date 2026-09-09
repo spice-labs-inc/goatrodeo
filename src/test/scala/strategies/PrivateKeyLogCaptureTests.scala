@@ -59,7 +59,7 @@ class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
     )
   )
 
-  private def runEveryPhase7Fixture(): Unit = {
+  private def runEveryPrivateKeyFixture(): Unit = {
     val root = java.nio.file.Paths.get("test_data/certificates/private-keys")
     if (!java.nio.file.Files.exists(root)) return
     val files = java.nio.file.Files
@@ -82,9 +82,9 @@ class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "[HARD RULE Phase 7] no log records from Certificates strategy across the entire Phase-7 corpus"
+    "[HARD RULE] no log records from Certificates strategy across the entire private-key corpus"
   ) {
-    val (_, events) = runWithCapture(() => runEveryPhase7Fixture())
+    val (_, events) = runWithCapture(() => runEveryPrivateKeyFixture())
     val fromCert = events.filter { e =>
       Option(e.getLoggerName).exists(
         _.startsWith("io.spicelabs.goatrodeo.omnibor.strategies.Certificates")
@@ -98,16 +98,16 @@ class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
         )
         .mkString("\n")
       fail(
-        s"Phase 7 hard rule: zero log records from Certificates expected; " +
+        s"Hard rule: zero log records from Certificates expected; " +
           s"got ${fromCert.length}:\n$sample"
       )
     }
   }
 
   test(
-    "[HARD RULE Phase 7] no log record mentions decrypt/password/passphrase/BadPadding (decryption-attempt smoke test)"
+    "[HARD RULE] no log record mentions decrypt/password/passphrase/BadPadding (decryption-attempt smoke test)"
   ) {
-    val (_, events) = runWithCapture(() => runEveryPhase7Fixture())
+    val (_, events) = runWithCapture(() => runEveryPrivateKeyFixture())
     val suspicious = events.filter { e =>
       val msg = Option(e.getFormattedMessage).getOrElse("").toLowerCase
       msg.contains("decrypt") || msg.contains("password") ||
@@ -121,7 +121,7 @@ class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
         )
         .mkString("\n")
       fail(
-        s"Phase 7 hard rule: no log record may suggest a decryption " +
+        s"Hard rule: no log record may suggest a decryption " +
           s"attempt; got ${suspicious.length}:\n$sample"
       )
     }

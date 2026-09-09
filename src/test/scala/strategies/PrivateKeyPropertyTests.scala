@@ -16,11 +16,11 @@ import java.nio.file.Paths
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** ScalaCheck properties over the Phase-7 corpus.
+/** ScalaCheck properties over the private-key corpus.
   *
   * ## What these tests test
   *
-  * Phase 7's hard rules apply uniformly across every private-key fixture. These
+  * The hard rules apply uniformly across every private-key fixture. These
   * properties pin those uniform invariants so a new fixture added later is
   * automatically covered:
   *
@@ -133,7 +133,7 @@ class PrivateKeyPropertyTests extends GoatRodeoScalaCheckSuite {
   }
 
   property(
-    "[PROP] encrypted private keys produce zero pURLs (Phase 7 hard rule)"
+    "[PROP] encrypted private keys produce zero pURLs (hard rule)"
   ) {
     forAll(genFixture) { f =>
       Certificates.classifyAndParse(wrap(f)) match {

@@ -26,7 +26,7 @@ import java.nio.file.Path
 import java.security.cert.CertificateFactory
 import scala.collection.immutable.TreeSet
 
-/** Phase D — Base64-embedded PEM capture (redaction-first).
+/** Base64-embedded PEM capture (redaction-first).
   *
   * Decodes certificates/private keys embedded as base64 data fields or inline
   * PEM in text configs using the real certificate/key corpus, and verifies the
@@ -70,7 +70,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     m.values.toVector.flatMap(_.toVector.map(_.value))
 
   test(
-    "T-D-01 kubeconfig certificate-authority-data yields a certificate item"
+    "kubeconfig certificate-authority-data yields a certificate item"
   ) {
     val m = meta(
       "kubeconfig.yaml",
@@ -100,7 +100,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T-D-02 kubeconfig client-key-data yields a private-key envelope, zero key bytes"
+    "kubeconfig client-key-data yields a private-key envelope, zero key bytes"
   ) {
     val m = meta(
       "kubeconfig.yaml",
@@ -134,7 +134,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-D-03 inline PEM block inside YAML yields a certificate item") {
+  test("inline PEM block inside YAML yields a certificate item") {
     val yaml =
       "kind: Secret\napiVersion: v1\nstringData:\n  tls.crt: |-\n    " +
         certPem.replace("\n", "\n    ") + "\n"
@@ -146,7 +146,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     assertEquals(m(keyAdHoc("kind")).head.value, "certificate")
   }
 
-  test("T-D-04 oversized base64 blob is skipped without OOM") {
+  test("oversized base64 blob is skipped without OOM") {
     val big = java.util.Base64.getEncoder
       .encodeToString(
         Array.fill[Byte](EmbeddedPemStrategy.MaxDecodeBytes + 1)(0x41)
@@ -162,7 +162,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     assert(!m.contains(certAdHoc("SubjectDN")), "oversize blob must not decode")
   }
 
-  test("T-D-05 malformed base64 is tolerated, no item, no panic") {
+  test("malformed base64 is tolerated, no item, no panic") {
     val m = meta(
       "kubeconfig.yaml",
       "certificate-authority-data: " + ("A" * 24) + "%\nclient-key-data: \"not-base64!!\"\n"
@@ -170,7 +170,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     assert(m.isEmpty, s"malformed input must not produce metadata: $m")
   }
 
-  test("T-D-06 property: emitted values are short tags, never secrets") {
+  test("property: emitted values are short tags, never secrets") {
     val battery = Vector(
       "kubeconfig.yaml" ->
         ("certificate-authority-data: " + b64(
@@ -202,7 +202,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T-D-07 certificate SPKI hash is the public key hash, not the secret") {
+  test("certificate SPKI hash is the public key hash, not the secret") {
     val cf = CertificateFactory.getInstance("X.509")
     val cert = cf
       .generateCertificate(

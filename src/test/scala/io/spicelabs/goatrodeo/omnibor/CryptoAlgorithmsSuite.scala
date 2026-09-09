@@ -18,19 +18,19 @@ import io.spicelabs.goatrodeo.omnibor.strategies.ShadowPasswordStrategy
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.CipherSuiteResolver
 
-/** Shared canonical algorithm-name registry tests (phase H).
+/** Shared canonical algorithm-name registry tests .
   *
   * The registry is the single source of truth for algorithm-name vocabulary,
   * primitive classification, and parameter extraction. These tests pin:
-  *   - R-T-01 totality: every canonical name a producer can emit is in the
-  *     registry vocabulary (closed vocabulary = no spelling drift in CBOMs).
-  *   - R-T-02 the new hash-family names classify as `hash`.
-  *   - R-T-03 the parameter table and legacy first-digit-run fallback.
-  *   - R-T-04 regression: pre-existing names keep their exact (primitive,
-  *     parameter) behavior except the approved deltas (C1/C2/C3).
-  *   - R-T-05 vocabulary hygiene: lowercase-hyphenated canonical form.
-  *   - R-T-06 no new classification name is a substring of a canonical name
-  *     that classifies as something else (false-positive minting guard).
+  *   - totality: every canonical name a producer can emit is in the registry
+  *     vocabulary (closed vocabulary = no spelling drift in CBOMs).
+  *   - the new hash-family names classify as `hash`.
+  *   - the parameter table and legacy first-digit-run fallback.
+  *   - regression: pre-existing names keep their exact (primitive, parameter)
+  *     behavior except the approved deltas (C1/C2/C3).
+  *   - vocabulary hygiene: lowercase-hyphenated canonical form.
+  *   - no new classification name is a substring of a canonical name that
+  *     classifies as something else (false-positive minting guard).
   */
 class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
 
@@ -178,7 +178,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
     "argon2id"
   )
 
-  test("R-T-01 producer-emitted names are a subset of the vocabulary") {
+  test("producer-emitted names are a subset of the vocabulary") {
     // Closed vocabulary: everything a discovery strategy can emit must be
     // inside CryptoAlgorithms.canonicalVocabulary, or the CBOM classifier
     // will see names it never registered.
@@ -210,7 +210,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
       }
     }
     // Classifier-only names (no producer yet) must also be present so that
-    // R1 classification works when they first appear.
+    // classification works when they first appear.
     Vector("blake3", "streebog").foreach { n =>
       assert(
         vocabulary.contains(n),
@@ -219,7 +219,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("R-T-02 new hash-family names classify as hash") {
+  test("new hash-family names classify as hash") {
     NewHashNames.foreach { n =>
       assertEquals(
         CryptoAlgorithms.inferPrimitive(n),
@@ -236,7 +236,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
     assertEquals(CryptoAlgorithms.inferPrimitive("rsa"), "pke")
   }
 
-  test("R-T-03 parameter rule: table, no-parameter names, and fallback") {
+  test("parameter rule: table, no-parameter names, and fallback") {
     val pinned: Map[String, Option[String]] = Map(
       "sha512-224" -> Some("224"),
       "sha512-256" -> Some("256"),
@@ -281,7 +281,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
     assertEquals(CryptoAlgorithms.parameterFor("x25519"), None)
   }
 
-  test("R-T-04 pre-existing names keep old behavior except approved deltas") {
+  test("pre-existing names keep old behavior except approved deltas") {
     OldPrimitives.foreach { case (name, oldPrimitive) =>
       val newPrimitive = CryptoAlgorithms.inferPrimitive(name)
       ApprovedPrimitiveDeltas.get(name) match {
@@ -322,7 +322,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("R-T-05 vocabulary and classification names are canonical") {
+  test("vocabulary and classification names are canonical") {
     val canonical = "^[a-z0-9][a-z0-9-]*$".r
     val allSets = Vector(
       CryptoAlgorithms.hashNames,
@@ -343,7 +343,7 @@ class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "R-T-06 a new hash name is never a substring of a differently-classified name"
+    "a new hash name is never a substring of a differently-classified name"
   ) {
     val vocabulary = CryptoAlgorithms.canonicalVocabulary
     NewHashNames.foreach { newName =>

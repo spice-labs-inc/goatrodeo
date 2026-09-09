@@ -21,8 +21,7 @@ import org.apache.tika.metadata.TikaCoreProperties
 
 import java.io.File
 
-/** Phase 0 — Evaluate MIME detection for the collected OpenSSL configuration
-  * corpus.
+/** Evaluate MIME detection for the collected OpenSSL configuration corpus.
   *
   * Apache Tika classifies `.cnf` files as `text/plain`. The custom
   * `OpenSSLConfigDetector` augmenter adds `application/x-openssl-config` when
@@ -32,7 +31,7 @@ import java.io.File
   * The augmenter is intentionally conservative: it detects the main OpenSSL
   * config files and most test/demo configs, but specialized files such as OID
   * tables or certificate-transparency log lists may fall through to
-  * `text/plain`. That is acceptable because Phase 1 only needs to capture files
+  * `text/plain`. That is acceptable because the capture needs only the files
   * with TLS/security configuration semantics.
   */
 class OpenSSLMimeDetectionSuite extends GoatRodeoFunSuite {

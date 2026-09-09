@@ -22,7 +22,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-/** T4.2 — End-to-end integration test for CycloneDX CBOM emission.
+/** End-to-end integration test for CycloneDX CBOM emission.
   *
   * Builds an ADG from a directory containing an X.509 certificate, an OpenSSL
   * configuration file, a Java `java.security` file, and a non-crypto file. With
@@ -82,7 +82,7 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T4.2 mixed directory produces CBOMs with certificate, OpenSSL, and Java security components"
+    "mixed directory produces CBOMs with certificate, OpenSSL, and Java security components"
   ) {
     val inputDir = Files.createTempDirectory("cbom-int-input").toFile()
     val outputDir = Files.createTempDirectory("cbom-int-output").toFile()
@@ -167,13 +167,13 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
     }
   }
 
-  // T4.3 — end-to-end via GoatRodeoBuilder with tamper-evident logging: the
+  // end-to-end via GoatRodeoBuilder with tamper-evident logging: the
   // run writes a hash-chained log and a run-level checksum, and every CBOM
   // carries the run's correlation ID. THEORY: the builder routes through
   // Howdy.run, so withTamperEvidentLog must produce the tamper-evident
   // artifacts and correlate the CBOMs to the run.
   test(
-    "T4.3 GoatRodeoBuilder tamper-evident run produces log, checksum, correlation"
+    "GoatRodeoBuilder tamper-evident run produces log, checksum, correlation"
   ) {
     val inputDir = Files.createTempDirectory("tel-int-input").toFile()
     val outputDir = Files.createTempDirectory("tel-int-output").toFile()

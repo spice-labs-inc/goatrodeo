@@ -12,7 +12,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import java.io.File
 import scala.collection.immutable.TreeSet
 
-class MavenPhase5CorpusSuite extends GoatRodeoFunSuite {
+class MavenJarStructureCorpusSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty, None, None)

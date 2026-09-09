@@ -20,12 +20,11 @@ import scala.collection.immutable.TreeSet
   *
   * ## What these tests test
   *
-  * Phase 6 first-pass gap analysis G6 + second-pass N5/N9: example-based tests
-  * can only pin specific fixtures. These properties hold across the full corpus
-  * and their **strength** is the focus of N5: each property must catch a
-  * realistic class of bug, not be tautological.
+  * Example-based tests can only pin specific fixtures. These properties hold
+  * across the full corpus and their **strength** is the point: each property
+  * must catch a realistic class of bug, not be tautological.
   *
-  * ### Properties (post-N5 / N9 strengthening)
+  * ### Properties
   *
   *   1. *Fingerprint hex shape* — every parsed key's fingerprint is lowercase
   *      hex, length ∈ {40, 64} (v4=20B SHA-1, v5/v6=32B SHA-256). Catches case
@@ -44,11 +43,11 @@ import scala.collection.immutable.TreeSet
   *        `once == twice` form (which only proved function purity). 4. *Per-key
   *        pURL distinctness* — every key in a ring emits a pURL that is
   *        distinct after canonicalization. Same dedup the strategy applies in
-  *        `getPurls`. 5. *Emission-path equivalence (N9)* — the property-test
-  *        pURL computation matches what the actual `getPurls` emission path
-  *        produces (the new property exercises the strategy's claim pipeline
-  *        through `Certificates.computeCertificateFiles`-style classification,
-  *        so it's not just a unit test of the helper).
+  *        `getPurls`. 5. *Emission-path equivalence * — the property-test pURL
+  *        computation matches what the actual `getPurls` emission path produces
+  *        (the new property exercises the strategy's claim pipeline through
+  *        `Certificates.computeCertificateFiles`-style classification, so it's
+  *        not just a unit test of the helper).
   *
   * ## Why this matters
   *
@@ -87,7 +86,7 @@ class PgpPropertyTests extends GoatRodeoScalaCheckSuite {
     Certificates.parsePgpKeyRing(FileWrapper(f, f.getName, None))
 
   property(
-    "[PROP] every parsed PGP key has lowercase-hex fingerprint of length 40 or 64 (G6)"
+    "[PROP] every parsed PGP key has lowercase-hex fingerprint of length 40 or 64 "
   ) {
     forAll(genFixture) { f =>
       parse(f) match {
@@ -107,7 +106,7 @@ class PgpPropertyTests extends GoatRodeoScalaCheckSuite {
   // it only compared fingerprint sets). This version compares every
   // field on every key, in the order each parse returned.
   property(
-    "[PROP] parse idempotence: same file → identical PgpKey list (N5 / G6)"
+    "[PROP] parse idempotence: same file → identical PgpKey list "
   ) {
     forAll(genFixture) { f =>
       val a = parse(f)
@@ -141,7 +140,7 @@ class PgpPropertyTests extends GoatRodeoScalaCheckSuite {
   // tests nothing) to a structural invariant on the canonicalized pURL
   // form. Catches: (a) fingerprint-not-in-pURL bugs, (b) qualifier-
   // ordering regressions, (c) missing alg/version qualifiers.
-  property("[PROP] pURL canonical form: structural invariants (N5 / G6)") {
+  property("[PROP] pURL canonical form: structural invariants") {
     forAll(genFixture) { f =>
       parse(f) match {
         case None => true
@@ -172,7 +171,7 @@ class PgpPropertyTests extends GoatRodeoScalaCheckSuite {
   // asserts that the count matches keys.length (no silent dedup of
   // distinct keys).
   property(
-    "[PROP] purlForPgpKey: one canonical pURL per cryptographic identity (G6)"
+    "[PROP] purlForPgpKey: one canonical pURL per cryptographic identity "
   ) {
     forAll(genFixture) { f =>
       parse(f) match {
@@ -215,7 +214,7 @@ class PgpPropertyTests extends GoatRodeoScalaCheckSuite {
   // PGP emission, would fail here even if `purlForPgpKey` itself was
   // unchanged.
   property(
-    "[PROP] strategy emission path (CertificatesState.getPurls) matches unit computation (N9)"
+    "[PROP] strategy emission path (CertificatesState.getPurls) matches unit computation "
   ) {
     forAll(genFixture) { f =>
       parse(f) match {

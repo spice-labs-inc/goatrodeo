@@ -21,7 +21,7 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 
 import scala.collection.immutable.TreeSet
 
-/** Phase E — Binary crypto algorithm-footprint scanner.
+/** Binary crypto algorithm-footprint scanner.
   *
   * Verifies EVP/Go/Rust/.NET footprint detection, precision (a bare substring
   * such as "aes" must not mint an asset), preservation of the existing
@@ -43,7 +43,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     new CryptoFootprintState(a).invokeBuildMetadata(a).toMap
   }
 
-  test("T-E-01 binary with EVP_aes_256_gcm emits aes-256-gcm") {
+  test("binary with EVP_aes_256_gcm emits aes-256-gcm") {
     val m = meta(
       "libssl.so",
       "\u0000\u0000libcrypto strings \u0000 EVP_aes_256_gcm \u0000 EVP_sha256 \u0000"
@@ -62,7 +62,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     assert(!m.contains(adHoc("unknown")), "all EVP needles resolve")
   }
 
-  test("T-E-02 Go binary with crypto/sha256 emits sha-256") {
+  test("Go binary with crypto/sha256 emits sha-256") {
     val m = meta(
       "server",
       "\u0000go:build\u0000 crypto/sha256 \u0000 golang.org/x/crypto/curve25519 \u0000"
@@ -73,7 +73,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     assert(m(adHoc("classifier")).toVector.map(_.value).toSet == Set("golang"))
   }
 
-  test("T-E-03 a bare substring like aes must not mint an asset") {
+  test("a bare substring like aes must not mint an asset") {
     assert(
       !CryptoFootprintStrategy.isKnownNeedle("aes"),
       "bare 'aes' is not a signal"
@@ -89,7 +89,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T-E-04 EmbeddedCertificates behavior is preserved for PEM-marker libs"
+    "EmbeddedCertificates behavior is preserved for PEM-marker libs"
   ) {
     val markerLib = ByteWrapper(
       (
@@ -118,7 +118,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-E-05 scan is bounded: needles beyond the cap are not seen") {
+  test("scan is bounded: needles beyond the cap are not seen") {
     val near =
       artifact("lib.so", "prefix" + ("A" * 1024) + "EVP_sha256" + "suffix")
     assert(
@@ -141,7 +141,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T-E-06 property: every emitted algorithm value is a known canonical name"
+    "property: every emitted algorithm value is a known canonical name"
   ) {
     // The pattern table is total: Every algorithm the scanner can emit is in
     // knownAlgorithms and is lowercase-hyphenated.
@@ -174,7 +174,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-E-07 new EVP needles emit canonical names with exact sets") {
+  test("new EVP needles emit canonical names with exact sets") {
     // Exact-set assertion: `EVP_sha512` is a substring of the new
     // `EVP_sha512_224`/`EVP_sha512_256` needles, so a binary carrying the
     // 224 variant deliberately dual-emits (both statements are true, C5).
@@ -217,7 +217,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T-E-08 Go md5 and x/crypto/sha3 needles emit canonical names") {
+  test("Go md5 and x/crypto/sha3 needles emit canonical names") {
     val m = meta(
       "server",
       "\u0000go:build\u0000 crypto/md5 \u0000 golang.org/x/crypto/sha3 \u0000"
@@ -231,7 +231,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-E-09 .NET SHA-384/SHA-512/SHA3 types emit canonical names") {
+  test(".NET SHA-384/SHA-512/SHA3 types emit canonical names") {
     val m = meta(
       "app.dll",
       "\u0000System.Security.Cryptography.SHA384\u0000" +
@@ -251,7 +251,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-E-10 read-window property: new needles at 0, EOF, and boundary") {
+  test("read-window property: new needles at 0, EOF, and boundary") {
     val newNeedles = Vector(
       "EVP_md5",
       "EVP_md4",
@@ -298,7 +298,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "R-T-07 needle-overlap property: only the two approved sha512 pairs overlap"
+    "needle-overlap property: only the two approved sha512 pairs overlap"
   ) {
     val newNeedles = Set(
       "EVP_md5",
@@ -339,7 +339,7 @@ class CryptoFootprintSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-E-11 mbedTLS needles flag firmware crypto with exact sets") {
+  test("mbedTLS needles flag firmware crypto with exact sets") {
     val m = meta(
       "arducopter",
       "\u0000mbedtls_x509_crt_parse\u0000mbedtls_pk_parse_key\u0000" +

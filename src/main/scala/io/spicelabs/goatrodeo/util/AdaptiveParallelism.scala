@@ -46,9 +46,8 @@ package io.spicelabs.goatrodeo.util
   * reads no clock, so it can be driven by synthetic traces in tests.
   *
   * Construction (via the companion `apply`) never raises: out-of-range or
-  * non-finite parameters are clamped to sane values (pinned by
-  * `AdaptiveParallelismSuite.T-AP-02`); the production defaults are exactly the
-  * defaults below.
+  * non-finite parameters are clamped to sane values (pinned by the clamping
+  * tests); the production defaults are exactly the defaults below.
   */
 final class AdaptiveParallelism private (
     val min: Int,

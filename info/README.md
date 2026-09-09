@@ -42,12 +42,12 @@ How Goat Rodeo resolves Maven package URLs:
 
 ### [Metadata Parity: Sources and Javadoc](metadata_parity_sources_javadoc.md)
 How to run and interpret sources/javadoc metadata parity tests:
-- 53 corpus-based tests opening real JAR files at test time
+- corpus-based tests opening real JAR files at test time
 - pURL superset verification, classifier checks, standalone sources JAR
 
 ### [Metadata Parity: Regular JARs](metadata_parity_regular_jars.md)
 How to run and interpret regular JAR metadata parity tests:
-- 47 tests including 12 Maven Central-verified coordinates
+- Maven Central-verified coordinates
 - "Better than the reference scanner" verification, companion POM priority, count checks
 
 ### [Append-Only Graph Database](append_only_graph.md)

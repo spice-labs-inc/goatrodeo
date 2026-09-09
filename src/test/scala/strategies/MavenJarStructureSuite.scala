@@ -16,7 +16,7 @@ import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-class MavenPhase5Suite extends GoatRodeoFunSuite {
+class MavenJarStructureSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, scala.collection.immutable.TreeSet.empty, None, None)

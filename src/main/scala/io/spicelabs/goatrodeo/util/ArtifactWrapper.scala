@@ -106,8 +106,8 @@ sealed trait ArtifactWrapper {
   def isRealFile(): Boolean = false
 
   /** The effective MIME set: the detected/augmented set UNIONED with the
-    * producer-stamped hint (spec §5). The hint is authoritative (never
-    * re-checked against content) and never produced by sniffing.
+    * producer-stamped hint . The hint is authoritative (never re-checked
+    * against content) and never produced by sniffing.
     */
   def mimeType: Set[String] =
     mimeHint.fold(_mimeType)(h => _mimeType + h)

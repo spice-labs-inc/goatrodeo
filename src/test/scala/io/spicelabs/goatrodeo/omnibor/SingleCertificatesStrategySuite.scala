@@ -3,8 +3,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 
-/** Phase 2 — single Certificates strategy entry (spec §4, user decision 3;
-  * T6.8).
+/** single Certificates strategy entry (user design decision).
   *
   * WHAT: exactly ONE non-terminal dispatch function claims the pkcs7-signature
   * MIME (the Certificates claim). The terminal catch-all (GenericFile, last in
@@ -36,7 +35,7 @@ class SingleCertificatesStrategySuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T6.8 exactly one non-terminal strategy claims pkcs7-signature") {
+  test("exactly one non-terminal strategy claims pkcs7-signature") {
     val claimers = nonTerminalClaimers(Certificates.CertPkcs7Mime)
     assertEquals(
       claimers,
@@ -45,7 +44,7 @@ class SingleCertificatesStrategySuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T6.8b the same single claimer claims the pem-bundle MIME") {
+  test("the same single claimer claims the pem-bundle MIME") {
     // sanity: the single Certificates claimer also handles the existing
     // pem-bundle family (no second claimer exists for it either)
     val claimers = nonTerminalClaimers("application/x-pem-bundle")

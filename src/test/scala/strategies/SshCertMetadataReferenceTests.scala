@@ -57,7 +57,7 @@ class SshCertMetadataReferenceTests extends GoatRodeoFunSuite {
     }.toMap
   }
 
-  test("user-cert-ed25519: full metadata table matches ssh-keygen -L (G6)") {
+  test("user-cert-ed25519: full metadata table matches ssh-keygen -L") {
     val w = wrap("test_data/certificates/ssh/synthetic/user-cert-ed25519.pub")
     val cert = Certificates.parseSshCert(w).get
     val m = md(cert, w)
@@ -123,7 +123,7 @@ class SshCertMetadataReferenceTests extends GoatRodeoFunSuite {
     )
   }
 
-  test("host-cert-rsa-signed-by-ed25519: cross-algorithm fields (G6)") {
+  test("host-cert-rsa-signed-by-ed25519: cross-algorithm fields") {
     val w = wrap(
       "test_data/certificates/ssh/synthetic/host-cert-rsa-signed-by-ed25519.pub"
     )

@@ -13,7 +13,7 @@ import java.io.File
 import java.nio.file.Files
 import scala.collection.immutable.TreeSet
 
-/** Phase 6 — JVM Distribution Strategy test suite.
+/** JVM Distribution Strategy test suite.
   *
   * Tests JvmDistribution.release file parsing, vendor detection, pURL
   * generation, metadata emission, and package tagging.

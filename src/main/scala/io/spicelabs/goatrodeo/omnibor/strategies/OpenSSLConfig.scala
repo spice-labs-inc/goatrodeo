@@ -196,7 +196,7 @@ case class OpenSSLConfigState(
       ))
     }
 
-    // Phase A — cipher-suite decomposition: resolved constituent algorithms and
+    // Cipher-suite decomposition: resolved constituent algorithms and
     // per-suite entries, derived from both `CipherString` and `Ciphersuites`.
     val cipherEntries =
       data.cipherString.toVector.flatMap(

@@ -4,24 +4,19 @@ import io.bullet.borer.Dom
 import org.eclipse.jgit.lib.*
 import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
-import org.eclipse.jgit.transport.PackParser
-import org.eclipse.jgit.treewalk.FileTreeIterator
-import org.eclipse.jgit.treewalk.TreeWalk
 
 import java.io.File
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import java.security.MessageDigest
-import java.time.Instant
 import scala.collection.mutable
 import scala.util.Try
 
 /** One captured git provenance record: the gitoid identifier and its metadata
-  * body (spec §6).
+  * body .
   */
 final case class GitRunItem(gitoid: String, json: Dom.MapElem)
 
-/** Git provenance capture for tagged runs (spec §6, user decisions 4 & 5).
+/** Git provenance capture for tagged runs .
   *
   * WHAT: for each unique containing repository discovered beneath the base
   * directories, capture the HEAD commit, the HEAD tree, the worktree tree, and
@@ -36,12 +31,10 @@ final case class GitRunItem(gitoid: String, json: Dom.MapElem)
   *     with a warning (JGit limitation). Fixtures may use git CLI.
   *   - Discovery: only the *containing* repo per base; nested repos are
   *     gitlinks. Dedupe by canonical worktree path.
-  *   - The worktree tree is built with a JGit TreeWalk honoring ignore rules
-  *     (repo-local config only), symlinks recorded as symlink entries (never
-  *     followed), FIFOs skipped, submodules as gitlinks.
-  *   - Caps: entry count, depth, blob size, parent count, message length,
-  *     capture deadline. A cap hit drops the worktree item (or truncates the
-  *     message) without failing the run.
+  *   - Exactly two Items per repo: the HEAD commit and the HEAD tree (the
+  *     commit's `getTree` id — the same value `git rev-parse HEAD:` prints). No
+  *     worktree walks, no synthesized trees, no parent Items: the hashes stored
+  *     are the repository's own, read via JGit and never recomputed.
   *   - Containment: gitdir/commondir/alternates must live inside the scan tree;
   *     violations skip the repo.
   *   - Redaction: emails digested (`sha256:<hex>`, deterministic), repo root
@@ -55,18 +48,8 @@ final case class GitRunItem(gitoid: String, json: Dom.MapElem)
   */
 object GitRunInfo {
 
-  val KindCommit = "commit"
-  val KindTree = "tree"
-  val KindWorktreeTree = "worktree_tree"
-  val KindParentCommit = "parent_commit"
-
   // Caps (per repo, seconds-level deadline)
-  val MaxEntries = 100000
-  val MaxDepth = 32
-  val MaxParents = 64
-  val MaxBlobBytes = 64L * 1024 * 1024
   val MaxMessageLen = 262144
-  val MaxCaptureMillis = 60000L
 
   private val log = com.typesafe.scalalogging.Logger(getClass)
 
@@ -93,20 +76,18 @@ object GitRunInfo {
     */
   def capture(
       bases: Seq[File],
-      runDate: String,
       redact: Boolean = true,
       scanRoot: Option[File] = None
   ): Vector[GitRunItem] = {
     val repos = discoverRepos(bases)
     repos.flatMap { repoRoot =>
-      captureRepo(repoRoot, runDate, redact, scanRoot)
+      captureRepo(repoRoot, redact, scanRoot)
     }
   }
 
   /** Capture for a single repo. All-or-nothing per repo; never throws. */
   private def captureRepo(
       repoRoot: File,
-      runDate: String,
       redact: Boolean,
       scanRoot: Option[File]
   ): Vector[GitRunItem] = {
@@ -116,7 +97,7 @@ object GitRunInfo {
     builder.setMustExist(true)
     val repository = builder.build()
     try {
-      captureRepoChecked(repository, repoRoot, runDate, redact, scanRoot)
+      captureRepoChecked(repository, repoRoot, redact, scanRoot)
     } finally repository.close()
   }
 
@@ -126,7 +107,6 @@ object GitRunInfo {
   private def captureRepoChecked(
       repository: Repository,
       repoRoot: File,
-      runDate: String,
       redact: Boolean,
       scanRoot: Option[File]
   ): Vector[GitRunItem] = {
@@ -158,8 +138,8 @@ object GitRunInfo {
       } else
         Option(repository.resolve(Constants.HEAD)) match {
           case None =>
-            // unborn HEAD → just the worktree tree
-            worktreeTree(repository, runDate, redact, scanRoot).toVector
+            // unborn HEAD: no commit, no tree — nothing to report
+            Vector.empty
           case Some(head) =>
             val rw = new RevWalk(repository)
             try {
@@ -168,8 +148,6 @@ object GitRunInfo {
                 GitRunItem(
                   gitoid(commit.getId, "commit"),
                   commitItem(
-                    commit.getId.name,
-                    runDate,
                     redact,
                     repoRoot,
                     scanRoot,
@@ -179,8 +157,6 @@ object GitRunInfo {
                 GitRunItem(
                   gitoid(commit.getTree.getId, "tree"),
                   treeItem(
-                    commit.getTree.getId.name,
-                    runDate,
                     redact,
                     repoRoot,
                     scanRoot,
@@ -189,199 +165,20 @@ object GitRunInfo {
                   )
                 )
               )
-              val parents: Vector[GitRunItem] =
-                commit.getParents.take(MaxParents).zipWithIndex.toVector.map {
-                  case (p, idx) =>
-                    val pCommit = rw.parseCommit(p)
-                    GitRunItem(
-                      gitoid(p.getId, "commit"),
-                      parentItem(
-                        p.getId.name,
-                        idx,
-                        runDate,
-                        redact,
-                        repoRoot,
-                        scanRoot,
-                        commit.getId.name
-                      )
-                    )
-                }
-              val withWorktree =
-                worktreeTree(repository, runDate, redact, scanRoot) match {
-                  case Some(wtItem)
-                      if wtItem.gitoid == gitoid(
-                        commit.getTree.getId,
-                        "tree"
-                      ) =>
-                    // clean repo: merge the worktree kind into the tree item
-                    base.map {
-                      case ref if ref.gitoid == wtItem.gitoid =>
-                        mergeWorktreeKind(ref)
-                      case ref => ref
-                    }
-                  case Some(wtItem) => base :+ wtItem
-                  case None         => base
-                }
-              withWorktree ++ parents
+              base
             } finally rw.close()
         }
     }
   }
 
-  /** Add the `worktree_tree` kind to a tree Item's kinds array. */
-  private def mergeWorktreeKind(ref: GitRunItem): GitRunItem = {
-    val newKinds = ref.json.members
-      .collectFirst {
-        case (Dom.StringElem("kinds"), Dom.ArrayElem.Unsized(items)) =>
-          Dom.ArrayElem.Unsized(items :+ Dom.StringElem(KindWorktreeTree))
-      }
-      .getOrElse(
-        Dom.ArrayElem.Unsized(
-          Vector(Dom.StringElem(KindTree), Dom.StringElem(KindWorktreeTree))
-        )
-      )
-    val newJson = Dom.MapElem.Unsized(
-      ref.json.members.toVector.map {
-        case (Dom.StringElem("kinds"), _) => Dom.StringElem("kinds") -> newKinds
-        case kv                           => kv
-      }*
-    )
-    ref.copy(json = newJson)
-  }
-
-  /** Build the worktree tree via a JGit TreeWalk. Honors repo-local ignore
-    * rules; symlinks recorded, not followed; FIFOs skipped; submodules as
-    * gitlinks. Returns the Item (or None when a cap/refusal drops it).
-    */
-  private def worktreeTree(
-      repository: Repository,
-      runDate: String,
-      redact: Boolean,
-      scanRoot: Option[File]
-  ): Option[GitRunItem] = {
-    val deadline = Instant.now().plusMillis(MaxCaptureMillis)
-    Try {
-      val formatter = new TreeFormatter()
-      val fileTree = new FileTreeIterator(repository)
-      val walk = new TreeWalk(repository)
-      walk.reset()
-      walk.addTree(fileTree)
-      walk.setRecursive(false)
-      var entries = 0
-      var depth = 0
-      var stopped = false
-
-      // The TreeWalk over fileTree yields worktree entries in-order;
-      // build the tree non-recursively here. A cap/deadline hit sets
-      // `stopped` and halts the walk without early-returning.
-      while (walk.next() && !stopped) {
-        if (Instant.now().isAfter(deadline)) {
-          log.warn(
-            s"Git provenance: capture deadline exceeded for ${repository.getWorkTree}"
-          )
-          stopped = true
-        } else if (entries >= MaxEntries || depth >= MaxDepth) {
-          log.warn(
-            s"Git provenance: caps exceeded for ${repository.getWorkTree}"
-          )
-          stopped = true
-        } else {
-          val name = walk.getNameString
-          val isDir = walk.isSubtree
-          if (isDir) {
-            walk.enterSubtree()
-          } else {
-            // FileTreeIterator gives FileMode; dirs handled above
-            val mode = walk.getFileMode(0)
-            mode match {
-              case FileMode.REGULAR_FILE | FileMode.EXECUTABLE_FILE =>
-                // blob hash from the object reader
-                val objectId = walk.getObjectId(0)
-                formatter.append(name, mode, objectId)
-                entries += 1
-              case FileMode.SYMLINK =>
-                // record the symlink target via the file attributes
-                val path = walk.getPathString
-                val target = Files
-                  .readSymbolicLink(
-                    new File(repository.getWorkTree, path).toPath
-                  )
-                  .toString
-                  .getBytes(StandardCharsets.UTF_8)
-                val blobId =
-                  readOnlyInserter.idFor(Constants.OBJ_BLOB, target)
-                formatter.append(name, FileMode.SYMLINK, blobId)
-                entries += 1
-              case FileMode.GITLINK =>
-                formatter.append(name, FileMode.GITLINK, walk.getObjectId(0))
-                entries += 1
-              case _ => // FIFO/socket/etc: skip
-            }
-          }
-        }
-      }
-      val treeId = readOnlyInserter.idFor(formatter)
-      val json = treeItemWithId(
-        treeId.name,
-        runDate,
-        redact,
-        repository.getWorkTree,
-        scanRoot,
-        repository.resolve(Constants.HEAD).name,
-        worktree = true
-      )
-      Some(GitRunItem(gitoid(treeId, "tree"), json))
-    }.toOption.flatten
-  }
-
   private def gitoid(objectId: AnyObjectId, kind: String): String =
     s"gitoid:$kind:sha1:${objectId.name}"
 
-  /** Read-only object id computation for git provenance.
-    *
-    * Goat Rodeo's hard invariant: scanned git repositories are never modified.
-    * JGit's `ObjectInserter` is a write-capable API; this instance keeps only
-    * the pure content-addressing half (`idFor`, which is SHA-1 over the
-    * canonical object bytes and touches no repository state) and throws on
-    * every entry point that could stage, flush, or persist an object. `idFor`
-    * yields exactly the ids a real insert would produce (they differ only in
-    * that nothing is ever written), so all gitoid values are unchanged from a
-    * write-based computation.
-    */
-  private[goatrodeo] def readOnlyInserter: ObjectInserter =
-    new ObjectInserter() {
-      private def forbidden(operation: String): Nothing =
-        throw new UnsupportedOperationException(
-          s"Goat Rodeo treats git repositories as read-only: ${operation} must never be called"
-        )
-
-      override def insert(
-          tpe: Int,
-          length: Long,
-          in: java.io.InputStream
-      ): ObjectId = forbidden("ObjectInserter.insert")
-
-      override def newPackParser(in: java.io.InputStream): PackParser =
-        forbidden("ObjectInserter.newPackParser")
-
-      override def newReader(): ObjectReader =
-        forbidden("ObjectInserter.newReader")
-
-      override def flush(): Unit =
-        forbidden("ObjectInserter.flush")
-
-      override def close(): Unit = ()
-    }
-
-  // ----- item JSON builders (redaction-aware) -----
-
   private def baseFields(
-      runDate: String,
       redact: Boolean,
       repoRoot: File,
       scanRoot: Option[File]
   ): Vector[(String, Dom.Element)] = {
-    val dateField = "date" -> Dom.StringElem(runDate)
     val rootField = if (redact) {
       scanRoot
         .map { root =>
@@ -397,7 +194,7 @@ object GitRunInfo {
     val scanDirField =
       if (redact) None
       else scanRoot.map(r => "scan_dir" -> Dom.StringElem(r.getAbsolutePath))
-    Vector(dateField, rootField) ++ scanDirField.toVector
+    Vector(rootField) ++ scanDirField.toVector
   }
 
   private def digestEmail(email: String): String = {
@@ -412,21 +209,16 @@ object GitRunInfo {
     if (redact) digestEmail(email) else email
 
   private def commitItem(
-      hex: String,
-      runDate: String,
       redact: Boolean,
       repoRoot: File,
       scanRoot: Option[File],
       commit: org.eclipse.jgit.revwalk.RevCommit
   ): Dom.MapElem = {
-    val id = commit.getId.name
     val author = commit.getAuthorIdent
     val committer = commit.getCommitterIdent
     val parents = commit.getParents.map(_.name).toVector
     val (msg, truncated) = truncateMessage(commit.getFullMessage)
-    val fields = baseFields(runDate, redact, repoRoot, scanRoot) ++ Vector(
-      "kinds" -> Dom.ArrayElem.Unsized(Vector(Dom.StringElem(KindCommit))),
-      "object_format" -> Dom.StringElem("sha1"),
+    val fields = baseFields(redact, repoRoot, scanRoot) ++ Vector(
       "author_name" -> Dom.StringElem(author.getName),
       "author_email" -> Dom.StringElem(
         emailField(redact, author.getEmailAddress)
@@ -445,56 +237,13 @@ object GitRunInfo {
   }
 
   private def treeItem(
-      hex: String,
-      runDate: String,
       redact: Boolean,
       repoRoot: File,
       scanRoot: Option[File],
       head: String,
       commit: org.eclipse.jgit.revwalk.RevCommit
   ): Dom.MapElem = {
-    val fields = baseFields(runDate, redact, repoRoot, scanRoot) ++ Vector(
-      "kinds" -> Dom.ArrayElem.Unsized(Vector(Dom.StringElem(KindTree))),
-      "object_format" -> Dom.StringElem("sha1"),
-      "head_commit" -> Dom.StringElem(head)
-    )
-    Dom.MapElem.Unsized(fields*)
-  }
-
-  private def treeItemWithId(
-      hex: String,
-      runDate: String,
-      redact: Boolean,
-      repoRoot: File,
-      scanRoot: Option[File],
-      head: String,
-      worktree: Boolean
-  ): Dom.MapElem = {
-    val kinds =
-      if (worktree) Vector(KindWorktreeTree) else Vector(KindTree)
-    val fields = baseFields(runDate, redact, repoRoot, scanRoot) ++ Vector(
-      "kinds" -> Dom.ArrayElem.Unsized(kinds.map(k => Dom.StringElem(k))),
-      "object_format" -> Dom.StringElem("sha1"),
-      "head_commit" -> Dom.StringElem(head)
-    ) ++ (if (worktree) Vector("dirty" -> Dom.BooleanElem(true)) else Vector())
-    Dom.MapElem.Unsized(fields*)
-  }
-
-  private def parentItem(
-      hex: String,
-      idx: Int,
-      runDate: String,
-      redact: Boolean,
-      repoRoot: File,
-      scanRoot: Option[File],
-      head: String
-  ): Dom.MapElem = {
-    val fields = baseFields(runDate, redact, repoRoot, scanRoot) ++ Vector(
-      "kinds" -> Dom.ArrayElem.Unsized(
-        Vector(Dom.StringElem(KindParentCommit))
-      ),
-      "object_format" -> Dom.StringElem("sha1"),
-      "parent_index" -> Dom.IntElem(idx),
+    val fields = baseFields(redact, repoRoot, scanRoot) ++ Vector(
       "head_commit" -> Dom.StringElem(head)
     )
     Dom.MapElem.Unsized(fields*)

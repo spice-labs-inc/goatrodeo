@@ -16,7 +16,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
 
-/** Phase 0 (0.8) — GRDWalker.readNext returns None for corrupt CBOR entry.
+/** GRDWalker.readNext returns None for corrupt CBOR entry.
   *
   * ## What this tests
   *
@@ -32,8 +32,8 @@ import scala.util.Try
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.8: GRDWalker.readNext returns None for corrupt CBOR entry
-  * rather than throwing.
+  * Requirement: GRDWalker.readNext returns None for corrupt CBOR entry rather
+  * than throwing.
   *
   * ## LLM-friendly summary
   *
@@ -65,8 +65,8 @@ class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
       * entry bytes (overwrites with garbage) while keeping the header intact.
       * Opens the file with GRDWalker and calls readNext(). Why: Corrupt CBOR
       * entries must be handled gracefully — returning None rather than
-      * propagating a CborDecodingException. Requirement: Phase 0 §0.8 —
-      * readNext returns None for corrupt CBOR.
+      * propagating a CborDecodingException. Requirement: — readNext returns
+      * None for corrupt CBOR.
       */
     val tempDir = Files.createTempDirectory("corruptcbor").toFile()
     try {
@@ -128,8 +128,8 @@ class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
 
     /** What: Creates a valid GRD file with one item, opens it, and reads the
       * entry. Should return Some(item). Why: Normal operation must still work
-      * after the pattern-match change. Requirement: Phase 0 §0.8 — readNext
-      * returns Some for valid entry.
+      * after the pattern-match change. Requirement: readNext returns Some for
+      * valid entry.
       */
     val tempDir = Files.createTempDirectory("validcbor").toFile()
     try {
@@ -176,8 +176,8 @@ class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
       * Why: When a CBOR entry is corrupt, readNext returns None silently.
       * Operators must have visibility into when and why entries are skipped.
       * The WARN log provides this visibility, indicating the position and error
-      * message of the corrupt entry. Requirement: Phase 0 §0.8 — readNext logs
-      * warning on corrupt entry.
+      * message of the corrupt entry. Requirement: readNext logs warning on
+      * corrupt entry.
       */
     val tempDir = Files.createTempDirectory("corruptcbor-warn").toFile()
     try {
@@ -252,7 +252,7 @@ class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
   }
 }
 
-/** Phase 4 — GRD EOF semantics (spec §10; user decision 6; T13.x).
+/** GRD EOF semantics. See ADR 0005.
   *
   * WHAT: pins that ANY negative entry length is treated as end-of-file (not
   * just −1), and that a positive length exceeding the remaining bytes is
@@ -315,7 +315,7 @@ class GrdEofSuite extends GoatRodeoFunSuite {
     } finally { f.delete(); () }
   }
 
-  test("T13.1 anyNegativeEntryLengthIsEof") {
+  test("anyNegativeEntryLengthIsEof") {
     Seq(-1, -2, -3, -65536, Int.MinValue).foreach { neg =>
       assertEquals(
         readFirst(validGrdWithFirstEntryLength(neg)),
@@ -325,13 +325,13 @@ class GrdEofSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T13.2 positiveLengthPastEofIsEndOfData") {
+  test("positiveLengthPastEofIsEndOfData") {
     // a length larger than the file's remaining bytes → end-of-data
     val bytes = validGrdWithFirstEntryLength(Int.MaxValue)
     assertEquals(readFirst(bytes), None)
   }
 
-  test("T13.3 realEntriesAreNeverNegative — round-trip unchanged") {
+  test("realEntriesAreNeverNegative — round-trip unchanged") {
     val tempDir = Files.createTempDirectory("grdeof").toFile()
     try {
       val id =

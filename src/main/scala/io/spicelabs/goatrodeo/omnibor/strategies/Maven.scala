@@ -294,7 +294,7 @@ case class MavenState(
     * pom.properties > embedded pom.xml > manifest > filename
     *
     * The companion POM (external POM) is the HIGHEST priority source for
-    * canonical pURL resolution (REQ-3). It is the authoritative published Maven
+    * canonical pURL resolution. It is the authoritative published Maven
     * metadata, more reliable than embedded pom.properties (which may be from
     * shaded dependencies), manifest headers, or filename heuristics.
     * pom.properties is filename-gated by
@@ -767,12 +767,12 @@ case class MavenState(
       // all metadata is collected via `accumulateInfo` as children are
       // processed, then applied in `applyAccumulatedAugmentation` after all
       // children are done.
-      //
+
       // groupId/artifactId/version resolution is deferred to
       // `applyAccumulatedAugmentation` because it requires data from
       // children (manifest, embedded pom.properties, etc.) that isn't
       // available until after child processing completes.
-      //
+
       // For standalone sources/javadoc JARs (claimed by computeMavenFiles
       // second pass), the classifier is detected from the filename
       // via detectClassifierFromFilename and stored in currentMarker context.
@@ -821,7 +821,7 @@ case class MavenState(
     // accumulated from children (manifest, pom.properties, etc.).
     // The pURL is instead generated in applyAccumulatedAugmentation after
     // all children have been processed.
-    //
+
     // For non-accumulator markers (POM, Metadata), resolve directly from
     // parsedPom and generate the pURL here.
     currentAccumulator match {
@@ -1451,11 +1451,11 @@ case class MavenState(
         // establish bidirectional alias edges:
         //   - pURL item gets aliasTo -> JAR item
         //   - JAR item gets aliasFrom -> pURL
-        //
+
         // A single pURL can have multiple aliasTo entries (e.g., if the
         // same pURL appears in multiple JARs, each JAR gets its own
         // aliasTo entry on the shared pURL item).
-        //
+
         // In addition to the canonical pURL (from the primary
         // groupId/artifactId/version), we also emit pURLs for ALL
         // non-primary embedded packages found inside the JAR (e.g.,
@@ -1601,7 +1601,7 @@ case class MavenState(
                           classifier // ← was None: secondary pURLs from
                           // sources/javadoc JARs must include
                           // the classifier (?packaging=sources
-                          // or ?classifier=javadoc) per REQ-1
+                          // or ?classifier=javadoc)
                         )
                     }
                     .toOption
@@ -1993,7 +1993,7 @@ case class MavenState(
     }.toOption.flatten
   }
 
-  /** Scan a JAR/WAR/EAR archive for structural metadata (Phase 5). */
+  /** Scan a JAR/WAR/EAR archive for structural metadata. */
   /** Build jar-structure metadata TreeMap from accumulated state.
     *
     * This replaces the old `buildJarStructureMetadata(artifact, manifest)`
@@ -2386,7 +2386,7 @@ object MavenToProcess {
     // This ensures standalone sources/javadoc JARs get full Maven
     // processing (accumulator, resolveGroupIdArtifactIdVersion, pURL emission) instead of
     // falling through to GenericFile (which emits 0 pURLs).
-    //
+
     // CRITICAL: Must check mimeType to prevent non-archive files from
     // being processed through the Maven pipeline (security: a text file
     // named foo-sources.jar should NOT be opened as a JAR archive).

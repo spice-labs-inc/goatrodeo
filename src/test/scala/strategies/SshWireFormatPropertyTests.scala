@@ -45,7 +45,7 @@ import org.scalacheck.Prop.propBoolean
   * example-based test caught because no fixture happened to have that value.
   * Property #2 — "uint64 round-trip including sentinels" — would have caught
   * it. The other properties guard related classes of bugs in the byte-pumping
-  * path that drives all of Phase 5's fingerprinting and metadata extraction.
+  * path that drives all fingerprinting and metadata extraction.
   */
 class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
 
@@ -112,7 +112,7 @@ class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
 
   // --- properties ---
 
-  property("[PROP] uint32 round-trip (G5 #1)") {
+  property("[PROP] uint32 round-trip") {
     forAll(genUInt32) { v =>
       val out = new java.io.ByteArrayOutputStream()
       writeUInt32(out, v)
@@ -122,7 +122,7 @@ class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
   }
 
   property(
-    "[PROP] uint64 round-trip including sentinels 0 and 0xFFFF…FFFF (G5 #2 / G1 regression guard)"
+    "[PROP] uint64 round-trip including sentinels 0 and 0xFFFF…FFFF "
   ) {
     forAll(genUInt64) { v =>
       val out = new java.io.ByteArrayOutputStream()
@@ -132,7 +132,7 @@ class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
     }
   }
 
-  property("[PROP] string round-trip preserves bytes (G5 #3)") {
+  property("[PROP] string round-trip preserves bytes") {
     forAll(genBytes) { b =>
       val out = new java.io.ByteArrayOutputStream()
       writeString(out, b)
@@ -141,7 +141,7 @@ class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
     }
   }
 
-  property("[PROP] readString returns None on truncated input (G5 #4)") {
+  property("[PROP] readString returns None on truncated input") {
     forAll(Gen.choose(1, 1024)) { claimedLen =>
       val out = new java.io.ByteArrayOutputStream()
       writeUInt32(out, claimedLen.toLong)
@@ -154,7 +154,7 @@ class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
   }
 
   property(
-    "[PROP] mpintBitLength matches BigInt.bitLength for non-negative inputs (G5 #5)"
+    "[PROP] mpintBitLength matches BigInt.bitLength for non-negative inputs "
   ) {
     forAll(Gen.choose(0, 4096), Arbitrary.arbitrary[Long]) { (bits, seed) =>
       val n =
@@ -167,7 +167,7 @@ class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
     }
   }
 
-  property("[PROP] string-list round-trip preserves elements (G5 #6)") {
+  property("[PROP] string-list round-trip preserves elements") {
     val genStr = Gen.alphaNumStr // ASCII, no embedded whitespace surprises
     val genList = Gen.choose(0, 16).flatMap(n => Gen.listOfN(n, genStr))
     forAll(genList) { ss =>

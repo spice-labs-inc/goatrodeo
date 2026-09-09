@@ -178,10 +178,9 @@ object CbomEmitter {
 
   /** True when the Item carries cryptographic metadata from a known strategy.
     *
-    * Includes the Phase A–G extended-capture prefixes (ServiceCrypto, Kerberos,
-    * JWT, JWK, EmbeddedKey, CryptoAlgorithms, CryptoDependency, MobileTls) so
-    * the emitter covers the same families as the captured ADG metadata can
-    * express.
+    * Includes the extended-capture prefixes (ServiceCrypto, Kerberos, JWT, JWK,
+    * EmbeddedKey, CryptoAlgorithms, CryptoDependency, MobileTls) so the emitter
+    * covers the same families as the captured ADG metadata can express.
     */
   private def isCryptoItem(item: Item): Boolean = {
     item.bodyAsItemMetaData.exists { meta =>
@@ -976,7 +975,7 @@ object CbomEmitter {
     extra.keys.exists(_.startsWith("EmbeddedCertificates:"))
   }
 
-  // Phase A–G extended-capture families (classification precedence:
+  // Extended-capture families (classification precedence:
   // EmbeddedKey, ServiceCrypto, Kerberos, JWT, JWK, CryptoAlgorithms,
   // CryptoDependency, MobileTls).
   private def hasEmbeddedKey(extra: Map[String, Set[String]]): Boolean = {

@@ -22,10 +22,9 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import java.io.File
 import java.nio.file.Files
 
-/** Phase 2 — `CryptoDetector` content-sniff signature unit tests.
+/** `CryptoDetector` content-sniff signature unit tests.
   *
-  * Each test traces back to one row of the detection-signatures table in
-  * `certificates-strategy/phases-1-2-foundation-detector.md` (Phase 2). For
+  * Each test traces back to one row of the detection-signatures table. For
   * every detection row, a synthetic byte sequence (or the smallest possible
   * real-world prefix) is fed through `CryptoDetector.detect` (the
   * package-private internal entry that lets us assert MIME-set output without
@@ -70,7 +69,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
 
   // ===================================================================
   // SECTION A — Phase-INVARIANT contracts
-  // (must hold across every phase from Phase 2 onwards)
+  // (must hold across every revision)
   // ===================================================================
 
   test("[INVARIANT] augmenter output ⊇ input (purely additive)") {
@@ -235,19 +234,19 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     assert(out.contains("application/x-openssh-certificate"))
   }
 
-  // G2 — sshCertTokens: the original sshCertTokens set had 4 of 6
-  // entries replaced by `[email protected]` placeholder strings. Phase 5
-  // restored the real OpenSSH cert-type tokens and these tests guard
-  // against regression for each of the 6.
+  // sshCertTokens: the token set once had 4 of 6 entries replaced by
+  // `[email protected]` placeholder strings. The real OpenSSH cert-type
+  // tokens are restored and these tests guard against regression for each
+  // of the 6.
   test(
-    "[OpenSSH cert]: ssh-dss-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)"
+    "[OpenSSH cert]: ssh-dss-cert-v01@openssh.com first token adds application/x-openssh-certificate "
   ) {
     val out = detect("ssh-dss-cert-v01@openssh.com AAAA comment\n".getBytes)
     assert(out.contains("application/x-openssh-certificate"))
   }
 
   test(
-    "[OpenSSH cert]: ecdsa-sha2-nistp256-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)"
+    "[OpenSSH cert]: ecdsa-sha2-nistp256-cert-v01@openssh.com first token adds application/x-openssh-certificate "
   ) {
     val out =
       detect("ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA comment\n".getBytes)
@@ -255,7 +254,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[OpenSSH cert]: ecdsa-sha2-nistp384-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)"
+    "[OpenSSH cert]: ecdsa-sha2-nistp384-cert-v01@openssh.com first token adds application/x-openssh-certificate "
   ) {
     val out =
       detect("ecdsa-sha2-nistp384-cert-v01@openssh.com AAAA comment\n".getBytes)
@@ -263,7 +262,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[OpenSSH cert]: ecdsa-sha2-nistp521-cert-v01@openssh.com first token adds application/x-openssh-certificate (G2)"
+    "[OpenSSH cert]: ecdsa-sha2-nistp521-cert-v01@openssh.com first token adds application/x-openssh-certificate "
   ) {
     val out =
       detect("ecdsa-sha2-nistp521-cert-v01@openssh.com AAAA comment\n".getBytes)
@@ -271,7 +270,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[OpenSSH cert][NEG]: placeholder string '[email protected]' must NOT be in token set (G2)"
+    "[OpenSSH cert][NEG]: placeholder string '[email protected]' must NOT be in token set "
   ) {
     val out = detect("[email protected] AAAA comment\n".getBytes)
     assert(
@@ -318,14 +317,13 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     assert(out.contains("application/pgp-keys"))
   }
 
-  // N2 (Phase 6 second-pass gap analysis): the old-format public-key
-  // packet tag (tag-6) has 4 length-encoding variants per RFC 4880 §4.2.1:
-  //   0x98 = 1-octet length, 0x99 = 2-octet, 0x9A = 4-octet, 0x9B = indeterminate.
-  // The original detector matched only 0x98; the G12 remediation extended
-  // it to all four. These three tests pin coverage of the newly-matched
-  // values so a future refactor cannot silently drop one.
+  // The old-format public-key packet tag (tag-6) has 4 length-encoding
+  // variants per RFC 4880 §4.2.1: 0x98 = 1-octet length, 0x99 = 2-octet,
+  // 0x9A = 4-octet, 0x9B = indeterminate. The detector matches all four;
+  // these three tests pin coverage of the values so a future refactor
+  // cannot silently drop one.
   test(
-    "[PGP binary]: first byte 0x99 (old-format tag-6, 2-octet length) adds application/pgp-keys (N2)"
+    "[PGP binary]: first byte 0x99 (old-format tag-6, 2-octet length) adds application/pgp-keys "
   ) {
     // 0x99 is what gpg(1) actually emits for an RSA-3072 export (the
     // v4-rsa3072-pub.gpg fixture starts with bytes 99 01 8d 04).
@@ -337,7 +335,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[PGP binary]: first byte 0x9A (old-format tag-6, 4-octet length) adds application/pgp-keys (N2)"
+    "[PGP binary]: first byte 0x9A (old-format tag-6, 4-octet length) adds application/pgp-keys "
   ) {
     val out = detect(Array[Byte](0x9a.toByte, 0x00, 0x00, 0x01, 0x00))
     assert(
@@ -347,7 +345,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[PGP binary]: first byte 0x9B (old-format tag-6, indeterminate length) adds application/pgp-keys (N2)"
+    "[PGP binary]: first byte 0x9B (old-format tag-6, indeterminate length) adds application/pgp-keys "
   ) {
     val out = detect(Array[Byte](0x9b.toByte, 0x04, 0x60.toByte, 0x00))
     assert(
@@ -546,7 +544,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     // window and continues just beyond, but with the BEGIN marker
     // length being > 1, the body itself isn't fully visible — what
     // matters is that the detector at least tries.
-    //
+
     // We also test the simpler case: header fully within the first
     // 4 KB but at the very end. If we read short, we miss it.
     val begin = "-----BEGIN CERTIFICATE-----".getBytes("UTF-8")
@@ -697,13 +695,13 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   // ===================================================================
-  // SECTION F — Phase-2 adversarial-review remediations
+  // SECTION F — hostile-input hardening
   // ===================================================================
 
   // --- P1: 1 MB DER probe budget ---
 
   test(
-    "[P1] DER X.509 PQC cert > 4 KB is detected (uses 1 MB DER probe budget)"
+    "DER X.509 PQC cert > 4 KB is detected (uses 1 MB DER probe budget)"
   ) {
     // SLH-DSA-SHA2-192f trust anchor is ~36 KB — would silently drop
     // out of the 4 KB-prefix budget. P1 fix raises the DER probe to
@@ -721,7 +719,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("[P1] ML-DSA-87 PQC cert (~7 KB) is detected") {
+  test("PQC cert (~7 KB) is detected") {
     val sample = new File(
       "test_data/certificates/x509/pqc/ml-dsa/ml-dsa-87.der"
     )
@@ -736,7 +734,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[P1] BUDGET — DER probe never reads more than 1 MB, even on huge files"
+    "BUDGET — DER probe never reads more than 1 MB, even on huge files"
   ) {
     // Construct a synthetic > 1 MB byte array with the DER prologue.
     // Detector must not OOM or block forever. We don't assert read-
@@ -761,7 +759,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
 
   // --- P2: PKCS#12 ASN.1 disambiguation probe ---
 
-  test("[P2] PKCS#12 fixture detected when filename has no .p12 extension") {
+  test("PKCS#12 fixture detected when filename has no .p12 extension") {
     // Real PKCS#12 bytes copied to a non-.p12-named file. The ASN.1
     // structure probe must catch it.
     val src = new File(
@@ -785,7 +783,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[P2] non-PKCS#12 .p12-named file (X.509 cert renamed) is detected as PKCS#12 via extension hint AND also as cert via dual emission"
+    "non-PKCS#12 .p12-named file (X.509 cert renamed) is detected as PKCS#12 via extension hint AND also as cert via dual emission"
   ) {
     // A real X.509 DER cert renamed to .p12 — extension says PKCS#12,
     // structure says X.509. Dual-emission policy: emit pkcs12
@@ -811,7 +809,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   // --- P3: DER PKCS#7 OID-near-start probe ---
 
   test(
-    "[P3] DER PKCS#7 SignedData detected via 1.2.840.113549.1.7.2 OID near start"
+    "DER PKCS#7 SignedData detected via 1.2.840.113549.1.7.2 OID near start"
   ) {
     // Synthetic DER ContentInfo with signedData OID. Structure:
     //   SEQUENCE (30 82 ...) {
@@ -849,7 +847,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("[P3] DER prefix without PKCS#7 OID is NOT detected as pkcs7-mime") {
+  test("DER prefix without PKCS#7 OID is NOT detected as pkcs7-mime") {
     // A pure X.509 cert prefix shouldn't match P3.
     val src = new File(
       "test_data/certificates/x509/synthetic/ed25519-selfsigned-der.der"
@@ -866,9 +864,9 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   // --- P4: full augmenter chain text/* preservation ---
 
   test(
-    "[P4] full augmenter chain (Dotnet → Saffron → Crypto) preserves text/plain on PEM input"
+    "full augmenter chain (Dotnet → Saffron → Crypto) preserves text/plain on PEM input"
   ) {
-    // P4 remediation: prove the chain order assumption explicitly.
+    // Prove the chain order assumption explicitly.
     // Construct a PEM-shaped artifact, invoke the production
     // augmenter chain via ArtifactWrapper.augmentMimeTypes, and
     // assert text/plain survives in the output AND the crypto MIMEs
@@ -897,7 +895,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
 
   // --- P7: SSH wire-format leading-whitespace / BOM tolerance ---
 
-  test("[P7] SSH pubkey with leading whitespace before token is detected") {
+  test("SSH pubkey with leading whitespace before token is detected") {
     val out = detect("    ssh-ed25519 AAAA comment\n".getBytes)
     assert(
       out.contains("application/x-openssh-public-key"),
@@ -905,7 +903,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("[P7] SSH pubkey with leading UTF-8 BOM is detected") {
+  test("SSH pubkey with leading UTF-8 BOM is detected") {
     val bom: Array[Byte] = Array(0xef.toByte, 0xbb.toByte, 0xbf.toByte)
     val payload = bom ++ "ssh-ed25519 AAAA comment\n".getBytes("UTF-8")
     val out = detect(payload)
@@ -918,7 +916,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   // --- P8: multi-line SSH (authorized_keys-shaped files) ---
 
   test(
-    "[P8] multi-line authorized_keys-style file detects pubkey on any line"
+    "multi-line authorized_keys-style file detects pubkey on any line"
   ) {
     val payload =
       """# comment line
@@ -934,7 +932,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[P8] multi-line file with pubkey on line 2 detected (first line is a comment)"
+    "multi-line file with pubkey on line 2 detected (first line is a comment)"
   ) {
     val payload = "# comment\nssh-ed25519 AAAA me@host\n".getBytes
     val out = detect(payload)
@@ -944,7 +942,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("[P8] multi-line file with cert on a non-first line is detected") {
+  test("multi-line file with cert on a non-first line is detected") {
     val payload =
       """# header comment
         |ssh-ed25519-cert-v01@openssh.com AAAA cert@host

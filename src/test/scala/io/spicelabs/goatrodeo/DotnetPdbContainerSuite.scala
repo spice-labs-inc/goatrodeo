@@ -8,9 +8,9 @@ import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import scala.util.Try
 
-/** Cilantro 0.4.0 PDB-as-container (handoff §2.4; user design: a PDB is just a
-  * container; embedded sources become ArtifactWrappers; contain:up connections
-  * happen automatically in the graph).
+/** Cilantro 0.4.0 PDB-as-container (user design: a PDB is just a container;
+  * embedded sources become ArtifactWrappers; contain:up connections happen
+  * automatically in the graph).
   *
   * Fixtures are REAL portable PDBs (BSJB root) with embedded sources from the
   * committed NuGet packages in test_data/dotnet/:

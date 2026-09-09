@@ -24,7 +24,7 @@ import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class MavenPhase1Suite extends GoatRodeoFunSuite {
+class MavenCoordinateResolutionSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item = Item(
     id,
@@ -816,16 +816,16 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
   }
 
   // ==================== Field-Level Merge Tests ====================
-  //
+
   // These tests verify that resolveGroupIdArtifactIdVersion uses field-level merge: for each field
   // (groupId, artifactId, version), the best value is picked from the best
   // source FOR THAT FIELD, not from the first source that provides all three.
-  //
+
   // Per-field priority:
   //   groupId:    pom.properties > external POM > embedded pom.xml > manifest > filename
   //   artifactId: pom.properties > external POM > embedded pom.xml > filename > manifest
   //   version:    pom.properties > external POM > embedded pom.xml > manifest > filename
-  //
+
   // The key change: filename has HIGHER priority than manifest for artifactId,
   // because Implementation-Title is human-readable, not a Maven artifactId.
 
@@ -842,8 +842,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * when one field is missing. Field-level merge keeps the good fields and
     * fills only the missing ones.
     *
-    * '''Requirement:''' Plan Test 1 — pom.properties partial → filename fills
-    * artifactId.
+    * '''Requirement:''' pom.properties partial → filename fills artifactId.
     *
     * '''LLM context:''' This is a RED test. It fails with the current
     * source-level priority code because pom.properties is incomplete (missing
@@ -888,7 +887,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * AutoConfigure"); filename matches Maven artifactId
     * ("spring-boot-autoconfigure").
     *
-    * '''Requirement:''' Plan Test 2 — filename beats manifest for artifactId.
+    * '''Requirement:''' filename beats manifest for artifactId.
     *
     * '''LLM context:''' This is a RED test. It fails with the current code
     * because manifest wins (source-level priority 4) and produces
@@ -937,8 +936,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * version still come from manifest (unchanged priority), only artifactId
     * comes from filename (swapped priority).
     *
-    * '''Requirement:''' Plan Test 3 — swap verification, all 3 fields from
-    * different sources.
+    * '''Requirement:''' swap verification, all 3 fields from different sources.
     *
     * '''LLM context:''' This is a RED test. With source-level priority, the
     * manifest wins wholesale, producing artifactId="Human Readable Name".
@@ -985,8 +983,8 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * Implementation-Version but no artifactId headers still has valid vendor
     * and version information. Field-level merge should use these fields.
     *
-    * '''Requirement:''' Plan Test 4 — manifest provides groupId/version when
-    * manifest has no artifactId.
+    * '''Requirement:''' manifest provides groupId/version when manifest has no
+    * artifactId.
     *
     * '''LLM context:''' This is a RED test. With the current code, the gate
     * causes resolveGroupIdArtifactIdVersionFromManifest to return None, so the
@@ -1027,8 +1025,8 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * '''Why:''' Source-level priority discards the entire pom.properties triple
     * when groupId is missing. Field-level merge keeps the good fields.
     *
-    * '''Requirement:''' Plan Test 5 — pom.properties missing groupId → manifest
-    * provides groupId.
+    * '''Requirement:''' pom.properties missing groupId → manifest provides
+    * groupId.
     *
     * '''LLM context:''' This is a RED test. With source-level priority,
     * fromProps=None (missing groupId), manifest wins → artifactId="My Library"
@@ -1077,7 +1075,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * version), the merge combines them: groupId from external POM, artifactId
     * from embedded pom.xml, version from external POM.
     *
-    * '''Requirement:''' Plan Test 6 — mixed-field across external/embedded POM.
+    * '''Requirement:''' mixed-field across external/embedded POM.
     *
     * '''LLM context:''' This is a RED test. With source-level priority, neither
     * POM provides a complete triple, so both are discarded and the result falls
@@ -1114,7 +1112,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * limitation: extractIdentityFromFilename splits on the last dot, which may
     * produce a wrong groupId/artifactId split for some filenames.
     *
-    * '''Requirement:''' Plan Test 7 — dotted filename + manifest groupId.
+    * '''Requirement:''' dotted filename + manifest groupId.
     */
   test(
     "field-merge: manifest groupId beats filename groupId when both present"
@@ -1160,7 +1158,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * pom.properties" case to work end-to-end. That is out of scope for this
     * plan.
     *
-    * '''Requirement:''' Plan Test 9 — full-pipeline integration.
+    * '''Requirement:''' full-pipeline integration.
     */
   test(
     "field-merge: full pipeline — no pom.properties, filename beats manifest"
@@ -1200,7 +1198,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * manifest's version. This is the current behavior — the test documents it,
     * not asserts it is correct.
     *
-    * '''Requirement:''' Plan Test 17 — version masking documentation.
+    * '''Requirement:''' version masking documentation.
     *
     * '''LLM context:''' This test documents a security concern, not a desired
     * behavior. The manifest's version is trusted because it's usually written
@@ -1245,7 +1243,7 @@ class MavenPhase1Suite extends GoatRodeoFunSuite {
     * Purl.encode() but semantically unguarded. This test documents that the
     * structural mitigation works.
     *
-    * '''Requirement:''' Plan Test 18 — character whitelist.
+    * '''Requirement:''' character whitelist.
     */
   test("security: filename with special characters does not crash") {
     val state = MavenState()

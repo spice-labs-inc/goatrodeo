@@ -103,7 +103,7 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
   }
 
   // ===== Test 1: SSH cert pURLs (already migrated to builder) ==========
-  //
+
   // These pass on the current code. They are regression guards.
 
   test(
@@ -169,12 +169,12 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
   }
 
   // ===== Test 2: purlForPgpKey with angle-bracket canonicalAlg =========
-  //
+
   // `purlForPgpKey` uses `new PackageURL(s"pkg:generic/pgp/fingerprint@...?$qual")`
   // where `qual` is built from `ListBuffer[String]` of `"key=value"` pairs
   // concatenated with `&`. If any qualifier value contains `<` or `>`,
   // the `PackageURL(String)` constructor throws `MalformedPackageURLException`.
-  //
+
   // This test constructs a `PgpKey` with `canonicalAlg = "<unknown-alg-99>"`
   // — the same pattern as the `sigAlgOidMap` fallback. The method must
   // return a valid pURL regardless of qualifier value content.
@@ -203,13 +203,13 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
   }
 
   // ===== Test 3: purlsForCert with unknown sig OID =====================
-  //
+
   // `purlsForCert` uses `new PackageURL(s"pkg:generic/x509/cert-sha256@...?$qual")`
   // where `qual` is built from `Seq[String]` of `"key=value"` pairs. The
   // `sig-alg` qualifier receives the output of `canonicalSigAlg`, which
   // returns `<unknown-sig-oid-...>` for OIDs not in `sigAlgOidMap`. The
   // angle brackets crash `new PackageURL(String)`.
-  //
+
   // This test builds a cert with a fabricated sig OID (`1.3.9999.9999.1`)
   // via a BC `ContentSigner` that reports the fake OID in the
   // AlgorithmIdentifier. Both the SPKI and cert pURLs must round-trip.
@@ -236,7 +236,7 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
   }
 
   // ===== Test 4: purlForCrl with unknown sig OID =======================
-  //
+
   // Same crash pattern as test 3 but on the CRL path. `purlForCrl` uses
   // `new PackageURL(s"pkg:generic/x509/crl-sha256@...?sig-alg=$sigAlg")` where
   // `sigAlg` comes from `canonicalSigAlgCrl` with the same fallback.
@@ -314,22 +314,22 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
   }
 
   // ===== Structural invariant tests: pkg:generic/{namespace}/{name}@... ====
-  //
+
   // These tests verify the pURL object structure (type, namespace, name)
   // for every crypto pURL construction method. They enforce the migration
   // from `pkg:{type}/{name}@...` to `pkg:generic/{namespace}/{name}@...`
   // per the user request.
-  //
+
   // ## What these tests test
-  //
+
   // Each test constructs a minimal input, calls the pURL construction method,
   // and asserts on the PackageURL field accessors (getType, getNamespace,
   // getName) rather than on string content. This is a stronger invariant
   // than string matching because it verifies the structural decomposition
   // the library performs, not just the serialized form.
-  //
+
   // ## Why these tests exist
-  //
+
   // The pURL spec defines `generic` as the correct type for non-ecosystem
   // identifiers. The crypto types (pgp, x509, ssh) are not registered pURL
   // types, so they must be expressed as namespaces under `generic`:

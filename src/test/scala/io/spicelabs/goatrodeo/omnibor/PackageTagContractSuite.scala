@@ -15,7 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-/** Phase 2 TDD Tests: ProcessingState.maybePackageTag contract
+/** ProcessingState.maybePackageTag contract
   *
   * These tests verify:
   *   - ProcessingState trait has maybePackageTag method
@@ -24,7 +24,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   *     tagging)
   *
   * Requirement Traceability:
-  *   - R7: Certificates and Generic excluded from per-package tagging
+  *   - Certificates and Generic excluded from per-package tagging
   */
 class PackageTagContractSuite extends GoatRodeoFunSuite {
 

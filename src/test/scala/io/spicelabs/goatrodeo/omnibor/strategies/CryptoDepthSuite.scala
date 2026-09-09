@@ -27,8 +27,8 @@ import java.nio.file.Path
 import java.util.Base64
 import scala.collection.immutable.TreeSet
 
-/** Phase F — Detection depth: keystore name fallback, binary PGP keyrings,
-  * keybox detection, PKCS#8 DER envelopes, certificate extension depth, and the
+/** Detection depth: keystore name fallback, binary PGP keyrings, keybox
+  * detection, PKCS#8 DER envelopes, certificate extension depth, and the
   * no-secret output property.
   */
 class CryptoDepthSuite extends GoatRodeoFunSuite {
@@ -70,7 +70,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     else bodyLines.mkString
   }
 
-  test("T-F-01 keystore name/extension fallback augments MIME") {
+  test("keystore name/extension fallback augments MIME") {
     for (
       name <- Vector(
         "conf/security/jssecacerts",
@@ -103,7 +103,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-F-02 binary .gpg keyring yields per-key metadata") {
+  test("binary .gpg keyring yields per-key metadata") {
     val armored = Files.readString(
       Path.of("test_data/certificates/pgp/real/debian-cdimage.asc"),
       StandardCharsets.UTF_8
@@ -143,7 +143,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-F-03 GPG keybox is detected (magic + extension)") {
+  test("GPG keybox is detected (magic + extension)") {
     val magic = Array[Byte](0x23, 0x4b, 0x42, 0x58, 0x66) // "#KBXf"
     assert(
       CryptoDetector
@@ -159,7 +159,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-F-04 PKCS#8 DER private key → envelope-only, no bytes") {
+  test("PKCS#8 DER private key → envelope-only, no bytes") {
     val pem = Files.readString(
       Path.of(
         "test_data/certificates/private-keys/synthetic/pkcs8-rsa-2048-unencrypted.pem"
@@ -211,7 +211,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     m.toMap
   }
 
-  test("T-F-05 certificate OCSP/CRL-DP extension depth") {
+  test("certificate OCSP/CRL-DP extension depth") {
     val m = certificateMetadata(
       "test_data/certificates/x509/leaves/python.org__www.python.org__a162964cfe.der"
     )
@@ -225,7 +225,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-F-06 certificate SKI + policies") {
+  test("certificate SKI + policies") {
     val m = certificateMetadata(
       "test_data/certificates/x509/canonical/letsencrypt-e1.pem"
     )
@@ -240,7 +240,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T-F-10 property: F-family outputs carry no secrets") {
+  test("property: F-family outputs carry no secrets") {
     val certPem = Files.readString(
       Path.of("test_data/certificates/x509/canonical/letsencrypt-e1.pem"),
       StandardCharsets.UTF_8

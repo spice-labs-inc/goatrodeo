@@ -7,8 +7,8 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 
-/** Phase 0.2 — Certificates.parseSshCertBlob returns None instead of throwing
-  * for cert-type mismatch and unsupported key algorithms.
+/** Certificates.parseSshCertBlob returns None instead of throwing for cert-type
+  * mismatch and unsupported key algorithms.
   *
   * REQUIREMENT: No exceptions for flow control. Previously, cert-type mismatch
   * triggered `require` (throws IllegalArgumentException) and unsupported key
@@ -111,9 +111,9 @@ class CertificatesSshCertBlobSuite extends GoatRodeoFunSuite {
     * WHAT: Calling parseSshCertBlob with various malformed inputs never throws,
     * always returns Option.
     *
-    * WHY: The central invariant of Phase 0 — no exceptions for flow control.
-    * This is a meta-test that ensures the method is provably non-throwing for
-    * the cases we control (cert-type mismatch, unsupported alg).
+    * WHY: The central invariant — no exceptions for flow control. This is a
+    * meta-test that ensures the method is provably non-throwing for the cases
+    * we control (cert-type mismatch, unsupported alg).
     *
     * REQUIREMENT: No exceptions for flow control.
     */

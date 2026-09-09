@@ -4,7 +4,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 
 import scala.collection.immutable.TreeSet
 
-/** Phase 0 (0.5) — Helpers.computeAssociatedSource OOME-safe path.
+/** Helpers.computeAssociatedSource OOME-safe path.
   *
   * ## What this tests
   *
@@ -16,14 +16,14 @@ import scala.collection.immutable.TreeSet
   *
   * ## Why this matters
   *
-  * Before the Phase 0 remediation, a corrupted class file that forced BCEL to
-  * allocate a huge array could cause an OOME crashing the entire process. The
-  * non-class path must short-circuit safely.
+  * A corrupted class file can force BCEL to allocate a huge array, causing an
+  * OOME that crashes the entire process. The non-class path must short-circuit
+  * safely.
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.5: computeAssociatedSource returns empty TreeSet for
-  * non-class MIME types without invoking BCEL.
+  * Requirement: computeAssociatedSource returns empty TreeSet for non-class
+  * MIME types without invoking BCEL.
   *
   * ## LLM-friendly summary
   *
@@ -42,8 +42,8 @@ class HelpersOomeSuite extends GoatRodeoFunSuite {
     /** What: Creates an ArtifactWrapper with a non-class MIME type and calls
       * computeAssociatedSource. Why: Non-class artifacts must not enter the
       * BCEL parsing path at all. The method should return an empty TreeSet
-      * immediately. Requirement: Phase 0 §0.5 — non-class MIME returns
-      * TreeSet.empty without BCEL invocation.
+      * immediately. Requirement: non-class MIME returns TreeSet.empty without
+      * BCEL invocation.
       */
     val artifact = ByteWrapper(
       "some text content".getBytes("UTF-8"),

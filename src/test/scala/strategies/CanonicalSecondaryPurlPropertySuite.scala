@@ -13,28 +13,28 @@ import org.scalacheck.Prop.forAll
 
 import java.io.File
 
-/* Phase 7a: Property-Based Tests
+/* Property-Based Tests: Canonical and Secondary pURL Emission
  *
  * '''What this suite tests:'''
  *   Cross-cutting invariants verified with ScalaCheck property tests:
- *   - Property 7.1: pURL count >= N (for JARs with N pom.properties)
- *   - Property 7.4: Secondary pURLs never use filename
- *   - Property 7.6: Companion POM consulted when pom.properties absent
- *   - Property 7.9: Deduplication — duplicate tuples produce one pURL
+ *   - pURL count >= N (for JARs with N pom.properties entries)
+ *   - Secondary pURLs never use filename
+ *   - Companion POM consulted when pom.properties absent
+ *   - Deduplication — duplicate tuples produce one pURL
  *
  * '''Already covered by existing property tests:'''
- *   - Property 7.2: Canonical pURL has classifier — Phase4SecondaryClassifierPropertySuite
- *   - Property 7.3: All pURLs have classifier — Phase4SecondaryClassifierPropertySuite
- *   - Property 7.5: Companion POM highest priority — MavenPropertyTests
- *   - Property 7.7: Exact match preferred — Phase3MatchingPropertySuite
- *   - Property 7.8: Field-level independence — MavenPropertyTests
- *   - Property 7.10: Classifier consistency — Phase4SecondaryClassifierPropertySuite
+ *   - Canonical pURL has classifier — SecondaryPurlClassifierPropertySuite
+ *   - All pURLs have classifier — SecondaryPurlClassifierPropertySuite
+ *   - Companion POM highest priority — MavenPropertyTests
+ *   - Exact match preferred — PurlMatchingPropertySuite
+ *   - Field-level independence — MavenPropertyTests
+ *   - Classifier consistency — SecondaryPurlClassifierPropertySuite
  *
  * '''LLM context:''' These tests verify system-wide invariants using
  * ScalaCheck generators. Each property is tested with randomly generated
  * inputs to catch edge cases that specific test cases might miss.
  */
-class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
+class CanonicalSecondaryPurlPropertySuite extends GoatRodeoScalaCheckSuite {
 
   // =========================================================================
   // Generators (bounded to avoid ScalaCheck discard issues)
@@ -151,18 +151,17 @@ class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
   // =========================================================================
   // Property 7.1: pURL count >= N
   // =========================================================================
-  //
+
   // What it tests:
   //   For any JAR with N embedded pom.properties entries (all valid),
   //   the pURL count >= N.
-  //
+
   // Why it's relevant:
-  //   REQ-1 — every embedded package must produce a pURL. If Goat Rodeo
+  //   every embedded package must produce a pURL. If Goat Rodeo
   //   misses any pom.properties, the pURL count will be < N.
-  //
+
   // Requirement section:
-  //   REQ-1, Test Strategy item 13.
-  //
+
   // Theory:
   //   ScalaCheck generates JARs with 1-10 random valid pom.properties
   //   entries. Process each. Assert pURL count >= N.
@@ -198,19 +197,18 @@ class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
   // =========================================================================
   // Property 7.4: Secondary pURLs never use filename
   // =========================================================================
-  //
+
   // What it tests:
   //   For any JAR, no secondary pURL (beyond the canonical) is derived
   //   from the filename. Secondary pURLs come exclusively from pom.properties
   //   or manifest — never from filename parsing.
-  //
+
   // Why it's relevant:
-  //   REQ-1 — secondary pURLs must not use filename. The filename is a
+  //   secondary pURLs must not use filename. The filename is a
   //   last-resort fallback for the canonical pURL only, not for secondary.
-  //
+
   // Requirement section:
-  //   REQ-1, Test Strategy item 16.
-  //
+
   // Theory:
   //   ScalaCheck generates JARs with random pom.properties and random
   //   filenames. Assert no secondary pURL's groupId/artifactId/version
@@ -275,18 +273,17 @@ class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
   // =========================================================================
   // Property 7.6: Companion POM consulted when pom.properties absent
   // =========================================================================
-  //
+
   // What it tests:
   //   For any JAR with no embedded pom.properties but a companion POM,
   //   the canonical pURL matches the companion POM's groupId/artifactId/version.
-  //
+
   // Why it's relevant:
-  //   REQ-3 — when pom.properties is absent, the companion POM is the
+  //   when pom.properties is absent, the companion POM is the
   //   authoritative source for Maven coordinates.
-  //
+
   // Requirement section:
-  //   REQ-3, Test Strategy item 18.
-  //
+
   // Theory:
   //   ScalaCheck generates JARs with no pom.properties but with companion
   //   POMs containing random coordinates. Assert canonical pURL from POM.
@@ -320,20 +317,19 @@ class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
   // =========================================================================
   // Property 7.9: Deduplication — duplicate tuples produce one pURL
   // =========================================================================
-  //
+
   // What it tests:
   //   For any JAR with N pom.properties entries where K are duplicates,
   //   the pURL count matches the distinct count (N - K + 1, since
   //   duplicates overwrite each other in the JAR).
-  //
+
   // Why it's relevant:
-  //   REQ-1 — duplicate pom.properties should not produce duplicate pURLs.
+  //   duplicate pom.properties should not produce duplicate pURLs.
   //   Each unique (groupId, artifactId, version) should produce exactly
   //   one pURL.
-  //
+
   // Requirement section:
-  //   REQ-1.
-  //
+
   // Theory:
   //   ScalaCheck generates JARs with some duplicate entries. Assert
   //   pURL count matches the distinct count of pom.properties tuples.
@@ -376,14 +372,13 @@ class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
   // =========================================================================
   // Property 7.1b: pURL count matches for sources JARs
   // =========================================================================
-  //
+
   // What it tests:
   //   Same as 7.1 but for sources JARs. For any sources JAR with N
   //   embedded pom.properties entries, pURL count >= N. All pURLs have
   //   ?packaging=sources.
-  //
+
   // Requirement section:
-  //   REQ-1, REQ-5.
 
   property("Property 7.1b: Sources JAR pURL count >= pom.properties count") {
     forAll(Gen.choose(1, 5)) { n =>

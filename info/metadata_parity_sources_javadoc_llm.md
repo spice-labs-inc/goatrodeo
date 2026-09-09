@@ -2,19 +2,18 @@
 
 ## Summary
 
-53 corpus-based tests verifying Goat Rodeo finds all pURLs from sources
-and javadoc JARs. All pass. No production code changes (fixes were in
-Phases 2-4).
+Corpus-based tests verifying Goat Rodeo finds all pURLs from sources
+and javadoc JARs. All pass.
 
 ## Run
 
 ```bash
-sbt 'testOnly *Phase5MetadataParitySourcesJavadocSuite'
+sbt 'testOnly *SourcesJavadocMetadataParitySuite'
 ```
 
 ## Key Design
 
-- **HS-4 compliant**: Opens real JAR files at test time, reads pom.properties
+- Opens real JAR files at test time, reads pom.properties
 - **Sampling**: 50 sources JARs from 3051 total (deterministic, every Nth)
 - **Companion POM**: Sources JAR POM is `foo-1.0.pom` (shared with main JAR)
 - **Classifier**: ALL pURLs have `?packaging=sources` or `?classifier=javadoc`
@@ -22,17 +21,22 @@ sbt 'testOnly *Phase5MetadataParitySourcesJavadocSuite'
 
 ## Tests
 
-| Test | What | Count |
-|------|------|-------|
-| 5.1 | Sources JARs discoverable | 1 |
-| 5.2 | Javadoc JARs discoverable | 1 |
-| 5.3 | Sources JAR pURLs >= pom.properties | 16 |
-| 5.4 | Javadoc JAR pURLs match | 1 |
-| 5.5 | Canonical pURL from companion POM | 11 |
-| 5.6 | Canonical pURL in metadata | 5 |
-| 5.7 | Standalone sources JAR emits pURLs | 10 |
-| 5.8 | pURL count >= pom.properties count | 16 |
+Per-JAR tests are named `<jar-filename> — <description> (N entries)`; the
+group-level discovery tests are `Discover sources JARs in test corpus` and
+`Discover javadoc JARs in test corpus`.
 
-## No Production Code Changes
+| Test | What |
+|------|------|
+| `Discover sources JARs in test corpus` | Sources JARs discoverable |
+| `Discover javadoc JARs in test corpus` | Javadoc JARs discoverable |
+| `<jar> — pURLs match pom.properties (N entries)` | Sources JAR pURLs >= pom.properties, superset |
+| `<jar> — pURLs match pom.properties (N entries)` | Javadoc JAR pURLs match |
+| `<jar> — canonical pURL from companion POM` | Canonical pURL from companion POM |
+| `<jar> — canonical pURL in metadata` | Canonical pURL in metadata |
+| `<jar> — standalone sources JAR emits pURLs` | Standalone sources JAR emits pURLs |
+| `<jar> — pURL count >= pom.properties count (N entries)` | pURL count >= pom.properties count |
 
-Phase 5 is test-only. All fixes were in Phases 2-4.
+## Test-Only
+
+These suites are test-only; they verify the metadata parity behavior,
+they do not change it.

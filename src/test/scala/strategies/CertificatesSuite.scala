@@ -28,11 +28,11 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   *        `itemCount` exactly, then assertions from [[CertificatesAssertions]]
   *        on the first Item.
   *
-  * ## Phase-0 state
+  * ## Harness-present state
   *
-  * Phase 0 of the Certificates strategy specifies the harness-is-present state.
-  * Phase 0 has split into (a) infrastructure — this file and its siblings — and
-  * (b) corpus population (the 200+ fixture download). Until (b) lands,
+  * The Certificates strategy specifies a harness-is-present state: it splits
+  * into (a) infrastructure — this file and its siblings — and (b) corpus
+  * population (the 200+ fixture download). Until (b) lands,
   * [[CertificatesFixtureInventory.pairs]] is empty and this suite emits zero
   * per-fixture tests.
   *
@@ -46,14 +46,14 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   */
 class CertificatesSuite extends GoatRodeoFunSuite {
 
-  /** Is the Certificates strategy class registered on the classpath? Phase 1's
-    * first commit creates
+  /** Is the Certificates strategy class registered on the classpath? The
+    * earliest committed version creates
     * `io.spicelabs.goatrodeo.omnibor.strategies.Certificates`; until then this
     * suite's per-fixture assertions cannot be meaningfully evaluated (the
     * pipeline uses GenericFile as the fallback and emits no crypto pURLs /
-    * metadata). To keep the state uniform per Phase 0's "all pending OR all
-    * fail loudly — no partial mix" rule, every per-fixture test is marked
-    * `.ignore` until the class exists.
+    * metadata). To keep the state uniform ("all pending OR all fail loudly — no
+    * partial mix" rule, every per-fixture test is marked `.ignore` until the
+    * class exists.
     */
   private val strategyPresent: Boolean = {
     try {

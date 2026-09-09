@@ -572,18 +572,18 @@ class DockerSuite extends GoatRodeoFunSuite {
   }
 
   // ==================== OCI image layout ====================
-  //
+
   // WHAT: pure OCI layouts (`oci-layout` + `index.json` + `blobs/sha256/…`,
   // as produced by `oras copy --to-oci-layout`) must be claimed by the SAME
   // Docker strategy, with wild-world fidelity: no RepoTags unless the
   // `org.opencontainers.image.ref.name` annotation happens to be present, and
   // hostile descriptors never resolved.
-  //
+
   // WHY: docker-save tars and OCI layouts are two transports of the same
   // image model; the strategy extracts what each format carries. These unit
   // tests pin the claim rules on synthetic fixtures; the wild fixtures are
   // pinned by OciDockerParitySuite.
-  //
+
   // LLM note: O-xx = test id.
 
   private def hex(c: Char, n: Int): String = c.toString * n

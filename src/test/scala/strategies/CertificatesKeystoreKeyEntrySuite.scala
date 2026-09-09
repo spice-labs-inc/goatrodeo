@@ -27,7 +27,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
 
-/** Phase 0 (0.1) — Keystore with private key entry produces cert metadata only.
+/** Keystore with private key entry produces cert metadata only.
   *
   * ==What this tests==
   *
@@ -51,7 +51,7 @@ import scala.jdk.CollectionConverters.*
   * certificate chains. If the strategy accidentally emitted private key
   * material (e.g., via `getKey(alias)` instead of
   * `getCertificateChain(alias)`), it would leak secrets into the ADG metadata,
-  * violating the core Phase 0 invariant.
+  * violating the core invariant.
   *
   * This test is the FIRST test that exercises the key-entry code path with a
   * real KeyStore object. The existing `CertificatesFilterLeaksSuite` tests
@@ -60,8 +60,8 @@ import scala.jdk.CollectionConverters.*
   *
   * ==Requirement trace==
   *
-  * Phase 0 item 0.1: Keystore with private key entry produces cert metadata
-  * only — no private key material in output.
+  * Requirement: Keystore with private key entry produces cert metadata only —
+  * no private key material in output.
   *
   * ==LLM-friendly summary==
   *
@@ -158,10 +158,10 @@ class CertificatesKeystoreKeyEntrySuite extends GoatRodeoFunSuite {
     *
     * WHAT NOT: Does NOT emit any private key bytes or PEM headers.
     *
-    * WHY: This is the core Phase 0 invariant for keystores: private key
-    * material must never appear in metadata. The metadata must describe the
-    * certificate chain only, allowing operators to see what certs are in the
-    * keystore without exposing secrets.
+    * WHY: This is the core invariant for keystores: private key material must
+    * never appear in metadata. The metadata must describe the certificate chain
+    * only, allowing operators to see what certs are in the keystore without
+    * exposing secrets.
     *
     * REQUIREMENT: Keystore with private key entry produces cert metadata only.
     */

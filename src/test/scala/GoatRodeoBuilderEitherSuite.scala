@@ -1,7 +1,7 @@
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-/** Phase 0 (0.3) — GoatRodeoBuilder.withTagDate Either-return contract.
+/** GoatRodeoBuilder.withTagDate Either-return contract.
   *
   * ## What this tests
   *
@@ -14,15 +14,14 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   *
   * ## Why this matters
   *
-  * Prior to the Phase 0 remediation, `withTagDate` threw an exception on
-  * unparseable dates. The Either return type allows callers to handle bad input
-  * functionally without try/catch, making the builder safe for programmatic
-  * use.
+  * `withTagDate` returns Either instead of throwing on unparseable dates,
+  * letting callers handle bad input functionally without try/catch, making the
+  * builder safe for programmatic use.
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.3: GoatRodeoBuilder.withTagDate returns Either instead of
-  * throwing on invalid date input.
+  * Requirement: GoatRodeoBuilder.withTagDate returns Either instead of throwing
+  * on invalid date input.
   *
   * ## LLM-friendly summary
   *
@@ -38,8 +37,8 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
 
     /** What: Feeds an unparseable date string to withTagDate. Why: The method
       * must not throw; it must return Left with a descriptive error so the
-      * caller can decide how to handle it. Requirement: Phase 0 §0.3 —
-      * withTagDate returns Either, not exception.
+      * caller can decide how to handle it. Requirement: — withTagDate returns
+      * Either, not exception.
       */
     val builder = new GoatRodeoBuilder()
     val result = builder.withTagDate("not-a-date")
@@ -56,7 +55,7 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
 
     /** What: Feeds a valid ISO 8601 date string to withTagDate. Why: A valid
       * date must produce Right(builder), allowing the fluent API to continue.
-      * Requirement: Phase 0 §0.3 — valid date yields Right.
+      * Requirement: valid date yields Right.
       */
     val builder = new GoatRodeoBuilder()
     val result = builder.withTagDate("2024-01-15")
@@ -74,8 +73,8 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
     /** What: Sets a valid tag and tagDate, then calls withTagDate with an
       * invalid date and verifies the builder's previous tagDate is unchanged.
       * Why: A Left result must be a no-op — the builder should not be partially
-      * mutated when date parsing fails. Requirement: Phase 0 §0.3 — Left is
-      * non-mutating; builder state is preserved.
+      * mutated when date parsing fails. Requirement: Left is non-mutating;
+      * builder state is preserved.
       */
     val builder = new GoatRodeoBuilder()
       .withTag("test-tag")

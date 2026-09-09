@@ -22,7 +22,7 @@ import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** CBOM emission for the Phase A–G extended-capture families.
+/** CBOM emission for the extended-capture families.
   *
   * ## LLM-friendly summary
   *

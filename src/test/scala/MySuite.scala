@@ -224,7 +224,7 @@ class MySuite extends GoatRodeoFunSuite {
      *  The Maven strategy produces pURLs for artifacts inside nested.tar
      *  even when Syft/static-metadata is disabled.  This ensures pURL
      *  generation is a core strategy behavior, not dependent on Syft.
-     *  Requirement: Phase 1-5 Maven strategy pURL generation.
+     *  Requirement: Maven strategy pURL generation.
      *  Theory:  log4j-core-2.22.1.jar inside nested.tar should be claimed by
      *  MavenToProcess and produce a pkg:maven/... pURL.
      */

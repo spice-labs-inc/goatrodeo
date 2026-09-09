@@ -19,7 +19,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
 
-/** Phase 7 Integration Tests: Per-Package Tagging with Real Test Data
+/** Per-Package Tagging with Real Test Data
   *
   * These tests verify that the per-package tagging feature works correctly with
   * actual test corpus files:
@@ -34,12 +34,12 @@ import java.io.File
   *   - Tag JSON structure follows the specification
   *
   * Requirement Traceability:
-  *   - R1: --package-tags CLI option generates tags
-  *   - R2: --package-tags-short-name generates short names
-  *   - R3: Tag JSON has correct structure (tag, version, date)
-  *   - R4: Maven strategy extracts groupId/artifactId/version and build date
-  *   - R5: Baharat strategy extracts name/version from .deb
-  *   - R6: Docker strategy extracts repository:tag and created date
+  *   - --package-tags CLI option generates tags
+  *   - --package-tags-short-name generates short names
+  *   - Tag JSON has correct structure (tag, version, date)
+  *   - Maven strategy extracts groupId/artifactId/version and build date
+  *   - Baharat strategy extracts name/version from .deb
+  *   - Docker strategy extracts repository:tag and created date
   */
 class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
 

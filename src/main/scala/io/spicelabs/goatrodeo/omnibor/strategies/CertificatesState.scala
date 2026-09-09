@@ -344,8 +344,8 @@ class CertificatesState(
     tm
   }
 
-  /** Metadata for an unencrypted PGP secret key ring; reuses Phase 6 PGP
-    * metadata plus envelope markers.
+  /** Metadata for an unencrypted PGP secret key ring; reuses the PGP metadata
+    * structure plus envelope markers.
     */
   private[strategies] def privateKeyPgpMetadata(
       artifact: ArtifactWrapper,
@@ -606,7 +606,7 @@ class CertificatesState(
     )
     // PQC and composite certs append the alg suffix so the inventory makes
     // PQC presence obvious; classical algs stay bare to match the
-    // historical sidecar contract from Phase 0b's `cert_sidecar.py`.
+    // historical sidecar contract from the legacy `cert_sidecar.py`.
     val pqcAlgs = Set("ml-dsa", "slh-dsa", "falcon", "composite")
     val descSuffix = if (pqcAlgs.contains(alg)) s" ($alg)" else ""
     perCert +? Some(MKC.NAME -> TreeSet(StringOrPair(cnOrDn(subject)))) +?

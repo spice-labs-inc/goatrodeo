@@ -31,8 +31,8 @@ import java.io.File
   * ## Why this matters
   *
   * Sidecars are materialized from the strategy's own emitters (tautological by
-  * construction, same pattern as Phase 4/5). These tests provide independent
-  * ground truth: the expected fingerprints were lifted from `gpg --show-keys
+  * construction, as with the SSH path). These tests provide independent ground
+  * truth: the expected fingerprints were lifted from `gpg --show-keys
   * --with-fingerprint --with-subkey-fingerprint` output and committed inline
   * below. A bug that flipped, say, `getFingerprint` to `getKeyID` (an 8-byte
   * truncation) would fail here.
@@ -65,7 +65,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "parsePgpKeyRing: v4 ed25519 primary + ECDH cv25519 encryption subkey (G3)"
+    "parsePgpKeyRing: v4 ed25519 primary + ECDH cv25519 encryption subkey "
   ) {
     // Fixture table: "ed25519, v4, subkey encryption".
     // Regenerated 2026-05-01 to add the encryption subkey the requirements
@@ -98,7 +98,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   // packet itself. This test pins that BC's `getValidSeconds()` reads
   // the binding-signature value correctly so subkey expiration is
   // preserved through the strategy's metadata path.
-  test("parsePgpKeyRing: subkey expiration is preserved (G7)") {
+  test("parsePgpKeyRing: subkey expiration is preserved") {
     val w = wrap("test_data/certificates/pgp/synthetic/v4-ed25519-pub.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     val primary = r.keys.find(_.isPrimary).get
@@ -152,12 +152,12 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(sub.keySize, Some(2048))
   }
 
-  // G5 — Phase 6 gap analysis flagged that 8 of 9 real-world fixtures
+  // A gap analysis flagged that 8 of 9 real-world fixtures
   // are asserted only via materializer-tautological values. These three
   // tests pin gpg(1) ground-truth fingerprints for additional fixtures
   // covering different organizational keys.
   test(
-    "parsePgpKeyRing: real-world docker-ce signing key (rsa4096 + S subkey) (G5)"
+    "parsePgpKeyRing: real-world docker-ce signing key (rsa4096 + S subkey) "
   ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   rsa4096 2017-02-22 [SCEAR]
@@ -177,7 +177,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(sub.fingerprintHex, "d3306a018370199e527ae7997ea0a9c3f273fcd8")
   }
 
-  test("parsePgpKeyRing: real-world debian-cdimage signing key (G5)") {
+  test("parsePgpKeyRing: real-world debian-cdimage signing key") {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   rsa4096 2011-01-05 [SCEAR]
     //         DF9B 9C49 EAA9 2984 3258  9D76 DA87 E80D 6294 BE9B
@@ -194,7 +194,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(sub.fingerprintHex, "47a8ea16451bf5c9b6915c64642a5ac311cd9819")
   }
 
-  test("parsePgpKeyRing: real-world kernel-konstantin (rsa2048) (G5)") {
+  test("parsePgpKeyRing: real-world kernel-konstantin (rsa2048)") {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   rsa2048 2011-09-20 [SCEAR]
     //         ABAF 11C6 5A29 70B1 30AB  E3C4 79BE 3E43 0041 1886
@@ -288,13 +288,13 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   }
 
   // N1 — second-pass gap analysis: the new fixtures landed by the first
-  // pass (G1/G2/G8/G9/G12) rely on materialized sidecars (tautological).
+  // pass  rely on materialized sidecars (tautological).
   // The tests below pin gpg(1) ground-truth fingerprints + structural
   // claims white-box, so a regression in `pgpAlgIdMap` (e.g. ECDH→unknown)
   // or `pgpCurveOidMap` (e.g. NIST P-256 OID typo) fails here, not just
   // in the sidecars (which would have re-emitted the bug).
   test(
-    "parsePgpKeyRing: v4 ECDSA NIST P-256 primary + ECDH NIST P-256 subkey (G1+G2 / N1)"
+    "parsePgpKeyRing: v4 ECDSA NIST P-256 primary + ECDH NIST P-256 subkey "
   ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   nistp256 2026-05-01 [SCA]
@@ -334,7 +334,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "parsePgpKeyRing: v4 ECDSA brainpoolP256r1 primary + ECDH subkey (G1+G2 / N1)"
+    "parsePgpKeyRing: v4 ECDSA brainpoolP256r1 primary + ECDH subkey "
   ) {
     // gpg --show-keys --with-fingerprint --with-subkey-fingerprint:
     //   pub   brainpoolP256r1 2026-05-01 [SCA]
@@ -365,7 +365,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   // G8 — multi-ring file (concatenated 2 primary keys w/ subkeys).
   // White-box assertion that splitArmoredBlocks + per-segment parse
   // produces the union of all keys across rings, not just the first ring.
-  test("parsePgpKeyRing: multi-ring file yields union of all keys (G8 / N1)") {
+  test("parsePgpKeyRing: multi-ring file yields union of all keys") {
     val w = wrap("test_data/certificates/pgp/synthetic/v4-multi-ring.asc")
     val r = Certificates.parsePgpKeyRing(w).get
     // Source: cat v4-rsa3072-pub.asc v4-ed25519-pub.asc
@@ -403,7 +403,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   // confirms the strategy emits the identical fingerprint on the binary
   // path as on the armored path.
   test(
-    "parsePgpKeyRing: binary .gpg file yields same identity as armored .asc (G12 / N1)"
+    "parsePgpKeyRing: binary .gpg file yields same identity as armored .asc "
   ) {
     val wBinary =
       wrap("test_data/certificates/pgp/synthetic/v4-rsa3072-pub.gpg")
@@ -423,16 +423,15 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(rBinary.keys.head.version, 4)
   }
 
-  // G9 — Phase 6 contract: the PUBLIC-key parser `parsePgpKeyRing`
-  // must reject a `BEGIN PGP PRIVATE KEY BLOCK` file (BC's object
-  // factory yields `PGPSecretKeyRing`, which `parsePgpKeyRing` does
-  // not match). Phase 7 wires a separate `parsePgpSecretKeyRing` and
-  // dispatches via `parsePgpKeyOrSecretKeyRing`; the public-key
-  // parser's None-returning contract on secret-key input is preserved.
-  // Fixture relocated from edge-cases/pgp/ to private-keys/synthetic/
-  // when Phase 7 began claiming it.
+  // The PUBLIC-key parser `parsePgpKeyRing` must reject a `BEGIN PGP
+  // PRIVATE KEY BLOCK` file (BC's object factory yields
+  // `PGPSecretKeyRing`, which `parsePgpKeyRing` does not match). A
+  // separate `parsePgpSecretKeyRing` handles secret keys, dispatched via
+  // `parsePgpKeyOrSecretKeyRing`; the public-key parser's None-returning
+  // contract on secret-key input is preserved. The fixture lives under
+  // private-keys/synthetic/.
   test(
-    "parsePgpKeyRing: PGP PRIVATE KEY BLOCK returns None from PUBLIC-key parser (G9)"
+    "parsePgpKeyRing: PGP PRIVATE KEY BLOCK returns None from PUBLIC-key parser "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/pgp-secret-ed25519-unencrypted.asc"
@@ -440,8 +439,8 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(
       Certificates.parsePgpKeyRing(w),
       None,
-      "parsePgpKeyRing (the Phase-6 public-key parser) must return " +
-        "None on secret-key input. Phase 7's parsePgpSecretKeyRing " +
+      "parsePgpKeyRing (the public-key parser) must return " +
+        "None on secret-key input. parsePgpSecretKeyRing " +
         "handles the actual claim; dispatch is via parsePgpKeyOrSecretKeyRing."
     )
   }
@@ -454,7 +453,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   // ECDH(18) and ECDSA(19), and `ed25519` covers both EdDSA-Legacy(22)
   // and Ed25519(27). Pin all three numbers.
   test(
-    "pgpAlgIdMap: 13 alg-id entries / 10 table rows / 8 distinct canonical alg names (N3)"
+    "pgpAlgIdMap: 13 alg-id entries / 10 table rows / 8 distinct canonical alg names "
   ) {
     assertEquals(
       Certificates.pgpAlgIdMap.size,
@@ -480,7 +479,7 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
 
   // N3 — `pgpCurveOidMap` size sanity. 8 entries covering NIST P-256/
   // 384/521, Brainpool 256/384/512, Curve25519, Ed25519Legacy.
-  test("pgpCurveOidMap: 8 curve-OID entries (N3)") {
+  test("pgpCurveOidMap: 8 curve-OID entries") {
     assertEquals(Certificates.pgpCurveOidMap.size, 8)
     // Spot-check: the two curves the new ECDSA fixtures exercise.
     assertEquals(Certificates.pgpCurveOidMap("1.2.840.10045.3.1.7"), "p-256")
@@ -490,12 +489,12 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     )
   }
 
-  // Phase H — PGP S2K hash tags (R3, corrected per RFC 9580).
-  //
-  // P-T-01 pins the map over the RFC 9580 §9.5 assigned tags plus the legacy
+  // PGP S2K hash tags (R3, corrected per RFC 9580).
+
+  // pins the map over the RFC 9580 §9.5 assigned tags plus the legacy
   // RFC 4880 §9.4 names (4 double-width SHA, 5 MD2, 6 TIGER/192, 7
   // HAVAL-5-160); reserved tags must stay unmapped (no invention).
-  test("P-T-01 pgpHashAlgNameMap is total over assigned tags, else unmapped") {
+  test("pgpHashAlgNameMap is total over assigned tags, else unmapped") {
     val expected = Map(
       1 -> "md5",
       2 -> "sha1",
@@ -520,13 +519,13 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
     }
   }
 
-  // P-T-02: BC's HashAlgorithmTags constants resolve through the exact
+  // BC's HashAlgorithmTags constants resolve through the exact
   // production expression (`s2k.getHashAlgorithm` → map lookup, the same
   // expression Certificates.scala uses for the S2K KDF-PRF). The legacy
   // tags double-sha/tiger/haval have real wire values (4/6/7), so a BC S2K
   // object carries them as-is; SHA3-224/384 have no wire value (RFC 9580
   // Reserved) and must stay unmapped.
-  test("P-T-02 BC S2K hash tags resolve to canonical names") {
+  test("BC S2K hash tags resolve to canonical names") {
     import org.bouncycastle.bcpg.HashAlgorithmTags
     import org.bouncycastle.bcpg.S2K
     Vector(

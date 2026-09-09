@@ -11,8 +11,8 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
 
-/** Phase 0 (0.7) — GRDWalker.open returns Failure (not thrown exception) for
-  * wrong magic number.
+/** GRDWalker.open returns Failure (not thrown exception) for wrong magic
+  * number.
   *
   * ## What this tests
   *
@@ -23,14 +23,14 @@ import scala.util.Try
   *
   * ## Why this matters
   *
-  * Before the Phase 0 remediation, `open()` might have thrown directly in some
-  * code paths, forcing callers to use try/catch. Returning `Failure` is the
-  * idiomatic Scala approach and allows composable error handling.
+  * `open()` returns `Failure` instead of throwing directly, so callers never
+  * need try/catch. Returning `Failure` is the idiomatic Scala approach and
+  * allows composable error handling.
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.7: GRDWalker.open returns Failure for wrong magic number
-  * rather than throwing.
+  * Requirement: GRDWalker.open returns Failure for wrong magic number rather
+  * than throwing.
   *
   * ## LLM-friendly summary
   *
@@ -46,8 +46,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       * magic number (0x00BE1100), opens it via FileChannel, and calls
       * GRDWalker.open(). Why: The open method must return a Try.Failure rather
       * than throwing an exception, allowing the caller to handle format errors
-      * gracefully. Requirement: Phase 0 §0.7 — open returns Failure, does not
-      * throw.
+      * gracefully. Requirement: open returns Failure, does not throw.
       */
     val tempFile = Files.createTempFile("wrong-magic-", ".grd").toFile()
     try {
@@ -106,7 +105,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
     /** What: Creates a file with correct magic number but truncated (no
       * envelope bytes after the magic number). Why: Short reads are expected
       * failures for corrupt/truncated files. Must return Failure, not throw.
-      * Requirement: Phase 0 §0.7 — open returns Failure for short read.
+      * Requirement: open returns Failure for short read.
       */
     val magic = Array[Byte](0x00.toByte, 0xbe.toByte, 0x11.toByte, 0x00.toByte)
     val tempFile = Files.createTempFile("short-read-", ".grd").toFile()
@@ -154,8 +153,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       * verify Failure cases (wrong magic, truncated file). The positive path —
       * opening a valid GRD file — must also be tested to confirm the full
       * open() contract works end-to-end with real data written by the same
-      * codebase. Requirement: Phase 0 §0.7 — open returns Success for valid
-      * file.
+      * codebase. Requirement: open returns Success for valid file.
       */
     val tempDir = Files.createTempDirectory("valid-grd-open").toFile()
     try {

@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import scala.collection.immutable.TreeSet
 
-/** Phase 2 — Unit tests for `JavaSecurityParser`.
+/** Unit tests for `JavaSecurityParser`.
   *
   * These tests verify that the parser extracts the five security-relevant
   * properties, tokenizes comma-separated lists, handles Java properties

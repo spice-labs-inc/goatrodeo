@@ -28,12 +28,12 @@ import scala.util.Try
   *
   * ## Why this suite exists
   *
-  * Phase 0b shipped 200 sidecars whose values were computed by
-  * `tools/cert_sidecar.py` (Python + the `cryptography` package, itself a
-  * wrapper over OpenSSL). If that computation had a bug, or if someone edited a
-  * sidecar by hand without regenerating, or if a fixture file was swapped
-  * without updating the sidecar — every such drift is a silent source of false
-  * green or false red downstream.
+  * The 200 committed sidecars were computed by `tools/cert_sidecar.py` (Python
+  * + the `cryptography` package, itself a wrapper over OpenSSL). If that
+  * computation had a bug, or if someone edited a sidecar by hand without
+  * regenerating, or if a fixture file was swapped without updating the sidecar
+  * — every such drift is a silent source of false green or false red
+  * downstream.
   *
   * This suite uses **the JDK's built-in** `java.security.cert.
   * CertificateFactory` — a completely separate X.509 parser from the one that
@@ -159,7 +159,7 @@ class CertificatesSidecarGroundTruthTests extends GoatRodeoFunSuite {
     // `cryptography` may differ on attribute ordering for multi-RDN
     // names — but for the canonical single-RDN cases that dominate
     // the corpus (CN/O/C), the strings are identical.
-    //
+
     // We report mismatches rather than failing hard, because DN
     // formatting has legitimate vendor variation. Mismatch count > 0
     // is information, not necessarily a defect. Failing threshold:

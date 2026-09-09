@@ -4,7 +4,7 @@ import java.io.File
 import java.util.jar.JarFile
 import scala.jdk.CollectionConverters.*
 
-/** Phase 1 — fat-jar hygiene (spec §1, T1.4).
+/** fat-jar hygiene .
   *
   * WHAT: verifies the fat jar survives the new pinned dependencies:
   * sqlite-jdbc's per-platform natives are present, exactly one
@@ -27,7 +27,7 @@ class FatJarContentsTest extends GoatRodeoFunSuite {
     new JarFile(f)
   }
 
-  test("T1.4a fat JAR carries sqlite-jdbc natives") {
+  test("fat JAR carries sqlite-jdbc natives") {
     val jar = fatJar()
     try {
       val entries = jar.entries().asScala.map(_.getName).toList
@@ -44,7 +44,7 @@ class FatJarContentsTest extends GoatRodeoFunSuite {
     } finally jar.close()
   }
 
-  test("T1.4b exactly one java.sql.Driver service entry") {
+  test("exactly one java.sql.Driver service entry") {
     val jar = fatJar()
     try {
       val drivers = jar
@@ -69,7 +69,7 @@ class FatJarContentsTest extends GoatRodeoFunSuite {
     } finally jar.close()
   }
 
-  test("T1.4c fat JAR must not contain signature files") {
+  test("fat JAR must not contain signature files") {
     val jar = fatJar()
     try {
       val entries = jar.entries().asScala.toList

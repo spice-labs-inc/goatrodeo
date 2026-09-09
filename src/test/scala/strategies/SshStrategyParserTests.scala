@@ -32,11 +32,10 @@ import java.io.File
   *
   * ## Why these tests matter
   *
-  * The Phase-5 acceptance criterion is "All SSH fixtures pass sidecar
-  * assertions". Sidecars were materialized from the strategy's own output
-  * (tautological by design — same as Phase 4). These tests provide an
-  * independent ground-truth anchor by comparing against `ssh-keygen` (Phase-0
-  * corpus generator) output that's been hand- verified.
+  * Sidecars were materialized from the strategy's own output (tautological by
+  * design). These tests provide an independent ground-truth anchor by comparing
+  * against `ssh-keygen` (the corpus generator) output that's been
+  * hand-verified.
   */
 class SshStrategyParserTests extends GoatRodeoFunSuite {
 
@@ -102,14 +101,14 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   // 0xFFFFFFFFFFFFFFFFL to mean "never expires" and 0L to mean "valid
   // always from the past". Both must render as their literal sentinel,
   // not as wrapped epoch dates (1970-01-01 / 1969-12-31).
-  test("sshCertTimeLabel: 0xFFFFFFFFFFFFFFFF emits 'forever' (G1)") {
+  test("sshCertTimeLabel: 0xFFFFFFFFFFFFFFFF emits 'forever'") {
     assertEquals(
       Certificates.sshCertTimeLabel(-1L, "forever"),
       "forever"
     )
   }
 
-  test("sshCertTimeLabel: 0L emits 'always' (G1)") {
+  test("sshCertTimeLabel: 0L emits 'always'") {
     assertEquals(
       Certificates.sshCertTimeLabel(0L, "always"),
       "always"
@@ -127,7 +126,7 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   // exercising the parser's None-on-bad-input contract. Required because
   // all 34 corpus fixtures parse successfully — an inadvertently-permissive
   // parser would pass every per-fixture test.
-  test("parseSshPubkey: garbage input returns None (G11)") {
+  test("parseSshPubkey: garbage input returns None") {
     val tmp = java.io.File.createTempFile("garbage", ".pub")
     tmp.deleteOnExit()
     java.nio.file.Files.write(
@@ -138,7 +137,7 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  test("parseSshPubkey: empty file returns None (G11)") {
+  test("parseSshPubkey: empty file returns None") {
     val tmp = java.io.File.createTempFile("empty", ".pub")
     tmp.deleteOnExit()
     java.nio.file.Files.write(tmp.toPath, "".getBytes("UTF-8"))
@@ -146,7 +145,7 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  test("parseSshPubkey: alg/wire mismatch returns None (G11)") {
+  test("parseSshPubkey: alg/wire mismatch returns None") {
     // Wire blob says "ssh-ed25519" but file's first token claims "ssh-rsa"
     // → `innerAlg == alg` sanity check rejects it.
     val ed25519WireB64 =
@@ -166,7 +165,7 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   // out-of-scope; they silently return None. This test pins that
   // contract so future refactors don't accidentally start claiming
   // option-prefixed lines (which could produce wrong fingerprints).
-  test("parseSshPubkey: authorized_keys option-prefix line returns None (G7)") {
+  test("parseSshPubkey: authorized_keys option-prefix line returns None") {
     val tmp = java.io.File.createTempFile("auth-keys", ".pub")
     tmp.deleteOnExit()
     val ed25519B64 =
@@ -181,7 +180,7 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  test("parseSshCert: garbage input returns None (G11)") {
+  test("parseSshCert: garbage input returns None") {
     val tmp = java.io.File.createTempFile("garbage", ".pub")
     tmp.deleteOnExit()
     java.nio.file.Files.write(

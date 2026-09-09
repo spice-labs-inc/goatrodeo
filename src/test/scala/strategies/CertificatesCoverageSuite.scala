@@ -9,7 +9,7 @@ import org.json4s.native.JsonMethods.*
 import java.io.File
 import scala.jdk.CollectionConverters.*
 
-/** Phase 8 — coverage matrix completeness suite.
+/** coverage matrix completeness suite.
   *
   * Per `certificates-strategy/phases-8-9-tests-docs.md` lines 39-66:
   *
@@ -133,7 +133,7 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
   // ===== Sanity: corpus exists ===========================================
 
   test(
-    "[COVERAGE] corpus has at least 100 sidecars (Phase 0b minimum carried forward)"
+    "[COVERAGE] corpus has at least 100 sidecars"
   ) {
     assert(
       sidecars.length >= 100,
@@ -141,7 +141,7 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
     )
   }
 
-  // ===== Required matrix per Phase 8 ===============================
+  // ===== Required coverage matrix ===================================
 
   private def x509SpkiOrCertPurls: Vector[Map[String, String]] =
     purlsByScheme
@@ -430,14 +430,12 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
     )
   }
 
-  // A4 in v2 review: Phase-7 second-pass remediation introduced two
-  // additional envelope values that the original Phase-8 spec didn't
-  // know about: `pem-legacy-encrypted` (RFC 1421 legacy PEM with
-  // Proc-Type:4,ENCRYPTED) and `pgp-encrypted-secret-key`. Coverage
-  // matrix must require these so a future contributor who removes
-  // the matching fixtures fails the build.
+  // Two additional envelope values are required: `pem-legacy-encrypted`
+  // (RFC 1421 legacy PEM with Proc-Type:4,ENCRYPTED) and
+  // `pgp-encrypted-secret-key`. The coverage matrix must require these so
+  // a future contributor who removes the matching fixtures fails the build.
   test(
-    "[COVERAGE] Private key envelope — pem-legacy-encrypted (RFC 1421 / Phase-7 path)"
+    "[COVERAGE] Private key envelope — pem-legacy-encrypted (RFC 1421)"
   ) {
     val envelopes =
       sidecars.flatMap(_.metadataContains.get("Certificates:Envelope")).toSet
@@ -448,7 +446,7 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "[COVERAGE] Private key envelope — pgp-encrypted-secret-key (Phase-7 second-pass remediation)"
+    "[COVERAGE] Private key envelope — pgp-encrypted-secret-key"
   ) {
     val envelopes =
       sidecars.flatMap(_.metadataContains.get("Certificates:Envelope")).toSet

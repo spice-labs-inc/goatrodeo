@@ -1,7 +1,6 @@
-/* Phase 2 Tests: PomParser Integration & Extended POM Metadata
-   Maven Phase 2 tests §2.1–2.5
+/* PomParser Integration & Extended POM Metadata
 
-   Phase 2 integrates PomParser into MavenState so that:
+   PomParser is integrated into MavenState so that:
    - POM processing uses PomParser for property-interpolated groupId/artifactId/version extraction
    - Extended POM metadata (name, description, url, organization, scm) is
      stored in MavenState and emitted via getMetadata
@@ -20,7 +19,7 @@ import io.spicelabs.goatrodeo.util.PomParser
 
 import scala.collection.immutable.TreeSet
 
-class MavenPhase2Suite extends GoatRodeoFunSuite {
+class MavenPomInterpolationSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item = Item(
     id,
@@ -419,7 +418,7 @@ class MavenPhase2Suite extends GoatRodeoFunSuite {
    * values when they exist, and only falling back to parent values when
    * the project doesn't specify its own.
    *
-   * Requirement: REQ-2 (canonical pURL priority) — the external POM must
+   * Requirement: canonical pURL priority — the external POM must
    * provide the correct project-level groupId/artifactId/version, not the
    * parent's values.
    */

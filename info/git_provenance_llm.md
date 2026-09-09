@@ -5,9 +5,9 @@
 ## What it is
 
 For **tagged runs only**, Goat Rodeo records provenance for every unique
-git repository containing a listed base directory: the HEAD commit, the
-HEAD tree, the worktree tree, and the parent commit(s) — as content-
-addressed ADG Items. Untagged runs perform zero git detection.
+git repository containing a listed base directory: exactly two Items — the
+HEAD commit and the HEAD tree — as content-addressed ADG Items. Untagged
+runs perform zero git detection.
 
 ## When it runs
 
@@ -19,13 +19,14 @@ addressed ADG Items. Untagged runs perform zero git detection.
 
 | Item | Identifier | Body fields |
 |---|---|---|
-| HEAD commit | `gitoid:commit:sha1:<hex>` | kinds, date, repo_root, object_format, author/committer name+email+date, parents, message (+ message_truncated) |
-| HEAD tree | `gitoid:tree:sha1:<hex>` | kinds, date, repo_root, object_format, head_commit |
-| Worktree tree | `gitoid:tree:sha1:<hex>` | kinds includes `worktree_tree`, dirty, head_commit |
-| Parent commits | `gitoid:commit:sha1:<hex>` | kinds `parent_commit`, parent_index, head_commit |
+| HEAD commit | `gitoid:commit:sha1:<hex>` | repo_root, author/committer name+email+date, parents, message (+ message_truncated) |
+| HEAD tree | `gitoid:tree:sha1:<hex>` | repo_root, head_commit |
 
-A clean repo's worktree tree equals the HEAD tree, so one tree Item
-carries both `tree` and `worktree_tree` kinds (no duplicate).
+The tree identifier is the commit's own tree object id — the same value
+`git rev-parse HEAD:` prints. No worktree walk, no synthesized trees, no
+parent Items: the hashes stored are the repository's own, read via JGit
+and never recomputed. The kind (`commit` vs `tree`) and the hash algorithm
+(`sha1`) follow from the identifier itself and are not carried in the body.
 
 ## Implementation notes
 
@@ -36,19 +37,18 @@ carries both `tree` and `worktree_tree` kinds (no duplicate).
   pseudonymous `sha256:<hex>` digest; repo_root is relativized to the
   scan base; scan_dir omitted. `--no-redact-git-info` (or TOML
   `redact_git_info = false`) disables it for raw capture.
-- **Caps:** entry count (100k), depth (32), blob size (64 MiB), parent
-  count (64), message length (256 KiB, truncated with flag), and a
-  capture deadline (60 s, checked per directory). A cap hit drops the
-  worktree item — never fails the run.
+- **Caps:** message length (256 KiB, truncated with flag). The capture
+  reads only the HEAD commit and its tree — no walks, so no entry/depth/
+  blob/parent caps. Never fails the run.
 - **Containment:** gitdir/commondir/alternates must live inside the scan
   tree; planted `.git` files/symlinks to foreign repos and alternates
   escaping the repo are refused (zero items + warning).
 - **Never fails the run:** corrupt object DBs, refusals, and JGit
   limitations (e.g. sha256 repos → skip with warning) all degrade to
   zero/partial items, never an exception.
-- The **tag date** (configured or JSON-overridden) is carried verbatim
-  into every git Item, so tag and provenance always agree on the run
-  date.
+- The git Items carry no run date: the tag itself holds the date, and the
+  commit item's own timestamps (`author_date`, `commit_time`) are the
+  repository's truth.
 
 ## CBOM note
 
@@ -62,12 +62,12 @@ builders should ignore `gitoid:commit:`/`gitoid:tree:` nodes.
 | Claim | Test |
 |---|---|
 | Containing repo discovered from nested bases; dedupe; not-a-repo → zero; nested repos not captured | `GitRunInfoSuite.T8.1, T8.2, T8.4, T8.5` |
-| Clean/root/dirty item shapes; identifiers are gitoids; body fields | `GitRunInfoSuite.T9.1–T9.3` |
+| Exactly two Items per repo (HEAD commit + HEAD tree); identifiers are gitoids; body fields | `GitRunInfoSuite.T9.1–T9.3` |
 | Symlink-base containment | `GitRunInfoSuite.T8.6` |
 | Redaction default + override; raw email absent when redacting | `GitRunInfoSuite.T11.1, T11.2` |
 | Containment refusals | `GitRunInfoSuite.T11.3` |
-| Caps/never-fail + corrupt DB | `GitRunInfoSuite.T11.5, T11.6` |
-| Tagged runs produce git items; untagged produce none; run-tag date verbatim | `GitTaggedRunIntegrationSuite.T10.1, T10.2`, `T12.x` |
+| Never-fail + corrupt DB | `GitRunInfoSuite.T11.6` |
+| Tagged runs produce git items; untagged produce none; git items carry no run date | `GitTaggedRunIntegrationSuite.T10.1, T10.2`, `T12.x` |
 | `--no-redact-git-info` flag + TOML `redact_git_info` | `ConfigTestSuite`, `ConfigurationTomlSuite` |
 | Git items never CBOM crypto inputs | `GitProvenanceNotInCbomSuite` |
-| Goat Rodeo NEVER modifies git files: `.git` is byte-for-byte untouched (same entries, sizes, mtimes) by `GitRunInfo.capture` and by a tagged `buildDB` run; object ids are computed read-only | `GitReadOnlyInvariantSuite` |
+| Goat Rodeo NEVER modifies git files: `.git` is byte-for-byte untouched (same entries, sizes, mtimes) by `GitRunInfo.capture` and by a tagged `buildDB` run; the two item ids are read from the repository, never computed | `GitReadOnlyInvariantSuite` |

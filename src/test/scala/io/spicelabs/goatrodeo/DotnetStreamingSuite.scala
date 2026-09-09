@@ -14,24 +14,21 @@ import java.io.FileInputStream
 import java.nio.file.Files
 import scala.util.Try
 
-/** Cilantro 0.3.1 streaming wiring — probe + walk (spec handoff CP-1/CP-2,
-  * wiring plan GRW-1..GRW-8).
+/** Cilantro 0.3.1 streaming wiring — probe + walk.
   *
   * WHAT: verifies Cilantro 0.3.1's streaming interface is wired into Goat
   * Rodeo's .NET detection and processing:
-  *   - GRW-1: DotnetDetector uses Cilantro's DotnetAssemblyProbe (no GR-side
-  *     PE-offset mark/reset sniffing); genuine assemblies are detected,
+  *   - DotnetDetector uses Cilantro's DotnetAssemblyProbe (no GR-side PE-offset
+  *     mark/reset sniffing); genuine assemblies are detected,
   *     non-PE/corrupt/truncated input is not, with no exceptions.
-  *   - GRW-2: AssemblyWalker.withinAssemblyStream enumerates every kind with a
-  *     correct name/kind/mimeHint, and processStream yields the exact bytes
+  *   - AssemblyWalker.withinAssemblyStream enumerates every kind with a correct
+  *     name/kind/mimeHint, and processStream yields the exact bytes
   *     (zero-copy).
-  *   - GRW-3: walked entries can be wrapped with ArtifactWrapper.newWrapper
-  *     carrying the entry's mimeHint, with GR-side MIME ownership.
-  *   - GRW-4: the deterministic order and the never-throws guarantee of the
-  *     walk.
+  *   - Walked entries can be wrapped with ArtifactWrapper.newWrapper carrying
+  *     the entry's mimeHint, with GR-side MIME ownership.
+  *   - The deterministic order and the never-throws guarantee of the walk.
   *
-  * WHY: Cilantro 0.3.1 ships the streaming interface (handoff
-  * workspace/2026_09_01_cilantro_handoff.md): probe, walk (name, kind,
+  * WHY: Cilantro 0.3.1 ships the streaming interface: probe, walk (name, kind,
   * mimeHint, processStream), PDB spool. GR must consume it exactly as it
   * consumes the zip/tar/saffron containers — probe → walk → wrap — with
   * zero-copy streams and no size-limit constants.

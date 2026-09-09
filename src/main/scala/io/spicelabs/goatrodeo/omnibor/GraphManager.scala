@@ -395,7 +395,7 @@ class GRDWalker(source: FileChannel) {
         if (entryLen.toLong > remaining) {
           // a positive length that exceeds the remaining bytes is
           // end-of-data (a corrupt/foreign tail) — never allocate at the
-          // declared size (spec §10)
+          // declared size
           None
         } else {
           val entryByteBuffer = ByteBuffer.allocate(entryLen)

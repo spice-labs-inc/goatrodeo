@@ -1,5 +1,4 @@
-/* Phase 3 Tests: POM Dependencies, Licenses, Scope Filtering
-   Maven Phase 3 tests §3.1–3.5
+/* POM Dependencies, Licenses, Scope Filtering
  */
 package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.omnibor.Edge
@@ -20,7 +19,7 @@ import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class MavenPhase3Suite extends GoatRodeoFunSuite {
+class MavenDependencyLicenseSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty[Edge], None, None)

@@ -6,7 +6,7 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import org.json4s.*
 import org.json4s.JsonAST.*
 
-/** Phase 0 (0.10) — Docker tag split Nil guard rail.
+/** Docker tag split Nil guard rail.
   *
   * ## What this tests
   *
@@ -24,8 +24,8 @@ import org.json4s.JsonAST.*
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.10: Docker tag split handles the empty-string base
-  * gracefully; the Nil case is documented as defensive.
+  * Requirement: Docker tag split handles the empty-string base gracefully; the
+  * Nil case is documented as defensive.
   *
   * ## LLM-friendly summary
   *
@@ -43,8 +43,8 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
     /** What: Evaluates "".split("/").toList and confirms it is not Nil. Why:
       * The computePurls match has a Nil case that is defensive. If this split
       * ever returned Nil, the code would still be safe, but we document that it
-      * currently does not. Requirement: Phase 0 §0.10 — empty string split does
-      * not produce Nil.
+      * currently does not. Requirement: empty string split does not produce
+      * Nil.
       */
     val result = "".split("/").toList
     assert(
@@ -59,8 +59,7 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
     /** What: Evaluates "foo".split("/").toList and confirms it matches the
       * `blob :: Nil` case in computePurls. Why: A Docker tag like
       * "myimage:latest" has no namespace separator, so the split yields a
-      * single element. Requirement: Phase 0 §0.10 — single component matches
-      * blob :: Nil.
+      * single element. Requirement: single component matches blob :: Nil.
       */
     val result = "foo".split("/").toList
     assertEquals(result, List("foo"))
@@ -76,8 +75,8 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
     /** What: Evaluates "ns/path".split("/").toList and confirms it matches the
       * `path :: subPath :: Nil` case in computePurls. Why: A Docker tag like
       * "myorg/myimage:latest" has exactly one slash, yielding two components
-      * with no namespace. Requirement: Phase 0 §0.10 — two components match
-      * path :: subPath :: Nil.
+      * with no namespace. Requirement: two components match path :: subPath ::
+      * Nil.
       */
     val result = "ns/path".split("/").toList
     assertEquals(result, List("ns", "path"))
@@ -145,8 +144,7 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
       * produces Some(PackageTagInfo) where version is Some("latest"). Why: The
       * normal Docker tag format "repo:tag" should split at the last colon to
       * extract the version component. This is the primary use case for
-      * maybePackageTag. Requirement: Phase 0 §0.10 — normal tag returns Some
-      * with version.
+      * maybePackageTag. Requirement: normal tag returns Some with version.
       */
     val manifestConfig = JObject(
       "RepoTags" -> JArray(List(JString("myimage:latest")))
@@ -173,8 +171,8 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
       * produces Some(PackageTagInfo) where version is None. Why: Docker tags
       * without a colon (no explicit version) are valid. The lastIndexOf(":")
       * returns -1, so versionOpt is None. The tag name is the full string. This
-      * edge case must be handled without crashing. Requirement: Phase 0 §0.10 —
-      * empty tag split returns None for version.
+      * edge case must be handled without crashing. Requirement: — empty tag
+      * split returns None for version.
       */
     val manifestConfig = JObject(
       "RepoTags" -> JArray(List(JString("myimage")))
@@ -206,8 +204,8 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
       * lastIndexOf(":") returns 0, which is NOT > 0. Why: The code checks `x >
       * 0` not `x >= 0`, so a colon at position 0 is treated the same as no
       * colon — version is None. This is a defensive edge case; real Docker tags
-      * never start with a colon. Requirement: Phase 0 §0.10 — colon at position
-      * 0 yields None version.
+      * never start with a colon. Requirement: colon at position 0 yields None
+      * version.
       */
     val manifestConfig = JObject(
       "RepoTags" -> JArray(List(JString(":latest")))
@@ -231,7 +229,7 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
 
     /** What: A Manifest marker (not Config) produces None. Why: Only Config
       * markers carry RepoTags; Manifest markers have no tag information to
-      * contribute. Requirement: Phase 0 §0.10 — non-Config markers return None.
+      * contribute. Requirement: non-Config markers return None.
       */
     val state = DockerState(Map())
     val result = state.maybePackageTag(DockerMarkers.Manifest)
@@ -244,8 +242,8 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
   test("Docker - maybePackageTag returns None for Layer marker") {
 
     /** What: A Layer marker produces None. Why: Layers are tarballs, not image
-      * configurations; they have no package tag. Requirement: Phase 0 §0.10 —
-      * Layer markers return None.
+      * configurations; they have no package tag. Requirement: — Layer markers
+      * return None.
       */
     val state = DockerState(Map())
     val result = state.maybePackageTag(DockerMarkers.Layer("sha256:abc"))
@@ -260,8 +258,7 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
     /** What: A Config marker whose manifestConfig has no RepoTags field
       * produces None. Why: A manifest entry without RepoTags (e.g., a manifest
       * list or an imported image with no tag) has no tag information to
-      * contribute. Requirement: Phase 0 §0.10 — Config without RepoTags returns
-      * None.
+      * contribute. Requirement: Config without RepoTags returns None.
       */
     val manifestConfig = JObject() // no RepoTags
     val info = makeManifestInfo(manifestConfig)
@@ -280,7 +277,7 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
     /** What: A Config marker with multiple RepoTags (e.g., "foo:1.0" and
       * "foo:latest") uses the first tag via headOption. Why: Docker images can
       * have multiple tags; the strategy picks the first one as the primary
-      * package tag. Requirement: Phase 0 §0.10 — first RepoTag is used.
+      * package tag. Requirement: first RepoTag is used.
       */
     val manifestConfig = JObject(
       "RepoTags" -> JArray(List(JString("foo:1.0"), JString("foo:latest")))
@@ -303,8 +300,7 @@ class DockerTagSplitSuite extends GoatRodeoFunSuite {
       * extracted from after the last colon. Why: Namespaced Docker images
       * (org/image:tag) are the most common format. The version extraction must
       * split at the LAST colon, not the first (which would incorrectly treat
-      * the org as the version). Requirement: Phase 0 §0.10 — lastIndexOf(":")
-      * extracts version.
+      * the org as the version). Requirement: lastIndexOf(":") extracts version.
       */
     val manifestConfig = JObject(
       "RepoTags" -> JArray(List(JString("spicelabs/bigtent:0.8.3")))

@@ -29,28 +29,22 @@ import io.spicelabs.goatrodeo.util.CryptoDetector
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Direct unit tests for Phase 1 stubs.
+/** Direct unit tests for the Certificates strategy stubs.
   *
-  * Phase 1 of the Certificates strategy ships:
+  * The current state of the strategy ships:
   *   - `CryptoDetector.mimeTypeAugmenter` — pass-through stub
   *   - `Certificates.computeCertificateFiles` — claims nothing
   *   - `CertificatesState`'s 5 `ProcessingState` methods — all pass-through
   *
-  * These tests assert the stub contracts directly. They guard the Phase-1
-  * invariant "no behavior change" against accidental regressions during Phase
-  * 2/3+ rewrites. They are a regression net, not an acceptance gate — Phase 2
-  * will replace `CryptoDetector.mimeTypeAugmenter` with content sniffing, so
-  * that test will need to update (per invariant #4 — discuss before changing).
-  *
-  * ## Traceability
-  *
-  * `certificates-strategy/phases-1-2-foundation-detector.md` Phase 1 task #3
-  * (CryptoDetector stub) and task #5 (Certificates skeleton with five
-  * ProcessingState methods).
+  * These tests assert the stub contracts directly. They guard the "no behavior
+  * change" invariant against accidental regressions in later rewrites. They are
+  * a regression net, not an acceptance gate: the moment
+  * `CryptoDetector.mimeTypeAugmenter` grows content sniffing, that test must
+  * change (per invariant #4 — discuss before changing).
   *
   * ## LLM-friendly summary
   *
-  * | Test                                                                     | Phase 1 contract verified                                             |
+  * | Test                                                                     | Contract verified                                                     |
   * |:-------------------------------------------------------------------------|:----------------------------------------------------------------------|
   * | `CryptoDetector returns currentMimes unchanged for empty set`            | augmenter passes through ∅                                            |
   * | `... for a small text-MIME set`                                          | augmenter doesn't strip text-prefixed MIMEs like SaffronDetector does |
@@ -86,11 +80,11 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
     )
   )
 
-  // === SECTION A — Phase-INVARIANT contracts ==============================
-  //
-  // These tests encode contracts that hold for EVERY phase from Phase 1
-  // through the strategy's final form. Phase 2/3+ rewrites must keep them
-  // green. If a future phase needs to weaken any of them, that requires
+  // === SECTION A — invariant contracts =================================
+
+  // These tests encode contracts that hold for every version of the
+  // strategy. Future rewrites must keep them green. If any future change
+  // needs to weaken one, that requires
   // invariant-#4 discussion BEFORE the test is changed.
 
   test(
@@ -110,8 +104,8 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   test(
     "[INVARIANT] CryptoDetector.mimeTypeAugmenter output is always a superset of input (additive)"
   ) {
-    // Phase 2 will replace the augmenter body with content sniffing.
-    // The body changes; the additive-contract invariant doesn't.
+    // A future content-sniffing body changes; the additive contract
+    // doesn't.
     val cases = Seq(
       Set.empty[String],
       Set("text/plain"),
@@ -129,20 +123,20 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
     }
   }
 
-  // === SECTION B — Phase-1-STUB-specific contracts =======================
-  //
+  // === SECTION B — stub-specific contracts =============================
+
   // These tests encode the SPECIFIC claim-nothing pass-through behavior of
-  // Phase 1. They WILL fail by design when their corresponding Phase 2/3+
-  // behavior lands:
-  //   - Phase 2 makes `CryptoDetector` content-sniff → the
+  // the current stubs. They fail by design when the corresponding behavior
+  // lands:
+  //   - `CryptoDetector` grows content sniffing → the
   //     "returns currentMimes unchanged" tests change to assert the
   //     specific MIMEs the augmenter adds for each signature.
-  //   - Phase 3 makes `Certificates.computeCertificateFiles` claim X.509
+  //   - `Certificates.computeCertificateFiles` claims X.509
   //     → "claim-nothing" tests change to assert which artifacts get
   //     claimed.
-  //   - Phase 3-7 fill the `CertificatesState` methods → identity
-  //     pass-through tests change to assert per-phase behavior.
-  //
+  //   - The `CertificatesState` methods gain behavior → identity
+  //     pass-through tests change to assert the new behavior.
+
   // Per CLAUDE.md invariant #4, every change to these tests in subsequent
   // phases requires explicit user approval before it lands.
 
@@ -154,7 +148,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "CryptoDetector.mimeTypeAugmenter on a typical Tika-ish set returns it identically (Phase 1 only — Phase 2 will add MIMEs for cert-shaped fixtures)"
+    "CryptoDetector.mimeTypeAugmenter on a typical Tika-ish set returns it identically"
   ) {
     val input = Set(
       "application/octet-stream",
@@ -171,7 +165,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   // === SECTION B continued — Phase-1-STUB-specific (Certificates) ========
 
   test(
-    "Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") at Phase 1 (claim-nothing dispatcher)"
+    "Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") (claim-nothing dispatcher)"
   ) {
     val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
     val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName = Map.empty
@@ -226,7 +220,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   // === SECTION B continued — Phase-1-STUB-specific (CertificatesState) ===
 
   test(
-    "CertificatesState.beginProcessing returns this (identity pass-through; Phase 3+ will use this stage to cache parsed cert)"
+    "CertificatesState.beginProcessing returns this (identity pass-through)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
@@ -235,7 +229,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "CertificatesState.getPurls returns (empty Vector, this) at Phase 1 (Phase 3+ emits per-cert pURLs)"
+    "CertificatesState.getPurls returns (empty Vector, this) (per-cert pURLs come later)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
@@ -246,7 +240,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "CertificatesState.getMetadata returns (empty TreeMap, this) at Phase 1 (Phase 3+ emits per-cert metadata)"
+    "CertificatesState.getMetadata returns (empty TreeMap, this) (per-cert metadata comes later)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)
@@ -257,7 +251,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "CertificatesState.finalAugmentation returns the input Item unchanged at Phase 1 (Phase 3+ runs the leak sweep here)"
+    "CertificatesState.finalAugmentation returns the input Item unchanged (the leak sweep runs here)"
   ) {
     val art = syntheticArtifact()
     val state = new CertificatesState(art)

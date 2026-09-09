@@ -24,7 +24,7 @@ import java.util.Date
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Phase 8 — generative X.509 roundtrip property tests.
+/** generative X.509 roundtrip property tests.
   *
   * Per `certificates-strategy/phases-8-9-tests-docs.md`:
   *
@@ -381,7 +381,7 @@ class CertificatesPropertySuite extends GoatRodeoScalaCheckSuite {
 
   // ===== Property 12: no private material in metadata (hard rule) ========
 
-  // A5 in v2 review: this property previously relied on
+  // This property previously relied on
   // `assertNoLeak` raising — duplicating the leak suite's work.
   // Strengthened: do the regex sweep IN-TEST against the emitted
   // metadata values, independent of the strategy's own leak guard.
@@ -443,7 +443,7 @@ class CertificatesPropertySuite extends GoatRodeoScalaCheckSuite {
   }
 
   // ===== Corpus-driven properties for SSH cert + CRL =====================
-  //
+
   // These are listed as properties but they aren't reasonably
   // runtime-generative (CRLs need an issuing key + revocation list;
   // SSH certs need a CA. Building either from scratch in test setup
@@ -583,8 +583,8 @@ class CertificatesPropertySuite extends GoatRodeoScalaCheckSuite {
     }
   }
 
-  // ===== Stratified per-algorithm-case tests (A1 in v2 review) ===========
-  //
+  // ===== Stratified per-algorithm-case tests =============================
+
   // The `forAll` properties above cover the 8 algorithm cases via
   // random sampling. With 50 runs / 8 cases, every case is
   // statistically exercised — but a particular run could miss e.g.

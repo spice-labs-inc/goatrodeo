@@ -6,7 +6,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-/** Phase 3 — Git provenance capture engine (spec §6; T8.x, T9.x).
+/** Git provenance capture engine .
   *
   * WHAT: pins discovery (containing repo only, dedupe, no nested repos), item
   * counts per repo shape, gitoid identifiers, and metadata body fields — all
@@ -16,10 +16,9 @@ import java.nio.file.Files
   * oracles) and 5 (containing repo only).
   *
   * LLM note: fixtures are created with JGit's `Git` API (init/commit). The
-  * worktree-tree oracle is JGit `TreeFormatter` over the working tree via the
-  * same building blocks the product uses — the tests assert the capture's
-  * behavior (counts, identifiers, fields), not byte-parity of tree ids against
-  * a fictional ground truth.
+  * capture emits exactly two Items per repo (HEAD commit + HEAD tree — the tree
+  * id is the commit's own tree object id); the tests assert counts,
+  * identifiers, and body fields against the fixture repos' actual HEAD.
   */
 class GitRunInfoSuite extends GoatRodeoFunSuite {
 
@@ -63,7 +62,6 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
   private def captureOf(root: File, scanRoot: File): Vector[GitRunItem] =
     GitRunInfo.capture(
       Seq(root),
-      runDate = "2026-09-02T00:00:00Z",
       redact = true,
       scanRoot = Some(scanRoot)
     )
@@ -77,7 +75,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
         }
     }.flatten
 
-  test("T8.1 containingRepoDiscoveredForBase") {
+  test("containingRepoDiscoveredForBase") {
     val root = tempDir("gr8")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
@@ -87,14 +85,14 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val nested = new File(root, "sub/dir")
     nested.mkdirs()
     val items =
-      GitRunInfo.capture(Seq(nested), "d", redact = true, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(nested), redact = true, scanRoot = Some(root))
     assert(
       items.nonEmpty,
       "containing repo must be discovered from a nested base"
     )
   }
 
-  test("T8.2 basesInSameRepoDedupeToOneSet") {
+  test("basesInSameRepoDedupeToOneSet") {
     val root = tempDir("gr8")
     write(root, "a.txt", "x")
     val git = initRepo(root)
@@ -104,28 +102,21 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val baseB = new File(root, "d2"); baseB.mkdirs()
     val items = GitRunInfo.capture(
       Seq(baseA, baseB),
-      "d",
       redact = true,
       scanRoot = Some(root)
     )
-    // one repo -> one set of items; no duplication
-    def kinds(item: GitRunItem): String = item.json.members
-      .collectFirst {
-        case (
-              io.bullet.borer.Dom.StringElem("kinds"),
-              io.bullet.borer.Dom.ArrayElem.Unsized(v)
-            ) =>
-          v.collect { case io.bullet.borer.Dom.StringElem(s) => s }
-            .mkString(",")
-      }
-      .getOrElse("")
-    val commitCount = items.count(i => kinds(i).split(",").contains("commit"))
+    // one repo -> one set of items; no duplication. The kind follows from
+    // the identifier: gitoid:commit: vs gitoid:tree:
+    val commitCount =
+      items.count(_.gitoid.startsWith("gitoid:commit:sha1:"))
     assertEquals(commitCount, 1)
+    val treeCount = items.count(_.gitoid.startsWith("gitoid:tree:sha1:"))
+    assertEquals(treeCount, 1)
   }
 
-  test("T14.3 markerInWorktreeDoesNotPolluteCapturedTree") {
+  test("markerInWorktreeDoesNotPolluteCapturedTree") {
     // a planted .user-ready marker in the worktree (to be tolerated) must
-    // not appear in the captured worktree tree — it is a dot file and the
+    // not appear in any item body — discovery ignores dot-named marker files
     // capture skips dot entries.
     val root = tempDir("gr14")
     write(root, "a.txt", "hello")
@@ -144,23 +135,23 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T8.4 notARepoYieldsZeroItems") {
+  test("notARepoYieldsZeroItems") {
     val root = tempDir("gr8")
     write(root, "a.txt", "x")
     val items =
-      GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(root), redact = true, scanRoot = Some(root))
     assertEquals(items, Vector.empty)
   }
 
-  test("T9.1 cleanRepoItemCounts") {
+  test("cleanRepoItemCounts") {
     val root = tempDir("gr9")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
     commitAll(git, "initial")
     git.close()
     val items = captureOf(root, root)
-    // clean repo: commit + tree (+worktree merged) + parent — but a root
-    // commit has NO parent, so 2 items (commit + tree/worktree).
+    // exactly two items: HEAD commit + HEAD tree (the tree id is the
+    // commit's own tree object id — no worktree walk, no parents).
     assertEquals(
       items.size,
       2,
@@ -176,7 +167,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T9.2 identifiersAreGitoids") {
+  test("identifiersAreGitoids") {
     val root = tempDir("gr9")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
@@ -190,7 +181,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T9.3 bodyCarriesGitMetadata") {
+  test("bodyCarriesGitMetadata") {
     val root = tempDir("gr9")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
@@ -205,11 +196,9 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
       email.startsWith("sha256:") && email.length > 7,
       s"digested email expected; got $email"
     )
-    assertEquals(jsonOf(commitItem, "date"), Some("2026-09-02T00:00:00Z"))
-    assertEquals(jsonOf(commitItem, "object_format"), Some("sha1"))
   }
 
-  test("T11.1 redactedByDefault — emails digested, raw never present") {
+  test("redactedByDefault — emails digested, raw never present") {
     val root = tempDir("gr9")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
@@ -229,20 +218,20 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T11.2 redactionOverridable — raw emails when redact=false") {
+  test("redactionOverridable — raw emails when redact=false") {
     val root = tempDir("gr9")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
     commitAll(git, "m")
     git.close()
     val items =
-      GitRunInfo.capture(Seq(root), "d", redact = false, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(root), redact = false, scanRoot = Some(root))
     val commitItem = items.find(_.gitoid.startsWith("gitoid:commit:sha1:")).get
     assertEquals(jsonOf(commitItem, "author_email"), Some("tester@example.com"))
     assertEquals(jsonOf(commitItem, "repo_root"), Some(root.getAbsolutePath))
   }
 
-  test("T8.6 symlinkBaseOutsideTreeIsRefused") {
+  test("symlinkBaseOutsideTreeIsRefused") {
     // a base that is a symlink pointing at a repo outside the scan tree
     val outside = tempDir("gr-out2")
     write(outside, "a.txt", "hello")
@@ -259,7 +248,6 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     }
     val items = GitRunInfo.capture(
       Seq(link),
-      "d",
       redact = true,
       scanRoot = Some(scanRoot)
     )
@@ -271,7 +259,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T11.5 captureCaps — caps drop the worktree item without failing the run"
+    "neverFailsOnMalformedRepo — zero items, no exception"
   ) {
     val root = tempDir("gr9")
     // make a repo with many files to trip the entry cap quickly is slow;
@@ -283,7 +271,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
       val head = new File(root, ".git/HEAD")
       Files.writeString(head.toPath, "ref: refs/heads/main\n")
       val items =
-        GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
+        GitRunInfo.capture(Seq(root), redact = true, scanRoot = Some(root))
       assertEquals(
         items,
         Vector.empty,
@@ -292,7 +280,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("T11.6 corruptObjectDbYieldsZeroItemsAndNoException") {
+  test("corruptObjectDbYieldsZeroItemsAndNoException") {
     val root = tempDir("gr9")
     write(root, "a.txt", "hello")
     val git = initRepo(root)
@@ -306,14 +294,14 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
         .foreach(f => Files.write(f.toPath, Array[Byte](1, 2, 3)))
     }
     val items =
-      GitRunInfo.capture(Seq(root), "d", redact = true, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(root), redact = true, scanRoot = Some(root))
     assert(
       items.isEmpty || items.nonEmpty,
       "capture must never throw; may degrade to zero or partial"
     )
   }
 
-  test("T11.3 containment — repo outside scan root is refused") {
+  test("containment — repo outside scan root is refused") {
     val outside = tempDir("gr-out")
     write(outside, "a.txt", "hello")
     val git = initRepo(outside)
@@ -322,7 +310,6 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val scanRoot = tempDir("gr-scan")
     val items = GitRunInfo.capture(
       Seq(outside),
-      "d",
       redact = true,
       scanRoot = Some(scanRoot)
     )

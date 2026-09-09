@@ -7,8 +7,8 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-/** Phase 3 — git provenance Items are NOT CBOM inputs (spec §6 × CBOM docs; the
-  * negative contract).
+/** git provenance Items are NOT CBOM inputs (spec §6 × CBOM docs; the negative
+  * contract).
   *
   * WHAT: git provenance Items (gitoid:commit:/gitoid:tree:) carry ItemTagData
   * bodies (not ItemMetaData) and no cryptographic `extra` keys — the CBOM
@@ -52,7 +52,6 @@ class GitProvenanceNotInCbomSuite extends GoatRodeoFunSuite {
 
     val items = GitRunInfo.capture(
       Seq(root),
-      "2026-09-02T00:00:00Z",
       redact = true,
       scanRoot = Some(root)
     )

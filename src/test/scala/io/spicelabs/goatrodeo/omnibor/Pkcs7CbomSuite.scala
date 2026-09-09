@@ -8,7 +8,7 @@ import io.spicelabs.goatrodeo.util.Configuration
 import java.io.File
 import java.nio.file.Files
 
-/** Phase 2 — PKCS#7 certificates surface in CBOM (spec §4, T7.x).
+/** PKCS#7 certificates surface in CBOM .
   *
   * WHAT: a pkcs7-signature-stamped artifact processed through the full pipeline
   * produces ADG items whose CBOM output contains a `cryptographic-asset`
@@ -55,7 +55,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
     java.nio.file.Files.readAllBytes(f.toPath)
   }
 
-  test("T7.1 pkcs7CertAppearsInCbom") {
+  test("pkcs7CertAppearsInCbom") {
     val bytes = readFixture("test_data/certificates/pkcs7/detached.p7b.der")
     val cbom = emitFor(bytes, "signed.p7b", Some(Certificates.CertPkcs7Mime))
     assert(
@@ -76,7 +76,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T7.2 bundleMetadataRecorded") {
+  test("bundleMetadataRecorded") {
     val bytes = readFixture("test_data/certificates/pkcs7/detached.p7b.der")
     val cbom = emitFor(bytes, "signed.p7b", Some(Certificates.CertPkcs7Mime))
     // bundle keys ride as properties-from-extra
@@ -94,7 +94,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T7.4 cbomComponentEquivalencePkcs7VsPem") {
+  test("cbomComponentEquivalencePkcs7VsPem") {
     // Same certificate as a DER p7b (BK) vs a PEM bundle: the certificate
     // properties must be equal. We compare the key certificate-property
     // fields appearing in both outputs.
@@ -116,7 +116,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
     assert(p7.contains("X.509") && pem.contains("X.509"))
   }
 
-  test("T7.3 invalidBlobNeverInCbomAsCertificate") {
+  test("invalidBlobNeverInCbomAsCertificate") {
     val junk = Array.tabulate[Byte](64)(i => (i * 7 + 1).toByte)
     val cbom = emitFor(junk, "junk.p7b", Some(Certificates.CertPkcs7Mime))
     // The invalid blob is claimed but yields no certs; the item carries no

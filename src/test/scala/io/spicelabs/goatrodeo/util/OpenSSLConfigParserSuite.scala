@@ -20,7 +20,7 @@ import org.scalacheck.Prop.forAll
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeSet
 
-/** Phase 1 — Unit tests for `OpenSSLConfigParser`.
+/** Unit tests for `OpenSSLConfigParser`.
   *
   * These tests verify that the parser extracts security-relevant directives,
   * follows `ssl_conf` indirection, records `.include` references, handles

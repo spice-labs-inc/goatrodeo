@@ -10,24 +10,24 @@ import org.scalacheck.Prop.forAll
 
 import java.io.File
 
-/** Phase 2: Canonical pURL Priority Fix.
+/** Canonical pURL Priority.
   *
   * '''What this suite tests:'''
-  *   - REQ-2: Canonical pURL in metadata with correct priority
-  *   - REQ-3: Companion POM as highest priority for canonical pURL
-  *   - GAP-2: Fix canonical pURL priority — companion POM must be first
-  *   - GAP-7: Verify canonical pURL in metadata for sources/javadoc
+  *   - Canonical pURL in metadata with correct priority
+  *   - Companion POM as highest priority for canonical pURL
+  *   - Canonical pURL priority — companion POM must be first
+  *   - Canonical pURL in metadata for sources/javadoc
   *
-  * '''Priority chain (after fix):''' external POM (companion) → pom.properties
-  * → embedded pom.xml → manifest → filename
+  * '''Priority chain:''' external POM (companion) → pom.properties → embedded
+  * pom.xml → manifest → filename
   *
   * '''LLM context:''' These tests verify that the companion POM is the highest
-  * priority source for canonical pURL resolution. Tests 2.1-2.2 verify the core
-  * behavioral change. Tests 2.3-2.4 verify canonical pURL metadata for
-  * sources/javadoc. Tests 2.5-2.10 cover edge cases.
+  * priority source for canonical pURL resolution. The first two tests verify
+  * the core behavioral change; the next two verify canonical pURL metadata for
+  * sources/javadoc; the remaining tests cover edge cases.
   */
 
-class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
+class CanonicalPurlPrioritySuite extends GoatRodeoFunSuite {
 
   /** Helper: find all CanonicalPurl values in the store's items. */
   private def findCanonicalPurls(
@@ -46,37 +46,37 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.1: Companion POM groupId wins over pom.properties for canonical pURL
+  // Companion POM groupId wins over pom.properties for canonical pURL
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When a JAR has embedded pom.properties with groupId=org.embedded
   //   and a companion POM with groupId=org.companion, the canonical pURL
   //   uses groupId=org.companion (companion POM wins).
-  //
+
   // Why it's relevant:
-  //   This is the core behavioral change of REQ-3. The companion POM is
+  //   This is the core behavioral change: the companion POM is
   //   the authoritative published metadata.
-  //
+
   // Requirement section:
-  //   REQ-3 — "The companion POM file is the HIGHEST priority source
+  //   "The companion POM file is the HIGHEST priority source
   //   for determining the canonical pURL's groupId/artifactId/version."
-  //
+
   // Theory:
   //   Create temp dir with JAR containing pom.properties
   //   (groupId=org.embedded, artifactId=embedded-art, version=1.0) and
   //   companion POM (groupId=org.companion, artifactId=companion-art,
   //   version=2.0). Process through pipeline. Assert canonical pURL
   //   contains org.companion (NOT org.embedded).
-  //
+
   // Expected (RED):
   //   Current code produces pURL with org.embedded because pom.properties
   //   has higher priority.
-  //
+
   // Expected (GREEN):
   //   After fix, produces pURL with org.companion.
 
-  test("Test 2.1: Companion POM wins over pom.properties for canonical pURL") {
+  test("Companion POM wins over pom.properties for canonical pURL") {
     MavenTestHelpers.withTempDir("test-2-1") { dir =>
       // JAR with pom.properties (groupId=org.embedded, artifactId=foo
       // — artifactId MUST match filename "foo" so pom.properties is
@@ -133,35 +133,35 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.2: Companion POM consulted when pom.properties absent
+  // Companion POM consulted when pom.properties absent
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When a JAR has NO embedded pom.properties but has a companion POM,
   //   the canonical pURL uses the companion POM values.
-  //
+
   // Why it's relevant:
   //   Many JARs don't have pom.properties inside them. The companion POM
   //   is the only authoritative source.
-  //
+
   // Requirement section:
-  //   REQ-3 — "For any JAR with no embedded pom.properties but a companion
+  //   "For any JAR with no embedded pom.properties but a companion
   //   POM, the canonical pURL's groupId/artifactId/version matches the
   //   companion POM."
-  //
+
   // Theory:
   //   Create temp dir with JAR (no pom.properties, just manifest with
   //   Implementation-Title=foo) and companion POM (groupId=org.real,
   //   artifactId=real-art, version=3.1). Process. Assert canonical pURL
   //   is pkg:maven/org.real/real-art@3.1 (not manifest-derived, not
   //   filename).
-  //
+
   // Expected (GREEN):
   //   Canonical pURL uses companion POM values. This should already PASS
   //   because when pom.properties is absent, external POM is the first
   //   available source in both the old and new priority chains.
 
-  test("Test 2.2: Companion POM used when pom.properties absent") {
+  test("Companion POM used when pom.properties absent") {
     MavenTestHelpers.withTempDir("test-2-2") { dir =>
       // JAR with manifest but NO pom.properties
       MavenTestHelpers.writeJar(
@@ -200,33 +200,33 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.3: Canonical pURL in metadata for sources JAR
+  // Canonical pURL in metadata for sources JAR
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   After processing a sources JAR with a companion POM, the gitoid
   //   Item's metadata has CanonicalPurl key with a pURL containing
   //   ?packaging=sources.
-  //
+
   // Why it's relevant:
-  //   GAP-7 — no test currently verifies canonical pURL metadata for
+  //   no test currently verifies canonical pURL metadata for
   //   sources/javadoc. The canonical pURL must include the correct
   //   classifier.
-  //
+
   // Requirement section:
-  //   REQ-2 — "The canonical pURL for a sources JAR includes
+  //   "The canonical pURL for a sources JAR includes
   //   ?packaging=sources."
-  //
+
   // Theory:
   //   Create temp dir with main JAR + sources JAR + companion POM.
   //   Process through pipeline. Read gitoid Items from store. Find
   //   CanonicalPurl metadata. Assert one contains ?packaging=sources.
-  //
+
   // Expected (GREEN):
   //   CanonicalPurl present with ?packaging=sources.
 
   test(
-    "Test 2.3: Canonical pURL in metadata for sources JAR has ?packaging=sources"
+    "Canonical pURL in metadata for sources JAR has ?packaging=sources"
   ) {
     MavenTestHelpers.withTempDir("test-2-3") { dir =>
       MavenTestHelpers.writeJar(dir, "foo-1.0.jar", Seq("foo.txt" -> "hello"))
@@ -255,18 +255,18 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.4: Canonical pURL in metadata for javadoc JAR
+  // Canonical pURL in metadata for javadoc JAR
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   Same as 2.3 but for javadoc JAR with ?classifier=javadoc.
-  //
+
   // Requirement section:
-  //   REQ-2 — "The canonical pURL for a javadoc JAR includes
+  //   "The canonical pURL for a javadoc JAR includes
   //   ?classifier=javadoc."
 
   test(
-    "Test 2.4: Canonical pURL in metadata for javadoc JAR has ?classifier=javadoc"
+    "Canonical pURL in metadata for javadoc JAR has ?classifier=javadoc"
   ) {
     MavenTestHelpers.withTempDir("test-2-4") { dir =>
       MavenTestHelpers.writeJar(dir, "foo-1.0.jar", Seq("foo.txt" -> "hello"))
@@ -295,33 +295,33 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.5: Parent POM groupId fallback through full pipeline
+  // Parent POM groupId fallback through full pipeline
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When the companion POM's <groupId> is absent but
   //   <parent><groupId> is present, the canonical pURL uses the
   //   parent's groupId.
-  //
+
   // Why it's relevant:
   //   Many POMs inherit groupId from parent. The PomParser already
   //   handles this (line 134), but no test verifies it through the full
   //   pipeline.
-  //
+
   // Requirement section:
-  //   REQ-3 — "Parent POM groupId: When the companion POM's own <groupId>
+  //   "Parent POM groupId: When the companion POM's own <groupId>
   //   is absent, the parser falls back to <parent><groupId>."
-  //
+
   // Theory:
   //   Create temp dir with JAR + companion POM where POM has no <groupId>
   //   but has <parent><groupId>org.inherited</groupId></parent>.
   //   Process. Assert canonical pURL's groupId is org.inherited.
-  //
+
   // Expected (GREEN):
   //   Canonical pURL uses parent groupId. Should PASS (PomParser already
   //   handles this).
 
-  test("Test 2.5: Parent POM groupId fallback through full pipeline") {
+  test("Parent POM groupId fallback through full pipeline") {
     MavenTestHelpers.withTempDir("test-2-5") { dir =>
       MavenTestHelpers.writeJar(dir, "foo-1.0.jar", Seq("foo.txt" -> "hello"))
       // POM with no <groupId> but <parent><groupId>
@@ -355,18 +355,18 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.6: Filename is last resort for canonical pURL
+  // Filename is last resort for canonical pURL
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When no companion POM and no JAR contents (no pom.properties, no
   //   manifest with useful data) exist, the canonical pURL is derived
   //   from the filename.
-  //
-  // Requirement section:
-  //   REQ-2 — "Filename (lowest priority, last resort)."
 
-  test("Test 2.6: Filename is last resort for canonical pURL") {
+  // Requirement section:
+  //   "Filename (lowest priority, last resort)."
+
+  test("Filename is last resort for canonical pURL") {
     MavenTestHelpers.withTempDir("test-2-6") { dir =>
       // JAR with no pom.properties, no manifest, no companion POM
       MavenTestHelpers.writeJar(dir, "foo-1.0.jar", Seq("foo.txt" -> "hello"))
@@ -386,25 +386,25 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.7: No canonical pURL when nothing resolvable
+  // No canonical pURL when nothing resolvable
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When no groupId/artifactId/version can be resolved from any source
   //   (no companion POM, no pom.properties, no manifest, and filename
   //   yields nothing), the CanonicalPurl key is ABSENT from metadata.
-  //
+
   // Requirement section:
-  //   REQ-2 — "If no groupId/artifactId/version can be resolved at all,
+  //   "If no groupId/artifactId/version can be resolved at all,
   //   no canonical pURL is written (the key is absent, not empty)."
-  //
+
   // Theory:
   //   Create a JAR named "x.jar" (no version, no POM, no pom.properties,
   //   no manifest). The filename "x.jar" has no dash-digit pattern, so
   //   extractIdentityFromFilename returns None. Process. Assert no
   //   CanonicalPurl in metadata.
 
-  test("Test 2.7: No canonical pURL when nothing resolvable") {
+  test("No canonical pURL when nothing resolvable") {
     MavenTestHelpers.withTempDir("test-2-7") { dir =>
       // JAR with a name that yields no groupId/artifactId/version
       // "x.jar" has no dash-digit pattern → extractIdentityFromFilename returns None
@@ -419,12 +419,12 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
       // returns None for all fields. With no other sources, no pURL.
       // However, the POM marker might still emit a pURL if parsedPom is
       // populated — but there's no POM file here.
-      //
+
       // Actually, "x.jar" → isMavenArchive("x.jar") = true (ends with .jar)
       // → computeMavenFiles will claim it. But with no POM, no pom.properties,
       // no manifest, and filename yielding nothing, resolveGroupIdArtifactIdVersion
       // returns (None, None, None) → no pURL.
-      //
+
       // We check that no CanonicalPurl exists with a meaningful value.
       // If the finalGroupId fallback kicks in (artifactId as groupId),
       // there might be a pURL. But artifactId is also None here.
@@ -437,17 +437,17 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.8: Corrupt companion POM does not crash pipeline
+  // Corrupt companion POM does not crash pipeline
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When the companion POM contains invalid XML, the pipeline does not
   //   crash and the canonical pURL falls back to JAR contents/filename.
-  //
-  // Requirement section:
-  //   REQ-2 — fallback chain.
 
-  test("Test 2.8: Corrupt companion POM does not crash pipeline") {
+  // Requirement section:
+  //   fallback chain.
+
+  test("Corrupt companion POM does not crash pipeline") {
     MavenTestHelpers.withTempDir("test-2-8") { dir =>
       // JAR with pom.properties (so we have a fallback source)
       MavenTestHelpers.writeJar(
@@ -482,22 +482,22 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.9: Companion POM with partial data — field-level merge fills gaps
+  // Companion POM with partial data — field-level merge fills gaps
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When the companion POM has groupId but NO version, and pom.properties
   //   has version, the canonical pURL uses POM groupId + pom.properties
   //   version (field-level merge, not all-or-nothing).
-  //
+
   // Why it's relevant:
   //   Verifies field-level independence. The companion POM is highest
   //   priority PER FIELD, not all-or-nothing.
-  //
-  // Requirement section:
-  //   REQ-3 — companion POM as highest priority per field.
 
-  test("Test 2.9: Companion POM partial data — field-level merge fills gaps") {
+  // Requirement section:
+  //   companion POM as highest priority per field.
+
+  test("Companion POM partial data — field-level merge fills gaps") {
     MavenTestHelpers.withTempDir("test-2-9") { dir =>
       // JAR with pom.properties (groupId=org.embedded, artifactId=foo, version=1.0)
       MavenTestHelpers.writeJar(
@@ -543,19 +543,19 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
   }
 
   // -------------------------------------------------------------------------
-  // Test 2.10: finalGroupId fallback — artifactId used as groupId
+  // finalGroupId fallback — artifactId used as groupId
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   When no groupId is resolved from any source, the code at
   //   Maven.scala:348 uses groupId.orElse(artifactId) — artifactId as
   //   groupId. This test documents this behavior.
-  //
+
   // Requirement section:
-  //   REQ-2 — filename as last resort. The finalGroupId fallback is
+  //   filename as last resort. The finalGroupId fallback is
   //   intentional: better to have a lookupable pURL than none.
 
-  test("Test 2.10: finalGroupId fallback — artifactId used as groupId") {
+  test("finalGroupId fallback — artifactId used as groupId") {
     MavenTestHelpers.withTempDir("test-2-10") { dir =>
       // JAR with filename mylib-1.0.jar (no POM, no pom.properties, no manifest)
       MavenTestHelpers.writeJar(dir, "mylib-1.0.jar", Seq("x.txt" -> "x"))
@@ -577,10 +577,10 @@ class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
 }
 
 // =============================================================================
-// Property-Based Test 2.11: Companion POM is always highest priority
+// Property-Based Tests: Companion POM is always highest priority
 // =============================================================================
 
-class Phase2PropertySuite extends GoatRodeoScalaCheckSuite {
+class CanonicalPurlPriorityPropertySuite extends GoatRodeoScalaCheckSuite {
 
   /** Generator for groupId strings. */
   val genGroupId: Gen[String] = for {
@@ -608,32 +608,31 @@ class Phase2PropertySuite extends GoatRodeoScalaCheckSuite {
   } yield (g, a, v)
 
   // -------------------------------------------------------------------------
-  // Property Test 2.11: Companion POM is always highest priority
+  // Companion POM is always highest priority
   // -------------------------------------------------------------------------
-  //
+
   // What it tests:
   //   For any JAR with a companion POM, the canonical pURL's
   //   groupId/artifactId/version always matches the companion POM,
   //   regardless of what's inside the JAR.
-  //
+
   // Why it's relevant:
-  //   This is the fundamental property of REQ-3.
-  //
+  //   This is the fundamental property: the companion POM wins.
+
   // Requirement section:
-  //   REQ-3.
-  //
+
   // Theory:
   //   ScalaCheck generates random companion POM coordinates and random
   //   JAR pom.properties coordinates. For any combination, the canonical
   //   pURL must match the companion POM.
-  //
+
   // Expected (RED):
   //   Fails because pom.properties currently wins.
-  //
+
   // Expected (GREEN):
   //   Passes after priority fix.
 
-  property("Test 2.11: Companion POM always wins over pom.properties") {
+  property("Companion POM always wins over pom.properties") {
     forAll(genCoordinates, genCoordinates) {
       case ((pomG, pomA, pomV), (propsG, propsA, propsV)) =>
         // Skip if coordinates are the same (trivial case)

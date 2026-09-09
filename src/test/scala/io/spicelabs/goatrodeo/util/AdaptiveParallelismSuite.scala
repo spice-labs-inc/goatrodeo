@@ -36,8 +36,8 @@ import org.scalacheck.Prop.propBoolean
   * leaves [min, max] for arbitrary traces.
   *
   * LLM note: T-AP-xx = test id; each test documents the requirement it pins.
-  * The clamping tests (T-AP-02) pin R6: the constructor never raises, invalid
-  * parameters are coerced, and the production defaults are byte-identical.
+  * The clamping tests pin: the constructor never raises, invalid parameters are
+  * coerced, and the production defaults are byte-identical.
   */
 class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
 
@@ -59,10 +59,10 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     }
   }
 
-  // T-AP-01 — R6: production defaults must be byte-identical to the original
+  // production defaults must be byte-identical to the original
   // (v2) controller so tuning behavior is unchanged for callers that rely on
   // the defaults.
-  test("T-AP-01 production defaults are pinned") {
+  test("production defaults are pinned") {
     val c = AdaptiveParallelism()
     assertEquals(c.min, 1)
     assertEquals(c.max, 32)
@@ -79,11 +79,11 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     assertEquals(c.current, 2)
   }
 
-  // T-AP-02 — R6: invalid constructor parameters must be clamped, never raise.
+  // invalid constructor parameters must be clamped, never raise.
   // THEORY: the pass must not be able to die from a bad configuration; the
   // coercions pin the parameter space. NaN/Infinity floating inputs fall back
   // to the production default.
-  test("T-AP-02 invalid parameters clamp instead of raising") {
+  test("invalid parameters clamp instead of raising") {
     assertEquals(AdaptiveParallelism(min = 0).min, 1)
     assertEquals(AdaptiveParallelism(min = -7).min, 1)
 
@@ -142,12 +142,12 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     )
   }
 
-  // T-AP-03 — R6 (property): for arbitrary completion-time traces, the
+  // (property): for arbitrary completion-time traces, the
   // concurrency target never leaves [min, max]. THEORY: whatever the shape of
   // the trace — pathological outliers, bursts, empty windows — the controller
   // must stay in bounds; a violation would let the pass over-subscribe the
   // device it is trying to protect.
-  property("T-AP-03 concurrency stays within [min, max] for arbitrary traces") {
+  property("concurrency stays within [min, max] for arbitrary traces") {
     forAll(
       Gen.choose(2, 64),
       Gen.listOfN(400, Gen.choose(0L, 1000000000L))
@@ -168,11 +168,11 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     }
   }
 
-  // T-AP-04 — collapse policy: sustained slow completions (median far above
+  // collapse policy: sustained slow completions (median far above
   // the best-seen floor) halve the target down to min. THEORY: multiplicative
   // decrease is the back-off the pass relies on when the cache stops serving
   // reads.
-  test("T-AP-04 sustained slow windows collapse the target to min") {
+  test("sustained slow windows collapse the target to min") {
     val c = AdaptiveParallelism(
       min = 1,
       max = 8,
@@ -186,29 +186,29 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     assertEquals(c.current, 1)
   }
 
-  // T-AP-05 — growth policy: sustained fast completions grow the target by
+  // growth policy: sustained fast completions grow the target by
   // one probe at a time up to max. THEORY: additive increase keeps the probe
   // gentle; the pass should rediscover spare throughput after a transient
   // slow period.
-  test("T-AP-05 sustained fast windows grow the target to max") {
+  test("sustained fast windows grow the target to max") {
     val c = AdaptiveParallelism(min = 1, max = 8, start = 2, windowSize = 4)
     windowsOf(c, 40, 1000L) // 3 growth-confirmation windows per +1
     assertEquals(c.current, 8)
   }
 
-  // T-AP-06 — collapse cooldown: after a collapse, growth is banned for
+  // collapse cooldown: after a collapse, growth is banned for
   // `collapseCooldownWindows` windows even when completions are fast, so a
   // borderline corpus settles instead of saw-toothing. THEORY: without the
   // cooldown the controller would immediately re-probe into the regime that
   // just collapsed.
-  //
+
   // Trace note: one slow spike causes two collapse windows by design — the
   // EMA decays only by half per window while the floor rises 10%, so the
   // ratio stays above `collapseThreshold` for the window after the spike
   // (8 -> 4 -> 2). The second collapse resets the cooldown; the pinned
   // behavior is that the following fast windows cannot grow until the
   // cooldown expires.
-  test("T-AP-06 growth is banned for the cooldown window after collapse") {
+  test("growth is banned for the cooldown window after collapse") {
     val c = AdaptiveParallelism(
       min = 1,
       max = 8,
@@ -231,11 +231,11 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     )
   }
 
-  // T-AP-07 — median robustness: the window statistic is the median, so a
+  // median robustness: the window statistic is the median, so a
   // single pathological completion cannot drag the signal down. THEORY: a
   // mean-based controller would collapse on one huge file; the median must
   // ignore it.
-  test("T-AP-07 a single outlier does not move the median") {
+  test("a single outlier does not move the median") {
     val c = AdaptiveParallelism(windowSize = 4)
     c.record(100L)
     c.record(100L)
@@ -244,10 +244,10 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     assertEquals(c.lastMedianNanos, 100.0)
   }
 
-  // T-AP-08 — partial windows: forceWindowClose evaluates whatever has
+  // partial windows: forceWindowClose evaluates whatever has
   // accumulated (the wall-clock timer path), even when the window is not
   // full. THEORY: very slow workloads must still produce measurements.
-  test("T-AP-08 forceWindowClose evaluates a partial window") {
+  test("forceWindowClose evaluates a partial window") {
     val c = AdaptiveParallelism(windowSize = 128)
     c.record(10L)
     c.record(30L)
@@ -256,10 +256,10 @@ class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
     assertEquals(c.lastMedianNanos, 20.0)
   }
 
-  // T-AP-09 — window storage grows past windowSize without losing samples or
+  // window storage grows past windowSize without losing samples or
   // raising. THEORY: the internal buffer expands as needed; the median of the
   // remainder after the last auto-close must be exact.
-  test("T-AP-09 record survives more samples than windowSize") {
+  test("record survives more samples than windowSize") {
     val c = AdaptiveParallelism(windowSize = 4)
     var i = 1L
     while (i <= 15L) {

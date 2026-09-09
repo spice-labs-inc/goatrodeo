@@ -78,8 +78,8 @@ import scala.util.Using
   */
 object Certificates {
 
-  /** The certificate blob MIME constants, owned by this module (spec §4.4).
-    * Other modules that stamp certificate blobs refer to these constants.
+  /** The certificate blob MIME constants, owned by this module . Other modules
+    * that stamp certificate blobs refer to these constants.
     */
   val CertPkixMime: String = "application/pkix-cert"
   val CertPkcs7Mime: String = "application/pkcs7-signature"
@@ -1287,7 +1287,7 @@ object Certificates {
     }
   }.toOption.flatten
 
-  // ── X.509 extension depth (Phase F) ──────────────────────────────────
+  // ── X.509 extension depth  ──────────────────────────────────
 
   /** Decode the DER value of an X.509 extension (outer OCTET STRING unwrapped
     * twice), pending on java.util may return null — wrapped in Option.

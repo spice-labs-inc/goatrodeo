@@ -6,7 +6,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.nio.charset.StandardCharsets
 
-/** Phase 0.9 — SshWireReader methods return Option instead of throwing.
+/** SshWireReader methods return Option instead of throwing.
   *
   * REQUIREMENT: No exceptions for flow control. Short reads or buffer overflows
   * on untrusted SSH wire data return None instead of throwing

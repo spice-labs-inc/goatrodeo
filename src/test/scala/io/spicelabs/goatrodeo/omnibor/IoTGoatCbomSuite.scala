@@ -22,7 +22,7 @@ import java.io.File
 import java.nio.file.Files
 import scala.util.Try
 
-/** T4.5 — Discovery-driven CBOM regression test for the IoTGoat x86 firmware.
+/** Discovery-driven CBOM regression test for the IoTGoat x86 firmware.
   *
   * The firmware image was opened with native tools and traversed; the static
   * cryptographic material found was:
@@ -100,7 +100,7 @@ class IoTGoatCbomSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T4.5 IoTGoat x86 CBOM contains all discovered static cryptographic material"
+    "IoTGoat x86 CBOM contains all discovered static cryptographic material"
   ) {
     assert(fixture.exists(), s"IoTGoat x86 fixture required: ${fixture}")
 

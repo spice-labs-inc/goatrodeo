@@ -4,7 +4,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 
-/** Phase 2 — Artifact MIME hints (spec §5, T5.x).
+/** Artifact MIME hints .
   *
   * WHAT: pins the optional authoritative MIME hint on artifact wrappers:
   * default None; unioned into the effective MIME set when present; survives
@@ -12,18 +12,18 @@ import java.nio.file.Files
   * authoritative (not validated against content); effective set is a superset
   * of the detected set.
   *
-  * WHY: the .NET walker (Cilantro handoff) and other producers stamp kind MIMEs
-  * (e.g. application/pkcs7-signature) that content sniffing must never
-  * fabricate. The hint is the producer-stamped channel.
+  * WHY: the .NET walker and other producers stamp kind MIMEs (e.g.
+  * application/pkcs7-signature) that content sniffing must never fabricate. The
+  * hint is the producer-stamped channel.
   *
   * LLM note: uses the public ArtifactWrapper API only. The hint parameter on
-  * newWrapper defaults to None so all existing call sites are unchanged (T5.6).
+  * newWrapper defaults to None so all existing call sites are unchanged.
   */
 class MimeHintSuite extends GoatRodeoFunSuite {
 
   private val hint = "application/pkcs7-signature"
 
-  test("T5.1 hintDefaultsToNone") {
+  test("hintDefaultsToNone") {
     val bytes = "hello".getBytes("UTF-8")
     val w = ArtifactWrapper.newWrapper(
       "plain.txt",
@@ -37,7 +37,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
     assert(w.mimeType.contains("text/plain"), s"got ${w.mimeType}")
   }
 
-  test("T5.2 hintIsUnionedIntoEffectiveSet") {
+  test("hintIsUnionedIntoEffectiveSet") {
     val bytes = "hello".getBytes("UTF-8")
     val w = ArtifactWrapper.newWrapper(
       "blob.bin",
@@ -59,7 +59,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("T5.3 hintSurvivesWrappersAndSpill") {
+  test("hintSurvivesWrappersAndSpill") {
     val dir = Files.createTempDirectory("mh").toAbsolutePath
     // small in-memory wrapper
     val small = ArtifactWrapper.newWrapper(
@@ -88,7 +88,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
     assertEquals(big.mimeHint, Some(hint), "hint must survive the spill path")
   }
 
-  test("T5.4 hintNeverSniffed") {
+  test("hintNeverSniffed") {
     // a blob whose CONTENT contains the literal MIME string must not gain
     // the MIME — sniffing never produces hints/kind MIMEs
     val bytes = s"prefix ${hint} suffix".getBytes("UTF-8")
@@ -106,7 +106,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
     assertEquals(w.mimeHint, None)
   }
 
-  test("T5.5 hintWithOctetStreamDetection") {
+  test("hintWithOctetStreamDetection") {
     // random binary that detects as octet-stream; the hint still lands
     val bytes = Array[Byte](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
     val w = ArtifactWrapper.newWrapper(
@@ -125,7 +125,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
   }
 
   test(
-    "T5.6 newWrapperConstructorCompat — default None, existing callers unchanged"
+    "newWrapperConstructorCompat — default None, existing callers unchanged"
   ) {
     val dir = Files.createTempDirectory("mh").toAbsolutePath
     val w = ArtifactWrapper.newWrapper(
@@ -138,7 +138,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
     assertEquals(w.mimeHint, None)
   }
 
-  test("T5.7 property hintUnionIsMonotonic") {
+  test("property hintUnionIsMonotonic") {
     import org.scalacheck.Prop.forAll
     import org.scalacheck.Gen
     val genMime = Gen.oneOf(

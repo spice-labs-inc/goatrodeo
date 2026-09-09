@@ -879,7 +879,7 @@ object DockerToProcess {
   }
 
   // ==================== OCI image layout ====================
-  //
+
   // A pure OCI image layout (what `oras copy --to-oci-layout` produces) has
   // `oci-layout`, `index.json`, and `blobs/sha256/<hex>` but no
   // `manifest.json`. The index may be a manifest list

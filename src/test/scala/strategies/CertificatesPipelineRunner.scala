@@ -32,16 +32,14 @@ import java.io.File
   * `ToProcessTestSuite`), and returns every Item in the resulting in-memory
   * store.
   *
-  * Per `certificates-strategy/appendices.md` Appendix B, the Certificates
-  * harness asserts against a single Item (`items.head`) when the sidecar's
-  * `itemCount == 1`. This runner returns the full vector so cases with
-  * multi-Item fixtures (if any ever emerge — keystores produce one Item) can
-  * still be reasoned about.
+  * The Certificates harness asserts against a single Item (`items.head`) when
+  * the sidecar's `itemCount == 1`. This runner returns the full vector so cases
+  * with multi-Item fixtures (if any ever emerge — keystores produce one Item)
+  * can still be reasoned about.
   *
   * Note: this method is test-only infrastructure. It is not optimized — it
-  * spins up a fresh in-memory `MemStorage` per call. Phase 0 prefers clarity
-  * over throughput; Phase 3+ fixture runs amount to ~200 invocations of this
-  * runner, which is acceptable.
+  * spins up a fresh in-memory `MemStorage` per call. Clarity is preferred over
+  * throughput; ~200 corpus fixture runs of this runner are acceptable.
   */
 object CertificatesPipelineRunner {
 

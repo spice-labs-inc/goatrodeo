@@ -1,5 +1,4 @@
-/* Phase 2 Tests: PomParser
-   PomParser tests §2.1–2.5
+/* PomParser tests
  */
 
 package io.spicelabs.goatrodeo.util
@@ -7,7 +6,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 class PomParserSuite extends GoatRodeoFunSuite {
 
-  // 2.1 PomParser basics
+  // PomParser basics
   test("PomParser - parses simple POM") {
     val pom = """<project>
       <groupId>com.example</groupId>

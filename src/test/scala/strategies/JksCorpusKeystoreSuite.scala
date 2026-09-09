@@ -114,10 +114,10 @@ class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
     md.get(key).flatMap(_.headOption).collect { case StringOf(s) => s }
   }
 
-  // K-C-01 — every v1 corpus file loads without a password via the real
+  // every v1 corpus file loads without a password via the real
   // parse path, with the expected entry count. THEORY: null-password loading
   // skips only the integrity digest; entries are fully readable.
-  test("K-C-01 all 20 JKS v1 files load with the expected entry count") {
+  test("all 20 JKS v1 files load with the expected entry count") {
     expectedEntries.foreach { case (name, expected) =>
       val parsed = Certificates.parseKeystore(wrap(s"$v1Dir/$name"), "JKS")
       assert(parsed.isDefined, s"$name: parseKeystore returned None")
@@ -128,10 +128,10 @@ class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
     }
   }
 
-  // K-C-02 — v1 and v2 of every pair parse identically. THEORY: the two
+  // v1 and v2 of every pair parse identically. THEORY: the two
   // format versions differ only in per-certificate type fields; a faithful
   // parser must not treat them differently.
-  test("K-C-02 v1 and v2 of every pair parse identically") {
+  test("v1 and v2 of every pair parse identically") {
     expectedEntries.keys.foreach { name =>
       val v2Name = name.replace("jks-v1-", "jks-v2-")
       val v1 = Certificates.parseKeystore(wrap(s"$v1Dir/$name"), "JKS")
@@ -146,10 +146,10 @@ class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
     }
   }
 
-  // K-C-03 — key entries are detected: each key entry emits its key
+  // key entries are detected: each key entry emits its key
   // algorithm/size/curve derived from the entry's public key (chain head
   // cert), never from the protected private key.
-  test("K-C-03 key entries are detected with algorithm, size, and curve") {
+  test("key entries are detected with algorithm, size, and curve") {
     val rsa = metadataFor(s"$v1Dir/jks-v1-01-rsa-key-single.jks", "JKS")
     assertEquals(
       mdString(rsa, "Certificates:Entry:entry:KeyAlgorithm"),
@@ -194,11 +194,11 @@ class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
     )
   }
 
-  // K-C-04 — trusted-cert-only stores have no detected keys. THEORY: key
+  // trusted-cert-only stores have no detected keys. THEORY: key
   // detection must only fire for key entries; a trusted cert is a cert, not
   // a key. Key entries are distinguishable by their `Chain:` metadata (only
   // key entries carry a certificate chain); trusted entries do not.
-  test("K-C-04 trusted-cert-only store has no detected keys") {
+  test("trusted-cert-only store has no detected keys") {
     val md = metadataFor(s"$v1Dir/jks-v1-06-trusted-single.jks", "JKS")
     assertEquals(mdString(md, "Certificates:KeyEntryCount"), Some("0"))
     assertEquals(mdString(md, "Certificates:CertCount"), Some("1"))
@@ -208,16 +208,16 @@ class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
     )
   }
 
-  // K-C-05 — the empty store loads and reports zero entries.
-  test("K-C-05 empty store loads with zero entries") {
+  // the empty store loads and reports zero entries.
+  test("empty store loads with zero entries") {
     val md = metadataFor(s"$v1Dir/jks-v1-10-empty.jks", "JKS")
     assertEquals(mdString(md, "Certificates:EntryCount"), Some("0"))
     assertEquals(mdString(md, "Certificates:KeyEntryCount"), Some("0"))
   }
 
-  // K-C-06 — JCEKS loads via the SunJCE provider fallback (BC has no JCEKS
+  // JCEKS loads via the SunJCE provider fallback (BC has no JCEKS
   // implementation either) and its key entry is detected.
-  test("K-C-06 JCEKS loads and detects its key entry") {
+  test("JCEKS loads and detects its key entry") {
     val parsed = Certificates.parseKeystore(
       wrap("test_data/certificates/keystores/synthetic/encrypted-jceks.jceks"),
       "JCEKS"

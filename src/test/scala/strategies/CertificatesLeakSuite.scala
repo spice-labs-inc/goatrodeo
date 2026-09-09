@@ -16,8 +16,7 @@ import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Phase 0.1 / Phase 8 — corpus-wide private-key leak sweep + hostile-reviewer
-  * sentinel check.
+/** corpus-wide private-key leak sweep + hostile-reviewer sentinel check.
   *
   * The `filterLeaks` method removes private-key material from metadata (instead
   * of throwing, as the old `assertNoLeak` did). This suite independently
@@ -132,9 +131,9 @@ class CertificatesLeakSuite extends GoatRodeoFunSuite {
     }
   }
 
-  /** HOSTILE-REVIEWER SENTINEL CHECK. Per the Phase 8 HS-2 step 3: "introduce a
-    * sentinel leak, confirm the leak suite catches it, then remove the
-    * sentinel."
+  /** HOSTILE-REVIEWER SENTINEL CHECK. The adversarial-review gate requires:
+    * "introduce a sentinel leak, confirm the leak suite catches it, then remove
+    * the sentinel."
     *
     * We inject the sentinel IN-MEMORY only — no fixture or committed code
     * carries it. The test asserts `filterLeaks` removes the offending entry.

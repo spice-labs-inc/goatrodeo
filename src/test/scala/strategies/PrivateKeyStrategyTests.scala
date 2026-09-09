@@ -19,7 +19,7 @@ import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 
 import java.io.File
 
-/** Strategy-level tests for Phase 7's private-key parsers + emitters.
+/** Strategy-level tests for the private-key parsers and emitters.
   *
   * ## What these tests test
   *
@@ -35,11 +35,11 @@ import java.io.File
   *
   * ## Why this matters (HS-3)
   *
-  * Phase 6's first-pass remediation (G5) flagged that materializer- sourced
-  * sidecar assertions are tautological: a regression in the strategy would
-  * re-emit the bug into the sidecar and the test would still pass. Independent
-  * ground truth (here: `openssl`'s public-key derivation, run at
-  * fixture-creation time) breaks the tautology.
+  * A gap analysis flagged that materializer-sourced sidecar assertions are
+  * tautological: a regression in the strategy would re-emit the bug into the
+  * sidecar and the test would still pass. Independent ground truth (here:
+  * `openssl`'s public-key derivation, run at fixture-creation time) breaks the
+  * tautology.
   *
   * ## Ground-truth recipe
   *
@@ -201,7 +201,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
   }
 
   // ===== UNENCRYPTED OpenSSH — structural assertions =====================
-  //
+
   // Cross-check via openssh-key-v1 envelope itself (the public-key wire
   // blob is in the clear; we read it directly). System ssh-keygen on
   // this host rejects these fixtures (libcrypto mismatch); the
@@ -226,15 +226,15 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     )
   }
 
-  // D2 — Phase-7 second-pass remediation: independent SSH SHA-256
-  // ground truth via Python (grandfathered for test_data tooling).
+  // Independent SSH SHA-256 ground truth via Python (grandfathered
+  // for test_data tooling).
   // System ssh-keygen rejects these fixtures ("error in libcrypto");
   // the values below were computed by a Python script that re-implements
   // the openssh-key-v1 envelope unpack + SHA-256(pubkey-wire-blob)
   // logic from scratch. Recipe in test_data/certificates/tools/
   // openssh_v1_fingerprint.py.
   test(
-    "parseOpenSshPrivateKey: openssh-ed25519 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-ed25519 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-ed25519-unencrypted"
@@ -256,7 +256,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "parseOpenSshPrivateKey: openssh-rsa-2048 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-rsa-2048 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-rsa-2048-unencrypted"
@@ -272,7 +272,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "parseOpenSshPrivateKey: openssh-rsa-4096 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-rsa-4096 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-rsa-4096-unencrypted"
@@ -288,7 +288,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
   }
 
   test(
-    "parseOpenSshPrivateKey: openssh-ecdsa-p256 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-ecdsa-p256 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-ecdsa-p256-unencrypted"
@@ -442,7 +442,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     )
   }
 
-  // ===== PGP SECRET KEY (Phase 7 inline) =================================
+  // ===== PGP SECRET KEY ================================================
 
   test(
     "parsePgpKeyOrSecretKeyRing: unencrypted PGP secret key (Ed25519 + ECDH cv25519 subkey) — gpg ground truth"
@@ -557,7 +557,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     assertEquals(md("Certificates:Envelope").head.value, "plaintext")
     assert(md.contains("Certificates:DerivedFromPrivateKey"))
     assertEquals(md("Certificates:DerivedFromPrivateKey").head.value, "true")
-    // Per-key fields (Phase 6 metadata structure preserved):
+    // Per-key fields (metadata structure preserved):
     assert(md.contains("Certificates:PgpKeyCount"))
     assertEquals(md("Certificates:PgpKeyCount").head.value, "2")
   }

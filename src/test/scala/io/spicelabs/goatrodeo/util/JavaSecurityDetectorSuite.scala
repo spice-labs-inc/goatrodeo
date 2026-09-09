@@ -17,7 +17,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
-/** Phase 2 — Unit tests for `JavaSecurityDetector`.
+/** Unit tests for `JavaSecurityDetector`.
   *
   * These tests verify that the MIME augmenter detects Java security properties
   * files by their content, ignores non-security text and binary data, and is

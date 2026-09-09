@@ -9,14 +9,14 @@ import org.scalacheck.Prop.forAll
 
 import java.io.File
 
-/* Phase 4: Secondary pURL Classifier Fix
+/* Secondary pURL Classifier
  *
  * '''What this suite tests:'''
- *   - REQ-1: ALL pURLs from sources/javadoc JARs include the classifier
+ *   - ALL pURLs from sources/javadoc JARs include the classifier
  *     (?packaging=sources or ?classifier=javadoc) — not just the canonical,
  *     but every secondary pURL too.
- *   - GAP-3: Secondary pURLs do NOT use filename (guard test)
- *   - GAP-4: Fix sources/javadoc secondary pURL classifiers
+ *   - Secondary pURLs do NOT use filename (guard test)
+ *   - Sources/javadoc secondary pURL classifiers
  *   - Deduplication: duplicate pom.properties tuples produce one pURL
  *   - Error isolation: malformed pom.properties does not prevent valid pURLs
  *   - False positive guard: regular JAR with "sources" in name doesn't
@@ -28,32 +28,32 @@ import java.io.File
  *   The fix passes the same `classifier` variable used for the canonical
  *   pURL.
  */
-class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
+class SecondaryPurlClassifierSuite extends GoatRodeoFunSuite {
 
   // =========================================================================
-  // Test 4.1: All pURLs from sources JAR have sources classifier
+  // All pURLs from sources JAR have sources classifier
   // =========================================================================
-  //
+
   // What it tests:
   //   When a sources JAR with 3 embedded pom.properties entries is
   //   processed, ALL emitted pURLs contain ?packaging=sources — not just
   //   the canonical, but every secondary pURL too.
-  //
+
   // Why it's relevant:
-  //   REQ-1 — "ALL pURLs from a sources JAR include ?packaging=sources."
+  //   "ALL pURLs from a sources JAR include ?packaging=sources."
   //   Distinguishing between gitoids that represent class files vs
   //   documentation is critical.
-  //
+
   // Requirement section:
-  //   REQ-1, details on sources/javadoc classifier.
-  //
+  //   Details on the sources/javadoc classifier.
+
   // Theory:
   //   Create temp dir with sources JAR containing 3 pom.properties entries
   //   + companion POM. Process through pipeline. Collect all pURLs from
   //   store. Assert purls.size >= 3 AND every pURL contains
   //   ?packaging=sources.
 
-  test("Test 4.1: All pURLs from sources JAR have sources classifier") {
+  test("All pURLs from sources JAR have sources classifier") {
     MavenTestHelpers.withTempDir("test-4-1") { dir =>
       MavenTestHelpers.writeJar(
         dir,
@@ -102,16 +102,16 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.2: All pURLs from javadoc JAR have javadoc classifier
+  // All pURLs from javadoc JAR have javadoc classifier
   // =========================================================================
-  //
+
   // What it tests:
   //   Same as 4.1 but for javadoc JAR with ?classifier=javadoc.
-  //
-  // Requirement section:
-  //   REQ-1 — "ALL pURLs from a javadoc JAR include ?classifier=javadoc."
 
-  test("Test 4.2: All pURLs from javadoc JAR have javadoc classifier") {
+  // Requirement section:
+  //   "ALL pURLs from a javadoc JAR include ?classifier=javadoc."
+
+  test("All pURLs from javadoc JAR have javadoc classifier") {
     MavenTestHelpers.withTempDir("test-4-2") { dir =>
       MavenTestHelpers.writeJar(
         dir,
@@ -155,21 +155,21 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.3: Secondary pURLs do NOT use filename (guard test)
+  // Secondary pURLs do NOT use filename (guard test)
   // =========================================================================
-  //
+
   // What it tests:
   //   Secondary pURLs come exclusively from pom.properties — never from
   //   the filename. This is a regression guard.
-  //
-  // Why it's relevant:
-  //   GAP-3 was already resolved in the current code, but without a test,
-  //   a future change could reintroduce the bug.
-  //
-  // Requirement section:
-  //   REQ-1 — "Secondary pURLs must NOT use the filename."
 
-  test("Test 4.3: Secondary pURLs do NOT use filename") {
+  // Why it's relevant:
+  //   The behavior already existed in the code, but without a test,
+  //   a future change could reintroduce the bug.
+
+  // Requirement section:
+  //   "Secondary pURLs must NOT use the filename."
+
+  test("Secondary pURLs do NOT use filename") {
     MavenTestHelpers.withTempDir("test-4-3") { dir =>
       // JAR with 2 embedded pom.properties and NO MANIFEST.MF
       // Companion POM has different artifactId than filename to distinguish
@@ -223,17 +223,17 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.4: Regular JAR secondary pURLs have no classifier
+  // Regular JAR secondary pURLs have no classifier
   // =========================================================================
-  //
+
   // What it tests:
   //   When a regular JAR (not sources, not javadoc) has embedded
   //   pom.properties entries, secondary pURLs do NOT have any classifier.
-  //
+
   // Why it's relevant:
   //   Only sources and javadoc JARs get classifiers. Regular JARs must not.
 
-  test("Test 4.4: Regular JAR secondary pURLs have no classifier") {
+  test("Regular JAR secondary pURLs have no classifier") {
     MavenTestHelpers.withTempDir("test-4-4") { dir =>
       MavenTestHelpers.writeJar(
         dir,
@@ -288,17 +288,17 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.5: Duplicate pom.properties tuples produce exactly one pURL
+  // Duplicate pom.properties tuples produce exactly one pURL
   // =========================================================================
-  //
+
   // What it tests:
   //   When a JAR has two identical pom.properties entries (same
   //   groupId/artifactId/version), only one pURL is emitted.
-  //
-  // Why it's relevant:
-  //   REQ-1 requires deduplication.
 
-  test("Test 4.5: Duplicate pom.properties tuples produce exactly one pURL") {
+  // Why it's relevant:
+  //   Deduplication is required.
+
+  test("Duplicate pom.properties tuples produce exactly one pURL") {
     MavenTestHelpers.withTempDir("test-4-5") { dir =>
       MavenTestHelpers.writeJar(
         dir,
@@ -348,17 +348,17 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.6: Malformed pom.properties does not prevent valid pURLs
+  // Malformed pom.properties does not prevent valid pURLs
   // =========================================================================
-  //
+
   // What it tests:
   //   When a JAR has 1 valid pom.properties + 1 with empty groupId,
   //   only the valid one produces a pURL. Malformed ones are silently skipped.
-  //
-  // Why it's relevant:
-  //   REQ-1 — "Malformed tuples are silently skipped."
 
-  test("Test 4.6: Malformed pom.properties does not prevent valid pURLs") {
+  // Why it's relevant:
+  //   "Malformed tuples are silently skipped."
+
+  test("Malformed pom.properties does not prevent valid pURLs") {
     MavenTestHelpers.withTempDir("test-4-6") { dir =>
       MavenTestHelpers.writeJar(
         dir,
@@ -401,18 +401,18 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.7: detectClassifierFromFilename false positive guard
+  // detectClassifierFromFilename false positive guard
   // =========================================================================
-  //
+
   // What it tests:
   //   A regular JAR named "my-sources-lib-1.0.jar" does NOT get
   //   ?packaging=sources on its secondary pURLs.
-  //
+
   // Why it's relevant:
   //   Guard rail against false-positive classifier detection.
 
   test(
-    "Test 4.7: Regular JAR with 'sources' in name does not get sources classifier"
+    "Regular JAR with 'sources' in name does not get sources classifier"
   ) {
     MavenTestHelpers.withTempDir("test-4-7") { dir =>
       MavenTestHelpers.writeJar(
@@ -463,17 +463,17 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 
   // =========================================================================
-  // Test 4.8: Try wrapping catches PurlException and continues
+  // Try wrapping catches PurlException and continues
   // =========================================================================
-  //
+
   // What it tests:
   //   When buildPackageURL throws (e.g., invalid characters in groupId),
   //   the Try wrapper catches it and remaining pURLs are still emitted.
-  //
+
   // Why it's relevant:
   //   Verifies the error isolation guard rail.
 
-  test("Test 4.8: Invalid pom.properties does not prevent valid pURLs") {
+  test("Invalid pom.properties does not prevent valid pURLs") {
     MavenTestHelpers.withTempDir("test-4-8") { dir =>
       MavenTestHelpers.writeJar(
         dir,
@@ -516,13 +516,13 @@ class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
   }
 }
 
-/* Property-based tests for Phase 4.
+/* Property-based tests for the secondary classifier.
  *
  * '''What this suite tests:'''
- *   - Property 4.9: For any sources JAR, all pURLs share the same classifier
- *   - Property 4.10: For any javadoc JAR, all pURLs share the same classifier
+ *   - For any sources JAR, all pURLs share the same classifier
+ *   - For any javadoc JAR, all pURLs share the same classifier
  */
-class Phase4SecondaryClassifierPropertySuite extends GoatRodeoScalaCheckSuite {
+class SecondaryPurlClassifierPropertySuite extends GoatRodeoScalaCheckSuite {
 
   private val genGroupId: Gen[String] = Gen.oneOf(
     "com.example",

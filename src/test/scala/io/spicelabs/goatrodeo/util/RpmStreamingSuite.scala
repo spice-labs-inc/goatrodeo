@@ -4,8 +4,8 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import java.io.File
 import java.security.MessageDigest
 
-/** Phase 1 — RPM payload streaming through the archive walker (spec §1,
-  * functional consequence of baharat 0.2.1).
+/** RPM payload streaming through the archive walker (spec §1, functional
+  * consequence of baharat 0.2.1).
   *
   * WHAT: a real RPM fixture is expanded by `FileWalker.withinArchiveStream` and
   * every payload file entry yields a correct, fully-readable content stream
@@ -28,7 +28,7 @@ class RpmStreamingSuite extends GoatRodeoFunSuite {
       .map("%02x".format(_))
       .mkString
 
-  test("T1.5 rpmPayloadStreamsEndToEnd — entries stream correct bytes") {
+  test("rpmPayloadStreamsEndToEnd — entries stream correct bytes") {
     val rpm = new File("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm")
     assert(rpm.exists(), "busybox rpm fixture missing")
     val wrapper = FileWrapper(rpm, rpm.getName, None)

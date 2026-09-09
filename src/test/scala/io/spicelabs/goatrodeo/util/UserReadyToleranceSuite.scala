@@ -5,7 +5,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-/** Phase 4 — `.user-ready` fixture tolerance (spec §10; T14.x).
+/** `.user-ready` fixture tolerance .
   *
   * WHAT: pins that fixture listing and deletion tolerate an externally planted
   * `.user-ready` marker file (possibly root-owned/un-deletable): discovery
@@ -40,7 +40,7 @@ class UserReadyToleranceSuite extends GoatRodeoFunSuite {
   private def discovered(root: File): Vector[File] =
     Helpers.findFiles(root)
 
-  test("T14.1 fileDiscoverySkipsDotFiles (readable and unreadable)") {
+  test("fileDiscoverySkipsDotFiles (readable and unreadable)") {
     val root = Files.createTempDirectory("ur").toFile
     try {
       // readable dot-name
@@ -62,7 +62,7 @@ class UserReadyToleranceSuite extends GoatRodeoFunSuite {
     } finally Helpers.deleteDirectory(root.toPath)
   }
 
-  test("T14.2 recursiveDeleteToleratesUndeletableMarker") {
+  test("recursiveDeleteToleratesUndeletableMarker") {
     val root = Files.createTempDirectory("ur").toFile
     val marker = new File(root, ".user-ready")
     Files.write(marker.toPath, "m".getBytes)
@@ -73,7 +73,7 @@ class UserReadyToleranceSuite extends GoatRodeoFunSuite {
     Helpers.deleteDirectory(root.toPath)
   }
 
-  test("T14.4 property_discoveryUnchangedByMarker") {
+  test("property_discoveryUnchangedByMarker") {
     import org.scalacheck.Prop.forAll
     import org.scalacheck.Gen
     val names =

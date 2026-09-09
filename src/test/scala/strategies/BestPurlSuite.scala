@@ -60,7 +60,7 @@ class BestPurlSuite extends GoatRodeoFunSuite {
     * https://repo1.maven.org/maven2/org/apache/commons/commons-codec/1.2/ —
     * confirmed exists.
     *
-    * '''Requirement:''' Plan Test 10 — field-level merge produces pURL in Maven
+    * '''Requirement:''' Field-level merge produces a pURL that exists in Maven
     * Central.
     *
     * '''LLM context:''' This is a RED test. The current code produces
@@ -125,8 +125,8 @@ class BestPurlSuite extends GoatRodeoFunSuite {
     * https://repo1.maven.org/maven2/org/apache/commons/commons-lang/2.4/ —
     * confirmed exists.
     *
-    * '''Requirement:''' Plan Test 10 (second case) — field-level merge produces
-    * Maven Central pURL for Bundle-SymbolicName case.
+    * '''Requirement:''' Field-level merge (second case) produces Maven Central
+    * pURL for Bundle-SymbolicName case.
     */
   test("commons-lang-2.4: field-level merge produces Maven Central pURL") {
     val state = MavenState()

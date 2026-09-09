@@ -3,46 +3,44 @@
 ## How to Run the Tests
 
 ```bash
-# Phase 6 suite (47 tests)
-sbt 'testOnly *Phase6MetadataParityRegularBestPurlSuite'
-
-# MultiplePurlSuite (113 tests, metadata superset)
+sbt 'testOnly *RegularJarMetadataParitySuite'
 sbt 'testOnly *MultiplePurlSuite'
-
-# BestPurlSuite (2 tests, field-level merge)
 sbt 'testOnly *BestPurlSuite'
 ```
 
-Expected runtime: ~30 seconds for Phase 6, ~2 minutes for MultiplePurlSuite.
+Expected runtime: ~30 seconds for RegularJarMetadataParitySuite,
+~2 minutes for MultiplePurlSuite.
 
 ## How to Interpret Results
 
-### Phase 6 Tests (47 tests)
+### RegularJarMetadataParitySuite
 
-- **Test 6.3** (12 tests): "Better than the reference scanner" — canonical pURL groupId
-  from companion POM, not the filename. Each test verifies the canonical
-  pURL contains the POM's groupId and does NOT use the filename as groupId.
+- **Canonical groupId from POM, not filename** ("better than the reference
+  scanner"): each per-JAR test (`<jar> — canonical pURL groupId from POM
+  (not filename)`) verifies the canonical pURL contains the companion
+  POM's groupId and does NOT use the filename as groupId.
 
-- **Test 6.4** (12 tests): Maven Central validation — canonical pURL
-  exactly matches hardcoded Maven Central coordinates. Coordinates were
-  manually verified to exist at `https://repo1.maven.org/maven2/` on
-  2026-07-08.
+- **Maven Central validation**: each per-JAR test (`<jar> — canonical pURL
+  matches Maven Central`) checks the canonical pURL exactly matches the
+  hardcoded Maven Central coordinate. Coordinates were manually verified
+  to exist at `https://repo1.maven.org/maven2/` on 2026-07-08.
 
-- **Test 6.5** (10 tests): pURL count >= reference scanner pURL count. Explicit count
-  check using MultiplePurlSuite data (sampled).
+- **pURL count >= reference scanner count**: explicit count check using
+  MultiplePurlSuite data (sampled).
 
-- **Test 6.6** (12 tests): Companion POM priority in full pipeline.
-  Parses the companion POM at test time using production `PomParser`,
-  processes the JAR through the full pipeline, asserts canonical pURL
-  matches POM values (not pom.properties or manifest).
+- **Companion POM priority in full pipeline**: each per-JAR test (`<jar> —
+  canonical pURL from companion POM in pipeline`) parses the companion POM
+  at test time using production `PomParser`, processes the JAR through the
+  full pipeline, asserts canonical pURL matches POM values (not
+  pom.properties or manifest).
 
-### MultiplePurlSuite (113 tests)
+### MultiplePurlSuite
 
 Tests that Goat Rodeo finds every pURL the reference scanner found (superset) for regular
 JARs/WARs. Uses `alias:from` connections on the JAR's Item, with
 companion POM and fat JAR filtering.
 
-### BestPurlSuite (2 tests)
+### BestPurlSuite
 
 Tests that field-level merge produces Maven Central pURLs for JARs
 where pom.properties is absent. Calls `resolveGroupIdArtifactIdVersion`
@@ -70,7 +68,7 @@ directly with `externalPom=None`.
 
 ## Maven Central Validation
 
-12 coordinates were manually verified to exist in Maven Central on
+Coordinates were manually verified to exist in Maven Central on
 2026-07-08:
 
 | groupId | artifactId | version | Maven Central URL |
@@ -92,10 +90,10 @@ directly with `externalPom=None`.
 
 | Claim | Test |
 |-------|------|
-| MultiplePurlSuite passes (superset) | MultiplePurlSuite (113 tests) |
-| BestPurlSuite passes (field-level merge) | BestPurlSuite (2 tests) |
-| Canonical pURL groupId from POM (not filename) | Test 6.3 (12 JARs) |
-| Canonical pURL matches Maven Central | Test 6.4 (12 JARs) |
-| pURL count >= reference scanner count | Test 6.5 (10 JARs) |
-| Companion POM priority in full pipeline | Test 6.6 (12 JARs) |
-| Superset for all 164 reference scanner JARs | MultiplePurlSuite (113 tests) |
+| MultiplePurlSuite passes (superset) | MultiplePurlSuite |
+| BestPurlSuite passes (field-level merge) | BestPurlSuite |
+| Canonical pURL groupId from POM (not filename) | `<jar> — canonical pURL groupId from POM (not filename)` (per JAR) |
+| Canonical pURL matches Maven Central | `<jar> — canonical pURL matches Maven Central` (per JAR) |
+| pURL count >= reference scanner count | count-check tests over the MultiplePurlSuite sample |
+| Companion POM priority in full pipeline | `<jar> — canonical pURL from companion POM in pipeline` (per JAR) |
+| Superset for all reference scanner JARs | MultiplePurlSuite |
