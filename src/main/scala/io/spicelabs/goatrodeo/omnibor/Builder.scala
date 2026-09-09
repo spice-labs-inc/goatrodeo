@@ -165,7 +165,7 @@ object Builder {
         GitRunInfo.capture(
           config.build,
           redact = config.redactGitInfo,
-          scanRoot = config.build.headOption
+          scanRoots = config.build
         )
     }
 

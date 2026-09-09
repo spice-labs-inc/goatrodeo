@@ -118,7 +118,7 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
     val items = GitRunInfo.capture(
       Seq(repo),
       redact = true,
-      scanRoot = Some(repo)
+      scanRoots = Vector(repo)
     )
     assert(items.nonEmpty, "git capture must produce provenance items")
     val after = gitSnapshot(new File(repo, ".git"))

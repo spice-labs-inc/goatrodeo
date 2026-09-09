@@ -53,7 +53,7 @@ class GitProvenanceNotInCbomSuite extends GoatRodeoFunSuite {
     val items = GitRunInfo.capture(
       Seq(root),
       redact = true,
-      scanRoot = Some(root)
+      scanRoots = Vector(root)
     )
     assert(items.nonEmpty)
     items.foreach { gi =>

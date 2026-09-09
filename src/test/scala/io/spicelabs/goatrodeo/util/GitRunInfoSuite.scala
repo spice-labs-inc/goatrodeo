@@ -63,7 +63,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     GitRunInfo.capture(
       Seq(root),
       redact = true,
-      scanRoot = Some(scanRoot)
+      scanRoots = Vector(scanRoot)
     )
 
   private def jsonOf(item: GitRunItem, key: String): Option[String] =
@@ -85,7 +85,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val nested = new File(root, "sub/dir")
     nested.mkdirs()
     val items =
-      GitRunInfo.capture(Seq(nested), redact = true, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(nested), redact = true, scanRoots = Vector(root))
     assert(
       items.nonEmpty,
       "containing repo must be discovered from a nested base"
@@ -103,7 +103,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val items = GitRunInfo.capture(
       Seq(baseA, baseB),
       redact = true,
-      scanRoot = Some(root)
+      scanRoots = Vector(root)
     )
     // one repo -> one set of items; no duplication. The kind follows from
     // the identifier: gitoid:commit: vs gitoid:tree:
@@ -112,6 +112,53 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     assertEquals(commitCount, 1)
     val treeCount = items.count(_.gitoid.startsWith("gitoid:tree:sha1:"))
     assertEquals(treeCount, 1)
+  }
+
+  test("multipleScanRootsCaptureReposUnderEveryRoot") {
+    // With multiple build/scan roots (multiple `-b` flags), a tagged
+    // capture must include repositories under EVERY root, not just the
+    // first one — provenance must not be silently skipped for the rest.
+    val rootA = tempDir("gr-multi-a")
+    write(rootA, "a.txt", "hello a")
+    val gitA = initRepo(rootA)
+    commitAll(gitA, "c1")
+    gitA.close()
+    val rootB = tempDir("gr-multi-b")
+    write(rootB, "b.txt", "hello b")
+    val gitB = initRepo(rootB)
+    commitAll(gitB, "c1")
+    gitB.close()
+    val items = GitRunInfo.capture(
+      Vector(rootA, rootB),
+      redact = true,
+      scanRoots = Vector(rootA, rootB)
+    )
+    val commitCount =
+      items.count(_.gitoid.startsWith("gitoid:commit:sha1:"))
+    assertEquals(
+      commitCount,
+      2,
+      "a repo under each scan root must contribute its commit item"
+    )
+    val treeCount = items.count(_.gitoid.startsWith("gitoid:tree:sha1:"))
+    assertEquals(treeCount, 2)
+  }
+
+  test("repoOutsideAllScanRootsIsSkipped") {
+    // Containment still enforced when roots are given: a repository whose
+    // gitdir lies outside every scan root contributes nothing.
+    val scanRoot = tempDir("gr-scan-only")
+    val outside = tempDir("gr-outside")
+    write(outside, "b.txt", "hello b")
+    val git = initRepo(outside)
+    commitAll(git, "c1")
+    git.close()
+    val items = GitRunInfo.capture(
+      Seq(outside),
+      redact = true,
+      scanRoots = Vector(scanRoot)
+    )
+    assertEquals(items.size, 0, "repo outside every scan root must be skipped")
   }
 
   test("markerInWorktreeDoesNotPolluteCapturedTree") {
@@ -139,7 +186,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val root = tempDir("gr8")
     write(root, "a.txt", "x")
     val items =
-      GitRunInfo.capture(Seq(root), redact = true, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(root), redact = true, scanRoots = Vector(root))
     assertEquals(items, Vector.empty)
   }
 
@@ -225,7 +272,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     commitAll(git, "m")
     git.close()
     val items =
-      GitRunInfo.capture(Seq(root), redact = false, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(root), redact = false, scanRoots = Vector(root))
     val commitItem = items.find(_.gitoid.startsWith("gitoid:commit:sha1:")).get
     assertEquals(jsonOf(commitItem, "author_email"), Some("tester@example.com"))
     assertEquals(jsonOf(commitItem, "repo_root"), Some(root.getAbsolutePath))
@@ -249,7 +296,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val items = GitRunInfo.capture(
       Seq(link),
       redact = true,
-      scanRoot = Some(scanRoot)
+      scanRoots = Vector(scanRoot)
     )
     assertEquals(
       items,
@@ -271,7 +318,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
       val head = new File(root, ".git/HEAD")
       Files.writeString(head.toPath, "ref: refs/heads/main\n")
       val items =
-        GitRunInfo.capture(Seq(root), redact = true, scanRoot = Some(root))
+        GitRunInfo.capture(Seq(root), redact = true, scanRoots = Vector(root))
       assertEquals(
         items,
         Vector.empty,
@@ -294,7 +341,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
         .foreach(f => Files.write(f.toPath, Array[Byte](1, 2, 3)))
     }
     val items =
-      GitRunInfo.capture(Seq(root), redact = true, scanRoot = Some(root))
+      GitRunInfo.capture(Seq(root), redact = true, scanRoots = Vector(root))
     assert(
       items.isEmpty || items.nonEmpty,
       "capture must never throw; may degrade to zero or partial"
@@ -311,7 +358,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     val items = GitRunInfo.capture(
       Seq(outside),
       redact = true,
-      scanRoot = Some(scanRoot)
+      scanRoots = Vector(scanRoot)
     )
     assertEquals(
       items,

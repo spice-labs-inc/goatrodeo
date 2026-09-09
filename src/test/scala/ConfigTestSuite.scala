@@ -15,6 +15,7 @@ limitations under the License. */
 import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.ExpandFiles
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.VectorOfStrings
@@ -321,6 +322,131 @@ class ConfigTestSuite extends GoatRodeoFunSuite {
     assertEquals(config.exclude.length, 1)
     assertEquals(config.exclude.head._1, pattern)
     assert(config.exclude.head._2.isSuccess)
+  }
+
+  test("Configuration - multiple --exclude-pattern flags all apply") {
+    // The CLI must accept one --exclude-pattern per pattern. Each occurrence
+    // appends to `Configuration.exclude`; a second occurrence must not be
+    // rejected as an unknown option (scopt treats a repeated non-unbounded
+    // option that way) and must not abort the run.
+    val parsed = ConfigurationParser.parse(
+      Array(
+        "-b",
+        "/tmp/exclude-pattern-in",
+        "--exclude-pattern",
+        "html$",
+        "--exclude-pattern",
+        "maven-metadata.xml$",
+        "--exclude-pattern",
+        "reify-state.json$"
+      )
+    )
+    assert(
+      parsed.isDefined,
+      "multiple --exclude-pattern flags must parse without being rejected"
+    )
+    val config = parsed.get
+    val patterns = config.exclude.map(_._1)
+    assertEquals(
+      patterns,
+      Vector("html$", "maven-metadata.xml$", "reify-state.json$")
+    )
+    assert(
+      config.exclude.forall(_._2.isSuccess),
+      "every pattern must compile as a regular expression"
+    )
+  }
+
+  test("Configuration - multiple -b/--build flags all apply") {
+    // Each occurrence of -b/--build must append its directory to
+    // `Configuration.build`; a second occurrence must not be rejected.
+    val dirA = Files.createTempDirectory("build-a").toFile()
+    val dirB = Files.createTempDirectory("build-b").toFile()
+    val parsed =
+      ConfigurationParser.parse(Array("-b", dirA.getPath, "-b", dirB.getPath))
+    assert(parsed.isDefined, "multiple --build flags must parse")
+    val config = parsed.get
+    assert(config.build.contains(dirA), "first build directory must be kept")
+    assert(config.build.contains(dirB), "second build directory must be kept")
+  }
+
+  test("Configuration - multiple --ignore flags all apply") {
+    // Each occurrence of --ignore must append its file to `Configuration.ignore`.
+    val fileA = Files.createTempFile("ignore-a", ".txt").toFile()
+    val fileB = Files.createTempFile("ignore-b", ".txt").toFile()
+    val parsed = ConfigurationParser.parse(
+      Array("--ignore", fileA.getPath, "--ignore", fileB.getPath)
+    )
+    assert(parsed.isDefined, "multiple --ignore flags must parse")
+    val config = parsed.get
+    assert(config.ignore.contains(fileA), "first ignore file must be kept")
+    assert(config.ignore.contains(fileB), "second ignore file must be kept")
+  }
+
+  test("Configuration - multiple --file-list flags all apply") {
+    // Each occurrence of --file-list must append its file to
+    // `Configuration.fileList`.
+    val fileA = Files.createTempFile("file-list-a", ".txt").toFile()
+    val fileB = Files.createTempFile("file-list-b", ".txt").toFile()
+    val parsed = ConfigurationParser.parse(
+      Array("--file-list", fileA.getPath, "--file-list", fileB.getPath)
+    )
+    assert(parsed.isDefined, "multiple --file-list flags must parse")
+    val config = parsed.get
+    assert(config.fileList.contains(fileA), "first file-list must be kept")
+    assert(config.fileList.contains(fileB), "second file-list must be kept")
+  }
+
+  test("Configuration - multiple --mime-filter flags all apply") {
+    // Each occurrence of --mime-filter must append its predicate to the
+    // IncludeExclude; a second occurrence must not be rejected.
+    val parsed = ConfigurationParser.parse(
+      Array(
+        "-b",
+        "/tmp/mime-filter-in",
+        "--mime-filter",
+        "-application/octet-stream",
+        "--mime-filter",
+        "-text/x-crypto-shape"
+      )
+    )
+    assert(parsed.isDefined, "multiple --mime-filter flags must parse")
+    val config = parsed.get
+    assert(
+      !config.mimeFilter.shouldInclude(Set("application/octet-stream")),
+      "first mime-filter predicate must be active"
+    )
+    assert(
+      !config.mimeFilter.shouldInclude(Set("text/x-crypto-shape")),
+      "second mime-filter predicate must be active"
+    )
+  }
+
+  test("Configuration - multiple --mime-filter-file flags all apply") {
+    // Each occurrence of --mime-filter-file must append its lines as
+    // predicates; a second occurrence must not be rejected.
+    val fileA = Files.createTempFile("mime-filter-a", ".txt").toFile()
+    val fileB = Files.createTempFile("mime-filter-b", ".txt").toFile()
+    Files.writeString(fileA.toPath(), "-alpha\n")
+    Files.writeString(fileB.toPath(), "-beta\n")
+    val parsed = ConfigurationParser.parse(
+      Array(
+        "--mime-filter-file",
+        fileA.getPath,
+        "--mime-filter-file",
+        fileB.getPath
+      )
+    )
+    assert(parsed.isDefined, "multiple --mime-filter-file flags must parse")
+    val config = parsed.get
+    assert(
+      !config.mimeFilter.shouldInclude(Set("alpha")),
+      "first mime-filter-file lines must be active"
+    )
+    assert(
+      !config.mimeFilter.shouldInclude(Set("beta")),
+      "second mime-filter-file lines must be active"
+    )
   }
 
   test("Configuration - blockList can be set") {

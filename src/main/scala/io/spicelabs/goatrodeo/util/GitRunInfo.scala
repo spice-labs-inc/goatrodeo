@@ -77,11 +77,11 @@ object GitRunInfo {
   def capture(
       bases: Seq[File],
       redact: Boolean = true,
-      scanRoot: Option[File] = None
+      scanRoots: Seq[File] = Vector.empty
   ): Vector[GitRunItem] = {
     val repos = discoverRepos(bases)
     repos.flatMap { repoRoot =>
-      captureRepo(repoRoot, redact, scanRoot)
+      captureRepo(repoRoot, redact, scanRoots)
     }
   }
 
@@ -89,7 +89,7 @@ object GitRunInfo {
   private def captureRepo(
       repoRoot: File,
       redact: Boolean,
-      scanRoot: Option[File]
+      scanRoots: Seq[File]
   ): Vector[GitRunItem] = {
     val builder = new FileRepositoryBuilder()
     builder.setWorkTree(repoRoot)
@@ -97,7 +97,7 @@ object GitRunInfo {
     builder.setMustExist(true)
     val repository = builder.build()
     try {
-      captureRepoChecked(repository, repoRoot, redact, scanRoot)
+      captureRepoChecked(repository, repoRoot, redact, scanRoots)
     } finally repository.close()
   }
 
@@ -108,20 +108,23 @@ object GitRunInfo {
       repository: Repository,
       repoRoot: File,
       redact: Boolean,
-      scanRoot: Option[File]
+      scanRoots: Seq[File]
   ): Vector[GitRunItem] = {
     val gitDir = repository.getDirectory.toPath.toAbsolutePath.normalize
-    val scanPath = scanRoot.map(_.toPath.toAbsolutePath.normalize)
-    val contained = scanPath.forall { root =>
-      if (!gitDir.startsWith(root)) {
-        log.warn(
-          s"Git provenance: gitdir $gitDir outside scan root $root — skipping ${repoRoot}"
-        )
-        false
-      } else true
-    }
-    if (!contained) Vector.empty
-    else {
+    // A repository is in scope when no scan roots were given or its gitdir
+    // lies under at least one of them. The old single-root `forall` would
+    // skip every repo outside the FIRST build directory once multiple `-b`
+    // flags were accepted.
+    val contained =
+      scanRoots.isEmpty || scanRoots.exists(root =>
+        gitDir.startsWith(root.toPath.toAbsolutePath.normalize)
+      )
+    if (!contained) {
+      log.warn(
+        s"Git provenance: gitdir $gitDir outside all scan roots — skipping ${repoRoot}"
+      )
+      Vector.empty
+    } else {
       // jgit 7.x doesn't surface ObjectFormat on the reader; the repo
       // config knob `extensions.objectformat` is the documented detector.
       val objectFormat: String =
@@ -150,7 +153,7 @@ object GitRunInfo {
                   commitItem(
                     redact,
                     repoRoot,
-                    scanRoot,
+                    scanRoots,
                     commit
                   )
                 ),
@@ -159,7 +162,7 @@ object GitRunInfo {
                   treeItem(
                     redact,
                     repoRoot,
-                    scanRoot,
+                    scanRoots,
                     head.name,
                     commit
                   )
@@ -174,11 +177,26 @@ object GitRunInfo {
   private def gitoid(objectId: AnyObjectId, kind: String): String =
     s"gitoid:$kind:sha1:${objectId.name}"
 
+  /** The scan root relevant to a repository: the first root that contains the
+    * repository's workdir; when none does (e.g. a linked worktree), the first
+    * root, matching the original single-root behavior.
+    */
+  private def matchedScanRoot(
+      repoRoot: File,
+      scanRoots: Seq[File]
+  ): Option[File] = {
+    val p = repoRoot.toPath.toAbsolutePath.normalize
+    scanRoots
+      .find(r => p.startsWith(r.toPath.toAbsolutePath.normalize))
+      .orElse(scanRoots.headOption)
+  }
+
   private def baseFields(
       redact: Boolean,
       repoRoot: File,
-      scanRoot: Option[File]
+      scanRoots: Seq[File]
   ): Vector[(String, Dom.Element)] = {
+    val scanRoot = matchedScanRoot(repoRoot, scanRoots)
     val rootField = if (redact) {
       scanRoot
         .map { root =>
@@ -211,14 +229,14 @@ object GitRunInfo {
   private def commitItem(
       redact: Boolean,
       repoRoot: File,
-      scanRoot: Option[File],
+      scanRoots: Seq[File],
       commit: org.eclipse.jgit.revwalk.RevCommit
   ): Dom.MapElem = {
     val author = commit.getAuthorIdent
     val committer = commit.getCommitterIdent
     val parents = commit.getParents.map(_.name).toVector
     val (msg, truncated) = truncateMessage(commit.getFullMessage)
-    val fields = baseFields(redact, repoRoot, scanRoot) ++ Vector(
+    val fields = baseFields(redact, repoRoot, scanRoots) ++ Vector(
       "author_name" -> Dom.StringElem(author.getName),
       "author_email" -> Dom.StringElem(
         emailField(redact, author.getEmailAddress)
@@ -239,11 +257,11 @@ object GitRunInfo {
   private def treeItem(
       redact: Boolean,
       repoRoot: File,
-      scanRoot: Option[File],
+      scanRoots: Seq[File],
       head: String,
       commit: org.eclipse.jgit.revwalk.RevCommit
   ): Dom.MapElem = {
-    val fields = baseFields(redact, repoRoot, scanRoot) ++ Vector(
+    val fields = baseFields(redact, repoRoot, scanRoots) ++ Vector(
       "head_commit" -> Dom.StringElem(head)
     )
     Dom.MapElem.Unsized(fields*)
