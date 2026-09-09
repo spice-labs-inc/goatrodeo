@@ -1144,22 +1144,38 @@ object CbomEmitter {
     f"cbom_${name}_${short}.json"
   }
 
-  /** Validate the output directory, reject symlinks, and create it safely. */
+  /** Validate the output directory, refuse a symlinked one, and create it
+    * safely.
+    *
+    * The refusal applies to the output directory itself, not to its ancestors.
+    * Walking every ancestor rejected ordinary installations: on macOS `/tmp`
+    * and `/var` are symlinks into `/private`, so `--emit-cbom-dir /tmp/cbom` --
+    * and anything under the system temporary directory -- could not run at all,
+    * and on Linux the same holds for bind-mounted, automounted or
+    * `/home`-redirected paths. Where the run's own output lands is the caller's
+    * business; how the machine arranges the path above it is not.
+    *
+    * The `Files.exists` guard is gone too. `exists` follows links, so it was
+    * false for a dangling symlink and `isSymbolicLink` was never reached --
+    * exempting a link aimed at a path that does not exist yet, which is the
+    * usual shape of the attack. `isSymbolicLink` alone is false for an absent
+    * path and true for a dangling link, which is what was wanted.
+    *
+    * A check on a path can only ever be a guard rail: whoever can plant a
+    * symlink can plant it after the check. What holds regardless is at the
+    * write -- [[atomicWrite]] moves the finished file into place with
+    * `Files.move`, which acts on the final path entry itself rather than
+    * following it, so a link planted at the target is replaced rather than
+    * written through.
+    */
   private def safeOutputDir(dir: File): Try[File] = Try {
     val path = pathOf(dir)
 
-    @tailrec
-    def checkSymlinks(p: Path | Null): Unit = {
-      if (p != null) {
-        if (Files.exists(p) && Files.isSymbolicLink(p)) {
-          throw new IllegalArgumentException(
-            f"CBOM output directory contains symlink: $p"
-          )
-        }
-        checkSymlinks(p.getParent())
-      }
+    if (Files.isSymbolicLink(path)) {
+      throw new IllegalArgumentException(
+        f"CBOM output directory is a symlink: $path"
+      )
     }
-    checkSymlinks(path)
 
     if (!dir.exists()) {
       try {

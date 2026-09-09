@@ -161,7 +161,7 @@ case class Configuration(
     progressListener: Option[ProgressListener] = None,
     cbomDir: Option[File] = None,
     cbomVersion: String = "1.6",
-    printProcessedFiles: Boolean = false,
+    logFilenames: Boolean = false,
     tamperEvidentLog: Option[File] = None,
     configFile: Option[File] = None,
     logging: Map[String, Any] = Map(),

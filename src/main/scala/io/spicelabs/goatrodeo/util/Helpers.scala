@@ -864,7 +864,11 @@ object Helpers {
   ): File = {
 
     val retFile = Files
-      .createTempFile(tempDir, "goats", suffix.trim().replaceAll("\u0000", ""))
+      .createTempFile(
+        tempDir,
+        "goats",
+        ArtifactWrapper.sanitizeName(suffix.trim())
+      )
       .toFile()
     val ret = FileOutputStream(retFile)
     val buffer = new Array[Byte](4096)

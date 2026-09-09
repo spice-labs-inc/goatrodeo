@@ -139,7 +139,15 @@
                 <extensions>true</extensions>
                 <configuration>
                     <publishingServerId>central</publishingServerId>
-                    <autoPublish>true</autoPublish>
+                    <!-- Always supplied by publish.yml as -Dcentral.autoPublish.
+                         `true` is the normal path; it is `false` when the release
+                         tag is not a natural successor, which leaves the
+                         deployment in the Central Portal for a human to publish
+                         or drop. Deliberately no default is declared here: CI
+                         injects the real pom's properties block at the
+                         REAL_PROPERTIES marker above, and declaring a second
+                         properties element would collide with it. -->
+                    <autoPublish>${central.autoPublish}</autoPublish>
                     <checksums>all</checksums>
                 </configuration>
             </plugin>

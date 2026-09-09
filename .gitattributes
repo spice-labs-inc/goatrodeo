@@ -9,7 +9,7 @@
 # paid for). Do NOT extend this list — the ban on new LFS files is absolute.
 #
 # Force non-LFS even if a global git-lfs filter would otherwise apply:
-* -filter -diff -merge -text
+* -filter -merge -text
 
 # --- legacy LFS allowlist (fixed; do not extend) ---
 test_data/bdinfo.tar filter=lfs diff=lfs merge=lfs

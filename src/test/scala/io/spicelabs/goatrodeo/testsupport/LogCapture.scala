@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.testsupport
 
+import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
@@ -80,7 +81,7 @@ object LogCapture {
     appender.start()
     root.addAppender(appender)
     val priorLevel = root.getLevel
-    root.setLevel(ch.qos.logback.classic.Level.TRACE)
+    root.setLevel(Level.toLevel("ALL"))
     val thread = Thread.currentThread().getName
     try {
       val result = body()

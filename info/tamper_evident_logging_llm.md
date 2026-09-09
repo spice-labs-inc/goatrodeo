@@ -28,7 +28,7 @@ does not prevent an adversary who fully controls the log file.
   programmatically (not via consumer `logback.xml`, which is excluded from the
   jar). The appender is the single serialization point (logback serializes
   appender calls), giving a total order under concurrency.
-- `--print-files` — **changed** to log each processed top-level file via the
+- `--log-filenames` — **changed** to log each processed top-level file via the
   logger (not `println`), so it is chained when tamper-evidence is on.
 
 ## Chain algorithm
@@ -95,5 +95,5 @@ CBOM's `goatrodeo:omnibor-path`/`goatrodeo:path`.
 Chain appender verifiability + tamper/truncation detection; chain-head exposure;
 correlation id generation/placement; `.grc` info always vs flag-gated + alignment;
 CBOM naming (normal/dotted/unsafe/full-path-truncated/deterministic); checksum
-file shape + all batches + chain head; `--print-files` routed to logger;
+file shape + all batches + chain head; `--log-filenames` routed to logger;
 end-to-end multi-batch integration + Python verifier pass/fail.

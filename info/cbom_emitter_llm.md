@@ -1,4 +1,4 @@
-# CycloneDX CBOM Emitter
+# CycloneDX CBOM Emitter — LLM Reference
 
 > **Navigation:** [Documentation Index](README.md) | [Architecture](architecture.md)
 >
@@ -6,6 +6,25 @@
 > CBOMs from a Goat Rodeo Artifact Dependency Graph (ADG). See
 > [Handoff: generating CBOMs from the ADG](#handoff-generating-cboms-from-the-adg)
 > for the input data model and the exact algorithm to reproduce.
+
+## Decision
+
+Add an optional post-processing stage that emits one CycloneDX cryptographic
+bill-of-materials (CBOM) JSON file per top-level ADG root.
+
+## Problem
+
+Goat Rodeo captures cryptographic material (certificates, keys, OpenSSL
+configs, Java security policies) as ADG metadata, but there was no structured
+output format for downstream crypto-inventory and risk tools.
+
+## Key files
+
+- `src/main/scala/io/spicelabs/goatrodeo/omnibor/CbomEmitter.scala` — emitter implementation.
+- `src/main/scala/io/spicelabs/goatrodeo/util/Configuration.scala` + `ConfigurationParser.scala` — `--emit-cbom-dir` and `--cbom-version` flags.
+- `src/main/scala/io/spicelabs/goatrodeo/omnibor/Builder.scala` — invokes the emitter after each batch's stores are written.
+- `src/test/scala/io/spicelabs/goatrodeo/omnibor/CbomEmitterSuite.scala` — test suite.
+- `src/test/resources/cyclonedx/bom-1.6.schema.json` and `bom-1.7.schema.json` — validation schemas.
 
 ## Overview
 
@@ -170,14 +189,22 @@ marker flags such as `Certificates:DerivedFromPrivateKey` and
 
 ## Security boundaries
 
-- Output directory creation rejects symlink components and uses `0750` permissions when POSIX is available. — verified by `CbomEmitterSuite.T3.21`.
+- The output directory itself must not be a symlink (`0750` permissions when POSIX is available). Symlinked *ancestors* are accepted (on macOS `/tmp` and `/var` are symlinks into `/private`), so `--emit-cbom-dir /tmp/cbom` works everywhere. — verified by `CbomEmitterSuite.T3.18b`, `CbomEmitterSuite.T3.21`.
 - CBOM files are written atomically (temp file + rename) with `0640` permissions and no leftover `.tmp` files. — verified by `CbomEmitterSuite.T3.22`.
 - Traversal is bounded: depth ≤ 32, and each root is capped at 100,000 components. If the cap is exceeded, a partial CBOM is emitted with a `cbom:truncated` top-level property and a warning is logged. — verified by `CbomEmitterSuite.T3.20`.
 - I/O failures are captured in `Try` and logged; they do not crash the main build. — verified by `CbomEmitterSuite.T3.10`.
+- Private-key bytes never enter the ADG (capture-time enforcement); marker flags are emitted faithfully. — `CbomEmitterSuite.T3.19`.
 
 ## Schema validation
 
 Emitted CBOMs are validated against the official CycloneDX 1.6 and 1.7 JSON schemas using a JSON schema validator in the test suite. — verified by `CbomEmitterSuite.T3.2`, `CbomEmitterSuite.T3.3`, `CbomEmitterSuite.T3.6`, and `CbomEmitterSuite.T3.15`.
+
+### 1.7 support note
+
+The 1.7 implementation uses the same component structure as 1.6 and sets
+`specVersion` to `"1.7"`. If CycloneDX 1.7 introduces crypto-specific fields
+not present in 1.6, they can be added in a follow-up change documented in a
+new ADR.
 
 ## Algorithm classification
 
@@ -336,11 +363,21 @@ Cryptographic material lives in `ItemMetaData.extra`, whose keys use a
 
 ## Verification
 
-- `CbomEmitterSuite` (41 tests) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private-key-marker fidelity, size limits, the opt-out behavior, expanded hash classification/parameters (T3.29–T3.32), golden byte-identity (T3.33), the hostile-JWT guard (T3.34), SWHID/OmniBOR core emission (T3.35–T3.37), carved certs (T3.41), traversal paths (T3.42), AP_ROMFS certs (T3.43), and the core/path-leaf agreement (T3.44).
+- `CbomEmitterSuite` (47 tests), with the coverage map:
+  - `T3.1`/`T3.17` — CLI parsing and validation; `T3.9` — no CBOM when disbled.
+  - `T3.2` — empty CBOM; `T3.10` — I/O failure handling; `T3.14` — multi-root; `T3.15` — cyclic `contains`; `T3.16` — duplicate GitOID dedup.
+  - `T3.3`/`T3.13` — certificate components; `T3.4` — OpenSSL config; `T3.5` — Java security.
+  - `T3.6` — CycloneDX 1.7 emission + schema validation; `T3.7` — nested-archive traversal; `T3.8` — filename stability.
+  - `T3.18` — output-directory auto-creation; `T3.18b` — symlinked ancestor accepted; `T3.19` — private-key markers; `T3.20` — 100,000-component truncation; `T3.21`/`T3.22` — symlink refusal of the dir itself / atomic writes.
+  - `T3.23`–`T3.30` — algorithm refs (keys, CRLs, EC curves, password hashes, usign, `parameterSetIdentifier`); `T3.29` — new hash names.
+  - `T3.31` — PasswordHash argon2id/nt-hash/apr1 → hash assets; `T3.32` — ServiceCrypto blake2b/sha3 → hash assets; `T3.33` — golden byte-identity; `T3.34` — hostile JWT `alg` guard.
+  - `T3.35`–`T3.37` — `swhid:core`/`omnibor:core` pair, no-alias refusal, malformed-alias tolerance.
+  - `T3.41` — carved RSA-1024 cert in an ELF; `T3.42` — nested container path chain; `T3.43` — AP_ROMFS trust-store certs; `T3.44` — core/path-leaf agreement.
+- `CbomEmitterSuite` (summary) covers CLI parsing, empty CBOMs, certificate mapping, OpenSSL and Java security mapping, CycloneDX 1.7 emission, nested-archive traversal, filename stability, I/O failure handling, multi-root emission, cycle detection, duplicate GitOID deduplication, directory auto-creation, private-key-marker fidelity, size limits, the opt-out behavior, expanded hash classification/parameters (T3.29–T3.32), golden byte-identity (T3.33), the hostile-JWT guard (T3.34), SWHID/OmniBOR core emission (T3.35–T3.37), carved certs (T3.41), traversal paths (T3.42), AP_ROMFS certs (T3.43), and the core/path-leaf agreement (T3.44).
 - `CryptoAlgorithmsSuite` (6 tests) pins the shared registry: producer-vocabulary totality (R-T-01), new-name classification (R-T-02), parameter rules (R-T-03), behavior regression (R-T-04), canonical-form hygiene (R-T-05), and substring-collision safety (R-T-06).
 
 ## Related
 
 - Implementation: `src/main/scala/io/spicelabs/goatrodeo/omnibor/CbomEmitter.scala`
-- CLI wiring: `src/main/scala/io/spicelabs/goatrodeo/util/Config.scala` and `src/main/scala/io/spicelabs/goatrodeo/omnibor/Builder.scala`
+- CLI wiring: `src/main/scala/io/spicelabs/goatrodeo/util/Configuration.scala` and `src/main/scala/io/spicelabs/goatrodeo/omnibor/Builder.scala`
 - ADR: `docs/adr/0005-cbom-output-format.md`

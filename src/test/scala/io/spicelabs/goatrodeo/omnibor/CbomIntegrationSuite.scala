@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
@@ -185,7 +186,7 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
         .withOutput(outputDir.getAbsolutePath)
         .withCbomDir(outputDir.getAbsolutePath)
         .withTamperEvidentLog(logFile.getAbsolutePath)
-        .withPrintFiles(true)
+        .withLogFilenames(true)
         .withThreads(1)
         .run()
 

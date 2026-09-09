@@ -99,7 +99,9 @@ object ConfigurationToml {
     "packageTags" -> "package_tags",
     "packageTagsShortName" -> "package_tags_short_name",
     "cbomDir" -> "emit_cbom_dir",
-    "cbomVersion" -> "cbom_version"
+    "cbomVersion" -> "cbom_version",
+    "logFilenames" -> "log_filenames",
+    "tamperEvidentLog" -> "tamper_evident_log"
   )
 
   /** How a setting should be named in a message, given the field it lives in.
@@ -154,6 +156,8 @@ object ConfigurationToml {
     "tag_version",
     "tag_date",
     "redact_git_info",
+    "log_filenames",
+    "tamper_evident_log",
     "package_tags",
     "package_tags_short_name",
     "emit_cbom_dir",
@@ -386,6 +390,12 @@ object ConfigurationToml {
     }
     bool(table, "redact_git_info").foreach(v =>
       config = config.copy(redactGitInfo = v)
+    )
+    bool(table, "log_filenames").foreach(v =>
+      config = config.copy(logFilenames = v)
+    )
+    str(table, "tamper_evident_log").foreach(v =>
+      config = config.copy(tamperEvidentLog = Some(file(v)))
     )
     bool(table, "package_tags").foreach(v =>
       config = config.copy(packageTags = v)

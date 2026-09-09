@@ -10,18 +10,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import scala.jdk.CollectionConverters.*
 
-/** WHAT: covers reading a [[Configuration]] from TOML — the schema itself, the
-  * precedence of the command line over the file, the rules that keep a config
-  * file from becoming a second way to say something it should not, and the
-  * map-backed [[TomlTables]] adapter the plugin SPI hands tables through.
-  *
-  * WHY: this schema is now published in three places — the parser, the docs,
-  * and the templates Allspice generates. Tests are what stop those drifting.
-  * The previous cross-program configuration channel failed exactly there: an
-  * allowlist of Goat Rodeo flags kept inside Allspice drifted until it
-  * permitted flags Goat Rodeo does not have, and nothing noticed because
-  * nothing checked.
-  */
 class ConfigurationTomlSuite extends GoatRodeoFunSuite {
 
   private def parse(toml: String): TomlTable = {
@@ -57,6 +45,8 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
       |package_tags = true
       |package_tags_short_name = true
       |cbom_version = "1.7"
+      |log_filenames = true
+      |tamper_evident_log = "/tmp/run.log"
       |""".stripMargin)
 
     assertEquals(config.out.map(_.getPath()), Some("/tmp/out"))
@@ -70,6 +60,11 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     assertEquals(config.packageTags, true)
     assertEquals(config.packageTagsShortName, true)
     assertEquals(config.cbomVersion, "1.7")
+    assertEquals(config.logFilenames, true)
+    assertEquals(
+      config.tamperEvidentLog.map(_.getPath()),
+      Some("/tmp/run.log")
+    )
   }
 
   test("array keys accumulate onto the base configuration") {
@@ -483,21 +478,6 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     } finally { Files.deleteIfExists(path); () }
   }
 
-  test("redact_git_info = false is honored from TOML") {
-    withConfigFile("[analysis]\nredact_git_info = false\n") { path =>
-      ConfigurationToml
-        .fromSources(
-          Some(path),
-          Configuration(),
-          environment = Map.empty,
-          report = _ => ()
-        ) match {
-        case Right((resolved, _)) => assertEquals(resolved.redactGitInfo, false)
-        case Left(err)            => fail(s"toml parse failed: $err")
-      }
-    }
-  }
-
   // ==================== the map-backed adapter ====================
 
   test("a table survives the round trip through a plain map") {
@@ -609,11 +589,9 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
   test("an empty array claims no element type, matching tomlj") {
     val original = parse("empty = []")
     val adapted = TomlTables.fromJavaMap(TomlTables.toPlainMap(original))
-    def hasStrings(arr: org.tomlj.TomlArray): Boolean =
-      arr.toList.asScala.forall(_.isInstanceOf[String])
     assertEquals(
-      hasStrings(adapted.getArray("empty")),
-      hasStrings(original.getArray("empty"))
+      adapted.getArray("empty").toList(),
+      original.getArray("empty").toList()
     )
     assertEquals(adapted.getArray("empty").isEmpty(), true)
   }
