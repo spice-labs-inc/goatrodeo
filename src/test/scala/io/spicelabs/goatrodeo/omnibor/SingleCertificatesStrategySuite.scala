@@ -1,7 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 
 /** Phase 2 — single Certificates strategy entry (spec §4, user decision 3;

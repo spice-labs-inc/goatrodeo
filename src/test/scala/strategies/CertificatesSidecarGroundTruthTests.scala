@@ -15,7 +15,6 @@ limitations under the License. */
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.security.MessageDigest

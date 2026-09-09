@@ -15,7 +15,6 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.io.File
 
 /** Tests for the ArduPilot `AP_ROMFS` embedded file store reader.

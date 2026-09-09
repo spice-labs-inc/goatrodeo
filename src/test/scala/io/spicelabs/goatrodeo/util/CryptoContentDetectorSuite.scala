@@ -15,7 +15,6 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.nio.charset.StandardCharsets
 
 /** Tests for the [[CryptoContentDetector]] MIME augmenter.

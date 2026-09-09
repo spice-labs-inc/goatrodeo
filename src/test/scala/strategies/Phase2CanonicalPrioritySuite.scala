@@ -2,10 +2,9 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
-
-import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 

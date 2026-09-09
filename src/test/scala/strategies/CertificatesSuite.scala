@@ -15,7 +15,6 @@ limitations under the License. */
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 /** Per-fixture parameterized test suite for the Certificates strategy.
   *
   * ## LLM-friendly summary

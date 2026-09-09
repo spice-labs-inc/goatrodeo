@@ -14,7 +14,6 @@ limitations under the License. */
 
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoDetector

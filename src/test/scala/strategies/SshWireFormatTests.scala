@@ -14,7 +14,6 @@ limitations under the License. */
 
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.util.SshWireReader
 
 /** Unit tests for the RFC 4251 SSH wire-format reader.

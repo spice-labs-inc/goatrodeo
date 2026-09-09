@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.util.GitRunInfo
 import org.eclipse.jgit.api.Git
 

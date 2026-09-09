@@ -14,7 +14,6 @@ limitations under the License. */
 
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
-
 import io.spicelabs.goatrodeo.util.SshWireReader
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen

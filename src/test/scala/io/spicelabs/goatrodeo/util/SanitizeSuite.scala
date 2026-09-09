@@ -15,7 +15,6 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 /** Tests for [[Sanitize]] — the shared escaping of untrusted strings before
   * they are interpolated into log lines.
   *

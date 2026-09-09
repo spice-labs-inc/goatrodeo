@@ -14,7 +14,6 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 

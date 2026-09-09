@@ -1,8 +1,7 @@
 package io.spicelabs.goatrodeo
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.cilantro.DotnetAssemblyProbe
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.goatrodeo.util.FileWalker

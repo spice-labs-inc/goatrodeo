@@ -4,7 +4,6 @@
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.nio.charset.StandardCharsets
 
 /** Phase 0.9 — SshWireReader methods return Option instead of throwing.

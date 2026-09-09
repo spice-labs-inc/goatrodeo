@@ -1,4 +1,3 @@
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -6,6 +5,7 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetFile
 import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper

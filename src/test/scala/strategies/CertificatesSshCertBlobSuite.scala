@@ -4,7 +4,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 

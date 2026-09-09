@@ -13,10 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.omnibor.strategies.CryptoFootprintStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.ShadowPasswordStrategy
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.CipherSuiteResolver
 
 /** Shared canonical algorithm-name registry tests (phase H).

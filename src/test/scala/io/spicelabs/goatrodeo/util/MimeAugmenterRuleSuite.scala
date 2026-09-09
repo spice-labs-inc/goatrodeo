@@ -15,7 +15,6 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*

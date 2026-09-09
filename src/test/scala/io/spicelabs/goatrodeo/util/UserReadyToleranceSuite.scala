@@ -1,7 +1,6 @@
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files

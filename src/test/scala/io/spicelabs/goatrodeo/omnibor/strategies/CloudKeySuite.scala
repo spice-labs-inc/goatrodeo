@@ -14,7 +14,6 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.util.ByteWrapper
 
 /** Tests for [[CloudKeyStrategy]]: cloud-managed key references in config/IaC

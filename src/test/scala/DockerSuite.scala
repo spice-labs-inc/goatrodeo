@@ -1,4 +1,3 @@
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.DockerTestFixtures
 import io.spicelabs.goatrodeo.omnibor.EdgeType
@@ -9,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerMarkers
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerState
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import org.json4s.*

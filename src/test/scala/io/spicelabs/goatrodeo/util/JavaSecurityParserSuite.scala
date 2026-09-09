@@ -14,7 +14,6 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
-
 import org.apache.commons.io.FileUtils
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll

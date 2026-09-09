@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.nio.file.Files

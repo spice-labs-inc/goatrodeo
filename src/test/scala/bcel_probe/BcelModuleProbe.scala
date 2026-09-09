@@ -1,6 +1,5 @@
 package bcel_probe
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import org.apache.bcel.classfile.Attribute
 import org.apache.bcel.classfile.JavaClass
 

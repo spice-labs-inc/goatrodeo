@@ -13,8 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
 import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
@@ -25,6 +23,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 

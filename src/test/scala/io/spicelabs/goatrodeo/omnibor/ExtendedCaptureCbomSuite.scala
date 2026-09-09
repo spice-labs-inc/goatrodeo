@@ -14,7 +14,6 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 

@@ -13,16 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
-import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
-
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
 import java.nio.file.Files
-// (the uniform 60-minute suite timeout of GoatRodeoFunSuite applies; no
-// per-suite cap is set here)
 import scala.util.Try
 
 /** T4.5 — Discovery-driven CBOM regression test for the IoTGoat x86 firmware.

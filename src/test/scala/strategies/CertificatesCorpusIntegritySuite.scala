@@ -15,7 +15,6 @@ limitations under the License. */
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-
 /** Structural-integrity assertions on the Certificates fixture corpus.
   *
   * ## LLM-friendly summary

@@ -4,7 +4,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
-
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
