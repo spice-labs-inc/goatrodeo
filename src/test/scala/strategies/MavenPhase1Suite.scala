@@ -1,6 +1,7 @@
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors. Apache 2.0 */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -15,7 +16,6 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PomParser
-import munit.FunSuite
 
 import java.io.File
 import java.io.FileOutputStream
@@ -25,7 +25,7 @@ import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class MavenPhase1Suite extends FunSuite {
+class MavenPhase1Suite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item = Item(
     id,
@@ -1268,7 +1268,7 @@ class MavenPhase1Suite extends FunSuite {
 
 // ==================== §1.6: groupId/artifactId/version Priority Chain Integration Tests ====================
 
-class GroupIdArtifactIdVersionPrioritySuite extends FunSuite {
+class GroupIdArtifactIdVersionPrioritySuite extends GoatRodeoFunSuite {
 
   private val state = MavenState()
 

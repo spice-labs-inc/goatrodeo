@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +22,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
 
-class ArtifactWrapperTestSuite extends munit.FunSuite {
+class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
 
   // ==================== FileWrapper Tests ====================
 

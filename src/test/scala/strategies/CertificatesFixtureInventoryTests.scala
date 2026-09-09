@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -46,7 +46,7 @@ import java.nio.file.Files
   *   - "empty root reports zero fixtures" — boundary.
   *   - "nonexistent root reports zero fixtures" — boundary.
   */
-class CertificatesFixtureInventoryTests extends FunSuite {
+class CertificatesFixtureInventoryTests extends GoatRodeoFunSuite {
 
   private def tmpCorpus(body: File => Unit): (File, () => Unit) = {
     val root = Files.createTempDirectory("cert-fixture-inv-").toFile

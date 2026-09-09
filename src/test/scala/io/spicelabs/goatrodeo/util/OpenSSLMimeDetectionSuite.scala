@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
@@ -36,7 +36,7 @@ import java.io.File
   * `text/plain`. That is acceptable because Phase 1 only needs to capture files
   * with TLS/security configuration semantics.
   */
-class OpenSSLMimeDetectionSuite extends FunSuite {
+class OpenSSLMimeDetectionSuite extends GoatRodeoFunSuite {
 
   private val corpusDir = new File("test_data/openssl_configs")
 

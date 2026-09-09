@@ -13,11 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.strategies.CryptoFootprintStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.ShadowPasswordStrategy
 import io.spicelabs.goatrodeo.util.CipherSuiteResolver
-import munit.FunSuite
 
 /** Shared canonical algorithm-name registry tests (phase H).
   *
@@ -33,7 +33,7 @@ import munit.FunSuite
   *   - R-T-06 no new classification name is a substring of a canonical name
   *     that classifies as something else (false-positive minting guard).
   */
-class CryptoAlgorithmsSuite extends FunSuite {
+class CryptoAlgorithmsSuite extends GoatRodeoFunSuite {
 
   private val ApprovedParameterDeltas: Set[String] = Set(
     "sha3-256", // C1: "3" -> "256"

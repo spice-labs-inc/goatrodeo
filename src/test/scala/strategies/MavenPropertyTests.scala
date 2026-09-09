@@ -11,6 +11,7 @@
  */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -19,7 +20,6 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PomParser
-import munit.ScalaCheckSuite
 import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.compact
 import org.json4s.native.JsonMethods.render
@@ -37,7 +37,7 @@ import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class MavenPropertyTests extends ScalaCheckSuite {
+class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Generators

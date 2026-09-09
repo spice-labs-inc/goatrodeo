@@ -13,12 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoDetector
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -48,7 +48,7 @@ import java.nio.file.Files
   * verify the synthetic-byte tests align with what the augmenter sees in the
   * wild.
   */
-class CryptoDetectorSuite extends FunSuite {
+class CryptoDetectorSuite extends GoatRodeoFunSuite {
 
   private def wrapBytes(
       bytes: Array[Byte],

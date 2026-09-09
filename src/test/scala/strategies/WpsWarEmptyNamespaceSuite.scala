@@ -2,6 +2,7 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -9,7 +10,6 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
-import munit.FunSuite
 
 import java.io.File
 import scala.collection.immutable.TreeMap
@@ -44,7 +44,7 @@ import scala.collection.immutable.TreeSet
   * which recursively traverses into the WAR and processes each child JAR
   * through its own `applyAccumulatedAugmentation`.
   */
-class WpsWarEmptyNamespaceSuite extends FunSuite {
+class WpsWarEmptyNamespaceSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; calls needing different
     * settings pass an explicit `(using ...)`.

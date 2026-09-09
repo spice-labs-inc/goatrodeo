@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +15,6 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -49,7 +49,7 @@ import scala.collection.immutable.TreeSet
   * | both non-empty | TreeSet("a")   | TreeSet("b")    | merged with both filenames |
   * | both empty     | TreeSet()      | TreeSet()       | merged OK, fileNames empty |
   */
-class StructMergeSuite extends FunSuite {
+class StructMergeSuite extends GoatRodeoFunSuite {
 
   test("ItemMetaData - merge handles empty fileNames on left side") {
 

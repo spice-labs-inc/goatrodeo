@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
 import org.json4s.*
 
 import java.io.File
@@ -30,7 +30,7 @@ import java.nio.file.Files
   * certificate, OpenSSL, and Java security components, and do not represent the
   * non-crypto file as cryptographic material.
   */
-class CbomIntegrationSuite extends FunSuite {
+class CbomIntegrationSuite extends GoatRodeoFunSuite {
 
   private def text(jv: JValue, path: String*): String = {
     path.foldLeft(jv: JValue)(_ \ _) match {

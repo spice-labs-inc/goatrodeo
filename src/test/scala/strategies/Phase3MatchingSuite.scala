@@ -2,10 +2,10 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -32,7 +32,7 @@ import org.scalacheck.Prop.forAll
  *   Property tests 3.14-3.15 are in Phase3MatchingPropertySuite.
  */
 
-class Phase3MatchingSuite extends FunSuite {
+class Phase3MatchingSuite extends GoatRodeoFunSuite {
 
   // =========================================================================
   // Test 3.1: Exact match preferred over substring
@@ -667,7 +667,7 @@ class Phase3MatchingSuite extends FunSuite {
  *     another, the longer (more specific) one is preferred when it
  *     matches the filename.
  */
-class Phase3MatchingPropertySuite extends ScalaCheckSuite {
+class Phase3MatchingPropertySuite extends GoatRodeoScalaCheckSuite {
 
   private val genArtifactId: Gen[String] = for {
     prefix <- Gen.oneOf(

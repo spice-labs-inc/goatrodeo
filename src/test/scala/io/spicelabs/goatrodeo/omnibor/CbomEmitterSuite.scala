@@ -13,12 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import _root_.strategies.CertificatesPipelineRunner
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 import org.everit.json.schema.ValidationException
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
@@ -31,14 +31,12 @@ import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class CbomEmitterSuite extends FunSuite {
+class CbomEmitterSuite extends GoatRodeoFunSuite {
 
   // T3.20 emits a 100,000-component CBOM; its runtime is workload- and
   // CPU-speed-bound, not correctness-bound, so the default 30s wall-clock cap
   // is not a meaningful gate on slower machines. A generous suite-wide
   // timeout is the safety net against hangs, not the acceptance criterion.
-  override val munitTimeout =
-    scala.concurrent.duration.Duration(5, "minutes")
 
   private lazy val schema16 = loadEveritSchema("bom-1.6.schema.json")
   private lazy val schema17 = loadEveritSchema("bom-1.7.schema.json")

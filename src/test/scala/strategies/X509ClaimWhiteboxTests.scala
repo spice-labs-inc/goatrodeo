@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
-import munit.FunSuite
 
 import java.io.File
 import java.security.Security
@@ -50,7 +50,7 @@ import java.security.Security
   * | Keystore alias enumeration         | `keytool -list -keystore <fixture> -storepass ""`                                                        |
   * | CRL DER SHA-256                    | `sha256sum <fixture>`                                                                                    |
   */
-class X509ClaimWhiteboxTests extends FunSuite {
+class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
 
   // BouncyCastle is required by the parse methods under test. Production code
   // registers it lazily via CryptoDetector / Certificates; running this suite

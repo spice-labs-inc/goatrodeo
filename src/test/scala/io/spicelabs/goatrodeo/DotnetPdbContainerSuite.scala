@@ -1,9 +1,9 @@
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
@@ -33,7 +33,7 @@ import scala.util.Try
   * contract (MIME key, withFile + withPdb, wrap sources inside the callback,
   * reject-without-throw).
   */
-class DotnetPdbContainerSuite extends FunSuite {
+class DotnetPdbContainerSuite extends GoatRodeoFunSuite {
 
   private def pollyPdbWrapper(): ArtifactWrapper = {
     val zip = new java.util.zip.ZipFile("test_data/dotnet/polly.8.4.1.nupkg")

@@ -2,6 +2,7 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -9,7 +10,6 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
@@ -73,7 +73,7 @@ import scala.jdk.CollectionConverters.*
   * | key entry metadata has no long hex on non-allowlisted keys | same                             | filterLeaks(metadata) == metadata                 |
   * | cert-only entry vs key entry                               | keystore with both entry types   | CertCount includes chain certs, KeyEntryCount > 0 |
   */
-class CertificatesKeystoreKeyEntrySuite extends FunSuite {
+class CertificatesKeystoreKeyEntrySuite extends GoatRodeoFunSuite {
 
   if (Security.getProvider("BC") == null) {
     Security.addProvider(

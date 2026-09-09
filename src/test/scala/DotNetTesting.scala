@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -16,7 +17,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-class DotNetTesting extends munit.FunSuite {
+class DotNetTesting extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.

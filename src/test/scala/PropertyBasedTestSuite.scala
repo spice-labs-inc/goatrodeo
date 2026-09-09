@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +21,6 @@ import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
-import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Prop.*
@@ -38,7 +38,7 @@ import scala.collection.immutable.TreeSet
   * As a snarky principal engineer once said: "Unit tests are cute. Property
   * tests are insurance."
   */
-class PropertyBasedTestSuite extends ScalaCheckSuite {
+class PropertyBasedTestSuite extends GoatRodeoScalaCheckSuite {
 
   // ==================== Generators ====================
   // Because ScalaCheck needs to know how to create random instances

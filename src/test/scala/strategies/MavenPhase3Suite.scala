@@ -2,6 +2,7 @@
    Maven Phase 3 tests §3.1–3.5
  */
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Edge
 import io.spicelabs.goatrodeo.omnibor.Item
@@ -20,7 +21,7 @@ import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class MavenPhase3Suite extends munit.FunSuite {
+class MavenPhase3Suite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty[Edge], None, None)

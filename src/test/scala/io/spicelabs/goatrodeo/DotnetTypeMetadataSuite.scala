@@ -1,4 +1,5 @@
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
@@ -7,7 +8,6 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.File
 
@@ -35,7 +35,7 @@ import java.io.File
   * whose metadata has the canonical JSON key. Fixtures are the real assemblies
   * in test_data/ (Smoke.dll, hackproj.dll).
   */
-class DotnetTypeMetadataSuite extends FunSuite {
+class DotnetTypeMetadataSuite extends GoatRodeoFunSuite {
 
   given Configuration = Configuration(
     tempDir = None,

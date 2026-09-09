@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +30,7 @@ import scala.jdk.CollectionConverters.*
   * loading). The `--help` execution is covered by the existing
   * FatJarExecutionTest.
   */
-class FatJarContentsTest extends munit.FunSuite {
+class FatJarContentsTest extends GoatRodeoFunSuite {
 
   private def fatJar(): JarFile = {
     val f = new File(

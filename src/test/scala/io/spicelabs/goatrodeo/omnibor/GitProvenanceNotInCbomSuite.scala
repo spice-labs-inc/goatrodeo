@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.GitRunInfo
-import munit.FunSuite
 import org.eclipse.jgit.api.Git
 
 import java.io.File
@@ -25,7 +25,7 @@ import java.nio.file.Files
   * ItemMetaData), plus the emitter's `isCryptoItem` prefix list not matching
   * the git item identifiers.
   */
-class GitProvenanceNotInCbomSuite extends FunSuite {
+class GitProvenanceNotInCbomSuite extends GoatRodeoFunSuite {
 
   private def tempDir(prefix: String): File =
     Files.createTempDirectory(prefix).toFile

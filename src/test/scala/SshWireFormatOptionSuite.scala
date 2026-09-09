@@ -2,8 +2,8 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.nio.charset.StandardCharsets
 
@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets
   * On successful reads, positions advance. On failed reads (None return),
   * positions must NOT advance (reader stays in consistent state).
   */
-class SshWireFormatOptionSuite extends FunSuite {
+class SshWireFormatOptionSuite extends GoatRodeoFunSuite {
 
   private def sshUint32(v: Long): Array[Byte] = Array(
     ((v >> 24) & 0xff).toByte,

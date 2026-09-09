@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
-class ShadowPasswordSuite extends FunSuite {
+class ShadowPasswordSuite extends GoatRodeoFunSuite {
 
   test("hashAlgorithm maps crypt prefixes to families") {
     assertEquals(ShadowPasswordStrategy.hashAlgorithm("$1$salt$hash"), "md5")

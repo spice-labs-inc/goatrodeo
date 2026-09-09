@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,7 +34,7 @@ import java.nio.file.StandardOpenOption
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class HelpersTestSuite extends munit.FunSuite {
+class HelpersTestSuite extends GoatRodeoFunSuite {
 
   // ==================== Hash Functions Tests ====================
 

@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 /** Phase 2 TDD Tests: ProcessingState.maybePackageTag contract
   *
@@ -25,7 +26,7 @@ package io.spicelabs.goatrodeo.omnibor
   * Requirement Traceability:
   *   - R7: Certificates and Generic excluded from per-package tagging
   */
-class PackageTagContractSuite extends munit.FunSuite {
+class PackageTagContractSuite extends GoatRodeoFunSuite {
 
   // ==================== Trait Contract Tests ====================
 

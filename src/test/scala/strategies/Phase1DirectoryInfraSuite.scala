@@ -2,9 +2,9 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -48,7 +48,7 @@ import java.io.File
 // Tests 1.1-1.5: Example-based tests
 // =============================================================================
 
-class Phase1DirectoryInfraSuite extends FunSuite {
+class Phase1DirectoryInfraSuite extends GoatRodeoFunSuite {
 
   // -------------------------------------------------------------------------
   // Test 1.1: Directory-based test helper creates valid MavenToProcess bundle
@@ -448,7 +448,7 @@ class Phase1DirectoryInfraSuite extends FunSuite {
 // Test 1.6: Property-based test
 // =============================================================================
 
-class Phase1PropertySuite extends ScalaCheckSuite {
+class Phase1PropertySuite extends GoatRodeoScalaCheckSuite {
 
   // -------------------------------------------------------------------------
   // Property-Based Test 1.6: For any directory with JAR + POM,

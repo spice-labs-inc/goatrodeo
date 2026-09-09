@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -49,7 +49,7 @@ import scala.sys.process.*
   * reviewer can hand-verify against `openssl x509 -subject -nameopt RFC2253`
   * output.
   */
-class ComputeExpectedToolTests extends FunSuite {
+class ComputeExpectedToolTests extends GoatRodeoFunSuite {
 
   private val script = new File(
     "test_data/certificates/tools/compute-expected.sh"

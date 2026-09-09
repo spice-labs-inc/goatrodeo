@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -50,7 +50,7 @@ import java.util.Base64
   * string("sk-ecdsa-sha2-nistp256@openssh.com") string("nistp256") string(Q) //
   * SEC1 uncompressed point string(application)
   */
-class SshSecurityKeyVectorTests extends FunSuite {
+class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
 
   private def writeSshString(
       out: ByteArrayOutputStream,

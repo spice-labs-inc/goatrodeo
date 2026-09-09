@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.ConfigurationToml
@@ -21,7 +22,7 @@ import scala.jdk.CollectionConverters.*
   * permitted flags Goat Rodeo does not have, and nothing noticed because
   * nothing checked.
   */
-class ConfigurationTomlSuite extends munit.FunSuite {
+class ConfigurationTomlSuite extends GoatRodeoFunSuite {
 
   private def parse(toml: String): TomlTable = {
     val result = Toml.parse(toml)

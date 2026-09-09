@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.util.SshWireReader
-import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
@@ -48,7 +48,7 @@ import org.scalacheck.Prop.propBoolean
   * it. The other properties guard related classes of bugs in the byte-pumping
   * path that drives all of Phase 5's fingerprinting and metadata extraction.
   */
-class SshWireFormatPropertyTests extends ScalaCheckSuite {
+class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
 
   // --- byte writers used to build wire blobs from generated values ---
 

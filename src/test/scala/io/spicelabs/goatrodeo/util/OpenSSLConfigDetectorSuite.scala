@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop
 import org.scalacheck.Prop.forAll
@@ -30,7 +30,7 @@ import java.nio.charset.StandardCharsets
   *   - reads no more than the configured prefix,
   *   - is purely additive.
   */
-class OpenSSLConfigDetectorSuite extends ScalaCheckSuite {
+class OpenSSLConfigDetectorSuite extends GoatRodeoScalaCheckSuite {
 
   private val expectedMime = OpenSSLConfigDetector.OpenSSLConfigMimeType
 

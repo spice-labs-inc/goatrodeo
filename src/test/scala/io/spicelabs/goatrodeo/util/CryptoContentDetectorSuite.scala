@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.nio.charset.StandardCharsets
 
@@ -38,7 +38,7 @@ import java.nio.charset.StandardCharsets
   *
   * LLM note: C-A-xx = test id.
   */
-class CryptoContentDetectorSuite extends FunSuite {
+class CryptoContentDetectorSuite extends GoatRodeoFunSuite {
 
   private def bytes(s: String): Array[Byte] =
     s.getBytes(StandardCharsets.ISO_8859_1)

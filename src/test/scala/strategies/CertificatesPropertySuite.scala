@@ -2,12 +2,12 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop
 import org.scalacheck.Prop.forAll
@@ -44,11 +44,10 @@ import scala.collection.immutable.TreeSet
   * without testing anything useful). Each property either roundtrips a hash,
   * asserts a structural invariant on the pURL, or guards an absence (no leak).
   */
-class CertificatesPropertySuite extends ScalaCheckSuite {
+class CertificatesPropertySuite extends GoatRodeoScalaCheckSuite {
 
   // The heavier properties take ~15s each on an idle machine; leave headroom
   // for the contention introduced by running test classes in parallel.
-  override val munitTimeout = scala.concurrent.duration.Duration(5, "minutes")
 
   // Register BC if not already (idempotent — also done by Certificates).
   if (Security.getProvider("BC") == null) {

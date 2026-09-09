@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.util.Configuration
@@ -33,7 +34,7 @@ import java.util.Date
   *   - R2: --package-tags-short-name CLI option
   *   - R3: Per-package tag JSON structure with optional version
   */
-class PackageTagInfoSuite extends munit.FunSuite {
+class PackageTagInfoSuite extends GoatRodeoFunSuite {
 
   // ==================== PackageTagInfo Construction Tests ====================
 

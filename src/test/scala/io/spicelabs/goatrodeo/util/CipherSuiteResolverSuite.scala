@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -27,7 +26,7 @@ import org.scalacheck.Prop.forAll
   * deduplicated, and that every resolved algorithm belongs to the closed
   * vocabulary.
   */
-class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
+class CipherSuiteResolverSuite extends GoatRodeoScalaCheckSuite {
 
   test("T-A-01 ECDHE-RSA-AES128-GCM-SHA256 decomposes to its algorithms") {
     val entries = CipherSuiteResolver.resolveCipherString(

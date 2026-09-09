@@ -13,11 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
@@ -28,7 +28,7 @@ import scala.collection.immutable.TreeSet
   * rule (secrets are never echoed), tolerant empty parsing, and no-claim for
   * unknown files.
   */
-class ServiceCryptoSuite extends FunSuite {
+class ServiceCryptoSuite extends GoatRodeoFunSuite {
 
   private val sc = MKC.adHoc("ServiceCrypto")
   private val krb = MKC.adHoc("Kerberos")

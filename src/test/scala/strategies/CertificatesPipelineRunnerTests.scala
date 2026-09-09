@@ -13,12 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.ItemTagData
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -53,7 +53,7 @@ import scala.collection.immutable.TreeSet
   *   - "runGoatRodeoOnSingleFile on a simple file returns at least one primary
   *     item" — end-to-end sanity (no alias stubs leak through).
   */
-class CertificatesPipelineRunnerTests extends FunSuite {
+class CertificatesPipelineRunnerTests extends GoatRodeoFunSuite {
 
   private def primaryItem(id: String): Item = Item(
     identifier = id,

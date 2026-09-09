@@ -1,10 +1,10 @@
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 
@@ -28,7 +28,7 @@ import java.io.File
   * MIME — so the recursion must be triggered by the cheap DotnetAssemblyProbe
   * (content), not just the MIME gate.
   */
-class DotnetNestedAssemblySuite extends FunSuite {
+class DotnetNestedAssemblySuite extends GoatRodeoFunSuite {
 
   given Configuration = Configuration(
     tempDir = None,

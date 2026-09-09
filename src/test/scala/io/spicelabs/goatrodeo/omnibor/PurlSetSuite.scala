@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.coordinates.Purl
-import munit.FunSuite
 
 /** Unit tests for the [[PurlSet]] type.
   *
@@ -66,7 +66,7 @@ import munit.FunSuite
   * Plan Part 1: PurlSet type — all 10 tests from the plan's "PurlSet unit
   * tests" section.
   */
-class PurlSetSuite extends FunSuite {
+class PurlSetSuite extends GoatRodeoFunSuite {
 
   // ---- Helpers ----
 

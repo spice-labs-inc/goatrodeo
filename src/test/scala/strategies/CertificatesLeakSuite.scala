@@ -2,6 +2,7 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -10,7 +11,6 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 import java.util.regex.Pattern
@@ -34,7 +34,7 @@ import scala.collection.immutable.TreeSet
   * Without this check, "the leak suite passes" is not evidence the plumbing
   * actually fires.
   */
-class CertificatesLeakSuite extends FunSuite {
+class CertificatesLeakSuite extends GoatRodeoFunSuite {
 
   private val appendixCPatterns: Seq[Pattern] = Seq(
     "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",

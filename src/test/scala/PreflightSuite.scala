@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +25,7 @@ import java.nio.file.Files
   * clear, actionable message instead of a pile of cryptic "not a valid zip" /
   * FileNotFound failures scattered across the suite.
   */
-class PreflightSuite extends munit.FunSuite {
+class PreflightSuite extends GoatRodeoFunSuite {
 
   // A few files that git tracks via LFS. If LFS wasn't pulled, each is a small
   // text pointer beginning with the line below rather than real binary content.

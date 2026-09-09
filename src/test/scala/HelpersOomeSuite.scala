@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +15,6 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
@@ -49,7 +49,7 @@ import scala.collection.immutable.TreeSet
   * file that triggers BCEL OOME, which is not feasible in a unit test. The
   * non-class path is tested here as the primary guard.
   */
-class HelpersOomeSuite extends FunSuite {
+class HelpersOomeSuite extends GoatRodeoFunSuite {
 
   test("Helpers - computeAssociatedSource returns empty for non-class MIME") {
 

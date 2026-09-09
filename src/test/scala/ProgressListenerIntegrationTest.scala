@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -25,9 +26,7 @@ import scala.jdk.CollectionConverters.*
   * is synthetic — just over a thousand tiny text files, sized to clear the
   * production-cadence throttle of 1,000 items between emissions.
   */
-class ProgressListenerIntegrationTest extends munit.FunSuite {
-
-  override val munitTimeout = scala.concurrent.duration.Duration(2, "minutes")
+class ProgressListenerIntegrationTest extends GoatRodeoFunSuite {
 
   private class Recorder extends ProgressListener {
     private val events = new ConcurrentLinkedQueue[(Long, Long)]()

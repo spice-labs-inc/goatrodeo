@@ -2,18 +2,18 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 import scala.collection.immutable.TreeSet
 
-class MavenPhase5CorpusSuite extends FunSuite {
+class MavenPhase5CorpusSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty, None, None)

@@ -1,5 +1,5 @@
 package io.spicelabs.goatrodeo.util
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.eclipse.jgit.api.Git
 
 import java.io.File
@@ -21,7 +21,7 @@ import java.nio.file.Files
   * behavior (counts, identifiers, fields), not byte-parity of tree ids against
   * a fictional ground truth.
   */
-class GitRunInfoSuite extends FunSuite {
+class GitRunInfoSuite extends GoatRodeoFunSuite {
 
   private def tempDir(prefix: String): File = {
     val d = Files.createTempDirectory(prefix).toFile

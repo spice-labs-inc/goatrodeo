@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 /** Tests for [[Sanitize]] — the shared escaping of untrusted strings before
   * they are interpolated into log lines.
@@ -30,7 +30,7 @@ import munit.FunSuite
   *
   * LLM note: S-x = test id.
   */
-class SanitizeSuite extends FunSuite {
+class SanitizeSuite extends GoatRodeoFunSuite {
 
   // S-1 — the full escape set: C0, C1, and U+2028/U+2029 are escaped; no raw
   // control character survives.

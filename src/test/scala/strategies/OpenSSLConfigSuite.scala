@@ -1,6 +1,7 @@
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors. Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
@@ -11,7 +12,6 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.OpenSSLConfigDetector
 import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
@@ -21,7 +21,7 @@ import scala.collection.immutable.TreeSet
   * metadata emission, cross-file reference tracking, and coexistence with other
   * strategies.
   */
-class OpenSSLConfigSuite extends FunSuite {
+class OpenSSLConfigSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; calls needing different
     * settings pass an explicit `(using ...)`.

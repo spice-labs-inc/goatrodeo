@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -25,7 +26,6 @@ import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesState
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoDetector
-import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -66,7 +66,7 @@ import scala.collection.immutable.TreeSet
   * | `... finalAugmentation returns input Item + this`                        | no Item mutation                                                      |
   * | `... postChildProcessing returns this`                                   | identity                                                              |
   */
-class CertificatesStubTests extends FunSuite {
+class CertificatesStubTests extends GoatRodeoFunSuite {
 
   // --- helpers ------------------------------------------------------------
 

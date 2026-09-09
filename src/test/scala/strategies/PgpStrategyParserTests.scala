@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 
@@ -42,7 +42,7 @@ import java.io.File
   * releases reject the v6 packet format. The BC parser handles them; the v6
   * fixture is asserted against values BC reports.
   */
-class PgpStrategyParserTests extends FunSuite {
+class PgpStrategyParserTests extends GoatRodeoFunSuite {
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)

@@ -1,5 +1,5 @@
 package io.spicelabs.goatrodeo.util
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.security.MessageDigest
@@ -19,7 +19,7 @@ import java.security.MessageDigest
   * LLM note: the fixture is a real RPM (busybox aarch64, sqlite-rpmdb-era
   * format option). The known-hash entry is the payload's LICENSE file.
   */
-class RpmStreamingSuite extends FunSuite {
+class RpmStreamingSuite extends GoatRodeoFunSuite {
 
   private def sha256(bytes: Array[Byte]): String =
     MessageDigest

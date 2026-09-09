@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +22,7 @@ import io.spicelabs.goatrodeo.util.VectorOfStrings
 import java.io.File
 import java.nio.file.Files
 
-class ConfigTestSuite extends munit.FunSuite {
+class ConfigTestSuite extends GoatRodeoFunSuite {
 
   // ==================== Configuration Defaults Tests ====================
 
@@ -337,7 +338,7 @@ class ConfigTestSuite extends munit.FunSuite {
   }
 }
 
-class GitRedactConfigSuite extends munit.FunSuite {
+class GitRedactConfigSuite extends GoatRodeoFunSuite {
   test("no-redact-git-info flag disables redaction") {
     val args = Array("--no-redact-git-info")
     val config = io.spicelabs.goatrodeo.util.ConfigurationParser.parse(args)

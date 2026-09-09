@@ -2,13 +2,13 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOIDUtils
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -35,7 +35,7 @@ import java.io.File
  * ScalaCheck generators. Each property is tested with randomly generated
  * inputs to catch edge cases that specific test cases might miss.
  */
-class Phase7aPropertySuite extends ScalaCheckSuite {
+class Phase7aPropertySuite extends GoatRodeoScalaCheckSuite {
 
   // =========================================================================
   // Generators (bounded to avoid ScalaCheck discard issues)

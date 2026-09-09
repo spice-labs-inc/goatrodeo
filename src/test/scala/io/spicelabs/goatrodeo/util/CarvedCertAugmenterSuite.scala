@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.File
 
@@ -35,7 +35,7 @@ import java.io.File
   *
   * LLM note: A-x = test id.
   */
-class CarvedCertAugmenterSuite extends FunSuite {
+class CarvedCertAugmenterSuite extends GoatRodeoFunSuite {
 
   private val dir = "test_data/carved-certs"
 

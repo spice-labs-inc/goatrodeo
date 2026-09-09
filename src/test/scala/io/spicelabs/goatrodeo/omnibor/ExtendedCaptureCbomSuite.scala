@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -43,7 +43,7 @@ import scala.collection.immutable.TreeSet
   *
   * Private-key markers are emitted faithfully as properties (no redaction).
   */
-class ExtendedCaptureCbomSuite extends FunSuite {
+class ExtendedCaptureCbomSuite extends GoatRodeoFunSuite {
 
   private implicit val formats: Formats = DefaultFormats
 

@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
@@ -41,11 +42,10 @@ import java.io.File
   *   - R5: Baharat strategy extracts name/version from .deb
   *   - R6: Docker strategy extracts repository:tag and created date
   */
-class PackageTagIntegrationSuite extends munit.FunSuite {
+class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
 
   // Walks multi-hundred-MB docker tarballs, which takes well over munit's
   // 30-second default — more so when other test classes run concurrently.
-  override val munitTimeout = scala.concurrent.duration.Duration(30, "minutes")
 
   // Helper to check if test files exist
   def checkTestFile(path: String): Boolean = new File(path).exists()

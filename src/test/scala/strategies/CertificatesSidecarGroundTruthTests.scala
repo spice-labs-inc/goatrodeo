@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
@@ -63,7 +63,7 @@ import scala.util.Try
   *   - "every X.509 fixture's SubjectDN matches JDK's RFC-2253 rendering of the
   *     parsed subject" — DN formatting cross-check.
   */
-class CertificatesSidecarGroundTruthTests extends FunSuite {
+class CertificatesSidecarGroundTruthTests extends GoatRodeoFunSuite {
 
   /** One X.509 fixture that has cert/SPKI/DN sidecar fields to verify. */
   private case class X509CheckCase(

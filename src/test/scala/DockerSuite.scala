@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.DockerTestFixtures
 import io.spicelabs.goatrodeo.omnibor.EdgeType
@@ -16,12 +17,11 @@ import org.json4s.native.JsonMethods.*
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class DockerSuite extends munit.FunSuite {
+class DockerSuite extends GoatRodeoFunSuite {
 
   // Whichever suite touches DockerTestFixtures first pays for parsing the
   // multi-hundred-MB docker tarballs, which exceeds munit's 30-second default
   // on its own — and more so when other test classes are running concurrently.
-  override val munitTimeout = scala.concurrent.duration.Duration(30, "minutes")
 
   val logger = Logger(getClass())
 

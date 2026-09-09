@@ -1,6 +1,7 @@
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors. Apache 2.0 */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
@@ -8,7 +9,6 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -19,7 +19,7 @@ import scala.collection.immutable.TreeSet
   * Tests JvmDistribution.release file parsing, vendor detection, pURL
   * generation, metadata emission, and package tagging.
   */
-class JvmDistributionSuite extends FunSuite {
+class JvmDistributionSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty, None, None)

@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +15,6 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoDetector
-import munit.FunSuite
 
 /** Phase 0 (0.6) — CryptoDetector DER/PKCS#12 graceful failure paths.
   *
@@ -50,7 +50,7 @@ import munit.FunSuite
   * | random non-PKCS12 data              | random bytes              | Set.empty, no pkcs12 |
   * | valid PKCS#12 via .p12 extension    | 0x30 0x82 + .p12 name     | contains pkcs12      |
   */
-class CryptoDetectorDerSuite extends FunSuite {
+class CryptoDetectorDerSuite extends GoatRodeoFunSuite {
 
   private def detect(
       bytes: Array[Byte],

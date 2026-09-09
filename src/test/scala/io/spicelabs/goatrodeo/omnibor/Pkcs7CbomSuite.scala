@@ -1,10 +1,10 @@
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -26,7 +26,7 @@ import java.nio.file.Files
   * LLM note: uses `ToProcess.buildGraphFromArtifactWrapper` +
   * `CbomEmitter.emitForStorage` — the real pipeline, no mocks.
   */
-class Pkcs7CbomSuite extends FunSuite {
+class Pkcs7CbomSuite extends GoatRodeoFunSuite {
 
   given Configuration = Configuration()
 

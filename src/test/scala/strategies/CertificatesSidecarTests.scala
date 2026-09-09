@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -42,7 +42,7 @@ import java.nio.file.Files
   *   - "wrong type on required field throws" — e.g., `itemCount: "one"`
   *     (string) must be rejected, not coerced.
   */
-class CertificatesSidecarTests extends FunSuite {
+class CertificatesSidecarTests extends GoatRodeoFunSuite {
 
   private def writeSidecar(json: String): File = {
     val f = File.createTempFile("sidecar-", ".expected.json")

@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.Configuration
-import munit.FunSuite
 import org.eclipse.jgit.api.Git
 
 import java.io.File
@@ -21,7 +21,7 @@ import java.nio.file.Files
   * LLM note: exercises the real Builder path with a JGit-created fixture repo;
   * reads the written GRD/GRC via GraphManager to inspect Items.
   */
-class GitTaggedRunIntegrationSuite extends FunSuite {
+class GitTaggedRunIntegrationSuite extends GoatRodeoFunSuite {
 
   private def tempDir(prefix: String): File =
     Files.createTempDirectory(prefix).toFile

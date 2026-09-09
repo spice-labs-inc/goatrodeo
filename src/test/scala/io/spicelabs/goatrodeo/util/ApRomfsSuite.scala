@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.File
 
@@ -36,7 +36,7 @@ import java.io.File
   *
   * LLM note: AR-x = test id.
   */
-class ApRomfsSuite extends FunSuite {
+class ApRomfsSuite extends GoatRodeoFunSuite {
 
   private val arducopter =
     new File("test_data/firmware-images/ardupilot/arducopter")

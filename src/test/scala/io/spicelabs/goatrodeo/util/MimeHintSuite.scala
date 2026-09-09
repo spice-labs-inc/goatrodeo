@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
@@ -20,7 +20,7 @@ import java.nio.file.Files
   * LLM note: uses the public ArtifactWrapper API only. The hint parameter on
   * newWrapper defaults to None so all existing call sites are unchanged (T5.6).
   */
-class MimeHintSuite extends FunSuite {
+class MimeHintSuite extends GoatRodeoFunSuite {
 
   private val hint = "application/pkcs7-signature"
 

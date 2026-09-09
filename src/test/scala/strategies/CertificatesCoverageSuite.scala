@@ -2,8 +2,8 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -28,7 +28,7 @@ import scala.jdk.CollectionConverters.*
   * (sig-alg), (cert-type), (envelope), (mime), (Phase-2 detector), etc. Then
   * check each required cell against the observed set.
   */
-class CertificatesCoverageSuite extends FunSuite {
+class CertificatesCoverageSuite extends GoatRodeoFunSuite {
 
   private val corpusRoot = new File("test_data/certificates")
 

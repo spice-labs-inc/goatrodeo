@@ -2,6 +2,7 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
@@ -9,7 +10,6 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.File
 import java.io.FileOutputStream
@@ -17,7 +17,7 @@ import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-class MavenPhase5Suite extends FunSuite {
+class MavenPhase5Suite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, scala.collection.immutable.TreeSet.empty, None, None)

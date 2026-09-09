@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.apache.commons.io.FileUtils
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
@@ -32,7 +31,7 @@ import scala.collection.immutable.TreeSet
   * conventions (line continuations, escapes, whitespace), tolerates malformed
   * input, and respects the read budget.
   */
-class JavaSecurityParserSuite extends FunSuite with ScalaCheckSuite {
+class JavaSecurityParserSuite extends GoatRodeoScalaCheckSuite {
 
   private def parse(text: String): JavaSecurityData = {
     JavaSecurityParser.parseString(text).get

@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 
@@ -42,7 +42,7 @@ import java.io.File
   * If the fixture bytes ever change, the expected values must be regenerated
   * from `ssh-keygen -L -f <fixture>` and committed alongside the fixture.
   */
-class SshCertMetadataReferenceTests extends FunSuite {
+class SshCertMetadataReferenceTests extends GoatRodeoFunSuite {
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)

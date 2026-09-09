@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -25,7 +26,7 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class GenericTestSuite extends munit.FunSuite {
+class GenericTestSuite extends GoatRodeoFunSuite {
 
   def createTestItem(id: String): Item = {
     Item(

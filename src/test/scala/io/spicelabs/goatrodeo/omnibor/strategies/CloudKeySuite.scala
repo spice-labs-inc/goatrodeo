@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 /** Tests for [[CloudKeyStrategy]]: cloud-managed key references in config/IaC
   * files (AWS KMS, Azure Key Vault, GCP Cloud KMS, HashiCorp Vault).
@@ -23,7 +23,7 @@ import munit.FunSuite
   * Hard rule under test: identifiers (ARNs/URLs) are emitted; key material and
   * credentials are never emitted (presence flag only; Vault URLs sanitized).
   */
-class CloudKeySuite extends FunSuite {
+class CloudKeySuite extends GoatRodeoFunSuite {
 
   private val awsArn =
     "arn:aws:kms:us-west-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab"

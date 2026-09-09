@@ -1,4 +1,5 @@
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.cilantro.DotnetAssemblyProbe
@@ -7,7 +8,6 @@ import io.spicelabs.goatrodeo.util.DotnetDetector
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -41,7 +41,7 @@ import scala.util.Try
   * fixtures are the real assemblies in test_data/ (Smoke.dll, hackproj.dll).
   * Hostile inputs are inline bytes.
   */
-class DotnetStreamingSuite extends FunSuite {
+class DotnetStreamingSuite extends GoatRodeoFunSuite {
 
   private def fileWrapper(name: String): ArtifactWrapper =
     FileWrapper(new File(name), name, None, _ => ())

@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
@@ -76,7 +76,7 @@ import java.util.Date
   * All tests pass after the remaining string-concat sites are replaced with
   * `PackageURLBuilder` construction.
   */
-class PurlConstructionTests extends FunSuite {
+class PurlConstructionTests extends GoatRodeoFunSuite {
 
   if (Security.getProvider("BC") == null) {
     Security.addProvider(

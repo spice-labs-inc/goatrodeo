@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
@@ -24,7 +25,6 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import munit.FunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
@@ -39,7 +39,7 @@ import scala.collection.immutable.TreeSet
   * detection, chain-head exposure), the CBOM filename format, the `.grc` `info`
   * additions, and the run-level checksum file.
   */
-class TamperEvidentSuite extends FunSuite {
+class TamperEvidentSuite extends GoatRodeoFunSuite {
 
   private def tempDir(): File =
     Files.createTempDirectory("tamper-test").toFile()

@@ -1,8 +1,8 @@
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.GitRunInfo
-import munit.FunSuite
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants
 
@@ -41,7 +41,7 @@ import java.nio.file.Files
   * or removed entry fails the equality assert. Reading never changes mtimes;
   * only writes do.
   */
-class GitReadOnlyInvariantSuite extends FunSuite {
+class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
 
   private def tempDir(prefix: String): File =
     Files.createTempDirectory(prefix).toFile

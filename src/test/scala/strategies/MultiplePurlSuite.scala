@@ -2,11 +2,11 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOIDUtils
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -41,7 +41,7 @@ import scala.jdk.CollectionConverters.*
   * that every pURL the reference scanner found is present in the JAR's
   * `alias:from` connections.
   */
-class MultiplePurlSuite extends FunSuite {
+class MultiplePurlSuite extends GoatRodeoFunSuite {
 
   test("JSON resource loads correctly") {
     val entries = MultiplePurlSuite.referenceEntries

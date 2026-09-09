@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import com.typesafe.scalalogging.Logger
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -48,7 +48,7 @@ import scala.jdk.CollectionConverters.*
   * make a real wrapper throw; the never-raise property is therefore pinned by
   * behavior on real wrappers plus the source scans.
   */
-class AdaptiveMimeBuilderSuite extends FunSuite {
+class AdaptiveMimeBuilderSuite extends GoatRodeoFunSuite {
 
   private val logger = Logger(getClass.getName)
 

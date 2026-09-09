@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -21,8 +22,6 @@ import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.CarvedCertAugmenter
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -47,7 +46,7 @@ import scala.collection.immutable.TreeSet
   *
   * LLM note: C-x = test id.
   */
-class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
+class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
 
   private val dir = "test_data/carved-certs"
 

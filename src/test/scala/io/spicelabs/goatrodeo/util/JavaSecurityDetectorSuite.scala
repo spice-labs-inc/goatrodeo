@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -25,7 +24,7 @@ import org.scalacheck.Prop.forAll
   * files by their content, ignores non-security text and binary data, and is
   * purely additive.
   */
-class JavaSecurityDetectorSuite extends FunSuite with ScalaCheckSuite {
+class JavaSecurityDetectorSuite extends GoatRodeoScalaCheckSuite {
 
   private val expectedMime = JavaSecurityDetector.JavaSecurityMimeType
 

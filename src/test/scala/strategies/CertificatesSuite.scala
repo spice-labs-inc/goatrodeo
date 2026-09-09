@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 /** Per-fixture parameterized test suite for the Certificates strategy.
   *
@@ -45,7 +45,7 @@ import munit.FunSuite
   * pending placeholders here when fixtures exist but the strategy is not yet
   * producing the expected Items.
   */
-class CertificatesSuite extends FunSuite {
+class CertificatesSuite extends GoatRodeoFunSuite {
 
   /** Is the Certificates strategy class registered on the classpath? Phase 1's
     * first commit creates

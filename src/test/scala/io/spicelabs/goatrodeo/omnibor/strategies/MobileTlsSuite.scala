@@ -13,11 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
@@ -26,7 +26,7 @@ import scala.collection.immutable.TreeSet
   * Verifies Android network-security-config cleartext/trust flags, manifest
   * usesCleartextTraffic, Apple ATS exceptions, and JDK crypto.policy capture.
   */
-class MobileTlsSuite extends FunSuite {
+class MobileTlsSuite extends GoatRodeoFunSuite {
 
   private val mt = MKC.adHoc("MobileTls")
   private val js = MKC.adHoc("java.security")

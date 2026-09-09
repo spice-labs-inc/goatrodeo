@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +21,6 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.testsupport.LogCapture
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.File
 import java.io.FileInputStream
@@ -55,7 +55,7 @@ import scala.util.Try
   * |:-------------------|:-------------------------------------|:----------------------|
   * | corrupt CBOR entry | write valid GRD, corrupt entry bytes | readNext returns None |
   */
-class GraphManagerReadNextSuite extends FunSuite {
+class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item = {
     Item(
@@ -283,7 +283,7 @@ class GraphManagerReadNextSuite extends FunSuite {
   * list + EOF marker + back-pointer tail) so each negative value is exercised
   * exactly. Real round-trips via `GraphManager.writeEntries`.
   */
-class GrdEofSuite extends FunSuite {
+class GrdEofSuite extends GoatRodeoFunSuite {
 
   private def validGrdWithFirstEntryLength(entryLen: Int): Array[Byte] = {
     // Build a real GRD with one item, then patch the first entry-length field.

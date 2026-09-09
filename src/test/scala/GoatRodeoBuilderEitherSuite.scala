@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
 
 /** Phase 0 (0.3) — GoatRodeoBuilder.withTagDate Either-return contract.
   *
@@ -46,7 +46,7 @@ import munit.FunSuite
   * | valid date      | "2024-01-15"            | Right(builder)            |
   * | preserves state | invalid after valid tag | builder.tagDate unchanged |
   */
-class GoatRodeoBuilderEitherSuite extends FunSuite {
+class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
 
   test("GoatRodeoBuilder - withTagDate returns Left for invalid date") {
 

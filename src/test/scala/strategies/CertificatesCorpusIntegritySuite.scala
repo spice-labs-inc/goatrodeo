@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 /** Structural-integrity assertions on the Certificates fixture corpus.
   *
@@ -60,7 +60,7 @@ import munit.FunSuite
   *   - Test `no orphan fixtures` → phase-0-corpus.md task #4 sourcing protocol.
   *   - Test `every sidecar parses` → phase-0-corpus.md sub-goal #1 (schema).
   */
-class CertificatesCorpusIntegritySuite extends FunSuite {
+class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
 
   test("corpus root exists") {
     assert(

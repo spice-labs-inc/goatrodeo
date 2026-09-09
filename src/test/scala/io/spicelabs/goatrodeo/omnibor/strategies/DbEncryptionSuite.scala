@@ -13,12 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoContentDetector
-import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -31,7 +31,7 @@ import scala.collection.immutable.TreeSet
   * Hard rule under test: key file contents and key VALUES are never read or
   * emitted — only presence, paths, declared algorithms, and backends.
   */
-class DbEncryptionSuite extends FunSuite {
+class DbEncryptionSuite extends GoatRodeoFunSuite {
 
   private def metadata(
       name: String,

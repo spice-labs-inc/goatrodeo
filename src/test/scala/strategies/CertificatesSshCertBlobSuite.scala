@@ -2,8 +2,8 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets
   * SSH wire format helper: strings are encoded as 4-byte big-endian length
   * followed by UTF-8 bytes.
   */
-class CertificatesSshCertBlobSuite extends FunSuite {
+class CertificatesSshCertBlobSuite extends GoatRodeoFunSuite {
 
   private def sshString(s: String): Array[Byte] = {
     val bytes = s.getBytes(StandardCharsets.UTF_8)

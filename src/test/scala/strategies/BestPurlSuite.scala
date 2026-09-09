@@ -2,10 +2,10 @@
    Apache 2.0 */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -38,7 +38,7 @@ import scala.collection.immutable.TreeSet
   * manifest/filename combinations and asserts the resulting
   * groupId/artifactId/version matches a real Maven Central coordinate.
   */
-class BestPurlSuite extends FunSuite {
+class BestPurlSuite extends GoatRodeoFunSuite {
 
   /** Tests that field-level merge produces a Maven Central pURL for
     * commons-codec-1.2.jar (from wps-demo-1.3.0.war).

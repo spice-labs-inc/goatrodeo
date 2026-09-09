@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +17,6 @@ import io.spicelabs.goatrodeo.omnibor.strategies.DockerMarkers
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerState
 import io.spicelabs.goatrodeo.omnibor.strategies.ManifestInfo
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 import org.json4s.*
 import org.json4s.JsonAST.*
 
@@ -50,7 +50,7 @@ import org.json4s.JsonAST.*
   * | two component split    | "ns/path".split("/").toList     | List("ns", "path")        |
   * | three component split  | "ns/sub/path".split("/").toList | List("ns", "sub", "path") |
   */
-class DockerTagSplitSuite extends FunSuite {
+class DockerTagSplitSuite extends GoatRodeoFunSuite {
 
   test("Docker - empty base split handled gracefully") {
 

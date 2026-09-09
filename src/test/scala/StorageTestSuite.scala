@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +24,7 @@ import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class StorageTestSuite extends munit.FunSuite {
+class StorageTestSuite extends GoatRodeoFunSuite {
 
   def createTestItem(id: String, fileNames: Set[String] = Set()): Item = {
     Item(

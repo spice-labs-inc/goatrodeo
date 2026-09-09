@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,7 +29,7 @@ import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class ToProcessTestSuite extends munit.FunSuite {
+class ToProcessTestSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.

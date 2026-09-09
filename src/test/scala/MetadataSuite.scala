@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2025-2026 Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,7 +31,7 @@ object MetadataSuite {
   val failSop = TreeSet(StringOrPair("fail"))
 
 }
-class MetadataSuite extends munit.FunSuite {
+class MetadataSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.

@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
 
 import java.io.File
 import java.nio.file.Paths
@@ -26,7 +26,7 @@ import java.nio.file.Paths
   * `--cbom-version`) parse correctly via `ConfigurationParser.parser`, reject
   * invalid input, and are accessible from the programmatic builder API.
   */
-class ConfigCbomFlagsSuite extends FunSuite {
+class ConfigCbomFlagsSuite extends GoatRodeoFunSuite {
 
   private def parse(args: String*): Option[Configuration] = {
     ConfigurationParser.parse(args.toArray)

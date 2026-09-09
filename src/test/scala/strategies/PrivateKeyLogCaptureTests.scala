@@ -2,12 +2,12 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 import scala.collection.immutable.TreeMap
@@ -34,7 +34,7 @@ import scala.collection.immutable.TreeSet
   * If either property fails, the relevant log records are dumped so the failing
   * call can be located.
   */
-class PrivateKeyLogCaptureTests extends FunSuite {
+class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
 
   import ch.qos.logback.classic.spi.ILoggingEvent
   import io.spicelabs.goatrodeo.testsupport.LogCapture

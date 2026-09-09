@@ -2,6 +2,7 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
@@ -10,7 +11,6 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.File
 import java.io.FileOutputStream
@@ -41,7 +41,7 @@ import scala.collection.immutable.TreeSet
 // gets its own accumulator lifecycle, resolves groupId/artifactId/version
 // from its own metadata, and emits pURLs with the correct classifier
 // (?packaging=sources or ?classifier=javadoc).
-class SourcesJavadocSuite extends FunSuite {
+class SourcesJavadocSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty, None, None)

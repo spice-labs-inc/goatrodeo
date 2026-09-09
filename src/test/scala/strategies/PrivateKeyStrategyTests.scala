@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
-import munit.FunSuite
 
 import java.io.File
 
@@ -59,7 +59,7 @@ import java.io.File
   * assertions on the materialized sidecar which iterates the entire
   * openssh-key-v1 envelope.
   */
-class PrivateKeyStrategyTests extends FunSuite {
+class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)

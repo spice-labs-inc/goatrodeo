@@ -2,10 +2,10 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -28,7 +28,7 @@ import java.io.File
   * sources/javadoc. Tests 2.5-2.10 cover edge cases.
   */
 
-class Phase2CanonicalPrioritySuite extends FunSuite {
+class Phase2CanonicalPrioritySuite extends GoatRodeoFunSuite {
 
   /** Helper: find all CanonicalPurl values in the store's items. */
   private def findCanonicalPurls(
@@ -581,7 +581,7 @@ class Phase2CanonicalPrioritySuite extends FunSuite {
 // Property-Based Test 2.11: Companion POM is always highest priority
 // =============================================================================
 
-class Phase2PropertySuite extends ScalaCheckSuite {
+class Phase2PropertySuite extends GoatRodeoScalaCheckSuite {
 
   /** Generator for groupId strings. */
   val genGroupId: Gen[String] = for {

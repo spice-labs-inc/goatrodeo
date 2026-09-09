@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +25,7 @@ limitations under the License. */
   * commit SHA matches the current git HEAD, the Maven resource-filtering
   * template produced a faithful replacement for sbt-buildinfo.
   */
-class BuildInfoTest extends munit.FunSuite {
+class BuildInfoTest extends GoatRodeoFunSuite {
 
   test("BuildInfo.name matches the sbt project name") {
     assertEquals(hellogoat.BuildInfo.name, "goatrodeo")

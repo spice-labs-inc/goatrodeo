@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +16,7 @@ limitations under the License. */
 import java.io.File
 import scala.sys.process.*
 
-class FatJarExecutionTest extends munit.FunSuite {
+class FatJarExecutionTest extends GoatRodeoFunSuite {
 
   test("fat JAR must execute without SecurityException") {
     val fatJarFile =

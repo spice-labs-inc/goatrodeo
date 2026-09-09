@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +33,7 @@ import scala.jdk.CollectionConverters.*
   * and asserts it is non-empty, guarding against a future regression where the
   * compiler flag is accidentally removed.
   */
-class SemanticDBTest extends munit.FunSuite {
+class SemanticDBTest extends GoatRodeoFunSuite {
 
   test("SemanticDB files are generated") {
     val semanticDbRoot = List(

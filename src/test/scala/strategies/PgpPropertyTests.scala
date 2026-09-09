@@ -2,12 +2,12 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -60,7 +60,7 @@ import scala.collection.immutable.TreeSet
   * mismatches). These reformulated properties actually catch realistic bug
   * classes.
   */
-class PgpPropertyTests extends ScalaCheckSuite {
+class PgpPropertyTests extends GoatRodeoScalaCheckSuite {
 
   /** All `.asc` PGP fixtures in the corpus. The property tests run against
     * every one.

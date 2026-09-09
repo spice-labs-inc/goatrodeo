@@ -1,6 +1,6 @@
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -22,7 +22,7 @@ import java.nio.file.Files
   * unreadable one is skipped, and a readable non-dot root-owned file is
   * discovered (unchanged).
   */
-class UserReadyToleranceSuite extends FunSuite {
+class UserReadyToleranceSuite extends GoatRodeoFunSuite {
 
   private def treeWithMarker(
       root: File,

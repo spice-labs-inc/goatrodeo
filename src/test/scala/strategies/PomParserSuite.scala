@@ -3,10 +3,10 @@
  */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
 
-class PomParserSuite extends FunSuite {
+class PomParserSuite extends GoatRodeoFunSuite {
 
   // 2.1 PomParser basics
   test("PomParser - parses simple POM") {

@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
 import io.spicelabs.goatrodeo.util.Configuration
@@ -54,11 +55,10 @@ import java.nio.file.Files
   * the build fetches them from the registries only when missing, and skips the
   * fetch (and thus these tests) where docker is unavailable.
   */
-class OciDockerParitySuite extends munit.FunSuite {
+class OciDockerParitySuite extends GoatRodeoFunSuite {
 
   // Parsing the ~450 MB postgres tarballs (twice, docker + OCI) exceeds the
   // munit default timeout, as in DockerSuite.
-  override val munitTimeout = scala.concurrent.duration.Duration(30, "minutes")
 
   private val alpineLayoutDir = new File("test_data/download/oci_images/alpine")
   private val postgresLayoutDir =

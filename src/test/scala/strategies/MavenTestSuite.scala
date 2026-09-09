@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
@@ -31,7 +32,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.xml.NodeSeq
 
-class MavenTestSuite extends munit.FunSuite {
+class MavenTestSuite extends GoatRodeoFunSuite {
 
   val pomXml = """<?xml version="1.0" encoding="UTF-8"?>
 <project>

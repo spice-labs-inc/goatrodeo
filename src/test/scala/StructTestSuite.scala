@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +25,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class StructTestSuite extends munit.FunSuite {
+class StructTestSuite extends GoatRodeoFunSuite {
 
   // ==================== EdgeType Predicate Tests ====================
 

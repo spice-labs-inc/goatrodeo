@@ -1,8 +1,8 @@
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 /** Phase 2 — single Certificates strategy entry (spec §4, user decision 3;
   * T6.8).
@@ -19,7 +19,7 @@ import munit.FunSuite
   * artifact and counts the non-terminal claimers. Dispatch positions are pinned
   * by construction (GenericFile is always last).
   */
-class SingleCertificatesStrategySuite extends FunSuite {
+class SingleCertificatesStrategySuite extends GoatRodeoFunSuite {
 
   private def nonTerminalClaimers(hint: String): Vector[Int] = {
     val wrapper =

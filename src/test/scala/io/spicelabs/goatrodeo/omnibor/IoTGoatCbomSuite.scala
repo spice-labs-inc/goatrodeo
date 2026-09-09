@@ -13,15 +13,16 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
 import java.nio.file.Files
-import scala.concurrent.duration.Duration
+// (the uniform 60-minute suite timeout of GoatRodeoFunSuite applies; no
+// per-suite cap is set here)
 import scala.util.Try
 
 /** T4.5 — Discovery-driven CBOM regression test for the IoTGoat x86 firmware.
@@ -49,12 +50,9 @@ import scala.util.Try
   * asserts that every one of those items is represented as a CycloneDX
   * cryptographic-asset component in the emitted CBOM.
   */
-class IoTGoatCbomSuite extends FunSuite {
+class IoTGoatCbomSuite extends GoatRodeoFunSuite {
 
   private val fixture = new File("test_data/IoTGoat-x86.img.gz")
-
-  override val munitTimeout: Duration = Duration(5, "minutes")
-
   private def deleteRecursive(dir: File): Unit = {
     if (dir.exists()) {
       Files

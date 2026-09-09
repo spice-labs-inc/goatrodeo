@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +25,7 @@ import java.io.File
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
-class ISOFileSuite extends munit.FunSuite {
+class ISOFileSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.

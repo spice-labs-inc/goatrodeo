@@ -2,8 +2,8 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-import munit.FunSuite
-import munit.ScalaCheckSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -28,7 +28,7 @@ import java.io.File
  *   The fix passes the same `classifier` variable used for the canonical
  *   pURL.
  */
-class Phase4SecondaryClassifierSuite extends FunSuite {
+class Phase4SecondaryClassifierSuite extends GoatRodeoFunSuite {
 
   // =========================================================================
   // Test 4.1: All pURLs from sources JAR have sources classifier
@@ -522,7 +522,7 @@ class Phase4SecondaryClassifierSuite extends FunSuite {
  *   - Property 4.9: For any sources JAR, all pURLs share the same classifier
  *   - Property 4.10: For any javadoc JAR, all pURLs share the same classifier
  */
-class Phase4SecondaryClassifierPropertySuite extends ScalaCheckSuite {
+class Phase4SecondaryClassifierPropertySuite extends GoatRodeoScalaCheckSuite {
 
   private val genGroupId: Gen[String] = Gen.oneOf(
     "com.example",

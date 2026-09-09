@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -28,7 +27,7 @@ import scala.collection.immutable.TreeSet
   * follows `ssl_conf` indirection, records `.include` references, handles
   * malformed input without throwing, and respects the read budget.
   */
-class OpenSSLConfigParserSuite extends FunSuite with ScalaCheckSuite {
+class OpenSSLConfigParserSuite extends GoatRodeoScalaCheckSuite {
 
   private def parse(text: String): OpenSSLConfigData = {
     OpenSSLConfigParser.parseString(text).get

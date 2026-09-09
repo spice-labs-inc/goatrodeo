@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -20,7 +21,6 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 import scala.collection.immutable.TreeMap
@@ -49,7 +49,7 @@ import scala.collection.immutable.TreeSet
   *
   * LLM note: K-C-xx = test id.
   */
-class JksCorpusKeystoreSuite extends FunSuite {
+class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
 
   private val v1Dir = "test_data/certificates/keystores/synthetic/jks-v1"
   private val v2Dir = "test_data/certificates/keystores/synthetic/jks-v2"

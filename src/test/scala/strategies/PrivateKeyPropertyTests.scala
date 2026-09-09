@@ -2,12 +2,12 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -47,7 +47,7 @@ import scala.collection.immutable.TreeSet
   * or a log message about encryption status beyond what's in the metadata."
   * These properties pin the uniform parts of that contract.
   */
-class PrivateKeyPropertyTests extends ScalaCheckSuite {
+class PrivateKeyPropertyTests extends GoatRodeoScalaCheckSuite {
 
   private val pkFixtures: Seq[File] = {
     val root = Paths.get("test_data/certificates/private-keys")

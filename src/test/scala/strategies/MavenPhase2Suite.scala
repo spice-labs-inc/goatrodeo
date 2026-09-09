@@ -9,6 +9,7 @@
  */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.Edge
 import io.spicelabs.goatrodeo.omnibor.Item
@@ -17,11 +18,10 @@ import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.PomParser
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
-class MavenPhase2Suite extends FunSuite {
+class MavenPhase2Suite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item = Item(
     id,

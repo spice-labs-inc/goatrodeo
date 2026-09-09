@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +17,7 @@ import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.PURLHelpers.Ecosystems
 
-class PURLHelpersTestSuite extends munit.FunSuite {
+class PURLHelpersTestSuite extends GoatRodeoFunSuite {
 
   // ==================== mavenQualifiers Tests ====================
 

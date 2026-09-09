@@ -1,7 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 import scala.util.Try
@@ -23,7 +23,7 @@ import scala.util.Try
   * LLM note: `classifyAndParse` is the internal dispatch; the suite also checks
   * the public claim path via ToProcess/strategies when feasible.
   */
-class CertificatesPkcs7Suite extends FunSuite {
+class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
 
   private val pkcs7Mime =
     io.spicelabs.goatrodeo.omnibor.strategies.Certificates.CertPkcs7Mime

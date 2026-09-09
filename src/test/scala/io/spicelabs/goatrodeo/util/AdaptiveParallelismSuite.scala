@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Prop.propBoolean
@@ -41,7 +40,7 @@ import org.scalacheck.Prop.propBoolean
   * The clamping tests (T-AP-02) pin R6: the constructor never raises, invalid
   * parameters are coerced, and the production defaults are byte-identical.
   */
-class AdaptiveParallelismSuite extends FunSuite with ScalaCheckSuite {
+class AdaptiveParallelismSuite extends GoatRodeoScalaCheckSuite {
 
   /** Fill `windowSize` completions with the given synthetic nanos. */
   private def windowOf(c: AdaptiveParallelism, nanos: Long): Unit = {

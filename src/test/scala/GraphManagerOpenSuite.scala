@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +18,6 @@ import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -52,7 +52,7 @@ import scala.util.Try
   * |:------------|:-------------|:-------------------------------|
   * | wrong magic | 0xDEADBEEF   | Failure (not thrown exception) |
   */
-class GraphManagerOpenSuite extends FunSuite {
+class GraphManagerOpenSuite extends GoatRodeoFunSuite {
 
   test("GRDWalker - open returns Failure for wrong magic number") {
 

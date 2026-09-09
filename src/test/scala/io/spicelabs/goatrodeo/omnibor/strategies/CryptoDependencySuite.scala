@@ -13,11 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
@@ -27,7 +27,7 @@ import scala.collection.immutable.TreeSet
   * precision (non-crypto deps are not emitted), version capture, the
   * recognized-but-unmapped flag, and the totality of the mapping table.
   */
-class CryptoDependencySuite extends FunSuite {
+class CryptoDependencySuite extends GoatRodeoFunSuite {
 
   private val adHoc = MKC.adHoc("CryptoDependency")
 
