@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Provision test fixtures that the suite reads but git does not carry inline.
 #
-# Ported from the `Tests.Setup` hooks that used to live in build.sbt. Run this
-# once before `mvn test` (or `sbt test`); it is idempotent and skips anything
-# already present. PreflightSuite points here when data is missing.
+# Mirrors the `Tests.Setup` hooks in build.sbt, for when you want the data
+# without running `sbt test`; it is idempotent and skips anything already
+# present. PreflightSuite points here when data is missing.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

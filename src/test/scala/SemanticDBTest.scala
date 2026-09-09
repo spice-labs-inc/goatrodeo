@@ -25,25 +25,21 @@ import scala.jdk.CollectionConverters.*
   * consumers can operate on this project.
   *
   * Theory: compiling a non-empty Scala source tree with `-Ysemanticdb` places
-  * at least one `.semanticdb` file under the SemanticDB target root. sbt writes
-  * to `target/scala-3.8.3/meta/META-INF/semanticdb` (the default
-  * `semanticdbTargetRoot`); the alternative Maven build writes to
-  * `target/classes/META-INF/semanticdb`. This test scans whichever root exists
-  * and asserts it is non-empty, guarding against a future regression where the
-  * compiler flag is accidentally removed.
+  * at least one `.semanticdb` file under the SemanticDB target root, which sbt
+  * places at `target/scala-3.8.3/meta/META-INF/semanticdb` (the default
+  * `semanticdbTargetRoot`). This test asserts that root exists and is
+  * non-empty, guarding against a future regression where the compiler flag is
+  * accidentally removed.
   */
 class SemanticDBTest extends munit.FunSuite {
 
   test("SemanticDB files are generated") {
-    val semanticDbRoot = List(
-      // sbt layout
-      new File("target/scala-3.8.3/meta/META-INF/semanticdb"),
-      // Maven layout
-      new File("target/classes/META-INF/semanticdb")
-    ).find(_.isDirectory)
+    val semanticDbRoot = Some(
+      new File("target/scala-3.8.3/meta/META-INF/semanticdb")
+    ).filter(_.isDirectory)
     assert(
       semanticDbRoot.isDefined,
-      "Expected a SemanticDB root under either target/scala-3.8.3/meta/... or target/classes/..."
+      "Expected a SemanticDB root under target/scala-3.8.3/meta/META-INF/semanticdb"
     )
 
     val files = Files

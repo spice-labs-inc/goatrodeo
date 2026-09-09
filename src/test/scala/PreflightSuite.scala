@@ -19,9 +19,9 @@ import java.nio.file.Files
   * of a pile of cryptic "not a valid zip" / FileNotFound failures scattered
   * across the suite.
   *
-  * The sbt build used to `git lfs pull` and download fixtures automatically in
-  * a `Tests.Setup` hook. Under Maven the build tool stays out of provisioning;
-  * this check tells you exactly what to run instead.
+  * The sbt build normally runs `git lfs pull` and downloads fixtures in its
+  * `Tests.Setup` hooks. If those were skipped or failed, this check tells you
+  * exactly what to run by hand.
   */
 class PreflightSuite extends munit.FunSuite {
 
