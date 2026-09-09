@@ -178,14 +178,19 @@ def machineRamBytes: Long = {
   }
 }
 
-Test / javaOptions ++= Seq(
-  {
-    val half = machineRamBytes / 2
-    val heap =
-      math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
-    s"-Xmx${heap}"
-  }
-)
+// The heap value is computed eagerly at build-definition load time rather than
+// as a lazy lambda inside `++=` — a generated lambda class in the meta-build
+// is what caused `NoClassDefFoundError: $<hash>$` at `Test / javaOptions`
+// evaluation on machines with a stale `project/target` (the class name changes
+// on every build.sbt edit, leaving orphaned references behind).
+val testHeap: String = {
+  val half = machineRamBytes / 2
+  val heap =
+    math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
+  s"-Xmx${heap}"
+}
+
+Test / javaOptions ++= Seq(testHeap)
 
 ThisBuild / scalacOptions ++=
   Seq(
