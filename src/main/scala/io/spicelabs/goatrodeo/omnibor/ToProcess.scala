@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor
 
+import scala.util.Try
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.AdaptiveMimeBuilder
@@ -910,16 +911,20 @@ object ToProcess {
               excludeFileRegex.find(p => p.matcher(name).find).isEmpty
             }
 
-          } yield FileWrapper(
-            file,
-            if (fsFilePaths) {
-              val ap = file.toPath().toAbsolutePath().normalize().toString()
-              if (ap.startsWith(basePath)) ap.substring(basePathLen + 1)
-              else ap.substring(1)
-            } else file.getName(),
-            tempDir,
-            finishedFile
-          )).toVector
+            // wrap the FileWrapper creation in a try
+            wrappedFile <- Try {
+              FileWrapper(
+                file,
+                if (fsFilePaths) {
+                  val ap = file.toPath().toAbsolutePath().normalize().toString()
+                  if (ap.startsWith(basePath)) ap.substring(basePathLen + 1)
+                  else ap.substring(1)
+                } else file.getName(),
+                tempDir,
+                finishedFile
+              )
+            }.toOption.toVector
+          } yield wrappedFile).toVector
 
         logger.info(f"Found all files, count ${allFiles.length}%,d")
 
