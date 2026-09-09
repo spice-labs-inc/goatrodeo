@@ -85,16 +85,6 @@ java -jar target/scala-3.8.3/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/
 
 > **Requirements:** Java 21+, Git LFS
 
-A Maven build (`pom.xml`) is also kept in the tree as an alternative:
-
-```bash
-mvn -DskipTests package
-java -jar target/scala-3.8.3/goatrodeo-*-fat.jar -b /path/to/artifacts -o /path/to/output
-```
-
-See [docs/maven-build.md](docs/maven-build.md) for Maven test tuning, publishing, and
-troubleshooting.
-
 ### Option 4: As a Library
 
 **Maven:**
