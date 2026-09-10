@@ -11,9 +11,11 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
 import java.math.BigInteger
+import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -76,12 +78,11 @@ class CertificatesKeystoreKeyEntrySuite extends GoatRodeoFunSuite {
 
   if (Security.getProvider("BC") == null) {
     Security.addProvider(
-      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      new BouncyCastleProvider()
     )
   }
 
-  private def generateSelfSignedCert()
-      : (java.security.KeyPair, X509Certificate) = {
+  private def generateSelfSignedCert(): (KeyPair, X509Certificate) = {
     val kpg = KeyPairGenerator.getInstance("RSA", "BC")
     kpg.initialize(2048, new SecureRandom())
     val kp = kpg.generateKeyPair()

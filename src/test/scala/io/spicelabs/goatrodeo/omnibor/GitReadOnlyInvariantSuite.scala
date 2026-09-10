@@ -3,10 +3,15 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.GitRunInfo
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.PersonIdent
 
 import java.io.File
+import java.io.FileInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.time.Instant
+import java.util.Date
+import scala.collection.mutable.ArrayBuffer
 
 /** Hard invariant: Goat Rodeo NEVER modifies git files. Scanned repositories
   * are strictly read-only — provenance capture reads the HEAD commit and HEAD
@@ -54,7 +59,7 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
       new File("a.txt").toPath
     )
     val git = Git.init().setDirectory(root).setInitialBranch("main").call()
-    val ident = new org.eclipse.jgit.lib.PersonIdent("T", "t@example.com")
+    val ident = new PersonIdent("T", "t@example.com")
     git.add().addFilepattern(".").call()
     // Fixture commits must never sign. JGit inherits the developer's global
     // git config; `commit.gpgsign=true` plus `gpg.format=ssh` (a common SSH
@@ -82,7 +87,7 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
       gitDir: File
   ): Vector[(String, String, Long, Long)] = {
     val out =
-      scala.collection.mutable.ArrayBuffer[(String, String, Long, Long)]()
+      ArrayBuffer[(String, String, Long, Long)]()
     def walk(dir: File, prefix: String): Unit = {
       val children = Option(dir.listFiles()).getOrElse(Array.empty[File])
       children.sortBy(_.getName).foreach { f =>
@@ -100,9 +105,9 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
   private def readItems(out: File): Vector[Item] = {
     val grc = out.listFiles().filter(_.getName.endsWith(".grc")).headOption
     assert(grc.isDefined, "grc must exist")
-    val items = scala.collection.mutable.ArrayBuffer[Item]()
+    val items = ArrayBuffer[Item]()
     out.listFiles().filter(_.getName.endsWith(".grd")).foreach { grd =>
-      val channel = new java.io.FileInputStream(grd).getChannel
+      val channel = new FileInputStream(grd).getChannel
       try {
         val walker = new GRDWalker(channel)
         walker.open().get
@@ -138,7 +143,7 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
       build = Vector(repo),
       tag = Some("run-1"),
       tagDate = Some(
-        java.util.Date.from(java.time.Instant.parse("2026-09-02T00:00:00Z"))
+        Date.from(Instant.parse("2026-09-02T00:00:00Z"))
       ),
       out = Some(out)
     )

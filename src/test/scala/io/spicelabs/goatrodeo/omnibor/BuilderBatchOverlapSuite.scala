@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.nio.file.Files
+import java.util.Comparator
 
 /** Tests for the batch wind-down overlap in [[Builder]].
   *
@@ -34,7 +35,7 @@ class BuilderBatchOverlapSuite extends GoatRodeoFunSuite {
     if (dir != null && dir.exists()) {
       Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(p => Files.deleteIfExists(p))
       ()
     }

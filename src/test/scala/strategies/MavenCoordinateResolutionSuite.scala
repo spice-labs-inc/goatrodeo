@@ -23,6 +23,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 class MavenCoordinateResolutionSuite extends GoatRodeoFunSuite {
 
@@ -1247,7 +1248,7 @@ class MavenCoordinateResolutionSuite extends GoatRodeoFunSuite {
     */
   test("security: filename with special characters does not crash") {
     val state = MavenState()
-    val result = scala.util.Try {
+    val result = Try {
       state.resolveGroupIdArtifactIdVersion(
         ByteWrapper(Array.emptyByteArray, "mylib%2Fevil-1.0.jar", None),
         None,

@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
+import java.util.Date
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.ListHasAsScala
@@ -127,11 +128,9 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
     // baharat returns a com.github.packageurl.PackageURL; convert to
     // io.spicelabs.coordinates.Purl via string round-trip.
     // Wrap in Try — a malformed pURL should not abort processing.
-    scala.util
-      .Try {
-        pkg.metadata().purl()
-      }
-      .toOption
+    Try {
+      pkg.metadata().purl()
+    }.toOption
       .map(p => PurlSet.single(p))
       .getOrElse(PurlSet.empty) -> this
   }
@@ -259,8 +258,8 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
     val metadata = pkg.metadata()
     val buildTime = metadata.buildTime()
 
-    val date: Option[java.util.Date] = buildTime.toScala.map { instant =>
-      new java.util.Date(instant.toEpochMilli())
+    val date: Option[Date] = buildTime.toScala.map { instant =>
+      new Date(instant.toEpochMilli())
     }
 
     Some(

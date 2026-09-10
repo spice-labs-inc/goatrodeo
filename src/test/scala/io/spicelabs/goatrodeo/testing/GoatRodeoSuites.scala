@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.testing
 
+import scala.concurrent.duration.Duration
+
 /** Base class for Goat Rodeo test suites.
   *
   * Goat Rodeo's integration tests are CPU-bound and workload-bound (large real
@@ -17,8 +19,8 @@ package io.spicelabs.goatrodeo.testing
   */
 abstract class GoatRodeoFunSuite extends munit.FunSuite {
 
-  override val munitTimeout: scala.concurrent.duration.Duration =
-    scala.concurrent.duration.Duration(60, "minutes")
+  override val munitTimeout: Duration =
+    Duration(60, "minutes")
 }
 
 /** ScalaCheck variant of [[GoatRodeoFunSuite]] for property-based suites.
@@ -27,6 +29,6 @@ abstract class GoatRodeoFunSuite extends munit.FunSuite {
   */
 abstract class GoatRodeoScalaCheckSuite extends munit.ScalaCheckSuite {
 
-  override val munitTimeout: scala.concurrent.duration.Duration =
-    scala.concurrent.duration.Duration(60, "minutes")
+  override val munitTimeout: Duration =
+    Duration(60, "minutes")
 }

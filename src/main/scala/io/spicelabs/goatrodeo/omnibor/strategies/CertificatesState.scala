@@ -29,6 +29,9 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import org.bouncycastle.asn1.ASN1Integer
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.ASN1Primitive
 
 import java.security.KeyStore
 import java.security.cert.X509CRL
@@ -800,12 +803,12 @@ class CertificatesState(
     val ext = crl.getExtensionValue("2.5.29.20")
     if (ext == null) None
     else {
-      val asn1 = org.bouncycastle.asn1.ASN1Primitive.fromByteArray(ext)
-      val octetStr = asn1.asInstanceOf[org.bouncycastle.asn1.ASN1OctetString]
+      val asn1 = ASN1Primitive.fromByteArray(ext)
+      val octetStr = asn1.asInstanceOf[ASN1OctetString]
       val inner =
-        org.bouncycastle.asn1.ASN1Primitive.fromByteArray(octetStr.getOctets)
+        ASN1Primitive.fromByteArray(octetStr.getOctets)
       Some(
-        inner.asInstanceOf[org.bouncycastle.asn1.ASN1Integer].getValue.toString
+        inner.asInstanceOf[ASN1Integer].getValue.toString
       )
     }
   }.toOption.flatten

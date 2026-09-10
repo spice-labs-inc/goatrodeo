@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
@@ -45,7 +46,7 @@ class MimeAugmenterRuleSuite extends GoatRodeoFunSuite {
 
   private def realClassFile(): Array[Byte] = {
     val jar = new ZipFile(
-      new java.io.File(
+      new File(
         "test_data/download/adg_tests/repo_ea/aop-common-1.3.2.jar"
       )
     )

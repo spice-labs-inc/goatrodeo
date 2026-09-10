@@ -13,11 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.security.MessageDigest
+import java.util.Base64
 
 /** Strategy-level tests for the private-key parsers and emitters.
   *
@@ -243,9 +249,9 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
+    val md = MessageDigest.getInstance("SHA-256")
     val sha = md.digest(p.wireBytes)
-    val b64 = java.util.Base64.getEncoder.withoutPadding.encodeToString(sha)
+    val b64 = Base64.getEncoder.withoutPadding.encodeToString(sha)
     assertEquals(
       b64,
       "oNA+weKy3joG5Lk8DyILmfET8o25s9dl6b7ZwXgZ1Lg",
@@ -265,8 +271,8 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
-    val b64 = java.util.Base64.getEncoder.withoutPadding
+    val md = MessageDigest.getInstance("SHA-256")
+    val b64 = Base64.getEncoder.withoutPadding
       .encodeToString(md.digest(p.wireBytes))
     assertEquals(b64, "t0/kOgTYoKNs5SqVqWSLJPoXV2gsRUIlrprl3Osdlfc")
   }
@@ -281,8 +287,8 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
-    val b64 = java.util.Base64.getEncoder.withoutPadding
+    val md = MessageDigest.getInstance("SHA-256")
+    val b64 = Base64.getEncoder.withoutPadding
       .encodeToString(md.digest(p.wireBytes))
     assertEquals(b64, "mnO0vOy97kw6cBAygwUoutkpQCBrhs66SJlfgJEbeLg")
   }
@@ -297,8 +303,8 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
-    val b64 = java.util.Base64.getEncoder.withoutPadding
+    val md = MessageDigest.getInstance("SHA-256")
+    val b64 = Base64.getEncoder.withoutPadding
       .encodeToString(md.digest(p.wireBytes))
     assertEquals(b64, "K0sk7wZe1Bj1TfmlBhuiUqc8/7l7Ty0FemZog9NUeUQ")
   }
@@ -530,7 +536,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     val purls = purlSet.canonicalStrings
     assertEquals(
@@ -551,7 +557,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     val (md, _) = state.getMetadata(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     assert(md.contains("Certificates:Envelope"))
     assertEquals(md("Certificates:Envelope").head.value, "plaintext")
@@ -575,7 +581,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     val purls = purlSet.canonicalStrings
     assertEquals(
@@ -596,7 +602,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     val purls = purlSet.canonicalStrings
     assertEquals(purls.length, 1)
@@ -610,14 +616,14 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
   test(
     "[HARD RULE] no metadata value matches a forbidden private-key pattern (full corpus sweep)"
   ) {
-    val pkRoot = java.nio.file.Paths.get("test_data/certificates/private-keys")
-    if (java.nio.file.Files.exists(pkRoot)) {
+    val pkRoot = Paths.get("test_data/certificates/private-keys")
+    if (Files.exists(pkRoot)) {
       import scala.jdk.CollectionConverters.*
-      val files = java.nio.file.Files
+      val files = Files
         .walk(pkRoot)
         .iterator()
         .asScala
-        .filter(p => java.nio.file.Files.isRegularFile(p))
+        .filter(p => Files.isRegularFile(p))
         .filter(p => !p.toString.endsWith(".expected.json"))
         .toVector
       assert(files.nonEmpty, "expected at least one private-key fixture")
@@ -631,7 +637,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
           val _ = state.getMetadata(
             w,
             stubItem(),
-            io.spicelabs.goatrodeo.omnibor.SingleMarker()
+            SingleMarker()
           )
         }
       }
@@ -640,7 +646,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
 
   // ===== Stub Item helper ================================================
 
-  private def stubItem(): io.spicelabs.goatrodeo.omnibor.Item = {
+  private def stubItem(): Item = {
     import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData}
     import scala.collection.immutable.{TreeMap, TreeSet}
     Item(

@@ -6,13 +6,13 @@ import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
 import io.spicelabs.cilantro.AssemblyWalker
 import io.spicelabs.cilantro.DotnetAssemblyProbe
+import io.spicelabs.cilantro.PDBView
 import io.spicelabs.cilantro.PortablePdbFile
 import io.spicelabs.saffron.DiskReader
 import io.spicelabs.saffron.SaffronProbe
 import io.spicelabs.saffron.container.BinaryContainerMount
+import io.spicelabs.saffron.fs.FileSystem
 import io.spicelabs.saffron.fs.FileSystemEntry
-import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
-import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
 import io.spicelabs.saffron.fs.FileSystemMount
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
@@ -22,17 +22,23 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
+import scala.util.Success
 import scala.util.Try
 import scala.util.Using
+
+import FileSystemEntry.EntryType
+import FileSystemEntry.RegularFile
 
 /** Utilities for traversing and extracting files from various archive formats.
   *
@@ -136,24 +142,22 @@ object FileWalker {
     if (rpmMimeTypes.intersect(in.mimeType).nonEmpty) {
       try {
         in.withFile(f => {
-          Using.resource(RpmReader.streamPayload(f.toPath())) {
-            import scala.jdk.CollectionConverters.IteratorHasAsScala
-            payload =>
-              val wrappers = for {
-                entry <- payload.iterator().asScala
+          Using.resource(RpmReader.streamPayload(f.toPath())) { payload =>
+            val wrappers = for {
+              entry <- payload.iterator().asScala
 
-                file <- entry match {
-                  case f: PayloadEntry.FileEntry => Some(f)
-                  case _                         => None
-                }
-              } yield ArtifactWrapper.newWrapper(
-                file.path(),
-                file.size(),
-                file.content(),
-                in.tempDir,
-                tempPath
-              )
-              Some(wrappers.toVector -> "RPM")
+              file <- entry match {
+                case f: PayloadEntry.FileEntry => Some(f)
+                case _                         => None
+              }
+            } yield ArtifactWrapper.newWrapper(
+              file.path(),
+              file.size(),
+              file.content(),
+              in.tempDir,
+              tempPath
+            )
+            Some(wrappers.toVector -> "RPM")
           }
         })
       } catch {
@@ -285,7 +289,7 @@ object FileWalker {
         val r = s.read(buf, total, n - total)
         if (r <= 0) done = true else total += r
       }
-      if (total == n) buf else java.util.Arrays.copyOf(buf, total)
+      if (total == n) buf else Arrays.copyOf(buf, total)
     }
 
   /** Read the last up-to-`n` bytes of the artifact through a fresh stream.
@@ -308,7 +312,7 @@ object FileWalker {
         val r = s.read(buf, total, want - total)
         if (r <= 0) done = true else total += r
       }
-      if (total == want) buf else java.util.Arrays.copyOf(buf, total)
+      if (total == want) buf else Arrays.copyOf(buf, total)
     }
 
   /** Cheap, spill-free probe: read bounded byte ranges via `withStream` and ask
@@ -435,8 +439,7 @@ object FileWalker {
           // name it. `Saffron EXT4` says which reader produced these artifacts
           // and a bare `Saffron` does not, and the name is only reachable from
           // the `disk` handle, which does not outlive this block.
-          val (diskSystems, diskFormat)
-              : (Vector[io.spicelabs.saffron.fs.FileSystem], Option[String]) =
+          val (diskSystems, diskFormat): (Vector[FileSystem], Option[String]) =
             if (
               mimes.intersect(saffronMimeTypes).nonEmpty ||
               Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
@@ -449,7 +452,7 @@ object FileWalker {
                 )
               }.getOrElse((Vector(), None))
             } else (Vector(), None)
-          val containerSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
+          val containerSystems: Vector[FileSystem] =
             if (mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty) {
               Try {
                 BinaryContainerMount.mount(path).toScala.toVector
@@ -538,20 +541,20 @@ object FileWalker {
             PortablePdbFile.withPdb[Option[(Vector[ArtifactWrapper], String)]](
               file,
               Some(spoolDir)
-            ) { (outcome: Try[Option[io.spicelabs.cilantro.PDBView]]) =>
+            ) { (outcome: Try[Option[PDBView]]) =>
               outcome match {
-                case scala.util.Success(Some(view)) =>
+                case Success(Some(view)) =>
                   val wrappers = view.sources.map { src =>
                     val name = src.name
                     val bytes = src.processStream { stream =>
-                      val bos = new java.io.ByteArrayOutputStream()
+                      val bos = new ByteArrayOutputStream()
                       Helpers.copy(stream, bos)
                       bos.toByteArray()
                     }
                     ArtifactWrapper.newWrapper(
                       nominalPath = name,
                       size = bytes.length.toLong,
-                      data = new java.io.ByteArrayInputStream(bytes),
+                      data = new ByteArrayInputStream(bytes),
                       tempDir = in.tempDir,
                       tempPath = tempDir,
                       mimeHint = Some("text/plain")
@@ -564,8 +567,8 @@ object FileWalker {
               }
             }
           result match {
-            case scala.util.Success(Some(inner)) => inner
-            case _                               => None
+            case Success(Some(inner)) => inner
+            case _                    => None
           }
         } catch {
           case _: Exception => None

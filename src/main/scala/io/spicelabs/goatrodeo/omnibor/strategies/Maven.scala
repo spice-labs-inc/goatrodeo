@@ -28,13 +28,18 @@ import org.apache.bcel.classfile.Module as BcelModule
 import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.compact
 import org.json4s.native.JsonMethods.render
+import org.xml.sax.ErrorHandler
+import org.xml.sax.SAXParseException
 
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.TimeZone
+import javax.xml.parsers.DocumentBuilderFactory
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 import scala.xml.NodeSeq
 
@@ -749,8 +754,8 @@ case class MavenState(
         Try(artifact.withStream(Helpers.slurpInputToString(_))).getOrElse("")
       val parsedOpt = PomParser.parse(pomString)
       val xml = parsedOpt match {
-        case Some(_) => scala.xml.NodeSeq.Empty // not used, but keep compat
-        case None    => scala.xml.NodeSeq.Empty
+        case Some(_) => NodeSeq.Empty // not used, but keep compat
+        case None    => NodeSeq.Empty
       }
 
       val bDate = extractBuildDateFromPom(parsedOpt)
@@ -860,7 +865,7 @@ case class MavenState(
         }
         (groupIdOpt, artifactIdOpt, versionOpt) match {
           case (Some(groupId), Some(artId), Some(ver)) =>
-            val purlOpt = scala.util.Try {
+            val purlOpt = Try {
               PURLHelpers
                 .buildPackageURL(
                   Ecosystems.Maven,
@@ -1466,19 +1471,17 @@ case class MavenState(
             // toCanonical into separate Try blocks: the constructor rarely
             // throws, but toCanonical() can throw PurlException for malformed
             // pURLs (e.g., maven with null namespace).
-            val canonicalPurlStr: Option[String] = scala.util
-              .Try {
-                PURLHelpers
-                  .buildPackageURL(
-                    Ecosystems.Maven,
-                    Some(groupId),
-                    artId,
-                    ver,
-                    classifier
-                  )
-              }
-              .toOption
-              .flatMap(p => scala.util.Try(p.toCanonical()).toOption)
+            val canonicalPurlStr: Option[String] = Try {
+              PURLHelpers
+                .buildPackageURL(
+                  Ecosystems.Maven,
+                  Some(groupId),
+                  artId,
+                  ver,
+                  classifier
+                )
+            }.toOption
+              .flatMap(p => Try(p.toCanonical()).toOption)
 
             // Merge canonical pURL metadata into fullMeta so it is written
             // alongside the manifest, pom, and jar-structure metadata.
@@ -1590,22 +1593,20 @@ case class MavenState(
                     .filter(t => !primaryOpt.contains(t))
 
                 secondaryTuples.foreach { case (sg, sa, sv) =>
-                  scala.util
-                    .Try {
-                      PURLHelpers
-                        .buildPackageURL(
-                          Ecosystems.Maven,
-                          Some(sg),
-                          sa,
-                          sv,
-                          classifier // ← was None: secondary pURLs from
-                          // sources/javadoc JARs must include
-                          // the classifier (?packaging=sources
-                          // or ?classifier=javadoc)
-                        )
-                    }
-                    .toOption
-                    .flatMap(p => scala.util.Try(p.toCanonical()).toOption)
+                  Try {
+                    PURLHelpers
+                      .buildPackageURL(
+                        Ecosystems.Maven,
+                        Some(sg),
+                        sa,
+                        sv,
+                        classifier // ← was None: secondary pURLs from
+                        // sources/javadoc JARs must include
+                        // the classifier (?packaging=sources
+                        // or ?classifier=javadoc)
+                      )
+                  }.toOption
+                    .flatMap(p => Try(p.toCanonical()).toOption)
                     .foreach(secondaryPurl =>
                       PurlAliasWriter.writeAlias(
                         secondaryPurl,
@@ -1863,7 +1864,7 @@ case class MavenState(
       xmlString: String
   ): Option[ParsedMavenMetadata] = {
     Try {
-      val dbf = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+      val dbf = DocumentBuilderFactory.newInstance()
       dbf.setNamespaceAware(false)
       dbf.setValidating(false)
       dbf.setFeature(
@@ -1879,13 +1880,13 @@ case class MavenState(
         false
       )
       val db = dbf.newDocumentBuilder()
-      db.setErrorHandler(new org.xml.sax.ErrorHandler {
-        def warning(e: org.xml.sax.SAXParseException): Unit = ()
-        def error(e: org.xml.sax.SAXParseException): Unit = ()
-        def fatalError(e: org.xml.sax.SAXParseException): Unit = ()
+      db.setErrorHandler(new ErrorHandler {
+        def warning(e: SAXParseException): Unit = ()
+        def error(e: SAXParseException): Unit = ()
+        def fatalError(e: SAXParseException): Unit = ()
       })
       val doc = db.parse(
-        new java.io.ByteArrayInputStream(xmlString.getBytes("UTF-8"))
+        new ByteArrayInputStream(xmlString.getBytes("UTF-8"))
       )
 
       def tagText(tag: String): Option[String] = {
@@ -2013,7 +2014,7 @@ case class MavenState(
   ): TreeMap[String, TreeSet[StringOrPair]] = acc match {
     case None => TreeMap.empty
     case Some(a) =>
-      val b = scala.collection.mutable.ArrayBuffer
+      val b = ArrayBuffer
         .empty[(String, TreeSet[StringOrPair])]
 
       a.jarType.foreach(t =>
@@ -2328,7 +2329,7 @@ object MavenToProcess {
         artifacts
     }.flatten
     val metadataXmlByDir = metadataXmlFiles.groupBy { a =>
-      Option(new java.io.File(a.path()).getParent()).getOrElse("")
+      Option(new File(a.path()).getParent()).getOrElse("")
     }
 
     val (toProcess, revisedByUUID, revisedByName, consumedMetaPaths) =
@@ -2353,7 +2354,7 @@ object MavenToProcess {
 
           // Try to match a maven-metadata.xml in the same directory
           val jarDir = Option(
-            new java.io.File(artifacts.head.path()).getParent()
+            new File(artifacts.head.path()).getParent()
           ).getOrElse("")
           val metaXml = metadataXmlByDir.get(jarDir).flatMap(_.headOption)
 

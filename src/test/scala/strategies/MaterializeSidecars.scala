@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.util.FileWrapper
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
@@ -25,7 +26,11 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 /** One-shot materializer: replaces `<computed in Phase N>` placeholders in
   * pem-bundle, CRL, and SSH sidecars with the actual canonical pURL strings
@@ -83,12 +88,11 @@ object MaterializeSidecars {
   ): Option[(CertificatesState, Certificates.ClaimedContent)] = {
     val w = wrap(fixture)
     val state = new CertificatesState(w)
-    val firstLine = scala.util
-      .Try {
-        val src = scala.io.Source.fromFile(fixture, "UTF-8")
-        try src.getLines().find(_.trim.nonEmpty).getOrElse("")
-        finally src.close()
-      }
+    val firstLine = Try {
+      val src = Source.fromFile(fixture, "UTF-8")
+      try src.getLines().find(_.trim.nonEmpty).getOrElse("")
+      finally src.close()
+    }
       .getOrElse("")
     val firstToken = firstLine.trim.split("\\s+", 2).headOption.getOrElse("")
     if (firstToken.endsWith("-cert-v01@openssh.com")) {
@@ -135,9 +139,9 @@ object MaterializeSidecars {
           case c: Certificates.SshCert =>
             state.invokeSshCertMetadata(wrap(fixture), c)
           case _ =>
-            scala.collection.immutable.TreeMap
-              .empty[String, scala.collection.immutable.TreeSet[
-                io.spicelabs.goatrodeo.omnibor.StringOrPair
+            TreeMap
+              .empty[String, TreeSet[
+                StringOrPair
               ]]
         }
         val emitted = tm.iterator.flatMap { case (k, vs) =>
@@ -181,9 +185,9 @@ object MaterializeSidecars {
           case p: Certificates.PrivateKeyEncrypted =>
             state.privateKeyEncryptedMetadata(w, p)
           case _ =>
-            scala.collection.immutable.TreeMap
-              .empty[String, scala.collection.immutable.TreeSet[
-                io.spicelabs.goatrodeo.omnibor.StringOrPair
+            TreeMap
+              .empty[String, TreeSet[
+                StringOrPair
               ]]
         }
         val emitted = tm.iterator.flatMap { case (k, vs) =>

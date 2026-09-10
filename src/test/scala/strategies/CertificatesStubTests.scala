@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.PurlSet
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesState
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
@@ -167,8 +168,8 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   test(
     "Certificates.computeCertificateFiles returns (empty Vector, byUUID, byName, \"Certificates\") (claim-nothing dispatcher)"
   ) {
-    val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
-    val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName = Map.empty
+    val byUUID: ToProcess.ByUUID = Map.empty
+    val byName: ToProcess.ByName = Map.empty
     val (claimed, returnedByUUID, returnedByName, label) =
       Certificates.computeCertificateFiles(byUUID, byName)
     assertEquals(claimed, Vector.empty, "Phase-1 stub must claim nothing.")
@@ -193,9 +194,9 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
     "Certificates.computeCertificateFiles preserves a single-entry byUUID map identity (claim-nothing → no map mutation)"
   ) {
     val art = syntheticArtifact()
-    val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID =
+    val byUUID: ToProcess.ByUUID =
       Map(art.uuid -> art)
-    val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName = Map.empty
+    val byName: ToProcess.ByName = Map.empty
     val (_, returnedByUUID, _, _) =
       Certificates.computeCertificateFiles(byUUID, byName)
     assertEquals(returnedByUUID, byUUID)
@@ -209,8 +210,8 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
     "Certificates.computeCertificateFiles preserves a single-entry byName map identity (claim-nothing → no map mutation)"
   ) {
     val art = syntheticArtifact("foo.pem")
-    val byUUID: io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID = Map.empty
-    val byName: io.spicelabs.goatrodeo.omnibor.ToProcess.ByName =
+    val byUUID: ToProcess.ByUUID = Map.empty
+    val byName: ToProcess.ByName =
       Map("foo.pem" -> Vector(art))
     val (_, _, returnedByName, _) =
       Certificates.computeCertificateFiles(byUUID, byName)

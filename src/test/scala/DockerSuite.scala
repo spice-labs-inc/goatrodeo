@@ -16,6 +16,7 @@ import org.json4s.native.JsonMethods.*
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.collection.mutable.ArrayBuffer
 
 class DockerSuite extends GoatRodeoFunSuite {
 
@@ -914,7 +915,7 @@ class DockerSuite extends GoatRodeoFunSuite {
     }
     val innermost =
       ociManifestJson("sha256:" + hex('f', 64), "sha256:" + hex('e', 64))
-    val pairs = scala.collection.mutable.ArrayBuffer[(String, String)]()
+    val pairs = ArrayBuffer[(String, String)]()
     pairs += ("oci-layout" -> """{"imageLayoutVersion":"1.0.0"}""")
     pairs += ("index.json" -> ociIndexJson(
       s"""{"mediaType":"application/vnd.oci.image.index.v1+json","digest":"${digests(

@@ -2,10 +2,15 @@ package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.PersonIdent
 
 import java.io.File
+import java.io.FileInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.time.Instant
+import java.util.Date
+import scala.collection.mutable.ArrayBuffer
 
 /** tagged-run provenance integration + tag date (spec §6, §7; T10.x, T12.x).
   *
@@ -34,7 +39,7 @@ class GitTaggedRunIntegrationSuite extends GoatRodeoFunSuite {
     val root = tempDir("gtr")
     write(root, "a.txt", "hello world")
     val git = Git.init().setDirectory(root).setInitialBranch("main").call()
-    val ident = new org.eclipse.jgit.lib.PersonIdent("T", "t@example.com")
+    val ident = new PersonIdent("T", "t@example.com")
     git.add().addFilepattern(".").call()
     // Fixture commits must never sign: JGit inherits the developer's global
     // git config, and `commit.gpgsign=true` with `gpg.format=ssh` (a common
@@ -54,10 +59,10 @@ class GitTaggedRunIntegrationSuite extends GoatRodeoFunSuite {
   private def readItems(out: File): Vector[Item] = {
     val grc = out.listFiles().filter(_.getName.endsWith(".grc")).headOption
     assert(grc.isDefined, "grc must exist")
-    val items = scala.collection.mutable.ArrayBuffer[Item]()
+    val items = ArrayBuffer[Item]()
     // walk the grd files referenced by the grc via GraphManager
     out.listFiles().filter(_.getName.endsWith(".grd")).foreach { grd =>
-      val channel = new java.io.FileInputStream(grd).getChannel
+      val channel = new FileInputStream(grd).getChannel
       try {
         val walker = new GRDWalker(channel)
         walker.open()
@@ -75,7 +80,7 @@ class GitTaggedRunIntegrationSuite extends GoatRodeoFunSuite {
       build = Vector(repo),
       tag = Some("run-1"),
       tagDate = Some(
-        java.util.Date.from(java.time.Instant.parse("2026-09-02T00:00:00Z"))
+        Date.from(Instant.parse("2026-09-02T00:00:00Z"))
       ),
       out = Some(out)
     )

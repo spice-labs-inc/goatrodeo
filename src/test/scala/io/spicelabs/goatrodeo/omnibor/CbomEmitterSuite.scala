@@ -19,13 +19,19 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
+import org.everit.json.schema.Schema
 import org.everit.json.schema.ValidationException
+import org.everit.json.schema.loader.SchemaClient
+import org.everit.json.schema.loader.SchemaLoader
+import org.json.JSONObject
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.Comparator
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
@@ -50,9 +56,9 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
     * `jsf-0.82.schema.json`, `cryptography-defs.schema.json`) from the test
     * classpath via a `SchemaClient`, so the schema resolves without a network.
     */
-  private def loadEveritSchema(name: String): org.everit.json.schema.Schema = {
-    val client = new org.everit.json.schema.loader.SchemaClient {
-      override def get(url: String): java.io.InputStream = {
+  private def loadEveritSchema(name: String): Schema = {
+    val client = new SchemaClient {
+      override def get(url: String): InputStream = {
         val base = "http://cyclonedx.org/schema/"
         val resource =
           if (url.startsWith(base)) {
@@ -65,9 +71,9 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         is
       }
     }
-    org.everit.json.schema.loader.SchemaLoader
+    SchemaLoader
       .builder()
-      .schemaJson(new org.json.JSONObject(schemaResource(name)))
+      .schemaJson(new JSONObject(schemaResource(name)))
       .schemaClient(client)
       .build()
       .load()
@@ -79,10 +85,10 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
     */
   private def validate(
       json: String,
-      schema: org.everit.json.schema.Schema
+      schema: Schema
   ): Set[String] = {
     try {
-      schema.validate(new org.json.JSONObject(json))
+      schema.validate(new JSONObject(json))
       Set.empty
     } catch {
       case e: ValidationException =>
@@ -102,7 +108,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
     if (dir != null && dir.exists()) {
       Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(Files.delete(_))
       ()
     }
@@ -218,7 +224,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
     val c2 = parseConfig("--emit-cbom-dir", "/tmp/cbom").get
     assertEquals(c2.cbomDir, Some(new File("/tmp/cbom")))
-    assertEquals(c2.cbomVersion, "1.6")
+    assertEquals(c2.cbomVersion, "1.7")
 
     val c3 = parseConfig().get
     assertEquals(c3.cbomDir, None)

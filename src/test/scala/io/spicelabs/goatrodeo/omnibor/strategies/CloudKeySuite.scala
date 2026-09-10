@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.PairOf
+import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 
@@ -144,8 +146,8 @@ class CloudKeySuite extends GoatRodeoFunSuite {
     )
     val meta = new CloudKeyState(wrapper).invokeBuildMetadata(wrapper)
     val values = meta.values.flatten.map {
-      case io.spicelabs.goatrodeo.omnibor.StringOf(s)   => s
-      case io.spicelabs.goatrodeo.omnibor.PairOf(_, s2) => s2
+      case StringOf(s)   => s
+      case PairOf(_, s2) => s2
     }.toSet
     assert(
       values.contains("true") && meta.contains("CloudKey:key_material_present"),

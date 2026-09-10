@@ -4,9 +4,12 @@ package io.spicelabs.goatrodeo.util
 import com.typesafe.scalalogging.Logger
 import org.w3c.dom.Document
 import org.w3c.dom.Element
+import org.xml.sax.ErrorHandler
+import org.xml.sax.SAXParseException
 
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
+import scala.collection.mutable.Map as MutableMap
 import scala.util.Try
 
 object PomParser {
@@ -46,8 +49,8 @@ object PomParser {
   private val MaxDepth = 10
   private val PropRegex = """\$\{([^}]+)\}""".r
 
-  private def secureDbf: javax.xml.parsers.DocumentBuilderFactory = {
-    val f = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+  private def secureDbf: DocumentBuilderFactory = {
+    val f = DocumentBuilderFactory.newInstance()
     f.setNamespaceAware(false)
     f.setValidating(false)
     f.setXIncludeAware(false)
@@ -109,10 +112,10 @@ object PomParser {
   /** Silent SAX error handler that prevents the default parser from printing
     * `[Fatal Error]` / `[Error]` / `[Warning]` lines to stderr.
     */
-  private object SilentSaxHandler extends org.xml.sax.ErrorHandler {
-    def warning(e: org.xml.sax.SAXParseException): Unit = ()
-    def error(e: org.xml.sax.SAXParseException): Unit = ()
-    def fatalError(e: org.xml.sax.SAXParseException): Unit = ()
+  private object SilentSaxHandler extends ErrorHandler {
+    def warning(e: SAXParseException): Unit = ()
+    def error(e: SAXParseException): Unit = ()
+    def fatalError(e: SAXParseException): Unit = ()
   }
 
   private def parse0(pomString: String): Option[ParsedPom] =
@@ -260,7 +263,7 @@ object PomParser {
     val propsNodes = doc.getElementsByTagName("properties")
     if (propsNodes.getLength > 0) {
       val propsElem = propsNodes.item(0).asInstanceOf[Element]
-      val result = scala.collection.mutable.Map.empty[String, String]
+      val result = MutableMap.empty[String, String]
       val children = propsElem.getChildNodes
       for (i <- 0 until children.getLength) {
         children.item(i) match {

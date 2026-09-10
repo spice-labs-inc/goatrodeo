@@ -7,7 +7,10 @@ import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
+import java.nio.file.Files
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 /** coverage matrix completeness suite.
   *
@@ -43,7 +46,7 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
   )
 
   private def parseSidecar(file: File): Sidecar = {
-    val raw = scala.io.Source.fromFile(file, "UTF-8").mkString
+    val raw = Source.fromFile(file, "UTF-8").mkString
     val json = parse(raw)
 
     def getStringSet(jval: JValue): Set[String] = jval match {
@@ -81,7 +84,7 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
   private def discoverSidecars(): Vector[Sidecar] = {
     if (!corpusRoot.exists()) Vector.empty
     else {
-      val all = java.nio.file.Files.walk(corpusRoot.toPath).iterator().asScala
+      val all = Files.walk(corpusRoot.toPath).iterator().asScala
       all
         .filter(p => p.toString.endsWith(".expected.json"))
         .map(p => parseSidecar(p.toFile))
@@ -496,7 +499,7 @@ class CertificatesCoverageSuite extends GoatRodeoFunSuite {
     }
     val unencrypted = keystoreSidecars.exists { s =>
       val cnt = s.metadataContains.get("Certificates:EntryCount")
-      cnt.exists(c => scala.util.Try(c.toInt).toOption.exists(_ > 0))
+      cnt.exists(c => Try(c.toInt).toOption.exists(_ > 0))
     }
     assert(encrypted, "no encrypted keystore fixture")
     assert(

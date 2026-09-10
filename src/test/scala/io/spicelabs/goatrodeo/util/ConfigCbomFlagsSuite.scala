@@ -56,7 +56,7 @@ class ConfigCbomFlagsSuite extends GoatRodeoFunSuite {
   test("--cbom-version defaults to 1.6 when omitted") {
     val parsed = parse("-b", "/tmp/in", "--emit-cbom-dir", "/tmp/cbom")
     assert(parsed.isDefined)
-    assertEquals(parsed.get.cbomVersion, "1.6")
+    assertEquals(parsed.get.cbomVersion, "1.7")
   }
 
   test("invalid --cbom-version is rejected") {

@@ -16,6 +16,7 @@ package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.security.cert.CertificateFactory
@@ -66,7 +67,7 @@ class CertificatesSidecarGroundTruthTests extends GoatRodeoFunSuite {
 
   /** One X.509 fixture that has cert/SPKI/DN sidecar fields to verify. */
   private case class X509CheckCase(
-      fixture: java.io.File,
+      fixture: File,
       sidecar: CertificatesSidecar
   )
 

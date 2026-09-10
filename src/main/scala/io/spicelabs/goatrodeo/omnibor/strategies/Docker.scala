@@ -22,6 +22,8 @@ import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -520,7 +522,7 @@ case class DockerState(
       // https://github.com/package-url/purl-spec?tab=readme-ov-file#some-purl-examples
       (cleanName, cleanVersion) match {
         case (Some(name), Some(ver)) =>
-          scala.util.Try {
+          Try {
             PURLHelpers
               .purl(
                 `type` = "docker",
@@ -915,7 +917,7 @@ object DockerToProcess {
   private val refNameAnnotation = "org.opencontainers.image.ref.name"
 
   private val blobDigestPattern =
-    java.util.regex.Pattern.compile("sha256:[0-9a-f]{64}")
+    Pattern.compile("sha256:[0-9a-f]{64}")
 
   /** A descriptor digest is accepted only in its canonical form, so a hostile
     * index.json cannot smuggle path components (separators, `..`, absolute
@@ -948,7 +950,7 @@ object DockerToProcess {
         if (total > maxBytes) None
         else {
           parseOpt(
-            new String(buf, 0, total, java.nio.charset.StandardCharsets.UTF_8)
+            new String(buf, 0, total, UTF_8)
           )
         }
       }

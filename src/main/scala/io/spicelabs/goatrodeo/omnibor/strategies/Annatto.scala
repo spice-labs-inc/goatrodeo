@@ -4,6 +4,7 @@ import io.spicelabs.annatto.Ecosystem
 import io.spicelabs.annatto.EcosystemRouter
 import io.spicelabs.annatto.LanguagePackage
 import io.spicelabs.annatto.LanguagePackageReader
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
@@ -20,6 +21,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
+import java.util.Date
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
@@ -105,8 +107,8 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
       .toPurl()
       .toScala
       .flatMap(p =>
-        scala.util.Try {
-          io.spicelabs.coordinates.Purl.parse(p.canonicalize())
+        Try {
+          Purl.parse(p.canonicalize())
         }.toOption
       )
       .map(p => PurlSet.single(p))
@@ -158,8 +160,8 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
     val metadata = pkg.metadata()
     val publishedAt = metadata.publishedAt()
 
-    val date: Option[java.util.Date] = publishedAt.toScala.map { instant =>
-      new java.util.Date(instant.toEpochMilli())
+    val date: Option[Date] = publishedAt.toScala.map { instant =>
+      new Date(instant.toEpochMilli())
     }
 
     Some(

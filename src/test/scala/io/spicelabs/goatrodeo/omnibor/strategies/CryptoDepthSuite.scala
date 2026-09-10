@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
@@ -129,7 +130,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
       .collectFirst { case c: Certificates => c }
       .getOrElse(fail("binary .gpg must be claimed by Certificates"))
     val (els, state) = certs.getElementsToProcess()
-    val item = io.spicelabs.goatrodeo.omnibor.Item(
+    val item = Item(
       "x",
       TreeSet.empty,
       None,
@@ -206,7 +207,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
       .getOrElse(fail(s"$pemPath must be claimed by Certificates"))
     val (els, state) = certs.getElementsToProcess()
     val item =
-      io.spicelabs.goatrodeo.omnibor.Item("x", TreeSet.empty, None, None)
+      Item("x", TreeSet.empty, None, None)
     val (m, _) = state.getMetadata(els.head._1, item, new SingleMarker())
     m.toMap
   }

@@ -1,6 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 
 /** single Certificates strategy entry (user design decision).
@@ -22,10 +23,9 @@ class SingleCertificatesStrategySuite extends GoatRodeoFunSuite {
   private def nonTerminalClaimers(hint: String): Vector[Int] = {
     val wrapper =
       ByteWrapper("x".getBytes("UTF-8"), "b.p7b", None, mimeHint = Some(hint))
-    val byUUID: Map[String, io.spicelabs.goatrodeo.util.ArtifactWrapper] =
+    val byUUID: Map[String, ArtifactWrapper] =
       Map(wrapper.uuid -> wrapper)
-    val byName
-        : Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
+    val byName: Map[String, Vector[ArtifactWrapper]] =
       Map(wrapper.path() -> Vector(wrapper))
     val total = ToProcess.computeToProcess.size
     // GenericFile is always the last entry (see ToProcess); exclude it.

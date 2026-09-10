@@ -19,12 +19,14 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CarvedCertAugmenter
 import io.spicelabs.goatrodeo.util.FileWrapper
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
 import java.io.File
+import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -87,7 +89,7 @@ class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
       f.exists(),
       "carved corpus fixtures required — run gen_carved_elf_corpus.sh"
     )
-    val bytes = java.nio.file.Files.readAllBytes(f.toPath())
+    val bytes = Files.readAllBytes(f.toPath())
     val (certs, cap) = CarvedCertAugmenter.carveCertificates(
       bytes,
       CarvedCertAugmenter.MaxScanBytes,
@@ -173,10 +175,9 @@ class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
     val b = FileWrapper(fixture("elf-no-certs"), "elf-no-certs", None)
     a.mimeType
     b.mimeType
-    val byUUID: Map[String, io.spicelabs.goatrodeo.util.ArtifactWrapper] =
+    val byUUID: Map[String, ArtifactWrapper] =
       Map(a.uuid -> a, b.uuid -> b)
-    val byName
-        : Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
+    val byName: Map[String, Vector[ArtifactWrapper]] =
       Map(a.path() -> Vector(a), b.path() -> Vector(b))
     val (claimed, _, _, name) =
       CarvedCertificatesStrategy.computeCarvedCertificateFiles(byUUID, byName)

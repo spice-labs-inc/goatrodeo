@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import org.scalacheck.Test.Parameters.default
 
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -91,7 +92,7 @@ class UserReadyToleranceSuite extends GoatRodeoFunSuite {
       } finally Helpers.deleteDirectory(root.toPath)
     }
     prop.check(
-      org.scalacheck.Test.Parameters.default.withMinSuccessfulTests(50)
+      default.withMinSuccessfulTests(50)
     )
   }
 }

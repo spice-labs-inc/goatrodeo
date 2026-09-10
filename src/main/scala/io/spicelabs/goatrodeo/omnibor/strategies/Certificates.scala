@@ -30,14 +30,35 @@ import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.SshWireReader
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import org.bouncycastle.asn1.ASN1Encodable
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.ASN1Primitive
+import org.bouncycastle.asn1.misc.ScryptParams
+import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers.id_pkix_ocsp
+import org.bouncycastle.asn1.pkcs.PBEParameter
+import org.bouncycastle.asn1.pkcs.PBES2Parameters
+import org.bouncycastle.asn1.pkcs.PBKDF2Params
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.asn1.pkcs.RSAPublicKey as BcRSAPublicKey
+import org.bouncycastle.asn1.x509.AuthorityInformationAccess
+import org.bouncycastle.asn1.x509.CRLDistPoint
+import org.bouncycastle.asn1.x509.Certificate
+import org.bouncycastle.asn1.x509.CertificatePolicies
+import org.bouncycastle.asn1.x509.DSAParameter
+import org.bouncycastle.asn1.x509.DistributionPointName
+import org.bouncycastle.asn1.x509.GeneralName
+import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.asn1.x509.SubjectKeyIdentifier
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import org.bouncycastle.asn1.x9.ECNamedCurveTable
 import org.bouncycastle.bcpg.ECPublicBCPGKey
 import org.bouncycastle.bcpg.EdDSAPublicBCPGKey
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.crypto.params.*
 import org.bouncycastle.crypto.util.PrivateKeyFactory
+import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory
 import org.bouncycastle.openpgp.PGPObjectFactory
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
@@ -52,23 +73,40 @@ import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo
 
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
+import java.lang.Long as JLong
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.nio.charset.StandardCharsets.ISO_8859_1
+import java.nio.charset.StandardCharsets.US_ASCII
+import java.nio.charset.StandardCharsets.UTF_16BE
+import java.nio.charset.StandardCharsets.UTF_8
 import java.security.KeyStore
+import java.security.MessageDigest
+import java.security.PublicKey
 import java.security.cert.CertificateFactory
 import java.security.cert.X509CRL
 import java.security.cert.X509Certificate
 import java.security.interfaces.DSAPublicKey
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
+import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Arrays
 import java.util.Base64
+import java.util.Base64.getDecoder
 import java.util.Date
+import java.util.Iterator
+import java.util.List as JList
 import java.util.regex.Matcher
 import java.util.regex.Pattern
+import javax.security.auth.x500.X500Principal
+import javax.security.auth.x500.X500Principal.RFC2253
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.Using
@@ -154,8 +192,8 @@ object Certificates {
       keySize: Option[Int],
       curve: Option[String],
       isPrimary: Boolean,
-      creationTime: java.util.Date,
-      expirationTime: Option[java.util.Date],
+      creationTime: Date,
+      expirationTime: Option[Date],
       userIds: Vector[String]
   )
 
@@ -531,7 +569,7 @@ object Certificates {
     artifact.withStream { f =>
       val raw = new String(
         Helpers.slurpInput(f),
-        java.nio.charset.StandardCharsets.UTF_8
+        UTF_8
       )
       SshWireReader
         .parseFirstKeyLine(raw)
@@ -561,7 +599,7 @@ object Certificates {
     artifact.withStream { f =>
       val raw = new String(
         Helpers.slurpInput(f),
-        java.nio.charset.StandardCharsets.UTF_8
+        UTF_8
       )
       SshWireReader
         .parseFirstKeyLine(raw)
@@ -584,11 +622,11 @@ object Certificates {
       comment: Option[String]
   ): Option[SshCert] = {
     val r = new SshWireReader(certBytes)
-    val keyFieldsBuf = new java.io.ByteArrayOutputStream()
+    val keyFieldsBuf = new ByteArrayOutputStream()
     var rsaBits: Option[Int] = None
 
     def writeString(
-        out: java.io.ByteArrayOutputStream,
+        out: ByteArrayOutputStream,
         b: Array[Byte]
     ): Unit = {
       val len = b.length
@@ -600,7 +638,7 @@ object Certificates {
     }
     writeString(
       keyFieldsBuf,
-      signedAlg.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+      signedAlg.getBytes(UTF_8)
     )
 
     def readKeyFields(): Option[Unit] = signedAlg match {
@@ -648,7 +686,7 @@ object Certificates {
       serialL <- r.readUInt64()
       serial =
         if (serialL >= 0) BigInt(serialL)
-        else BigInt(java.lang.Long.toUnsignedString(serialL))
+        else BigInt(JLong.toUnsignedString(serialL))
       certType <- r.readUInt32()
       keyId <- r.readUtf8String()
       principals <- r.readStringList()
@@ -682,7 +720,7 @@ object Certificates {
 
   /** SHA-256 base64-no-padding fingerprint over an SSH wire blob. */
   private[strategies] def sshFingerprintB64(wire: Array[Byte]): String = {
-    val md = java.security.MessageDigest.getInstance("SHA-256")
+    val md = MessageDigest.getInstance("SHA-256")
     val digest = md.digest(wire)
     Base64.getEncoder.withoutPadding.encodeToString(digest)
   }
@@ -697,7 +735,7 @@ object Certificates {
     val isUnsignedMax = epochSec == -1L
     val isZero = epochSec == 0L
     if (isUnsignedMax || isZero) sentinelLabel
-    else isoUtc(Date.from(java.time.Instant.ofEpochSecond(epochSec)))
+    else isoUtc(Date.from(Instant.ofEpochSecond(epochSec)))
   }
 
   private[strategies] case class KVPair(key: String, value: String)
@@ -783,11 +821,11 @@ object Certificates {
     * segment (binary input).
     */
   private def splitArmoredBlocks(raw: Array[Byte]): Vector[Array[Byte]] = {
-    val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
+    val text = new String(raw, ISO_8859_1)
     val begin = "-----BEGIN PGP "
     if (!text.contains(begin)) Vector(raw)
     else {
-      val acc = scala.collection.mutable.ListBuffer[Array[Byte]]()
+      val acc = ListBuffer[Array[Byte]]()
       var idx = text.indexOf(begin)
       while (idx >= 0) {
         val next = text.indexOf(begin, idx + begin.length)
@@ -795,7 +833,7 @@ object Certificates {
         acc += text
           .substring(idx, end)
           .getBytes(
-            java.nio.charset.StandardCharsets.ISO_8859_1
+            ISO_8859_1
           )
         idx = next
       }
@@ -840,7 +878,7 @@ object Certificates {
 
   /** Project PGPPublicKeyRings into a single PgpKeyRing. */
   private def buildPgpKeyRing(
-      rings: Vector[org.bouncycastle.openpgp.PGPPublicKeyRing]
+      rings: Vector[PGPPublicKeyRing]
   ): PgpKeyRing = {
     val keys = rings.flatMap { ring =>
       ring.getPublicKeys.asScala.toVector.map(pgpKeyOf)
@@ -883,9 +921,9 @@ object Certificates {
     val decoded = PGPUtil.getDecoderStream(
       new ByteArrayInputStream(bytes)
     )
-    val factory = new org.bouncycastle.openpgp.PGPObjectFactory(
+    val factory = new PGPObjectFactory(
       decoded,
-      new org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
+      new BcKeyFingerprintCalculator()
     )
     val factoryObjs = factoryToVec(factory)
     factoryObjs.foldLeft(acc) {
@@ -1048,9 +1086,9 @@ object Certificates {
     }
 
     val expSecs = Try(pk.getValidSeconds).toOption.getOrElse(0L)
-    val expiration: Option[java.util.Date] =
+    val expiration: Option[Date] =
       if (expSecs > 0)
-        Some(new java.util.Date(pk.getCreationTime.getTime + expSecs * 1000L))
+        Some(new Date(pk.getCreationTime.getTime + expSecs * 1000L))
       else None
 
     PgpKey(
@@ -1098,7 +1136,7 @@ object Certificates {
     *   the certificate (used as fallback via SPKI OID)
     */
   private[strategies] def keyAlgAndQualifier(
-      pub: Option[java.security.PublicKey],
+      pub: Option[PublicKey],
       cert: X509Certificate
   ): (String, Map[String, String]) = {
     pub match {
@@ -1133,15 +1171,15 @@ object Certificates {
 
   /** Resolve EC curve name via BC's ECNamedCurveTable. */
   private def bcCurveNameFromCert(cert: X509Certificate): Option[String] = Try {
-    val spki = org.bouncycastle.asn1.x509.SubjectPublicKeyInfo.getInstance(
+    val spki = SubjectPublicKeyInfo.getInstance(
       cert.getPublicKey.getEncoded
     )
     val algOid = spki.getAlgorithm.getAlgorithm
     val params = spki.getAlgorithm.getParameters
     if (algOid.getId == "1.2.840.10045.2.1" && params != null) {
       val curveOid = params.toString
-      val name = org.bouncycastle.asn1.x9.ECNamedCurveTable.getName(
-        new org.bouncycastle.asn1.ASN1ObjectIdentifier(curveOid)
+      val name = ECNamedCurveTable.getName(
+        new ASN1ObjectIdentifier(curveOid)
       )
       Option(name).orElse(Some(curveOid))
     } else None
@@ -1154,14 +1192,14 @@ object Certificates {
       cert: X509Certificate
   ): Option[Array[Byte]] = Try {
     val bcCert =
-      org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
+      Certificate.getInstance(cert.getEncoded)
     bcCert.getSubjectPublicKeyInfo.getEncoded
   }.toOption
 
   /** Extract the SPKI algorithm OID from a certificate. */
   private[strategies] def spkiAlgOidFromCert(cert: X509Certificate): String = {
     val bcCert =
-      org.bouncycastle.asn1.x509.Certificate.getInstance(cert.getEncoded)
+      Certificate.getInstance(cert.getEncoded)
     bcCert.getSubjectPublicKeyInfo.getAlgorithm.getAlgorithm.getId
   }
 
@@ -1210,7 +1248,7 @@ object Certificates {
   }
 
   /** ISO-8601 UTC date string. */
-  private[strategies] def isoUtc(d: java.util.Date): String = {
+  private[strategies] def isoUtc(d: Date): String = {
     val instant = d.toInstant
     DateTimeFormatter.ISO_INSTANT
       .withZone(ZoneOffset.UTC)
@@ -1261,7 +1299,7 @@ object Certificates {
     if (san == null) None
     else {
       val entries = san.asScala.toSeq.flatMap { entry =>
-        val list = entry.asInstanceOf[java.util.List[?]].asScala.toSeq
+        val list = entry.asInstanceOf[JList[?]].asScala.toSeq
         if (list.length < 2) None
         else {
           val tag = list(0).asInstanceOf[Integer].intValue
@@ -1295,22 +1333,22 @@ object Certificates {
   private[strategies] def extensionValue(
       cert: X509Certificate,
       oid: String
-  ): Option[org.bouncycastle.asn1.ASN1Primitive] =
+  ): Option[ASN1Primitive] =
     Option(cert.getExtensionValue(oid))
       .flatMap { raw =>
-        Try(org.bouncycastle.asn1.ASN1Primitive.fromByteArray(raw)).toOption
+        Try(ASN1Primitive.fromByteArray(raw)).toOption
       }
       .flatMap { outer =>
         Try {
-          val oct = outer.asInstanceOf[org.bouncycastle.asn1.ASN1OctetString]
-          org.bouncycastle.asn1.ASN1Primitive.fromByteArray(oct.getOctets)
+          val oct = outer.asInstanceOf[ASN1OctetString]
+          ASN1Primitive.fromByteArray(oct.getOctets)
         }.toOption
       }
 
   private def generalNameUri(
-      enc: org.bouncycastle.asn1.ASN1Encodable
+      enc: ASN1Encodable
   ): Option[String] = Try {
-    val gn = org.bouncycastle.asn1.x509.GeneralName.getInstance(enc)
+    val gn = GeneralName.getInstance(enc)
     if (gn.getTagNo == 6) Option(gn.getName).map(_.toString) else None
   }.toOption.flatten
 
@@ -1319,12 +1357,12 @@ object Certificates {
     extensionValue(cert, "1.3.6.1.5.5.7.1.1").flatMap { p =>
       Try {
         val aia =
-          org.bouncycastle.asn1.x509.AuthorityInformationAccess.getInstance(p)
+          AuthorityInformationAccess.getInstance(p)
         val urls = aia.getAccessDescriptions.toVector.flatMap { ad =>
           if (
             Option(ad.getAccessMethod)
               .exists(
-                _.getId == org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers.id_pkix_ocsp.getId
+                _.getId == id_pkix_ocsp.getId
               )
           ) {
             generalNameUri(ad.getAccessLocation).toVector
@@ -1340,17 +1378,17 @@ object Certificates {
   ): Option[String] =
     extensionValue(cert, "2.5.29.31").flatMap { p =>
       Try {
-        val cdps = org.bouncycastle.asn1.x509.CRLDistPoint.getInstance(p)
+        val cdps = CRLDistPoint.getInstance(p)
         val urls = cdps.getDistributionPoints.toVector.flatMap { dp =>
           Option(dp.getDistributionPoint)
             .flatMap { dpNameEnc =>
               Try {
-                val dpn = org.bouncycastle.asn1.x509.DistributionPointName
+                val dpn = DistributionPointName
                   .getInstance(dpNameEnc)
                 Option(dpn.getName) match {
                   case Some(names) =>
                     val gns =
-                      org.bouncycastle.asn1.x509.GeneralNames.getInstance(names)
+                      GeneralNames.getInstance(names)
                     gns.getNames.toVector.flatMap(gn =>
                       generalNameUri(gn).toVector
                     )
@@ -1368,7 +1406,7 @@ object Certificates {
   private[strategies] def subjectKeyId(cert: X509Certificate): Option[String] =
     extensionValue(cert, "2.5.29.14").flatMap { p =>
       Try(
-        org.bouncycastle.asn1.x509.SubjectKeyIdentifier
+        SubjectKeyIdentifier
           .getInstance(p)
           .getKeyIdentifier
       ).toOption.map(Helpers.toHex)
@@ -1381,7 +1419,7 @@ object Certificates {
     extensionValue(cert, "2.5.29.32").flatMap { p =>
       Try {
         val cp =
-          org.bouncycastle.asn1.x509.CertificatePolicies.getInstance(p)
+          CertificatePolicies.getInstance(p)
         val ids =
           cp.getPolicyInformation.toVector.map(_.getPolicyIdentifier.getId)
         if (ids.isEmpty) None else Some(ids.mkString(","))
@@ -1390,9 +1428,9 @@ object Certificates {
 
   /** RFC2253 DN with JDK #hex fallback decoded to text form. */
   private[strategies] def dnString(
-      name: javax.security.auth.x500.X500Principal
+      name: X500Principal
   ): String = {
-    val rfc2253 = name.getName(javax.security.auth.x500.X500Principal.RFC2253)
+    val rfc2253 = name.getName(RFC2253)
     val hexRun = "#([0-9a-fA-F]{4,})".r
     hexRun.replaceAllIn(
       rfc2253,
@@ -1434,13 +1472,13 @@ object Certificates {
         tag match {
           case 0x13 | 0x16 | 0x14 =>
             Some(
-              new String(payload, java.nio.charset.StandardCharsets.US_ASCII)
+              new String(payload, US_ASCII)
             )
           case 0x0c =>
-            Some(new String(payload, java.nio.charset.StandardCharsets.UTF_8))
+            Some(new String(payload, UTF_8))
           case 0x1e =>
             Some(
-              new String(payload, java.nio.charset.StandardCharsets.UTF_16BE)
+              new String(payload, UTF_16BE)
             )
           case _ => None
         }
@@ -1450,7 +1488,7 @@ object Certificates {
 
   /** CN if present, else full DN. */
   private[strategies] def cnOrDn(
-      name: javax.security.auth.x500.X500Principal
+      name: X500Principal
   ): String = {
     val dn = dnString(name)
     val cnRegex = "CN=([^,]+)".r
@@ -1531,7 +1569,7 @@ object Certificates {
   ): Option[ClaimedContent] = Try {
     artifact.withStream { f =>
       val raw = Helpers.slurpInput(f)
-      val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
+      val text = new String(raw, ISO_8859_1)
       if (procTypeEncryptedHeaderPresent(text)) {
         Some(legacyEncryptedPemClaim(text))
       } else {
@@ -1540,7 +1578,7 @@ object Certificates {
     }
   }.toOption.flatten
 
-  private def iteratorToVec[T](parser: java.util.Iterator[T]): Vector[T] = {
+  private def iteratorToVec[T](parser: Iterator[T]): Vector[T] = {
     val iterator = parser
     var ret = Vector[T]()
     while (iterator.hasNext) {
@@ -1623,7 +1661,7 @@ object Certificates {
       new PEMParser(
         new InputStreamReader(
           new ByteArrayInputStream(raw),
-          java.nio.charset.StandardCharsets.ISO_8859_1
+          ISO_8859_1
         )
       )
     ) { parser =>
@@ -1678,7 +1716,7 @@ object Certificates {
         case _ => None
       }
       pub.map(p =>
-        org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory
+        SubjectPublicKeyInfoFactory
           .createSubjectPublicKeyInfo(p)
       )
     }.toOption.flatten
@@ -1692,7 +1730,7 @@ object Certificates {
 
   /** Project SPKI ASN.1 → (alg, size?, curve?, params?). */
   private[strategies] def algAndQualifierFromSpki(
-      spki: org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+      spki: SubjectPublicKeyInfo
   ): AlgAndQualifier = {
     val algOid = spki.getAlgorithm.getAlgorithm.getId
     pubkeyOidMap.get(algOid) match {
@@ -1703,8 +1741,8 @@ object Certificates {
             // RSA — read modulus from inner RSAPublicKey ASN.1
             val sz = Try {
               val keyBytes = spki.getPublicKeyData.getBytes
-              val rsaPub = org.bouncycastle.asn1.pkcs.RSAPublicKey.getInstance(
-                org.bouncycastle.asn1.ASN1Primitive.fromByteArray(keyBytes)
+              val rsaPub = BcRSAPublicKey.getInstance(
+                ASN1Primitive.fromByteArray(keyBytes)
               )
               rsaPub.getModulus.bitLength
             }.toOption
@@ -1716,9 +1754,9 @@ object Certificates {
             val curve = Try {
               val params = spki.getAlgorithm.getParameters
               val asOid =
-                org.bouncycastle.asn1.ASN1ObjectIdentifier.getInstance(params)
+                ASN1ObjectIdentifier.getInstance(params)
               val stdName =
-                org.bouncycastle.asn1.x9.ECNamedCurveTable.getName(asOid)
+                ECNamedCurveTable.getName(asOid)
               val key =
                 if (stdName != null) stdName.toLowerCase
                 else asOid.getId
@@ -1730,7 +1768,7 @@ object Certificates {
             val sz = Try {
               val params = spki.getAlgorithm.getParameters
               val dsaParams =
-                org.bouncycastle.asn1.x509.DSAParameter.getInstance(params)
+                DSAParameter.getInstance(params)
               dsaParams.getP.bitLength
             }.toOption
             AlgAndQualifier("dsa", sz, None, None)
@@ -1745,13 +1783,13 @@ object Certificates {
 
   /** Build encrypted-PKCS#8 claim; inspects PBES2/PBES1 parameters. */
   private def pkcs8EncryptedClaimFrom(
-      epki: org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo
+      epki: PKCS8EncryptedPrivateKeyInfo
   ): PrivateKeyEncrypted = {
     val algOid = epki.getEncryptionAlgorithm.getAlgorithm.getId
     // PBES2 = 1.2.840.113549.1.5.13. Its parameters wrap (KDF, cipher).
     if (algOid == "1.2.840.113549.1.5.13") {
       val params = Try {
-        org.bouncycastle.asn1.pkcs.PBES2Parameters.getInstance(
+        PBES2Parameters.getInstance(
           epki.getEncryptionAlgorithm.getParameters
         )
       }.toOption
@@ -1763,7 +1801,7 @@ object Certificates {
             case "1.2.840.113549.1.5.12" =>
               // PBKDF2
               val pbkdf2 = Try {
-                org.bouncycastle.asn1.pkcs.PBKDF2Params.getInstance(
+                PBKDF2Params.getInstance(
                   kdf.getParameters
                 )
               }.toOption
@@ -1781,7 +1819,7 @@ object Certificates {
             case "1.3.6.1.4.1.11591.4.11" =>
               // scrypt — salt is in ScryptParams
               val scrypt = Try {
-                org.bouncycastle.asn1.misc.ScryptParams.getInstance(
+                ScryptParams.getInstance(
                   kdf.getParameters
                 )
               }.toOption
@@ -1807,7 +1845,7 @@ object Certificates {
           val iv = Try {
             val rawParams = p.getEncryptionScheme.getParameters
             val asOctet =
-              org.bouncycastle.asn1.ASN1OctetString.getInstance(rawParams)
+              ASN1OctetString.getInstance(rawParams)
             Helpers.toHex(asOctet.getOctets)
           }.toOption.filter(_.nonEmpty)
           (cipher, iv)
@@ -1828,7 +1866,7 @@ object Certificates {
       // pbeWithSHA1AndDES-CBC, pbeWithSHA1And3-KeyTripleDES-CBC, etc.
       // Their parameters are a SEQUENCE { salt OCTET STRING, iterationCount INTEGER }.
       val pbes1 = Try {
-        org.bouncycastle.asn1.pkcs.PBEParameter.getInstance(
+        PBEParameter.getInstance(
           epki.getEncryptionAlgorithm.getParameters
         )
       }.toOption
@@ -1863,7 +1901,7 @@ object Certificates {
 
   /** Strip PEM armor and base64-decode the inner body. */
   private def decodeOpenSshArmor(raw: Array[Byte]): Option[Array[Byte]] = {
-    val text = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
+    val text = new String(raw, ISO_8859_1)
     val begin = "-----BEGIN OPENSSH PRIVATE KEY-----"
     val end = "-----END OPENSSH PRIVATE KEY-----"
     val bIdx = text.indexOf(begin)
@@ -1872,7 +1910,7 @@ object Certificates {
     else {
       val body = text.substring(bIdx + begin.length, eIdx)
       val b64 = body.replaceAll("\\s+", "")
-      Try(java.util.Base64.getDecoder.decode(b64)).toOption
+      Try(getDecoder.decode(b64)).toOption
     }
   }
 
@@ -1881,17 +1919,17 @@ object Certificates {
       env: Array[Byte]
   ): Option[ClaimedContent] = {
     val magic = "openssh-key-v1\u0000".getBytes(
-      java.nio.charset.StandardCharsets.US_ASCII
+      US_ASCII
     )
     if (env.length < magic.length) None
     else if (
-      !java.util.Arrays.equals(
-        java.util.Arrays.copyOfRange(env, 0, magic.length),
+      !Arrays.equals(
+        Arrays.copyOfRange(env, 0, magic.length),
         magic
       )
     ) None
     else {
-      val body = java.util.Arrays.copyOfRange(env, magic.length, env.length)
+      val body = Arrays.copyOfRange(env, magic.length, env.length)
       val r = SshWireReader(body)
       val cipherName = r.readUtf8String().getOrElse("")
       val kdfName = r.readUtf8String().getOrElse("")
@@ -2081,7 +2119,7 @@ object Certificates {
 
   /** URL-encode a keystore alias. */
   private[strategies] def urlEncodeAlias(alias: String): String = {
-    java.net.URLEncoder.encode(alias, "UTF-8")
+    URLEncoder.encode(alias, "UTF-8")
   }
 }
 

@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import java.nio.file.Files
 
 /** Strategy-level SSH parser tests that cross-check fingerprints computed by
   * `Certificates.sshFingerprintB64` against the canonical `ssh-keygen -lf`
@@ -127,9 +128,9 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   // all 34 corpus fixtures parse successfully — an inadvertently-permissive
   // parser would pass every per-fixture test.
   test("parseSshPubkey: garbage input returns None") {
-    val tmp = java.io.File.createTempFile("garbage", ".pub")
+    val tmp = File.createTempFile("garbage", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       "not-an-algo AAAA comment\n".getBytes("UTF-8")
     )
@@ -138,9 +139,9 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   }
 
   test("parseSshPubkey: empty file returns None") {
-    val tmp = java.io.File.createTempFile("empty", ".pub")
+    val tmp = File.createTempFile("empty", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(tmp.toPath, "".getBytes("UTF-8"))
+    Files.write(tmp.toPath, "".getBytes("UTF-8"))
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
@@ -150,9 +151,9 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
     // → `innerAlg == alg` sanity check rejects it.
     val ed25519WireB64 =
       "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
-    val tmp = java.io.File.createTempFile("mismatch", ".pub")
+    val tmp = File.createTempFile("mismatch", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       s"ssh-rsa $ed25519WireB64 fake-comment\n".getBytes("UTF-8")
     )
@@ -166,11 +167,11 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   // contract so future refactors don't accidentally start claiming
   // option-prefixed lines (which could produce wrong fingerprints).
   test("parseSshPubkey: authorized_keys option-prefix line returns None") {
-    val tmp = java.io.File.createTempFile("auth-keys", ".pub")
+    val tmp = File.createTempFile("auth-keys", ".pub")
     tmp.deleteOnExit()
     val ed25519B64 =
       "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       s"from=\"1.2.3.4\",no-pty ssh-ed25519 $ed25519B64 user@host\n".getBytes(
         "UTF-8"
@@ -181,9 +182,9 @@ class SshStrategyParserTests extends GoatRodeoFunSuite {
   }
 
   test("parseSshCert: garbage input returns None") {
-    val tmp = java.io.File.createTempFile("garbage", ".pub")
+    val tmp = File.createTempFile("garbage", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       "not-an-algo-cert-v01@openssh.com AAAA\n".getBytes("UTF-8")
     )

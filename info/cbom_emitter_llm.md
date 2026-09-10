@@ -37,7 +37,7 @@ Two new command-line flags control the emitter:
 | Flag | Meaning | Default |
 |------|---------|---------|
 | `--emit-cbom-dir <dir>` | Output directory for CBOM files. Disabled when omitted. | None |
-| `--cbom-version <1.6\|1.7>` | CycloneDX specification version to emit. | `1.6` |
+| `--cbom-version <1.6\|1.7>` | CycloneDX specification version to emit. | `1.7` (default); `1.6` is legacy support. |
 
 Only `"1.6"` and `"1.7"` are accepted; other values are a parse error. — verified by ``CbomEmitterSuite` `CLI flags parse correctly`` and ``CbomEmitterSuite` `invalid --cbom-version rejected``.
 

@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PomParser
 import org.json4s.JsonDSL.*
+import org.json4s.native.JsonMethods
 import org.json4s.native.JsonMethods.compact
 import org.json4s.native.JsonMethods.render
 import org.scalacheck.Gen
@@ -36,6 +37,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
 
@@ -193,7 +195,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
     "extractIdentityFromFilename terminates for all inputs (isDefined or None, never crashes)"
   ) {
     forAll(genFilename) { filename =>
-      val result = scala.util.Try(
+      val result = Try(
         MavenState().resolveGroupIdArtifactIdVersionFromFilename(filename)
       )
       // Must not crash
@@ -367,7 +369,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
   ) {
     forAll(genDateStr) { s =>
       val state = MavenState()
-      val result = scala.util.Try(state.parseDateString(s))
+      val result = Try(state.parseDateString(s))
       // Must not crash
       result.isSuccess &&
       // Result must be an Option (Some or None)
@@ -382,7 +384,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
   property("PomParser.parse never crashes on arbitrary strings") {
     forAll(Gen.asciiStr) { s =>
       // Must not throw; returns Option
-      scala.util.Try(PomParser.parse(s)).isSuccess
+      Try(PomParser.parse(s)).isSuccess
     }
   }
 
@@ -458,7 +460,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
     "PomParser.parse terminates for all inputs (isDefined or None, never throws)"
   ) {
     forAll(genPomXml) { xml =>
-      val result = scala.util.Try(PomParser.parse(xml))
+      val result = Try(PomParser.parse(xml))
       // Must not crash
       result.isSuccess &&
       // If it succeeds it must be an Option (Some or None), never a thrown exception
@@ -513,7 +515,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
     "PomParser.resolveProperty terminates for all inputs (isDefined or None, never crashes)"
   ) {
     forAll(genProperties, genPropName) { (props, name) =>
-      val result = scala.util.Try(PomParser.resolveProperty(name, props))
+      val result = Try(PomParser.resolveProperty(name, props))
       // Must not crash
       result.isSuccess &&
       // Result must be an Option (Some or None)
@@ -568,7 +570,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
       // Parse JSON back
       import org.json4s.JsonAST._
       val parsed =
-        org.json4s.native.JsonMethods.parse(json).asInstanceOf[JArray]
+        JsonMethods.parse(json).asInstanceOf[JArray]
       val back = parsed.arr.map {
         case JObject(fields) =>
           val fieldMap = fields.toMap
@@ -1082,7 +1084,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
         "implementation-title" -> TreeSet(StringOrPair(s1)),
         "implementation-version" -> TreeSet(StringOrPair(s3))
       )
-      val result = scala.util.Try {
+      val result = Try {
         state.resolveGroupIdArtifactIdVersion(
           ByteWrapper(Array.emptyByteArray, s"$s2-$s3.jar", None),
           None,
@@ -1173,7 +1175,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
   } yield (g, a, v)
 
   private def createTestItem(id: String): Item =
-    Item(id, scala.collection.immutable.TreeSet.empty, None, None)
+    Item(id, TreeSet.empty, None, None)
 
   private def writeJarEntries(
       jarFile: File,
@@ -1515,7 +1517,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
                |  <version>$pomV</version>
                |</project>""".stripMargin
             val pomFile = new File(tempDir, s"$pomA-$pomV.pom")
-            java.nio.file.Files
+            Files
               .write(pomFile.toPath, pomContent.getBytes("UTF-8"))
 
             val srcWrapper =

@@ -162,7 +162,7 @@ case class Configuration(
     redactGitInfo: Boolean = true,
     progressListener: Option[ProgressListener] = None,
     cbomDir: Option[File] = None,
-    cbomVersion: String = "1.6",
+    cbomVersion: String = "1.7",
     logFilenames: Boolean = false,
     tamperEvidentLog: Option[File] = None,
     configFile: Option[File] = None,
@@ -170,22 +170,28 @@ case class Configuration(
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
 
-  /** A printable summary of the settings in force, one line per setting.
+  /** A printable summary of the non-default settings in force.
     *
     * For the run-start echo, so the log alone says what this run was told to
-    * do. Ambient state (`runtime`) is skipped — it describes how the process
-    * was started, not what the run was asked to do — and so is the
-    * [[ProgressListener]], which is an object, not a setting. The single
-    * formatter is shared by every field type, so a field added later is covered
-    * without anyone remembering to cover it.
+    * do. Settings equal to the defaults are omitted (a default run reads
+    * "Configuration: " with nothing after it), and ambient state (`runtime`) is
+    * skipped — it describes how the process was started, not what the run was
+    * asked to do — as is the [[ProgressListener]], which is an object, not a
+    * setting. The single formatter is shared by every field type, so a field
+    * added later is covered without anyone remembering to cover it.
     */
-  def operationalSummary: Vector[String] = {
+  def operationalSummary: String = {
+    val defaults = Configuration()
     val skip = Set("runtime", "progressListener")
     productElementNames
       .zip(productIterator)
-      .filterNot((name, _) => skip.contains(name))
-      .map((name, value) => f"  ${name} = ${echoValue(value)}")
-      .toVector
+      .zip(defaults.productIterator)
+      .filterNot { case ((name, _), _) => skip.contains(name) }
+      .collect {
+        case ((name, mine), theirs) if echoValue(mine) != echoValue(theirs) =>
+          f"${name} = ${echoValue(mine)}"
+      }
+      .mkString(", ")
   }
 
   /** Render one setting value for [[operationalSummary]], recursively for

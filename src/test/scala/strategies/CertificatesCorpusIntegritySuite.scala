@@ -15,6 +15,8 @@ limitations under the License. */
 package strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
+import scala.util.Try
+
 /** Structural-integrity assertions on the Certificates fixture corpus.
   *
   * ## LLM-friendly summary
@@ -108,7 +110,7 @@ class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
   test("every sidecar parses and declares required fields") {
     val sidecars = CertificatesFixtureInventory.allSidecars
     val errors = sidecars.flatMap { s =>
-      scala.util.Try(CertificatesSidecar.parse(s)).failed.toOption.map { e =>
+      Try(CertificatesSidecar.parse(s)).failed.toOption.map { e =>
         s"${s.getPath}: ${e.getMessage}"
       }
     }

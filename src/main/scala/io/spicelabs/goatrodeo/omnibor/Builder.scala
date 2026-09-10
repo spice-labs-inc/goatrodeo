@@ -37,9 +37,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** Build the GitOIDs the container and all the sub-elements found in the
@@ -90,7 +93,7 @@ object Builder {
       tag: Option[TagInfo],
       fileListers: Seq[(File, () => Seq[File])],
       ignorePathSet: Set[String],
-      excludeFileRegex: Seq[java.util.regex.Pattern],
+      excludeFileRegex: Seq[Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
       preWriteDB: Vector[Storage => Boolean] = Vector(),
@@ -613,11 +616,11 @@ object Builder {
                     cbomDir,
                     TamperEvidentLog.correlationId
                   ) match {
-                  case scala.util.Success(files) =>
+                  case Success(files) =>
                     logger.info(
                       f"Wrote ${files.length}%,d CBOM file(s) to ${cbomDir}"
                     )
-                  case scala.util.Failure(e) =>
+                  case Failure(e) =>
                     logger.error(
                       f"Failed to emit CBOMs to ${cbomDir}: ${e.getMessage()}",
                       e

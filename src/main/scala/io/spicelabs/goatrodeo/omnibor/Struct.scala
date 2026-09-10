@@ -16,6 +16,7 @@ limitations under the License. */
 
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
+import io.bullet.borer.Dom
 import io.bullet.borer.Encoder
 import io.bullet.borer.Writer
 import io.bullet.borer.derivation.key
@@ -338,7 +339,7 @@ object ItemTagData {
   * @param tag
   *   the tag data as a CBOR DOM element
   */
-case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
+case class ItemTagData(tag: Dom.Element) {
 
   /** Merge this tag data with another ItemTagData.
     *
@@ -351,16 +352,16 @@ case class ItemTagData(tag: io.bullet.borer.Dom.Element) {
 
     // Merge logic for Dom.Element
     val mergedTag = (this.tag, other.tag) match {
-      case (f1: io.bullet.borer.Dom.MapElem, f2: io.bullet.borer.Dom.MapElem) =>
-        io.bullet.borer.Dom.MapElem.Unsized(f1.members ++ f2.members)
+      case (f1: Dom.MapElem, f2: Dom.MapElem) =>
+        Dom.MapElem.Unsized(f1.members ++ f2.members)
       case (
-            a1: io.bullet.borer.Dom.ArrayElem,
-            a2: io.bullet.borer.Dom.ArrayElem
+            a1: Dom.ArrayElem,
+            a2: Dom.ArrayElem
           ) =>
-        io.bullet.borer.Dom.ArrayElem.Unsized(a1.elems ++ a2.elems)
-      case (a1: io.bullet.borer.Dom.ArrayElem, _) =>
+        Dom.ArrayElem.Unsized(a1.elems ++ a2.elems)
+      case (a1: Dom.ArrayElem, _) =>
         a1
-      case (_, a2: io.bullet.borer.Dom.ArrayElem) =>
+      case (_, a2: Dom.ArrayElem) =>
         a2
       case (a, _) =>
         a

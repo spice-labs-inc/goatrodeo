@@ -1,13 +1,16 @@
 package io.spicelabs.goatrodeo.util
 
+import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import org.eclipse.jgit.lib.*
+import org.eclipse.jgit.revwalk.RevCommit
 import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.Locale
 import scala.collection.mutable
 import scala.util.Try
 
@@ -51,7 +54,7 @@ object GitRunInfo {
   // Caps (per repo, seconds-level deadline)
   val MaxMessageLen = 262144
 
-  private val log = com.typesafe.scalalogging.Logger(getClass)
+  private val log = Logger(getClass)
 
   /** Discover each containing repo for the base paths (walk up, dedupe).
     * Returns the canonical worktree roots.
@@ -216,7 +219,7 @@ object GitRunInfo {
   }
 
   private def digestEmail(email: String): String = {
-    val norm = email.trim.toLowerCase(java.util.Locale.ROOT)
+    val norm = email.trim.toLowerCase(Locale.ROOT)
     val digest = MessageDigest
       .getInstance("SHA-256")
       .digest(norm.getBytes(StandardCharsets.UTF_8))
@@ -230,7 +233,7 @@ object GitRunInfo {
       redact: Boolean,
       repoRoot: File,
       scanRoots: Seq[File],
-      commit: org.eclipse.jgit.revwalk.RevCommit
+      commit: RevCommit
   ): Dom.MapElem = {
     val author = commit.getAuthorIdent
     val committer = commit.getCommitterIdent
@@ -259,7 +262,7 @@ object GitRunInfo {
       repoRoot: File,
       scanRoots: Seq[File],
       head: String,
-      commit: org.eclipse.jgit.revwalk.RevCommit
+      commit: RevCommit
   ): Dom.MapElem = {
     val fields = baseFields(redact, repoRoot, scanRoots) ++ Vector(
       "head_commit" -> Dom.StringElem(head)

@@ -1,7 +1,9 @@
 package io.spicelabs.goatrodeo.omnibor
+import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.GitRunInfo
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.PersonIdent
 
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -35,7 +37,7 @@ class GitProvenanceNotInCbomSuite extends GoatRodeoFunSuite {
     f.getParentFile.mkdirs()
     Files.write(f.toPath, "hello".getBytes(StandardCharsets.UTF_8))
     val git = Git.init().setDirectory(root).setInitialBranch("main").call()
-    val ident = new org.eclipse.jgit.lib.PersonIdent("T", "t@example.com")
+    val ident = new PersonIdent("T", "t@example.com")
     git.add().addFilepattern(".").call()
     // Fixture commits must never sign: JGit inherits the developer's global
     // git config, and `commit.gpgsign=true` with `gpg.format=ssh` makes JGit
@@ -64,7 +66,7 @@ class GitProvenanceNotInCbomSuite extends GoatRodeoFunSuite {
       )
       // body is a Dom map with no crypto "extra" — ItemMetaData is never produced
       assert(gi.json.members.forall {
-        case (io.bullet.borer.Dom.StringElem(k), _) =>
+        case (Dom.StringElem(k), _) =>
           !k.startsWith("Certificates:")
         case _ => true
       })

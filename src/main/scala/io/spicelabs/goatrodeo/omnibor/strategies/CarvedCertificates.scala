@@ -30,6 +30,7 @@ import io.spicelabs.goatrodeo.util.CarvedCertAugmenter
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
+import java.security.cert.X509Certificate
 import java.util.Arrays
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -152,7 +153,7 @@ class CarvedCertificatesState(artifact: ArtifactWrapper)
 
   private def readAndCarve(
       artifact: ArtifactWrapper
-  ): (Vector[java.security.cert.X509Certificate], Boolean) = {
+  ): (Vector[X509Certificate], Boolean) = {
     val bytes = Try {
       artifact.withStream { s =>
         val buf = new Array[Byte](CarvedCertAugmenter.MaxScanBytes)

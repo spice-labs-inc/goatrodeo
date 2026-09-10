@@ -28,6 +28,8 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.time.Instant
 import java.util.UUID
 import scala.annotation.tailrec
+import scala.collection.mutable.LinkedHashSet
+import scala.collection.mutable.Map as MutableMap
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -234,7 +236,7 @@ object CbomEmitter {
       }
       // Deduplicate synthetic algorithm components across the root by bom-ref,
       // preserving the first occurrence of each referenced algorithm.
-      val seen = scala.collection.mutable.LinkedHashSet[String]()
+      val seen = LinkedHashSet[String]()
       all.filter { c =>
         val ref = (c \ "bom-ref") match {
           case JString(s) => s
@@ -604,7 +606,7 @@ object CbomEmitter {
       extra: Map[String, Set[String]],
       chain: Vector[Item]
   ): (Option[JObject], Map[String, JObject]) = {
-    val algs = scala.collection.mutable.Map[String, JObject]()
+    val algs = MutableMap[String, JObject]()
 
     def addAlg(
         raw: String,
@@ -1257,6 +1259,6 @@ object CbomEmitter {
   }
 
   private def pathOf(f: File): Path = {
-    java.nio.file.Path.of(f.getAbsolutePath())
+    Path.of(f.getAbsolutePath())
   }
 }

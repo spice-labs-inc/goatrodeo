@@ -382,8 +382,8 @@ class MavenTestSuite extends GoatRodeoFunSuite {
     // Simulate ByteWrapper returning correct mime type
     val tempDir = Files.createTempDirectory("maventest")
     try {
-      val jarFile = new java.io.File(tempDir.toFile(), "test.jar")
-      val pomFile = new java.io.File(tempDir.toFile(), "test.pom")
+      val jarFile = new File(tempDir.toFile(), "test.jar")
+      val pomFile = new File(tempDir.toFile(), "test.pom")
 
       // Create minimal valid JAR (just zip header)
       Helpers.writeOverFile(
@@ -418,8 +418,8 @@ class MavenTestSuite extends GoatRodeoFunSuite {
   test("computeMavenFiles - excludes -sources.jar from main jars") {
     val tempDir = Files.createTempDirectory("mavenexclude")
     try {
-      val mainJar = new java.io.File(tempDir.toFile(), "test.jar")
-      val sourcesJar = new java.io.File(tempDir.toFile(), "test-sources.jar")
+      val mainJar = new File(tempDir.toFile(), "test.jar")
+      val sourcesJar = new File(tempDir.toFile(), "test-sources.jar")
 
       val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00,
         0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -456,7 +456,7 @@ class MavenTestSuite extends GoatRodeoFunSuite {
   test("computeMavenFiles - handles war files") {
     val tempDir = Files.createTempDirectory("mavenwar")
     try {
-      val warFile = new java.io.File(tempDir.toFile(), "test.war")
+      val warFile = new File(tempDir.toFile(), "test.war")
       val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00,
         0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)

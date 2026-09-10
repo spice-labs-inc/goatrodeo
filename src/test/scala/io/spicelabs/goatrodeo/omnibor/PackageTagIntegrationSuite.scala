@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
@@ -71,7 +72,7 @@ class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
   /** Helper to extract tag content from item as Map[String, Dom.Element] */
   def extractTagContent(
       item: Item
-  ): Option[Map[String, io.bullet.borer.Dom.Element]] = {
+  ): Option[Map[String, Dom.Element]] = {
     item.body.flatMap {
       case tagData: ItemTagData =>
         import io.bullet.borer.Dom
@@ -89,21 +90,21 @@ class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
 
   /** Helper to extract a string field from tag content */
   def stringField(
-      content: Map[String, io.bullet.borer.Dom.Element],
+      content: Map[String, Dom.Element],
       key: String
   ): Option[String] =
-    content.get(key).collect { case io.bullet.borer.Dom.StringElem(value) =>
+    content.get(key).collect { case Dom.StringElem(value) =>
       value
     }
 
   /** Helper to check if a boolean field is true */
   def isBooleanTrue(
-      content: Map[String, io.bullet.borer.Dom.Element],
+      content: Map[String, Dom.Element],
       key: String
   ): Boolean =
     content.get(key) match {
-      case Some(io.bullet.borer.Dom.BooleanElem(value)) => value
-      case _                                            => false
+      case Some(Dom.BooleanElem(value)) => value
+      case _                            => false
     }
 
   // ==================== Maven JAR Tests ====================

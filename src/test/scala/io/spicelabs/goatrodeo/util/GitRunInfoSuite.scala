@@ -1,8 +1,12 @@
 package io.spicelabs.goatrodeo.util
+import io.bullet.borer.Dom
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.PersonIdent
+import org.eclipse.jgit.revwalk.RevCommit
 
 import java.io.File
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
@@ -42,10 +46,10 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
   private def commitAll(
       git: Git,
       msg: String
-  ): org.eclipse.jgit.revwalk.RevCommit = {
+  ): RevCommit = {
     git.add().addFilepattern(".").call()
     val author =
-      new org.eclipse.jgit.lib.PersonIdent("Tester", "tester@example.com")
+      new PersonIdent("Tester", "tester@example.com")
     // Fixture commits must never sign: JGit inherits the developer's global
     // git config, and `commit.gpgsign=true` with `gpg.format=ssh` makes JGit
     // throw UnsupportedSigningFormatException (no SSH signer). setSign(false)
@@ -68,10 +72,10 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
 
   private def jsonOf(item: GitRunItem, key: String): Option[String] =
     item.json.members.collectFirst {
-      case (io.bullet.borer.Dom.StringElem(k), v) if k == key =>
+      case (Dom.StringElem(k), v) if k == key =>
         v match {
-          case io.bullet.borer.Dom.StringElem(s) => Some(s)
-          case _                                 => None
+          case Dom.StringElem(s) => Some(s)
+          case _                 => None
         }
     }.flatten
 
@@ -290,7 +294,7 @@ class GitRunInfoSuite extends GoatRodeoFunSuite {
     try {
       Files.createSymbolicLink(link.toPath, outside.toPath)
     } catch {
-      case _: UnsupportedOperationException | _: java.io.IOException =>
+      case _: UnsupportedOperationException | _: IOException =>
         fail("symlinks are required for this test")
     }
     val items = GitRunInfo.capture(

@@ -9,6 +9,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -130,7 +131,7 @@ class DotnetStreamingSuite extends GoatRodeoFunSuite {
       .withinAssemblyStream(new File("test_data/Smoke.dll")) { entries =>
         entries.map { e =>
           e.processStream { stream =>
-            val buf = new java.io.ByteArrayOutputStream()
+            val buf = new ByteArrayOutputStream()
             Helpers.copy(stream, buf)
             buf.size()
           }

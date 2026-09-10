@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util.Base64
 
 /** Hand-crafted security-key (sk-*) wire-format vectors.
@@ -75,7 +76,7 @@ class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
     val b64 = Base64.getEncoder.encodeToString(wire)
     val tmp = File.createTempFile("sk-vector", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       s"$algo $b64 $comment\n".getBytes(StandardCharsets.UTF_8)
     )

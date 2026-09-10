@@ -19,13 +19,16 @@ import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.nio.file.Path
 
 /** Parity between docker-save tars and OCI image layouts, against wild fixtures
   * fetched from public registries by pinned digest (see build.sbt `ociPins`).
@@ -100,7 +103,7 @@ class OciDockerParitySuite extends GoatRodeoFunSuite {
       val files = Files
         .walk(layoutDir.toPath())
         .toArray()
-        .map(_.asInstanceOf[java.nio.file.Path])
+        .map(_.asInstanceOf[Path])
         .filter(p =>
           Files.isRegularFile(p) && !p.getFileName.toString.startsWith(".")
         )
@@ -153,8 +156,8 @@ class OciDockerParitySuite extends GoatRodeoFunSuite {
 
   private def dockerManifestEntry(tar: File): JValue = {
     val stream =
-      new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
-        new java.io.FileInputStream(tar)
+      new TarArchiveInputStream(
+        new FileInputStream(tar)
       )
     try {
       var found: Option[JValue] = None
@@ -423,8 +426,8 @@ class OciDockerParitySuite extends GoatRodeoFunSuite {
       val pinned = pinnedConfigDigests(name)
       val dockerConfigReal = {
         val stream =
-          new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
-            new java.io.FileInputStream(dockerTar)
+          new TarArchiveInputStream(
+            new FileInputStream(dockerTar)
           )
         try {
           var found: Option[JValue] = None

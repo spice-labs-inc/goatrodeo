@@ -11,11 +11,14 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.file.Files
+import scala.collection.immutable.TreeSet
 
 class MavenParentPomMetadataSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, scala.collection.immutable.TreeSet.empty, None, None)
+    Item(id, TreeSet.empty, None, None)
 
   // ==================== 4.1: Parent POM Metadata ====================
 
@@ -87,7 +90,7 @@ class MavenParentPomMetadataSuite extends GoatRodeoFunSuite {
     import java.util.jar.{JarOutputStream, Manifest, Attributes}
     val manifest = new Manifest()
     manifest.getMainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0")
-    val jos = new JarOutputStream(new java.io.FileOutputStream(path), manifest)
+    val jos = new JarOutputStream(new FileOutputStream(path), manifest)
     jos.close()
   }
 
@@ -99,12 +102,12 @@ class MavenParentPomMetadataSuite extends GoatRodeoFunSuite {
 
     // Create a valid minimal JAR so Tika detects java-archive MIME
     createMinimalJar(jarFile)
-    java.nio.file.Files.write(
+    Files.write(
       pomFile.toPath,
       """<project><groupId>com.example</groupId><artifactId>my-artifact</artifactId><version>1.0.0</version></project>"""
         .getBytes("UTF-8")
     )
-    java.nio.file.Files
+    Files
       .write(metaFile.toPath, makeMetadataXml().getBytes("UTF-8"))
 
     try {

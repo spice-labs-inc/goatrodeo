@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
@@ -14,6 +15,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
@@ -29,9 +31,9 @@ class HelpersTestSuite extends GoatRodeoFunSuite {
     val temp = Files.createTempFile("readcbor-short", ".bin").toFile()
     try {
       Files.write(temp.toPath(), Array[Byte](1, 2))
-      val channel = new java.io.FileInputStream(temp).getChannel()
+      val channel = new FileInputStream(temp).getChannel()
       try {
-        val result = Helpers.readCBOR[io.spicelabs.goatrodeo.omnibor.Item](
+        val result = Helpers.readCBOR[Item](
           channel,
           8
         )

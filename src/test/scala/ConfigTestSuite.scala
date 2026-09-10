@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import io.spicelabs.goatrodeo.GoatRodeo
+import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.testsupport.LogCapture
 import io.spicelabs.goatrodeo.util.Configuration
@@ -23,6 +24,9 @@ import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.io.File
 import java.nio.file.Files
+import java.util.regex.Pattern
+import scala.util.Failure
+import scala.util.Success
 
 class ConfigTestSuite extends GoatRodeoFunSuite {
 
@@ -314,7 +318,6 @@ class ConfigTestSuite extends GoatRodeoFunSuite {
 
   test("Configuration - exclude patterns can be added") {
     import scala.util.Try
-    import java.util.regex.Pattern
 
     val pattern = ".*\\.html$"
     val config =
@@ -466,69 +469,74 @@ class ConfigTestSuite extends GoatRodeoFunSuite {
 
   // ==================== operational summary tests ====================
 
-  test("Configuration - operationalSummary lists effective settings only") {
-    val pattern = java.util.regex.Pattern.compile(".*\\.class")
+  test("Configuration - operationalSummary lists non-default settings only") {
+    val pattern = Pattern.compile(".*\\.class")
     val config = Configuration(
       threads = 12,
       build = Vector(File("/tmp/built/from/here")),
       tag = Some("test-tag"),
-      exclude = Vector("*.class" -> scala.util.Success(pattern)),
+      exclude = Vector("*.class" -> Success(pattern)),
       logging = Map("io.spicelabs.goatrodeo" -> "DEBUG"),
-      progressListener = Some(new io.spicelabs.goatrodeo.ProgressListener {
+      progressListener = Some(new ProgressListener {
         def onProgress(current: Long, total: Long): Unit = ()
       })
     )
     val summary = config.operationalSummary
+    // one line, comma-separated, only the settings that differ from defaults
     assert(
-      summary.exists(_.contains("threads = 12")),
+      summary.contains("threads = 12"),
       s"threads must appear: $summary"
     )
     assert(
-      summary.exists(_.contains("/tmp/built/from/here")),
+      summary.contains("/tmp/built/from/here"),
       s"build roots must appear: $summary"
     )
     assert(
-      summary.exists(_.contains("test-tag")),
+      summary.contains("test-tag"),
       s"tag must appear: $summary"
     )
     assert(
-      summary.exists(_.contains(".*\\.class")),
+      summary.contains(".*\\.class"),
       s"exclude patterns must appear: $summary"
     )
     assert(
-      summary.exists(_.contains("DEBUG")),
+      summary.contains("DEBUG"),
       s"logging settings must appear: $summary"
     )
     assert(
-      !summary.exists(_.startsWith("runtime")),
+      !summary.contains("maxRecords"),
+      s"default settings must be omitted: $summary"
+    )
+    assert(
+      !summary.contains("cbomVersion"),
+      s"default settings must be omitted: $summary"
+    )
+    assert(
+      !summary.contains("runtime"),
       s"ambient runtime state must not be echoed: $summary"
     )
     assert(
-      !summary.exists(_.startsWith("progressListener")),
+      !summary.contains("progressListener"),
       s"the listener object must not be echoed: $summary"
     )
   }
 
   test("Configuration - operationalSummary names an invalid exclude pattern") {
     val config = Configuration(
-      exclude = Vector("bad(" -> scala.util.Failure(new RuntimeException("no")))
+      exclude = Vector("bad(" -> Failure(new RuntimeException("no")))
     )
     val summary = config.operationalSummary
     assert(
-      summary.exists(_.contains("bad(")) &&
-        summary.exists(_.contains("invalid")),
+      summary.contains("bad(") && summary.contains("invalid"),
       s"invalid patterns must be visible as invalid: $summary"
     )
   }
 
-  test("Configuration - operationalSummary renders the default mime filter") {
-    // The default filter includes everything and must read that way in the
-    // echo, not as an object identity hash.
+  test("Configuration - operationalSummary is empty for a default run") {
+    // Defaults are omitted, so an untouched configuration summarizes to an
+    // empty string — the run-start line then reads "all defaults".
     val summary = Configuration().operationalSummary
-    assert(
-      summary.exists(_.contains("no filters")),
-      s"the default filter must read as empty: $summary"
-    )
+    assertEquals(summary, "", s"defaults must be omitted: $summary")
   }
 
   // ==================== run-start configuration echo ====================
@@ -547,7 +555,10 @@ class ConfigTestSuite extends GoatRodeoFunSuite {
           s"data $i\n"
         )
       }
-      val (_, captured) = LogCapture.apply(() => {
+      // INFO capture only: the assertion needs the run's own INFO lines, and
+      // raising the root level (as LogCapture.apply does) would leak every
+      // concurrently-running suite's DEBUG output into the console.
+      val (_, captured) = LogCapture.applyWithoutRaise(() => {
         GoatRodeo
           .builder()
           .withPayload(payloadDir.getAbsolutePath)
@@ -557,20 +568,25 @@ class ConfigTestSuite extends GoatRodeoFunSuite {
         ()
       })
       val lines = captured.map(_.getFormattedMessage)
+      val echoLines = lines.filter(_.startsWith("Configuration"))
       assert(
-        lines.exists(_.contains("Configuration:")),
-        s"a Configuration: header must be logged: $lines"
+        echoLines.size == 1,
+        s"the echo must be exactly one line: $lines"
       )
       assert(
-        lines.exists(l => l.contains("threads = 2")),
+        echoLines.head.contains("threads = 2"),
         s"the echo must carry the effective settings: $lines"
       )
       assert(
-        lines.exists(l => l.contains(payloadDir.getAbsolutePath)),
+        echoLines.head.contains(payloadDir.getAbsolutePath),
         s"the echo must carry the build roots: $lines"
       )
       assert(
-        !lines.exists(_.contains("progressListener")),
+        !echoLines.head.contains("maxRecords"),
+        s"default settings must be omitted from the echo: $echoLines"
+      )
+      assert(
+        !echoLines.head.contains("progressListener"),
         s"the listener object must not be echoed: $lines"
       )
     } finally {

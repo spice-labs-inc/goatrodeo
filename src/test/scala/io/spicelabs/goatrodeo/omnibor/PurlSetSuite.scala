@@ -16,6 +16,8 @@ package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
+import java.util.Collections
+
 /** Unit tests for the [[PurlSet]] type.
   *
   * ==What these tests test==
@@ -84,7 +86,7 @@ class PurlSetSuite extends GoatRodeoFunSuite {
       null, // maven requires a namespace — this will throw on toCanonical
       name,
       null,
-      java.util.Collections.emptyMap[String, String](),
+      Collections.emptyMap[String, String](),
       null
     )
   }

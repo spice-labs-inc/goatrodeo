@@ -17,6 +17,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import java.nio.file.Files
 
 /** Strategy-level PGP parser tests with `gpg --show-keys --with-fingerprint`
   * ground truth.
@@ -272,17 +273,17 @@ class PgpStrategyParserTests extends GoatRodeoFunSuite {
   }
 
   test("parsePgpKeyRing: garbage input returns None") {
-    val tmp = java.io.File.createTempFile("garbage", ".asc")
+    val tmp = File.createTempFile("garbage", ".asc")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(tmp.toPath, "not a pgp file\n".getBytes("UTF-8"))
+    Files.write(tmp.toPath, "not a pgp file\n".getBytes("UTF-8"))
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parsePgpKeyRing(w), None)
   }
 
   test("parsePgpKeyRing: empty file returns None") {
-    val tmp = java.io.File.createTempFile("empty", ".asc")
+    val tmp = File.createTempFile("empty", ".asc")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(tmp.toPath, "".getBytes("UTF-8"))
+    Files.write(tmp.toPath, "".getBytes("UTF-8"))
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parsePgpKeyRing(w), None)
   }

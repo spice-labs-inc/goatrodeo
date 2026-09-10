@@ -15,7 +15,10 @@ import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.PomParser
 
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.file.Files
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -630,10 +633,10 @@ class MavenDependencyLicenseSuite extends GoatRodeoFunSuite {
       entries: Seq[(String, String)]
   ): Unit = {
     val zos =
-      new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(jarFile))
+      new ZipOutputStream(new FileOutputStream(jarFile))
     try {
       for ((path, content) <- entries) {
-        zos.putNextEntry(new java.util.zip.ZipEntry(path))
+        zos.putNextEntry(new ZipEntry(path))
         zos.write(content.getBytes("UTF-8"))
         zos.closeEntry()
       }

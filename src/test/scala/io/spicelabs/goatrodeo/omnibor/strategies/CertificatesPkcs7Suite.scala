@@ -1,9 +1,13 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.strategies.Certificates
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** Certificates PKCS#7 claim + parse .
@@ -26,9 +30,9 @@ import scala.util.Try
 class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
 
   private val pkcs7Mime =
-    io.spicelabs.goatrodeo.omnibor.strategies.Certificates.CertPkcs7Mime
+    Certificates.CertPkcs7Mime
   private val pkixCertMime =
-    io.spicelabs.goatrodeo.omnibor.strategies.Certificates.CertPkixMime
+    Certificates.CertPkixMime
   private val pkcs7MimeLegacy = "application/pkcs7-mime"
 
   private def wrapperFor(
@@ -42,7 +46,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     // creating the wrapper with the hint and relying on augmented sets.
     // For tests that need a precise MIME set we pass a FileWrapper and
     // call the internal dispatch with the set constructed directly.
-    io.spicelabs.goatrodeo.util.ByteWrapper(bytes, name, None, mimeHint = hint)
+    ByteWrapper(bytes, name, None, mimeHint = hint)
   }
 
   private def claimed(
@@ -135,8 +139,8 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     ) // truncated SEQUENCE
     val w = wrapperFor(bad, "bad.p7b", Set(), Some(pkcs7Mime))
     Try(parse(w)) match {
-      case scala.util.Success(v) => assertEquals(v, None)
-      case scala.util.Failure(e) =>
+      case Success(v) => assertEquals(v, None)
+      case Failure(e) =>
         fail(s"parse must not throw: ${e.getMessage}")
     }
   }

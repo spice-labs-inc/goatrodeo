@@ -13,8 +13,10 @@ import org.scalacheck.Prop.forAll
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.Arrays
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** ScalaCheck properties over the private-key corpus.
   *
@@ -102,14 +104,14 @@ class PrivateKeyPropertyTests extends GoatRodeoScalaCheckSuite {
           ax.keySize == bx.keySize &&
           ax.curve == bx.curve &&
           ax.params == bx.params &&
-          java.util.Arrays.equals(ax.spkiBytes, bx.spkiBytes)
+          Arrays.equals(ax.spkiBytes, bx.spkiBytes)
         case (
               Some(ax: Certificates.PrivateKeyPlaintextOpenSsh),
               Some(bx: Certificates.PrivateKeyPlaintextOpenSsh)
             ) =>
           ax.algName == bx.algName &&
           ax.rsaModulusBits == bx.rsaModulusBits &&
-          java.util.Arrays.equals(ax.wireBytes, bx.wireBytes)
+          Arrays.equals(ax.wireBytes, bx.wireBytes)
         case (
               Some(ax: Certificates.PrivateKeyPlaintextPgp),
               Some(bx: Certificates.PrivateKeyPlaintextPgp)
@@ -177,11 +179,10 @@ class PrivateKeyPropertyTests extends GoatRodeoScalaCheckSuite {
           val state = new CertificatesState(wrap(f), Some(claim))
           // getMetadata runs assertNoLeak internally. If it raises,
           // the property fails.
-          scala.util
-            .Try {
-              val _ = state.getMetadata(wrap(f), stubItem(), SingleMarker())
-              true
-            }
+          Try {
+            val _ = state.getMetadata(wrap(f), stubItem(), SingleMarker())
+            true
+          }
             .getOrElse(false)
       }
     }

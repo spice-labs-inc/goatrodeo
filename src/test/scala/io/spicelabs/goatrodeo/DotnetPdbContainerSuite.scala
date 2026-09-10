@@ -6,6 +6,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
+import java.util.zip.ZipFile
 import scala.util.Try
 
 /** Cilantro 0.4.0 PDB-as-container (user design: a PDB is just a container;
@@ -35,7 +36,7 @@ import scala.util.Try
 class DotnetPdbContainerSuite extends GoatRodeoFunSuite {
 
   private def pollyPdbWrapper(): ArtifactWrapper = {
-    val zip = new java.util.zip.ZipFile("test_data/dotnet/polly.8.4.1.nupkg")
+    val zip = new ZipFile("test_data/dotnet/polly.8.4.1.nupkg")
     try {
       val e = zip.getEntry("lib/net6.0/Polly.pdb")
       val in = zip.getInputStream(e)

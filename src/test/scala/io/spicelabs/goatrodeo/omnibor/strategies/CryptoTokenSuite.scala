@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 
+import java.util.Base64
 import scala.collection.immutable.TreeSet
 
 /** JWT/JWK inventory.
@@ -33,10 +34,10 @@ class CryptoTokenSuite extends GoatRodeoFunSuite {
   private val jwkAdHoc = MKC.adHoc("JWK")
 
   private def b64url(s: String): String =
-    java.util.Base64.getUrlEncoder.withoutPadding
+    Base64.getUrlEncoder.withoutPadding
       .encodeToString(s.getBytes("UTF-8"))
   private def b64url(bytes: Array[Byte]): String =
-    java.util.Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
+    Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
 
   private def artifact(name: String, content: String): ByteWrapper =
     ByteWrapper(content.getBytes("UTF-8"), name, None)

@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo
 import io.spicelabs.cilantro.AssemblyWalker
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.omnibor.ToProcess
@@ -8,7 +9,9 @@ import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 
+import java.io.ByteArrayOutputStream
 import java.io.File
+import scala.collection.immutable.TreeSet
 
 /** Cilantro 0.3.1 canonical-type JSON surfaced as Item metadata (GRW-6).
   *
@@ -48,7 +51,7 @@ class DotnetTypeMetadataSuite extends GoatRodeoFunSuite {
 
   private def buildAndFindAssembly(
       path: String
-  ): Option[io.spicelabs.goatrodeo.omnibor.Item] = {
+  ): Option[Item] = {
     val wrapper = FileWrapper(new File(path), path, None)
     val store = ToProcess.buildGraphFromArtifactWrapper(wrapper)
     // Find the Item that carries the cilantro:TypeJson metadata (the
@@ -70,7 +73,7 @@ class DotnetTypeMetadataSuite extends GoatRodeoFunSuite {
     )
     val jsonValues = itemOpt.get.bodyAsItemMetaData
       .flatMap(_.extra.get(typeJsonKey))
-      .getOrElse(scala.collection.immutable.TreeSet.empty[StringOrPair])
+      .getOrElse(TreeSet.empty[StringOrPair])
     assert(
       jsonValues.nonEmpty,
       "the assembly must have at least one canonical type JSON"
@@ -83,7 +86,7 @@ class DotnetTypeMetadataSuite extends GoatRodeoFunSuite {
     val itemOpt = buildAndFindAssembly("test_data/Smoke.dll")
     val jsonValues = itemOpt.get.bodyAsItemMetaData
       .flatMap(_.extra.get(typeJsonKey))
-      .getOrElse(scala.collection.immutable.TreeSet.empty[StringOrPair])
+      .getOrElse(TreeSet.empty[StringOrPair])
     // The canonical JSON is a deterministic, versioned object. Spot-check
     // the format marker: it should be a JSON object with a format marker
     // ("cilantro-type" v1) as produced by Cilantro's CanonicalJson.
@@ -122,7 +125,7 @@ class DotnetTypeMetadataSuite extends GoatRodeoFunSuite {
           .filter(_.mimeHint.contains("cilantro/type"))
           .map { e =>
             e.processStream { stream =>
-              val bos = new java.io.ByteArrayOutputStream()
+              val bos = new ByteArrayOutputStream()
               Helpers.copy(stream, bos)
               new String(bos.toByteArray(), "UTF-8")
             }

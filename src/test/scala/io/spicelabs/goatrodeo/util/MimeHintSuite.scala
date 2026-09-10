@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.util
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import org.scalacheck.Test.Parameters.default
 
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
@@ -168,7 +169,7 @@ class MimeHintSuite extends GoatRodeoFunSuite {
       ) || detected == "application/json" // JSON may be misdetected as octet-stream for 1 byte
     }
     prop.check(
-      org.scalacheck.Test.Parameters.default.withMinSuccessfulTests(50)
+      default.withMinSuccessfulTests(50)
     )
   }
 }

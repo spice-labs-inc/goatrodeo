@@ -22,19 +22,23 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v2CRLBuilder
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentSigner
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
+import java.io.ByteArrayInputStream
 import java.io.OutputStream
 import java.math.BigInteger
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
 import java.security.Security
+import java.security.cert.CertificateFactory
 import java.security.cert.X509CRL
 import java.security.cert.X509Certificate
 import java.util.Calendar
 import java.util.Date
+import javax.security.auth.x500.X500Principal
 
 /** Red-phase tests demonstrating that the current string-concat pURL
   * construction crashes on adversarial qualifier values.
@@ -79,7 +83,7 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
 
   if (Security.getProvider("BC") == null) {
     Security.addProvider(
-      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      new BouncyCastleProvider()
     )
   }
 
@@ -563,7 +567,7 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
   private def buildCrlWithUnknownSigOid(
       pair: KeyPair
   ): X509CRL = {
-    val issuer = new javax.security.auth.x500.X500Principal(
+    val issuer = new X500Principal(
       "CN=PurlUnknownOidTest, O=GoatRodeo"
     )
     val now = new Date()
@@ -585,9 +589,9 @@ class PurlConstructionTests extends GoatRodeoFunSuite {
       override def getSignature: Array[Byte] = realSigner.getSignature
     }
     val holder = builder.build(signerWithFakeOid)
-    val cf = java.security.cert.CertificateFactory.getInstance("X.509", "BC")
+    val cf = CertificateFactory.getInstance("X.509", "BC")
     cf.generateCRL(
-      new java.io.ByteArrayInputStream(holder.getEncoded)
+      new ByteArrayInputStream(holder.getEncoded)
     ).asInstanceOf[X509CRL]
   }
 }

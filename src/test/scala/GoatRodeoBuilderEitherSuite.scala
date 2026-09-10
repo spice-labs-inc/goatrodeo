@@ -1,6 +1,7 @@
 import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.TomlTables
 import org.tomlj.Toml
 
@@ -112,7 +113,7 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
     val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
     field.setAccessible(true)
     val config =
-      field.get(applied).asInstanceOf[io.spicelabs.goatrodeo.util.Configuration]
+      field.get(applied).asInstanceOf[Configuration]
     assertEquals(config.threads, 11)
     assertEquals(config.maxRecords, 4242)
   }
@@ -132,7 +133,7 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
     val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
     field.setAccessible(true)
     val config =
-      field.get(builder).asInstanceOf[io.spicelabs.goatrodeo.util.Configuration]
+      field.get(builder).asInstanceOf[Configuration]
     assertEquals(
       config.threads,
       2,

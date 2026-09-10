@@ -3,6 +3,9 @@ package io.spicelabs.goatrodeo.omnibor
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
+import io.bullet.borer.Dom.Element
+import io.bullet.borer.Dom.MapElem
+import io.bullet.borer.Dom.StringElem
 import io.bullet.borer.Encoder
 import io.bullet.borer.Reader
 import io.bullet.borer.Writer
@@ -12,6 +15,7 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
+import java.util.Date
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.*
@@ -518,34 +522,33 @@ object Item {
     */
   def decode(bytes: Array[Byte]): Try[Item] = {
     val expectedKeys = Vector(
-      io.bullet.borer.Dom.StringElem("body"),
-      io.bullet.borer.Dom.StringElem("body_mime_type"),
-      io.bullet.borer.Dom.StringElem("connections"),
-      io.bullet.borer.Dom.StringElem("identifier")
+      StringElem("body"),
+      StringElem("body_mime_type"),
+      StringElem("connections"),
+      StringElem("identifier")
     )
-    Try(Cbor.decode(bytes).to[io.bullet.borer.Dom.Element].value).flatMap {
-      el =>
-        mapKeys(el) match {
-          case Some(keys) if keys == expectedKeys =>
-            Try(Cbor.decode(bytes).to[Item].value)
-          case _ =>
-            val seen =
-              mapKeys(el).map(_.take(8)).getOrElse(Vector("not a CBOR map"))
-            Failure(
-              new Exception(
-                s"Expected Item map with keys body, body_mime_type, connections, identifier in encoder order, got $seen"
-              )
+    Try(Cbor.decode(bytes).to[Element].value).flatMap { el =>
+      mapKeys(el) match {
+        case Some(keys) if keys == expectedKeys =>
+          Try(Cbor.decode(bytes).to[Item].value)
+        case _ =>
+          val seen =
+            mapKeys(el).map(_.take(8)).getOrElse(Vector("not a CBOR map"))
+          Failure(
+            new Exception(
+              s"Expected Item map with keys body, body_mime_type, connections, identifier in encoder order, got $seen"
             )
-        }
+          )
+      }
     }
   }
 
   /** The ordered keys of a Dom map, or None when the element is not a map. */
   private def mapKeys(
-      el: io.bullet.borer.Dom.Element
-  ): Option[Vector[io.bullet.borer.Dom.Element]] =
+      el: Element
+  ): Option[Vector[Element]] =
     el match {
-      case m: io.bullet.borer.Dom.MapElem =>
+      case m: MapElem =>
         Some(m.members.map(_._1).toVector)
       case _ => None
     }
@@ -559,7 +562,7 @@ object Item {
   * @param extra
   *   optional additional JSON/CBOR data to include with the tag
   */
-case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])
+case class TagInfo(name: String, extra: Option[Element])
 
 /** Information for per-package tagging.
   *
@@ -573,7 +576,7 @@ case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])
 case class PackageTagInfo(
     name: String,
     version: Option[String],
-    date: Option[java.util.Date]
+    date: Option[Date]
 )
 
 object PackageTagInfo {
@@ -593,7 +596,7 @@ object PackageTagInfo {
   def toJson(info: PackageTagInfo): String = {
     val dateStr = info.date
       .map(formatDateISO8601)
-      .getOrElse(formatDateISO8601(new java.util.Date()))
+      .getOrElse(formatDateISO8601(new Date()))
 
     val json = info.version match {
       case Some(ver) =>
@@ -610,9 +613,9 @@ object PackageTagInfo {
 
   /** Format a Date as ISO 8601 string (public version).
     */
-  def toIso8601(date: java.util.Date): String = formatDateISO8601(date)
+  def toIso8601(date: Date): String = formatDateISO8601(date)
 
-  private def formatDateISO8601(date: java.util.Date): String = {
+  private def formatDateISO8601(date: Date): String = {
     val tz = TimeZone.getTimeZone("UTC")
     val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
     df.setTimeZone(tz)

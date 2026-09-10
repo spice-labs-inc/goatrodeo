@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import java.lang.Double as JDouble
+import java.util.Arrays
 
 /** An adaptive concurrency controller for I/O-heavy passes.
   *
@@ -103,7 +105,7 @@ final class AdaptiveParallelism private (
     */
   def record(completionNanos: Long): Unit = synchronized {
     if (count == times.length) {
-      times = java.util.Arrays.copyOf(times, times.length * 2)
+      times = Arrays.copyOf(times, times.length * 2)
     }
     times(count) = math.max(0L, completionNanos)
     count += 1
@@ -123,7 +125,7 @@ final class AdaptiveParallelism private (
     }
     val n = count
     count = 0
-    java.util.Arrays.sort(times, 0, n)
+    Arrays.sort(times, 0, n)
     val median: Double =
       if (n % 2 == 1) times(n / 2).toDouble
       else (times(n / 2 - 1).toDouble + times(n / 2).toDouble) / 2.0
@@ -189,7 +191,7 @@ object AdaptiveParallelism {
       hi: Double,
       dflt: Double
   ): Double = {
-    if (java.lang.Double.isFinite(v) && v >= lo && v <= hi) v else dflt
+    if (JDouble.isFinite(v) && v >= lo && v <= hi) v else dflt
   }
 
   /** Build a controller with clamped parameters (never raises). See the class

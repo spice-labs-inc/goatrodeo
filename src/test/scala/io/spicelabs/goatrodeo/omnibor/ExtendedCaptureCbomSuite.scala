@@ -19,6 +19,7 @@ import org.json4s.native.JsonMethods.*
 
 import java.io.File
 import java.nio.file.Files
+import java.util.Comparator
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -81,7 +82,7 @@ class ExtendedCaptureCbomSuite extends GoatRodeoFunSuite {
     if (dir != null && dir.exists()) {
       Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(Files.delete(_))
       ()
     }

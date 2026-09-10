@@ -8,6 +8,7 @@ import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
@@ -15,10 +16,12 @@ import io.spicelabs.goatrodeo.util.config
 
 import java.io.File
 import java.time.Instant
+import java.util.Date
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -465,7 +468,7 @@ trait ToProcess {
                     }
 
                     // Resolve date (use provided or current)
-                    val resolvedDate = info.date.getOrElse(new java.util.Date())
+                    val resolvedDate = info.date.getOrElse(new Date())
                     val dateStr = PackageTagInfo.toIso8601(resolvedDate)
 
                     // Build tag JSON using borer Dom.Element
@@ -489,7 +492,7 @@ trait ToProcess {
 
                     import io.bullet.borer.Json
                     val jsonString = Json.encode(tagJson).toUtf8String
-                    val tagGitoid = io.spicelabs.goatrodeo.util.GitOIDUtils
+                    val tagGitoid = GitOIDUtils
                       .urlForString(jsonString)
 
                     // Write tag item — unified with "tags" root
@@ -831,6 +834,7 @@ object ToProcess {
 
     if (infoMsgs_? && largeCnt_?)
       logger.info("Creating strategies for artifacts")
+    if (infoMsgs_? && largeCnt_?) logger.debug("Built UUID map")
     // Progress for this pass is time-based: on a fast machine the loop ends
     // long before the first 30-second tick, which is the point — these lines
     // exist only to show that a slow setup is still working. The pass is
@@ -849,7 +853,6 @@ object ToProcess {
       f.uuid -> f
     }*)
 
-    if (infoMsgs_? && largeCnt_?) logger.debug("Built UUID map")
     // Keyed by full path (not bare filename) so that strategies can
     // disambiguate files with the same name in different directories.
     // groupBy preserves per-key insertion order and avoids the O(n)
@@ -881,6 +884,9 @@ object ToProcess {
         )
       }
 
+    if (infoMsgs_? && largeCnt_?)
+      logger.debug("Finished setting files up")
+
     processSet
 
   }
@@ -888,7 +894,7 @@ object ToProcess {
   def buildQueueOnSeparateThread(
       fileListers: Seq[(File, () => Seq[File])],
       ignorePathList: Set[String],
-      excludeFileRegex: Seq[java.util.regex.Pattern],
+      excludeFileRegex: Seq[Pattern],
       finishedFile: File => Unit,
       tempDir: Option[File],
       count: AtomicInteger,
@@ -948,18 +954,16 @@ object ToProcess {
         strategiesForArtifacts(
           allFiles,
           toProcess => {
-            queue.add(toProcess)
             val total = count.addAndGet(toProcess.itemCnt)
             if (total % 1000 == 0) {
               logger.debug(
                 f"built strategies to handle ${total}%,d of ${allFiles.length}%,d"
               )
             }
+            queue.add(toProcess)
           },
           true
         )
-
-        logger.debug("Finished setting files up")
       } catch {
         case e: Exception =>
           logger.error(f"Failed to build graph ${e.getMessage()}")

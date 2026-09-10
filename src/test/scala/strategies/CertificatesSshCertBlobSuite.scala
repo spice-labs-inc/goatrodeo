@@ -6,6 +6,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import scala.util.Try
 
 /** Certificates.parseSshCertBlob returns None instead of throwing for cert-type
   * mismatch and unsupported key algorithms.
@@ -166,7 +167,7 @@ class CertificatesSshCertBlobSuite extends GoatRodeoFunSuite {
       ("ssh-rsa-cert-v01@openssh.com", "ssh-rsa", Array.emptyByteArray)
     )
     cases.foreach { case (certType, signedAlg, wire) =>
-      val result = scala.util.Try(
+      val result = Try(
         Certificates.parseSshCertBlob(certType, signedAlg, wire, None)
       )
       assert(

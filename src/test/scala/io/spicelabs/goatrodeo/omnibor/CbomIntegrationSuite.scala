@@ -17,10 +17,12 @@ package io.spicelabs.goatrodeo.omnibor
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
+import org.json4s.native.JsonMethods
 
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.Comparator
 
 /** End-to-end integration test for CycloneDX CBOM emission.
   *
@@ -62,7 +64,7 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
     if (dir.exists()) {
       Files
         .walk(dir.toPath)
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(p => Files.deleteIfExists(p))
       ()
     }
@@ -121,7 +123,7 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
       )
 
       val allTypes = cbomFiles.flatMap { file =>
-        val root = org.json4s.native.JsonMethods.parse(
+        val root = JsonMethods.parse(
           Files.readString(file.toPath())
         )
         assert(
@@ -147,7 +149,7 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
 
       val allNames = cbomFiles
         .flatMap { file =>
-          val root = org.json4s.native.JsonMethods.parse(
+          val root = JsonMethods.parse(
             Files.readString(file.toPath())
           )
           (root \ "components") match {
@@ -202,14 +204,14 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
         outputDir.listFiles(f => f.getName.endsWith("_checksum.json"))
       assertEquals(checksums.length, 1, "exactly one checksum file")
       val checksum =
-        org.json4s.native.JsonMethods
+        JsonMethods
           .parse(Files.readString(checksums(0).toPath()))
       val corrId = text(checksum, "correlation_id")
       assert(corrId.nonEmpty, "checksum should carry a correlation ID")
       val cboms = outputDir.listFiles(f => f.getName.startsWith("cbom_"))
       assert(cboms != null && cboms.nonEmpty, "should emit CBOMs")
       val cbom =
-        org.json4s.native.JsonMethods.parse(Files.readString(cboms(0).toPath()))
+        JsonMethods.parse(Files.readString(cboms(0).toPath()))
       val topProps = (cbom \ "properties") match {
         case JArray(ps) =>
           ps.collect { case o: JObject =>

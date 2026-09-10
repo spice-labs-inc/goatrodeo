@@ -1,6 +1,7 @@
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors. Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
@@ -9,9 +10,12 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.OpenSSLConfigDetector
 import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
 
+import java.io.ByteArrayOutputStream
+import java.io.File
 import scala.collection.immutable.TreeSet
 
 /** Tests for the OpenSSL config capture strategy.
@@ -337,7 +341,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     val cnfBytes = basicConfig.getBytes("UTF-8")
 
     // Build TAR containing the config.
-    val tarBaos = new java.io.ByteArrayOutputStream()
+    val tarBaos = new ByteArrayOutputStream()
     val tarOut = new TarArchiveOutputStream(tarBaos)
     val tarEntry = new TarArchiveEntry("etc/ssl/openssl.cnf")
     tarEntry.setSize(cnfBytes.length)
@@ -347,7 +351,7 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
     tarOut.close()
 
     // Build ZIP containing the TAR.
-    val zipBaos = new java.io.ByteArrayOutputStream()
+    val zipBaos = new ByteArrayOutputStream()
     val zipOut = new ZipArchiveOutputStream(zipBaos)
     val zipEntry = new ZipArchiveEntry("nested.tar")
     zipEntry.setSize(tarBaos.size())
@@ -379,12 +383,12 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
   }
 
   test("strategy does not steal PEM certificates") {
-    val certFile = new java.io.File(
+    val certFile = new File(
       "test_data/certificates/x509/synthetic/rsa-2048-selfsigned.pem"
     )
     assert(certFile.exists(), "test certificate fixture must exist")
     val cert =
-      io.spicelabs.goatrodeo.util.FileWrapper(certFile, "cert.pem", None)
+      FileWrapper(certFile, "cert.pem", None)
     val cnf = configArtifact("openssl.cnf", basicConfig)
 
     assert(cert.mimeType.contains("application/x-pem-file"))
@@ -479,8 +483,8 @@ class OpenSSLConfigSuite extends GoatRodeoFunSuite {
 
 /** Helper for creating minimal Items in tests. */
 object ItemTestHelper {
-  def testItem(id: String): io.spicelabs.goatrodeo.omnibor.Item = {
-    io.spicelabs.goatrodeo.omnibor.Item(
+  def testItem(id: String): Item = {
+    Item(
       id,
       TreeSet.empty,
       None,

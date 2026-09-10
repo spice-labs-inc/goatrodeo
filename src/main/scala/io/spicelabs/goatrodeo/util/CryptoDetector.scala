@@ -19,6 +19,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.ByteArrayInputStream
 import java.security.Security
 import java.security.cert.CertificateFactory
+import scala.collection.mutable.Builder
 import scala.util.Try
 
 /** Detects cryptographic file formats (X.509, keystores, PGP, SSH, CRLs,
@@ -142,7 +143,7 @@ object CryptoDetector {
 
   private def detectPemHeaders(
       text: String,
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     val begin = "-----BEGIN CERTIFICATE-----"
     val certCount = countOccurrences(text, begin)
@@ -193,7 +194,7 @@ object CryptoDetector {
 
   private def detectSshWireFormat(
       text: String,
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     // SSH pubkey / authorized_keys files: `<token> <base64-blob> <comment>`
     val lines = text.split("\\r?\\n")
@@ -228,7 +229,7 @@ object CryptoDetector {
 
   private def detectMagicBytes(
       prefix: Array[Byte],
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     if (prefix.length >= 4) {
       val (b0, b1, b2, b3) =
@@ -243,7 +244,7 @@ object CryptoDetector {
 
   private def detectPgpBinary(
       prefix: Array[Byte],
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     // OpenPGP packet-tag bytes per RFC 4880 §4.2
     if (prefix.length >= 1) {
@@ -262,7 +263,7 @@ object CryptoDetector {
       prefix: Array[Byte],
       filename: String,
       fullDer: Array[Byte],
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     if (prefix.length < 4) return
     val (b0, b1) = (prefix(0) & 0xff, prefix(1) & 0xff)
@@ -293,7 +294,7 @@ object CryptoDetector {
   /** Detect DER-encoded PKCS#7/CMS by scanning for the signedData OID. */
   private def detectDerPkcs7(
       prefix: Array[Byte],
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     if (prefix.length < 11) return
     if ((prefix(0) & 0xff) != 0x30 || (prefix(1) & 0xff) != 0x82) return
@@ -417,7 +418,7 @@ object CryptoDetector {
     */
   private def detectKeystoreByFilename(
       filename: String,
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     val lower = filename.toLowerCase
     val base = {
@@ -443,7 +444,7 @@ object CryptoDetector {
   private def detectKeyboxByFilename(
       filename: String,
       prefix: Array[Byte],
-      builder: scala.collection.mutable.Builder[String, Set[String]]
+      builder: Builder[String, Set[String]]
   ): Unit = {
     val keyboxMagic =
       prefix.length >= 4 && prefix(0) == 0x23.toByte && prefix(

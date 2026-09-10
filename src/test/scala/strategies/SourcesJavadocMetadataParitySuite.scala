@@ -14,6 +14,7 @@ import io.spicelabs.goatrodeo.util.PomParser.ParsedPom
 import java.io.File
 import java.nio.file.Files
 import java.util.zip.ZipFile
+import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 import scala.jdk.CollectionConverters.given
 
@@ -84,7 +85,7 @@ class SourcesJavadocMetadataParitySuite extends GoatRodeoFunSuite {
   /** Recursively find files matching a predicate. */
   private def findFiles(dir: File, pred: String => Boolean): Vector[File] = {
     if (!dir.exists()) return Vector.empty
-    val result = scala.collection.mutable.ArrayBuffer[File]()
+    val result = ArrayBuffer[File]()
     def scan(d: File): Unit = {
       val entries = d.listFiles()
       if (entries != null) {
@@ -172,7 +173,7 @@ class SourcesJavadocMetadataParitySuite extends GoatRodeoFunSuite {
         }
 
       val tuples = entries.flatMap { entry =>
-        val content = scala.io.Source
+        val content = Source
           .fromInputStream(
             zip.getInputStream(entry)
           )

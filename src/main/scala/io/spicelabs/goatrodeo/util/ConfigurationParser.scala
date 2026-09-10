@@ -88,11 +88,11 @@ object ConfigurationParser {
 
   /** Values as a person wrote them, not as Scala prints them. */
   private def show(value: Any): String = value match {
-    case Some(v)         => show(v)
-    case None            => "unset"
-    case v: Vector[?]    => v.map(show).mkString("[", ", ", "]")
-    case f: java.io.File => f.toString
-    case other           => other.toString
+    case Some(v)      => show(v)
+    case None         => "unset"
+    case v: Vector[?] => v.map(show).mkString("[", ", ", "]")
+    case f: File      => f.toString
+    case other        => other.toString
   }
 
   private def parseWith(

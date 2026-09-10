@@ -2,6 +2,7 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.PairOf
@@ -12,9 +13,13 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 /** corpus-wide private-key leak sweep + hostile-reviewer sentinel check.
   *
@@ -63,18 +68,18 @@ class CertificatesLeakSuite extends GoatRodeoFunSuite {
     * emitted metadata, and sweep against the forbidden-pattern regex list.
     */
   test("[LEAK SWEEP] zero forbidden-pattern matches across the entire corpus") {
-    val corpusRoot = java.nio.file.Paths.get("test_data/certificates")
-    if (!java.nio.file.Files.exists(corpusRoot)) {
+    val corpusRoot = Paths.get("test_data/certificates")
+    if (!Files.exists(corpusRoot)) {
       fail(
         "test_data/certificates does not exist; corpus is required for leak sweep"
       )
     }
     import scala.jdk.CollectionConverters.*
-    val artifacts = java.nio.file.Files
+    val artifacts = Files
       .walk(corpusRoot)
       .iterator()
       .asScala
-      .filter(p => java.nio.file.Files.isRegularFile(p))
+      .filter(p => Files.isRegularFile(p))
       .filter(p => !p.toString.endsWith(".expected.json"))
       .filter(p => !p.toString.contains("/tools/"))
       .filter(p => !p.toString.endsWith("/SOURCES.md"))
@@ -88,32 +93,31 @@ class CertificatesLeakSuite extends GoatRodeoFunSuite {
       "corpus walk found zero artifacts — fixture-discovery bug"
     )
 
-    val violations = scala.collection.mutable.ListBuffer[String]()
+    val violations = ListBuffer[String]()
     var checked = 0
     artifacts.foreach { path =>
       val w = FileWrapper(new File(path.toString), path.toString, None)
       val claimOpt =
-        scala.util.Try(Certificates.classifyAndParse(w)).toOption.flatten
+        Try(Certificates.classifyAndParse(w)).toOption.flatten
       claimOpt.foreach { claim =>
         val state = new CertificatesState(w, Some(claim))
-        scala.util
-          .Try {
-            val (md, _) = state.getMetadata(w, stubItem(), SingleMarker())
-            checked += 1
-            md.foreach { case (key, values) =>
-              values.foreach { v =>
-                val text = v match {
-                  case StringOf(s)   => s
-                  case PairOf(_, s2) => s2
-                }
-                appendixCPatterns.foreach { pat =>
-                  if (pat.matcher(text).find()) {
-                    violations += s"FIXTURE=${path} KEY=$key PATTERN=/${pat.pattern}/ VALUE=$text"
-                  }
+        Try {
+          val (md, _) = state.getMetadata(w, stubItem(), SingleMarker())
+          checked += 1
+          md.foreach { case (key, values) =>
+            values.foreach { v =>
+              val text = v match {
+                case StringOf(s)   => s
+                case PairOf(_, s2) => s2
+              }
+              appendixCPatterns.foreach { pat =>
+                if (pat.matcher(text).find()) {
+                  violations += s"FIXTURE=${path} KEY=$key PATTERN=/${pat.pattern}/ VALUE=$text"
                 }
               }
             }
           }
+        }
           .recover { case ex: RuntimeException =>
             violations += s"FIXTURE=${path} UNEXPECTED-CRASH: ${ex.getClass.getSimpleName}: ${ex.getMessage}"
           }
@@ -377,19 +381,19 @@ class CertificatesLeakSuite extends GoatRodeoFunSuite {
     val ks = KeyStore.getInstance("JKS")
     ks.load(null, null)
     val emptyKs = Certificates.Keystore(Some(ks), "jks", 0)
-    val wrapper = java.io.File.createTempFile("test", ".jks")
+    val wrapper = File.createTempFile("test", ".jks")
     wrapper.deleteOnExit()
-    val aw = io.spicelabs.goatrodeo.util
+    val aw = goatrodeo.util
       .FileWrapper(wrapper, wrapper.getAbsolutePath, None)
     val state = new CertificatesState(aw, Some(emptyKs))
-    val item = io.spicelabs.goatrodeo.omnibor.Item(
+    val item = Item(
       identifier = "gitoid:test",
-      connections = scala.collection.immutable.TreeSet.empty,
+      connections = TreeSet.empty,
       bodyMimeType = None,
       body = None
     )
     val (meta, _) =
-      state.getMetadata(aw, item, io.spicelabs.goatrodeo.omnibor.SingleMarker())
+      state.getMetadata(aw, item, SingleMarker())
     val allValues = meta.values.flatten.map(_.value.toLowerCase)
     assert(
       !allValues.exists(_.contains("-----begin private key-----"))

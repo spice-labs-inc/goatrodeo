@@ -5,6 +5,7 @@ import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.cilantro.AssemblyNameReference
 import io.spicelabs.cilantro.CSVersion
 import io.spicelabs.cilantro.CustomAttribute
+import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
@@ -159,7 +160,7 @@ class DotnetState(
   ): (PurlSet, DotnetState) = {
     // Return the Purl object directly (not a string). PurlSet.canonicalStrings
     // will handle toCanonical() at the storage boundary, wrapped in Try.
-    val purlOpt: Option[io.spicelabs.coordinates.Purl] =
+    val purlOpt: Option[Purl] =
       assemblyOpt
         .flatMap { assembly =>
           val nameOpt =
@@ -172,7 +173,7 @@ class DotnetState(
           (nameOpt, versionOpt) match {
             case (Some(name), Some(version)) =>
               // nuget purls take no namespace (the spec prohibits it).
-              scala.util.Try {
+              Try {
                 PURLHelpers
                   .purl(
                     `type` = "nuget",

@@ -10,7 +10,7 @@ This file maps factual claims in the documentation to tests that verify them.
 | Goat Rodeo captures Java `java.security` policies. | `JavaSecuritySuite`, `JavaSecurityParserSuite` |
 | Goat Rodeo emits CycloneDX CBOM files. | `CbomEmitterSuite`, `CbomIntegrationSuite` |
 | CLI flag `--emit-cbom-dir <dir>` exists and emits CBOMs. | ``CbomEmitterSuite` `CLI flags parse correctly``, ``ConfigCbomFlagsSuite` `GoatRodeoBuilder withExtraArg supports CBOM keys``, ``CbomIntegrationSuite` `mixed directory produces CBOMs with certificate, OpenSSL, and Java security components`` |
-| CLI flag `--cbom-version <1.6\|1.7>` exists and defaults to `1.6`. | ``CbomEmitterSuite` `CLI flags parse correctly``, ``ConfigCbomFlagsSuite` `GoatRodeoBuilder withExtraArg supports CBOM keys`` |
+| CLI flag `--cbom-version <1.6\|1.7>` exists and defaults to `1.7`. | ``CbomEmitterSuite` `CLI flags parse correctly``, ``ConfigCbomFlagsSuite` `GoatRodeoBuilder withExtraArg supports CBOM keys`` |
 
 ## info/goat_rodeo_operation.md / info/goat_rodeo_operation_llm.md
 

@@ -19,10 +19,12 @@ import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationToml
+import io.spicelabs.goatrodeo.util.DateParser
 import io.spicelabs.goatrodeo.util.TomlTables
 import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.nio.file.Paths
+import java.util.Map as JMap
 import java.util.regex.Pattern
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
@@ -264,7 +266,7 @@ class GoatRodeoBuilder {
     *   Left(errorMessage) otherwise
     */
   def withTagDate(d: String): Either[String, GoatRodeoBuilder] = {
-    io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
+    DateParser.parse(d) match {
       case Right(date) =>
         config = config.copy(tagDate = Some(date))
         Right(this)
@@ -304,7 +306,7 @@ class GoatRodeoBuilder {
     * @return
     *   this builder
     */
-  def withExtraArgs(args: java.util.Map[String, String]): GoatRodeoBuilder = {
+  def withExtraArgs(args: JMap[String, String]): GoatRodeoBuilder = {
     withExtraArgs(args.asScala.toMap)
   }
 
@@ -398,7 +400,7 @@ class GoatRodeoBuilder {
     *   rejected key/value. Never throws.
     */
   def withConfiguration(
-      table: java.util.Map[String, Object],
+      table: JMap[String, Object],
       label: String
   ): Either[String, GoatRodeoBuilder] = {
     ConfigurationToml.nestedFromToml(

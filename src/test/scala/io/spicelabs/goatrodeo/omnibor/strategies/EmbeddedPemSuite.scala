@@ -24,6 +24,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.util.Base64
+import java.util.Base64.getEncoder
 import scala.collection.immutable.TreeSet
 
 /** Base64-embedded PEM capture (redaction-first).
@@ -52,7 +55,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
     )
 
   private def b64(s: String): String =
-    java.util.Base64.getEncoder.withoutPadding
+    getEncoder.withoutPadding
       .encodeToString(s.getBytes(StandardCharsets.UTF_8))
 
   private def artifact(name: String, content: String): ByteWrapper =
@@ -147,7 +150,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
   }
 
   test("oversized base64 blob is skipped without OOM") {
-    val big = java.util.Base64.getEncoder
+    val big = Base64.getEncoder
       .encodeToString(
         Array.fill[Byte](EmbeddedPemStrategy.MaxDecodeBytes + 1)(0x41)
       )
@@ -208,7 +211,7 @@ class EmbeddedPemSuite extends GoatRodeoFunSuite {
       .generateCertificate(
         new ByteArrayInputStream(certPem.getBytes(StandardCharsets.ISO_8859_1))
       )
-      .asInstanceOf[java.security.cert.X509Certificate]
+      .asInstanceOf[X509Certificate]
     val m = meta(
       "kubeconfig.yaml",
       "certificate-authority-data: " + b64(certPem) + "\n"

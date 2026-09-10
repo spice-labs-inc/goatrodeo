@@ -70,7 +70,7 @@ Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects
    to generate a list of files to process (e.g., exclude html files that may have been downloaded as part of a site crawl)
 * `--exclude-pattern` : A regular expression pattern that can be used to exclude files, for example `html$` will exclude all files that end in `html`
 * `--emit-cbom-dir <dir>` : Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input file into this directory. The directory is created if it does not exist. CBOM emission is disabled when this flag is omitted.
-* `--cbom-version <1.6|1.7>` : CycloneDX CBOM specification version to emit when `--emit-cbom-dir` is set. Accepts only `1.6` (default) or `1.7`.
+* `--cbom-version <1.6|1.7>` : CycloneDX CBOM specification version to emit when `--emit-cbom-dir` is set. Accepts only `1.6` (legacy) or `1.7` (default).
 * `-V` or `--version`: Print the version and exit
 
 ## Operation
@@ -428,17 +428,18 @@ pkg:generic/x509/cert-sha256@96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffce
 
 ### Run-start configuration echo
 
-The run begins by echoing the effective configuration to the log, one setting
-per line under a `Configuration:` header. This is what an operator reads to
-confirm what the run was told to do — roots, threads, filters, tag, CBOM
-settings, and the rest. The two fields never echoed are the ambient runtime
-environment and the progress-listener object: the first describes how the
-process was started rather than what the run was told to do, and a listener is
-an object, not a setting (as demonstrated by the tests `ConfigTestSuite`
-"Configuration - operationalSummary lists effective settings only" and
-"Configuration - operationalSummary renders the default mime filter"). An
-uncompilable exclude pattern appears in the echo as `invalid (...)` rather
-than vanishing (as demonstrated by `ConfigTestSuite` "Configuration -
+The run begins by echoing the effective configuration to the log as a single
+line under a `Configuration:` prefix; settings equal to their defaults are
+omitted, so a default run reads "Configuration: (all defaults)". This is what
+an operator reads to confirm what the run was told to do — roots, threads,
+filters, tag, CBOM settings, and the rest. The two fields never echoed are the
+ambient runtime environment and the progress-listener object: the first
+describes how the process was started rather than what the run was told to
+do, and a listener is an object, not a setting (as demonstrated by the tests
+`ConfigTestSuite` "Configuration - operationalSummary lists non-default
+settings only" and "Configuration - operationalSummary is empty for a default
+run"). An uncompilable exclude pattern appears in the echo as `invalid (...)`
+rather than vanishing (as demonstrated by `ConfigTestSuite` "Configuration -
 operationalSummary names an invalid exclude pattern").
 
 ### Progress cadence
@@ -477,7 +478,10 @@ The bundled logging defaults set the DEB/RPM package readers
 "Read DEB/RPM package" line per archive (as demonstrated by `LogDefaultsSuite`
 "bundled defaults keep the DEB/RPM readers at WARN"). Goat Rodeo's own
 loggers stay at INFO (as demonstrated by `LogDefaultsSuite` "bundled defaults
-keep Goat Rodeo's own loggers at INFO"). The runtime `[logging]` TOML group
+keep Goat Rodeo's own loggers at INFO"). The git-provenance
+library is kept at WARN as well (`org.eclipse.jgit` debug-logs every probe and
+file stat; as demonstrated by `LogDefaultsSuite` "bundled defaults keep the
+git library at WARN"). The runtime `[logging]` TOML group
 moves only `io.spicelabs.goatrodeo`-owned loggers by design; the bundled
 defaults are the lever for third-party readers.
 

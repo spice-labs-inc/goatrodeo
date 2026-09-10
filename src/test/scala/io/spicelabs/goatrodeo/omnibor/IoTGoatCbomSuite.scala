@@ -20,6 +20,7 @@ import org.json4s.native.JsonMethods.*
 
 import java.io.File
 import java.nio.file.Files
+import java.util.Comparator
 import scala.util.Try
 
 /** Discovery-driven CBOM regression test for the IoTGoat x86 firmware.
@@ -54,7 +55,7 @@ class IoTGoatCbomSuite extends GoatRodeoFunSuite {
     if (dir.exists()) {
       Files
         .walk(dir.toPath)
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(p => Files.deleteIfExists(p))
       ()
     }

@@ -5,6 +5,7 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 
 class FileWalkerTestSuite extends GoatRodeoFunSuite {
 
@@ -182,7 +183,7 @@ class FileWalkerTestSuite extends GoatRodeoFunSuite {
   }
 
   test("withinTempDir - cleans up directory") {
-    var tempPathOpt: Option[java.nio.file.Path] = None
+    var tempPathOpt: Option[Path] = None
 
     FileWalker.withinTempDir { tempDir =>
       tempPathOpt = Some(tempDir)

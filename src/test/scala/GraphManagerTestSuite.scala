@@ -6,6 +6,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Helpers
 
+import java.io.File
 import java.io.FileInputStream
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
@@ -86,7 +87,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
         val dataFileName = f"${Helpers.toHex(dif.dataFile)}.grd"
         val indexFileName = f"${Helpers.toHex(dif.indexFile)}.gri"
         assert(
-          new java.io.File(tempDir, dataFileName).exists() ||
+          new File(tempDir, dataFileName).exists() ||
             tempDir.listFiles().exists(_.getName().endsWith(".grd")),
           "Data file should exist"
         )
@@ -106,7 +107,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       )
       GraphManager.writeEntries(tempDir, items.iterator)
 
-      val historyFile = new java.io.File(tempDir, "history.jsonl")
+      val historyFile = new File(tempDir, "history.jsonl")
       assert(historyFile.exists(), "history.jsonl should exist")
       val content =
         new String(Files.readAllBytes(historyFile.toPath()), "UTF-8")
@@ -359,7 +360,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
     val tempDir = Files.createTempDirectory("invalidmagic").toFile()
     try {
       // Create a file with invalid content
-      val invalidFile = new java.io.File(tempDir, "invalid.grd")
+      val invalidFile = new File(tempDir, "invalid.grd")
       Files.write(invalidFile.toPath(), Array[Byte](0, 0, 0, 0))
 
       val channel = new FileInputStream(invalidFile).getChannel()

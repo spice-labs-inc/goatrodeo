@@ -9,6 +9,7 @@ import java.io.FileInputStream
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Failure
 
 /** GRDWalker.open returns Failure (not thrown exception) for wrong magic
   * number.
@@ -64,7 +65,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
           "open() should return Failure for file with wrong magic number"
         )
         assert(
-          result.asInstanceOf[scala.util.Failure[?]].exception != null,
+          result.asInstanceOf[Failure[?]].exception != null,
           "Failure should contain an exception describing the problem"
         )
       } finally {
@@ -86,7 +87,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
         val result = walker.open()
 
         assert(result.isFailure)
-        val ex = result.asInstanceOf[scala.util.Failure[?]].exception
+        val ex = result.asInstanceOf[Failure[?]].exception
         assert(
           ex.getMessage.contains("magic") || ex.getMessage.contains("Magic"),
           s"Failure message should mention magic number, got: ${ex.getMessage}"

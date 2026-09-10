@@ -21,6 +21,9 @@ import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.util.Arrays
+import scala.util.Random
 
 /** `CryptoDetector` content-sniff signature unit tests.
   *
@@ -444,7 +447,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
   }
 
   test("[NEG]: random binary returns empty MIME set") {
-    val rnd = new scala.util.Random(0xcafebabe)
+    val rnd = new Random(0xcafebabe)
     val bytes = new Array[Byte](512)
     rnd.nextBytes(bytes)
     // Avoid accidental collisions with magic / packet tags by zeroing the
@@ -524,7 +527,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     // padding and claim it. If it correctly stops at 4096, the
     // header is invisible and no claim is made.
     val padding = new Array[Byte](CryptoDetector.MAX_READ_BYTES)
-    java.util.Arrays.fill(padding, 0x20.toByte) // ASCII spaces
+    Arrays.fill(padding, 0x20.toByte) // ASCII spaces
     val tail =
       "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----\n".getBytes(
         "UTF-8"
@@ -550,7 +553,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     val begin = "-----BEGIN CERTIFICATE-----".getBytes("UTF-8")
     val padBefore = CryptoDetector.MAX_READ_BYTES - begin.length
     val padding = new Array[Byte](padBefore)
-    java.util.Arrays.fill(padding, 0x20.toByte)
+    Arrays.fill(padding, 0x20.toByte)
     val payload =
       padding ++ begin ++ "\nABC\n-----END CERTIFICATE-----\n".getBytes
     val out = detect(payload, "header-at-end-of-4k.bin")
@@ -770,7 +773,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
     Files.copy(
       src.toPath,
       tmp.toPath,
-      java.nio.file.StandardCopyOption.REPLACE_EXISTING
+      REPLACE_EXISTING
     )
     try {
       val out = CryptoDetector.detect(FileWrapper(tmp, tmp.getName, None))

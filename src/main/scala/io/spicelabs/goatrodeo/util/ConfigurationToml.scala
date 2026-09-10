@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.util
 
+import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.config.ConfigurationException
@@ -14,9 +15,14 @@ import org.tomlj.TomlTable
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.List as JList
+import java.util.Map as JMap
+import java.util.Set as JSet
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** Reads a [[Configuration]] from a TOML table.
@@ -43,7 +49,7 @@ import scala.util.Try
   */
 object ConfigurationToml {
 
-  private val logger = com.typesafe.scalalogging.Logger(getClass())
+  private val logger = Logger(getClass())
 
   /** The configuration group these settings belong to.
     *
@@ -190,7 +196,7 @@ object ConfigurationToml {
   ): Either[String, (Configuration, Resolution)] = {
     val resolver = new Resolver(
       EnvironmentPrefix,
-      java.util.Set.of(Group, Logging.GROUP),
+      JSet.of(Group, Logging.GROUP),
       message => report(message)
     )
 
@@ -206,7 +212,7 @@ object ConfigurationToml {
           val root = TomlTables.toPlainMap(result)
           val loose = root.asScala
             .collect {
-              case (key, value) if !value.isInstanceOf[java.util.Map[?, ?]] =>
+              case (key, value) if !value.isInstanceOf[JMap[?, ?]] =>
                 key
             }
             .toSeq
@@ -215,7 +221,7 @@ object ConfigurationToml {
             Left(
               s"settings belong in a table: move ${loose.mkString(", ")} under [$Group]"
             )
-          else Right(resolver.withFile(path, root, java.util.List.of()))
+          else Right(resolver.withFile(path, root, JList.of()))
         }
     }
 
@@ -263,7 +269,7 @@ object ConfigurationToml {
   ): Either[String, Configuration] =
     fromResolution(
       Resolution.of(
-        java.util.Map.of(Group, TomlTables.toPlainMap(table)),
+        JMap.of(Group, TomlTables.toPlainMap(table)),
         Origin.embedded(if (label.isEmpty) Group else label)
       ),
       base,
@@ -421,9 +427,9 @@ object ConfigurationToml {
     run(c =>
       str(table, "tag_json").fold(Right(c))(v =>
         Try(Json.decode(v.getBytes("UTF-8")).to[Dom.Element].value) match {
-          case scala.util.Success(elm) =>
+          case Success(elm) =>
             Right(c.copy(tagJson = Some(elm)))
-          case scala.util.Failure(_) =>
+          case Failure(_) =>
             Left(s"tag_json is not valid JSON: $v")
         }
       )

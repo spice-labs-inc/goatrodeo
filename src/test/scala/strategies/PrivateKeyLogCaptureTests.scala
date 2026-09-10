@@ -9,6 +9,8 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -60,13 +62,13 @@ class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
   )
 
   private def runEveryPrivateKeyFixture(): Unit = {
-    val root = java.nio.file.Paths.get("test_data/certificates/private-keys")
-    if (!java.nio.file.Files.exists(root)) return
-    val files = java.nio.file.Files
+    val root = Paths.get("test_data/certificates/private-keys")
+    if (!Files.exists(root)) return
+    val files = Files
       .walk(root)
       .iterator()
       .asScala
-      .filter(p => java.nio.file.Files.isRegularFile(p))
+      .filter(p => Files.isRegularFile(p))
       .filter(p => !p.toString.endsWith(".expected.json"))
       .filter(p => !p.toString.endsWith("/generate.sh"))
       .filter(p => !p.toString.endsWith("/SOURCES.md"))

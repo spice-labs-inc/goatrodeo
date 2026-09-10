@@ -16,9 +16,13 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 import java.io.File
 import java.security.Security
+import java.security.cert.X509Certificate
+import java.util.Enumeration
+import scala.collection.mutable.ListBuffer
 
 /** White-box tests with **independent ground truth** for `SingleCert`,
   * `Bundle`, `Keystore`, and `Crl` claim types.
@@ -57,7 +61,7 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
   // idempotent registration pattern used by the sibling test suites.
   if (Security.getProvider("BC") == null) {
     Security.addProvider(
-      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      new BouncyCastleProvider()
     )
   }
 
@@ -187,8 +191,8 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
     )
     val ks = Certificates.parseKeystore(w, "PKCS12").get
     val aliases =
-      ks.ks.get.aliases().asInstanceOf[java.util.Enumeration[String]]
-    val aliasList = scala.collection.mutable.ListBuffer[String]()
+      ks.ks.get.aliases().asInstanceOf[Enumeration[String]]
+    val aliasList = ListBuffer[String]()
     while (aliases.hasMoreElements) aliasList += aliases.nextElement
     assertEquals(aliasList.toList, List("letsencrypt-isrg-root-x1"))
   }
@@ -204,7 +208,7 @@ class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
     val ks = Certificates.parseKeystore(w, "PKCS12").get
     val cert = ks.ks.get
       .getCertificate("letsencrypt-isrg-root-x1")
-      .asInstanceOf[java.security.cert.X509Certificate]
+      .asInstanceOf[X509Certificate]
     assertEquals(
       sha256Hex(cert.getEncoded),
       "96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6",

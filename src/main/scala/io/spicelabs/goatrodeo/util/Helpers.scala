@@ -16,6 +16,7 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
+import io.bullet.borer.Decoder
 import io.spicelabs.coordinates.Coordinates
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -48,6 +49,7 @@ import java.util.Date
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import java.util.jar.Manifest
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
@@ -81,7 +83,7 @@ object Helpers {
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
     val manifestVec = Try {
-      java.util.jar.Manifest.apply(bis)
+      Manifest.apply(bis)
     }.toOption.toVector
 
     val mapping = for {
@@ -390,11 +392,11 @@ object Helpers {
     *   the 16 bytes of the MD5 hash
     */
   def computeMD5(str: String): Array[Byte] =
-    computeMD5(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+    computeMD5(new ByteArrayInputStream(str.getBytes("UTF-8")))
 
   /** Compute MD5 of a File. */
   def computeMD5(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeMD5(fis) }
     finally { fis.close() }
   }
@@ -418,7 +420,7 @@ object Helpers {
 
   /** Compute SHA-1 hash of a String. */
   def computeSHA1(str: String): Array[Byte] =
-    computeSHA1(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+    computeSHA1(new ByteArrayInputStream(str.getBytes("UTF-8")))
 
   /** Compute SHA-1 hash of an InputStream.
     */
@@ -438,7 +440,7 @@ object Helpers {
 
   /** Compute SHA-1 hash of a File. */
   def computeSHA1(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeSHA1(fis) }
     finally { fis.close() }
   }
@@ -469,7 +471,7 @@ object Helpers {
   }
 
   def computeSHA256(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeSHA256(fis) }
     finally { fis.close() }
   }
@@ -494,12 +496,12 @@ object Helpers {
 
   /** Compute the SHA-512 hash of a String. */
   def computeSHA512(str: String): Array[Byte] = {
-    computeSHA512(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+    computeSHA512(new ByteArrayInputStream(str.getBytes("UTF-8")))
   }
 
   /** Compute SHA-512 hash of a File. */
   def computeSHA512(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeSHA512(fis) }
     finally { fis.close() }
   }
@@ -909,13 +911,13 @@ object Helpers {
 
   def readLenAndCBOR[A](
       fc: FileChannel
-  )(implicit decoder: io.bullet.borer.Decoder[A]): Try[A] = {
+  )(implicit decoder: Decoder[A]): Try[A] = {
     val len = Helpers.readInt(fc)
     readCBOR(fc, len)
   }
 
   def readCBOR[A](fc: FileChannel, len: Int)(implicit
-      decoder: io.bullet.borer.Decoder[A]
+      decoder: Decoder[A]
   ): Try[A] = {
     Try(ByteBuffer.allocate(len)).flatMap { dest =>
       Try(fc.read(dest)).flatMap { bytesRead =>

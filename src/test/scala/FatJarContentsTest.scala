@@ -2,6 +2,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.util.jar.JarFile
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
 
 /** fat-jar hygiene .
@@ -58,7 +59,7 @@ class FatJarContentsTest extends GoatRodeoFunSuite {
       assertEquals(drivers, List("META-INF/services/java.sql.Driver"))
       val in =
         jar.getInputStream(jar.getJarEntry("META-INF/services/java.sql.Driver"))
-      val lines = scala.io.Source
+      val lines = Source
         .fromInputStream(in)
         .getLines()
         .map(_.trim)

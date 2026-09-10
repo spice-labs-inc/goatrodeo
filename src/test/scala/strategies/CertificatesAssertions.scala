@@ -19,7 +19,9 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.PairOf
 import io.spicelabs.goatrodeo.omnibor.StringOf
 
+import java.util.regex.Pattern
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** Assertion helpers shared by all Certificates-strategy test suites.
   *
@@ -212,9 +214,9 @@ object CertificatesAssertions {
       byKey.get(k) match {
         case None => Some(s"range key '$k' missing")
         case Some(values) =>
-          val parsed = values.flatMap(v => scala.util.Try(BigInt(v)).toOption)
-          val min = scala.util.Try(BigInt(range.min)).toOption
-          val max = scala.util.Try(BigInt(range.max)).toOption
+          val parsed = values.flatMap(v => Try(BigInt(v)).toOption)
+          val min = Try(BigInt(range.min)).toOption
+          val max = Try(BigInt(range.max)).toOption
           (min, max) match {
             case (Some(mn), Some(mx)) =>
               if (parsed.exists(n => n >= mn && n <= mx)) None
@@ -260,7 +262,7 @@ object CertificatesAssertions {
       patterns: List[String],
       label: String
   ): Unit = {
-    val compiled = patterns.map(p => p -> java.util.regex.Pattern.compile(p))
+    val compiled = patterns.map(p => p -> Pattern.compile(p))
     val violations = for {
       (key, value) <- metadataEntries(item)
       (raw, pat) <- compiled

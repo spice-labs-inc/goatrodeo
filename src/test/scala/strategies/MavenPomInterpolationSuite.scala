@@ -17,6 +17,9 @@ import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.PomParser
 
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeSet
 
 class MavenPomInterpolationSuite extends GoatRodeoFunSuite {
@@ -307,13 +310,13 @@ class MavenPomInterpolationSuite extends GoatRodeoFunSuite {
   test("Bundle-License from JAR manifest appears in metadata") {
     val manifest =
       "Bundle-License: https://www.apache.org/licenses/LICENSE-2.0\n"
-    val baos = new java.io.ByteArrayOutputStream
-    val zos = new java.util.zip.ZipOutputStream(baos)
-    zos.putNextEntry(new java.util.zip.ZipEntry("META-INF/MANIFEST.MF"))
+    val baos = new ByteArrayOutputStream
+    val zos = new ZipOutputStream(baos)
+    zos.putNextEntry(new ZipEntry("META-INF/MANIFEST.MF"))
     zos.write(manifest.getBytes("UTF-8"))
     zos.closeEntry()
     zos.putNextEntry(
-      new java.util.zip.ZipEntry(
+      new ZipEntry(
         "META-INF/maven/com.example/test/pom.properties"
       )
     )

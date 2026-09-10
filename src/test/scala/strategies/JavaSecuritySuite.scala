@@ -12,6 +12,7 @@ import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.JavaSecurityDetector
 import io.spicelabs.goatrodeo.util.JavaSecurityParser
 
+import java.io.ByteArrayOutputStream
 import scala.collection.immutable.TreeSet
 
 /** Tests for the Java `java.security` capture strategy.
@@ -184,7 +185,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
     val secBytes = basicSecurity.getBytes("ISO-8859-1")
 
     // Build TAR containing the config.
-    val tarBaos = new java.io.ByteArrayOutputStream()
+    val tarBaos = new ByteArrayOutputStream()
     val tarOut = new TarArchiveOutputStream(tarBaos)
     val tarEntry = new TarArchiveEntry("lib/security/java.security")
     tarEntry.setSize(secBytes.length)
@@ -194,7 +195,7 @@ class JavaSecuritySuite extends GoatRodeoFunSuite {
     tarOut.close()
 
     // Build ZIP containing the TAR.
-    val zipBaos = new java.io.ByteArrayOutputStream()
+    val zipBaos = new ByteArrayOutputStream()
     val zipOut = new ZipArchiveOutputStream(zipBaos)
     val zipEntry = new ZipArchiveEntry("nested.tar")
     zipEntry.setSize(tarBaos.size())

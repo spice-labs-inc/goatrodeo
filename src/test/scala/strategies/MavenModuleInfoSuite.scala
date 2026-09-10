@@ -15,11 +15,12 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import scala.collection.immutable.TreeSet
 
 class MavenModuleInfoSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, scala.collection.immutable.TreeSet.empty, None, None)
+    Item(id, TreeSet.empty, None, None)
 
   private def writeJarEntriesBytes(
       jarFile: File,

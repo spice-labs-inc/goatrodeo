@@ -4,6 +4,7 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
+import io.spicelabs.goatrodeo.util.Helpers
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -238,7 +239,7 @@ class MavenDirectoryInfraSuite extends GoatRodeoFunSuite {
       MavenTestHelpers.writePom(dir, "foo-1.0.pom", "org.example", "foo", "1.0")
       // Write a maven-metadata.xml file
       val metaFile = new File(dir, "maven-metadata.xml")
-      io.spicelabs.goatrodeo.util.Helpers.writeOverFile(
+      Helpers.writeOverFile(
         metaFile,
         """<?xml version="1.0" encoding="UTF-8"?>
           |<metadata>

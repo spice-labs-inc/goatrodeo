@@ -1,3 +1,5 @@
+import io.spicelabs.goatrodeo.GoatRodeo
+import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
@@ -6,8 +8,13 @@ import io.spicelabs.goatrodeo.util.TomlTables
 import org.tomlj.Toml
 import org.tomlj.TomlTable
 
+import java.lang.Boolean as JBoolean
+import java.lang.Long as JLong
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.List as JList
+import java.util.Map as JMap
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
 class ConfigurationTomlSuite extends GoatRodeoFunSuite {
@@ -154,7 +161,7 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     // The file and the environment are resolved together, so crediting the file
     // for everything the command line displaces names the wrong loser whenever
     // the value came from a variable.
-    val reported = scala.collection.mutable.ArrayBuffer[String]()
+    val reported = ArrayBuffer[String]()
     withConfigFile("[analysis]\nthreads = 4\nmax_records = 999999\n") { path =>
       ConfigurationToml
         .fromSources(
@@ -241,7 +248,7 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
   }
 
   test("the environment beats the config file, and says so") {
-    val reported = scala.collection.mutable.ArrayBuffer[String]()
+    val reported = ArrayBuffer[String]()
     withConfigFile("[analysis]\nthreads = 4\n") { path =>
       val config = ConfigurationToml
         .fromFile(
@@ -402,9 +409,9 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     // in it — Allspice's [[repositories]] is the first.
     val table = TomlTables.fromMap(
       Map(
-        "repositories" -> java.util.List.of(
-          java.util.Map.of("id", "one"),
-          java.util.Map.of("id", "two")
+        "repositories" -> JList.of(
+          JMap.of("id", "one"),
+          JMap.of("id", "two")
         )
       )
     )
@@ -436,8 +443,8 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
       )
     )
 
-    assertEquals(table.getLong("threads"), java.lang.Long.valueOf(16L))
-    assertEquals(table.getBoolean("static_metadata"), java.lang.Boolean.TRUE)
+    assertEquals(table.getLong("threads"), JLong.valueOf(16L))
+    assertEquals(table.getBoolean("static_metadata"), JBoolean.TRUE)
     assertEquals(
       table.getString("tag"),
       "42",
@@ -601,7 +608,7 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
   test("a table applied through the builder reaches the configuration") {
     // This is the whole point of the exercise: `spice` hands its
     // `[survey.inventory.analysis]` table over without knowing what is in it.
-    val builder = io.spicelabs.goatrodeo.GoatRodeo
+    val builder = GoatRodeo
       .builder()
       .withThreads(2)
       .withConfiguration(
@@ -616,7 +623,7 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
   }
 
   test("the builder rejects an unknown key rather than ignoring it") {
-    val result = io.spicelabs.goatrodeo.GoatRodeo
+    val result = GoatRodeo
       .builder()
       .withConfiguration(
         TomlTables.toPlainMap(parse("thraeds = 4")),
@@ -633,9 +640,9 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     * rather than widening the API for their own convenience.
     */
   private def builderConfig(
-      b: io.spicelabs.goatrodeo.GoatRodeoBuilder
+      b: GoatRodeoBuilder
   ): Configuration = {
-    val field = classOf[io.spicelabs.goatrodeo.GoatRodeoBuilder]
+    val field = classOf[GoatRodeoBuilder]
       .getDeclaredField("config")
     field.setAccessible(true)
     field.get(b).asInstanceOf[Configuration]

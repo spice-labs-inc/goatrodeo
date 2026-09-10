@@ -7,6 +7,7 @@ import io.spicelabs.goatrodeo.util.Configuration
 
 import java.io.File
 import java.nio.file.Files
+import scala.io.Source
 
 /** PKCS#7 certificates surface in CBOM .
   *
@@ -43,7 +44,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
       .toOption
       .getOrElse(fail("emit failed"))
     val f = files.head
-    val txt = scala.io.Source.fromFile(f).mkString
+    val txt = Source.fromFile(f).mkString
     // cleanup
     outDir.listFiles().foreach(_.delete()); outDir.delete()
     txt
@@ -52,7 +53,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
   private def readFixture(path: String): Array[Byte] = {
     val f = new File(path)
     assert(f.exists(), s"$path missing")
-    java.nio.file.Files.readAllBytes(f.toPath)
+    Files.readAllBytes(f.toPath)
   }
 
   test("pkcs7CertAppearsInCbom") {

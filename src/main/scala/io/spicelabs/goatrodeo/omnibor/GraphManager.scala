@@ -9,6 +9,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
+import org.json4s.native.JsonMethods
 
 import java.io.File
 import java.io.FileOutputStream
@@ -22,6 +23,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import scala.collection.immutable.TreeMap
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -273,13 +275,13 @@ object GraphManager {
     // travels as JSON text rather than as a nested object. Rendered with json4s
     // -- which this file already uses below -- rather than concatenated, so that
     // quoting and escaping are the library's problem and not this function's.
-    val sha256Json = org.json4s.native.JsonMethods.compact(
-      org.json4s.native.JsonMethods.render(
+    val sha256Json = JsonMethods.compact(
+      JsonMethods.render(
         ("grd" -> fileSet.map(_.dataFileSha256).toVector) ~
           ("gri" -> fileSet.map(_.indexFileSha256).toVector)
       )
     )
-    val info = scala.collection.immutable.TreeMap[String, String](
+    val info = TreeMap[String, String](
       "correlation_id" -> TamperEvidentLog.correlationId,
       "sha256" -> sha256Json
     ) ++ TamperEvidentLog.currentChainHead.map("log_chain_head" -> _)
@@ -406,8 +408,8 @@ class GRDWalker(source: FileChannel) {
 
           val entryBytes = entryByteBuffer.array()
           Item.decode(entryBytes) match {
-            case scala.util.Success(entry) => Some(entry)
-            case scala.util.Failure(err) =>
+            case Success(entry) => Some(entry)
+            case Failure(err) =>
               logger.warn(
                 s"Corrupt CBOR entry at position ${source.position()}: ${err.getMessage}"
               )

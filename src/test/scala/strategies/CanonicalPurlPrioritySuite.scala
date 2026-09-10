@@ -2,9 +2,11 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
+import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
+import io.spicelabs.goatrodeo.util.Helpers
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
@@ -31,7 +33,7 @@ class CanonicalPurlPrioritySuite extends GoatRodeoFunSuite {
 
   /** Helper: find all CanonicalPurl values in the store's items. */
   private def findCanonicalPurls(
-      store: io.spicelabs.goatrodeo.omnibor.MemStorage
+      store: MemStorage
   ): Set[String] = {
     store
       .keys()
@@ -326,7 +328,7 @@ class CanonicalPurlPrioritySuite extends GoatRodeoFunSuite {
       MavenTestHelpers.writeJar(dir, "foo-1.0.jar", Seq("foo.txt" -> "hello"))
       // POM with no <groupId> but <parent><groupId>
       val pomFile = new File(dir, "foo-1.0.pom")
-      io.spicelabs.goatrodeo.util.Helpers.writeOverFile(
+      Helpers.writeOverFile(
         pomFile,
         s"""<?xml version="1.0" encoding="UTF-8"?>
            |<project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -463,7 +465,7 @@ class CanonicalPurlPrioritySuite extends GoatRodeoFunSuite {
       )
       // Corrupt POM file
       val pomFile = new File(dir, "foo-1.0.pom")
-      io.spicelabs.goatrodeo.util.Helpers.writeOverFile(
+      Helpers.writeOverFile(
         pomFile,
         "<<invalid xml>>"
       )
@@ -513,7 +515,7 @@ class CanonicalPurlPrioritySuite extends GoatRodeoFunSuite {
       )
       // Companion POM with groupId and artifactId but NO version
       val pomFile = new File(dir, "foo-1.0.pom")
-      io.spicelabs.goatrodeo.util.Helpers.writeOverFile(
+      Helpers.writeOverFile(
         pomFile,
         s"""<?xml version="1.0" encoding="UTF-8"?>
            |<project xmlns="http://maven.apache.org/POM/4.0.0">
