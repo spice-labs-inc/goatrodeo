@@ -22,6 +22,27 @@ import scala.collection.immutable.TreeSet
 
 class HelpersTestSuite extends GoatRodeoFunSuite {
 
+  test("Helpers - readCBOR short read returns Failure, never throws") {
+    // A channel with fewer bytes than the declared length is a corrupt or
+    // truncated record. readCBOR must surface that as a Failure value, not a
+    // thrown exception (a throw inside the reader would escape the walk).
+    val temp = Files.createTempFile("readcbor-short", ".bin").toFile()
+    try {
+      Files.write(temp.toPath(), Array[Byte](1, 2))
+      val channel = new java.io.FileInputStream(temp).getChannel()
+      try {
+        val result = Helpers.readCBOR[io.spicelabs.goatrodeo.omnibor.Item](
+          channel,
+          8
+        )
+        assert(
+          result.isFailure,
+          "a short read must be a Failure, not a thrown exception"
+        )
+      } finally channel.close()
+    } finally temp.delete()
+  }
+
   // ==================== Hash Functions Tests ====================
 
   test("computeMD5 - computes correct MD5 for simple string") {

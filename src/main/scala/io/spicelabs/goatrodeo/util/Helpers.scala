@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 /** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
   * content-addressable identifier based on Git's object hashing scheme.
@@ -908,21 +908,25 @@ object Helpers {
 
   def readLenAndCBOR[A](
       fc: FileChannel
-  )(implicit decoder: io.bullet.borer.Decoder[A]): A = {
+  )(implicit decoder: io.bullet.borer.Decoder[A]): Try[A] = {
     val len = Helpers.readInt(fc)
     readCBOR(fc, len)
   }
 
   def readCBOR[A](fc: FileChannel, len: Int)(implicit
       decoder: io.bullet.borer.Decoder[A]
-  ): A = {
-
-    val dest = ByteBuffer.allocate(len)
-    val bytesRead = fc.read(dest)
-    if (bytesRead != len) {
-      throw Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
+  ): Try[A] = {
+    Try(ByteBuffer.allocate(len)).flatMap { dest =>
+      Try(fc.read(dest)).flatMap { bytesRead =>
+        if (bytesRead != len) {
+          Failure(
+            Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
+          )
+        } else {
+          Try(Cbor.decode(dest).to[A].value)
+        }
+      }
     }
-    Cbor.decode(dest).to[A].value
   }
 
   /** Slurp the contents of a File

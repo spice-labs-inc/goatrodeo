@@ -392,25 +392,25 @@ class GoatRodeoBuilder {
     * @param label
     *   the table's path in the caller's file, for error messages — e.g.
     *   `registry.analysis`
-    * @throws IllegalArgumentException
-    *   if the table has an unknown key, a value of the wrong type, or a setting
-    *   that may not be given to an embedded run
+    *
     * @return
-    *   this builder
+    *   Right(this builder) with the table applied, or Left(error) naming the
+    *   rejected key/value. Never throws.
     */
   def withConfiguration(
       table: java.util.Map[String, Object],
       label: String
-  ): GoatRodeoBuilder = {
+  ): Either[String, GoatRodeoBuilder] = {
     ConfigurationToml.nestedFromToml(
       TomlTables.fromJavaMap(table),
       config,
       label
     ) match {
-      case Right(updated) => config = updated
-      case Left(error)    => throw IllegalArgumentException(error)
+      case Right(updated) =>
+        config = updated
+        Right(this)
+      case Left(error) => Left(error)
     }
-    this
   }
 
   /** Attach a progress listener that is notified at phase boundaries (Scanning,

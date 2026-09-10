@@ -557,21 +557,25 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
         TomlTables.toPlainMap(parse("threads = 11\nmax_records = 4242")),
         "survey.inventory.analysis"
       )
+      .toOption
+      .get
     val applied = builderConfig(builder)
     assertEquals(applied.threads, 11)
     assertEquals(applied.maxRecords, 4242)
   }
 
   test("the builder rejects an unknown key rather than ignoring it") {
-    val error = intercept[IllegalArgumentException] {
-      io.spicelabs.goatrodeo.GoatRodeo
-        .builder()
-        .withConfiguration(
-          TomlTables.toPlainMap(parse("thraeds = 4")),
-          "survey.inventory.analysis"
-        )
-    }
-    assert(error.getMessage().contains("thraeds"), error.getMessage())
+    val result = io.spicelabs.goatrodeo.GoatRodeo
+      .builder()
+      .withConfiguration(
+        TomlTables.toPlainMap(parse("thraeds = 4")),
+        "survey.inventory.analysis"
+      )
+    assert(result.isLeft, s"an unknown key must produce Left, got $result")
+    assert(
+      result.swap.toOption.get.contains("thraeds"),
+      result.swap.toOption.get
+    )
   }
 
   /** The builder keeps its configuration private; tests read it reflectively

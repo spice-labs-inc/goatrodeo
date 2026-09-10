@@ -22,7 +22,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
-import scala.util.Failure
+import scala.util.{Failure, Success, Try}
 
 /** Manages persistence and retrieval of Artifact Dependency Graph (ADG) data.
   *
@@ -362,18 +362,19 @@ class GRDWalker(source: FileChannel) {
     * @return
     *   a Try containing the envelope on success, or an error on failure
     */
-  def open(): DataFileEnvelope = {
+  def open(): Try[DataFileEnvelope] = {
     val magic_? = Helpers.readInt(source)
     if (magic_? != GraphManager.Consts.DataFileMagicNumber) {
-      throw new Exception(f"Found incorrect magic number ${magic_?}")
+      Failure(new Exception(f"Found incorrect magic number ${magic_?}"))
     } else {
       val len = Helpers.readShort(source)
       val ba = ByteBuffer.allocate(len)
-      val readLen = source.read(ba)
-      if (len != readLen) {
-        throw new Exception(f"Wanted ${len} bytes got ${readLen}")
-      } else {
-        DataFileEnvelope.decode(ba.position(0).array())
+      Try(source.read(ba)).flatMap { readLen =>
+        if (len != readLen) {
+          Failure(new Exception(f"Wanted ${len} bytes got ${readLen}"))
+        } else {
+          Try(DataFileEnvelope.decode(ba.position(0).array()))
+        }
       }
     }
   }

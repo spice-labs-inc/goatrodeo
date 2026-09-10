@@ -105,7 +105,7 @@ class GitReadOnlyInvariantSuite extends GoatRodeoFunSuite {
       val channel = new java.io.FileInputStream(grd).getChannel
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
         items ++= walker.items()
       } finally channel.close()
     }

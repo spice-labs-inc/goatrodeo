@@ -58,7 +58,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(tempFile).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val result = Try { walker.open() }
+        val result = walker.open()
 
         assert(
           result.isFailure,
@@ -84,7 +84,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(tempFile).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val result = Try { walker.open() }
+        val result = walker.open()
 
         assert(result.isFailure)
         val ex = result.asInstanceOf[scala.util.Failure[?]].exception
@@ -115,7 +115,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(tempFile).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val result = Try { walker.open() }
+        val result = walker.open()
 
         assert(
           result.isFailure,
@@ -169,7 +169,7 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(grdFile).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val result = Try { walker.open() }
+        val result = walker.open()
 
         assert(
           result.isSuccess,

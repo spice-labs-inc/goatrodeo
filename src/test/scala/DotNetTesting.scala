@@ -139,7 +139,7 @@ class DotNetTesting extends GoatRodeoFunSuite {
 
   // ==================== DotnetState Tests ====================
 
-  test("DotnetState.beginProcessing - throws exception for non-dotnet") {
+  test("DotnetState.beginProcessing - no exception for non-dotnet") {
     val artifact = ByteWrapper("not dotnet".getBytes("UTF-8"), "test.txt", None)
     val item = createTestItem("test-id")
     val state = DotnetState()
@@ -150,8 +150,10 @@ class DotNetTesting extends GoatRodeoFunSuite {
       case Success(_) => None
       case Failure(t) => Some(t)
     }
-    // For non-dotnet, beginProcessing should return the original state (no assembly found)
-    assert(exception.isDefined, "An empty file should result in an exception")
+    // For non-dotnet, beginProcessing must NOT throw: the parse failure is a
+    // value (the state stays a no-op) so the containing walk survives.
+    // See DotnetFailureContainmentSuite for the contract.
+    assert(exception.isEmpty, "A non-dotnet file must not result in an exception")
   }
 
   // ==================== DotnetState.formatDeps Tests ====================

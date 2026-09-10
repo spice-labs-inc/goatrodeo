@@ -85,7 +85,10 @@ class DotnetState(
         log.error(
           s"Error while reading assembly from ${artifact.path()}: ${excpt.getMessage()}"
         )
-        throw excpt
+        // The failure is a value: processing continues as a no-op for this
+        // artifact instead of aborting the containing walk (a native DLL or
+        // hostile PE inside a fat jar must never lose the whole jar).
+        DotnetState(None, None)
       case Success(value) => value
     }
   }

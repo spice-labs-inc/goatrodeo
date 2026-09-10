@@ -24,6 +24,30 @@ import java.nio.file.Files
 
 class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
 
+  // ==================== newWrapper Tests ====================
+
+  test("newWrapper - size mismatch between declaration and content does not throw") {
+    // A corrupt/lying zip entry can declare a size that differs from what the
+    // stream actually yields. The wrapper must carry the actual bytes and
+    // never throw: a thrown size check inside the entry loop loses the whole
+    // containing artifact.
+    val tempDir = Files.createTempDirectory("aw-mismatch").toFile()
+    val wrapper = ArtifactWrapper.newWrapper(
+      "lying-1.0.bin",
+      1024L,
+      ByteArrayInputStream("only ten".getBytes("UTF-8")),
+      None,
+      tempDir.toPath
+    )
+    val actual =
+      wrapper.asInstanceOf[ByteWrapper].bytes
+    assertEquals(
+      new String(actual, "UTF-8"),
+      "only ten",
+      "the wrapper must carry the bytes that actually arrived"
+    )
+  }
+
   // ==================== FileWrapper Tests ====================
 
   test("FileWrapper - path returns correct path") {

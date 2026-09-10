@@ -6,6 +6,7 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 import javax.xml.parsers.DocumentBuilderFactory
+import java.io.ByteArrayInputStream
 import scala.util.Try
 
 object PomParser {
@@ -119,13 +120,9 @@ object PomParser {
       val db = secureDbf.newDocumentBuilder()
       db.setErrorHandler(SilentSaxHandler)
       val doc =
-        try {
-          db.parse(
-            new java.io.ByteArrayInputStream(pomString.getBytes("UTF-8"))
-          )
-        } catch {
-          case e: Exception => throw e
-        }
+        db.parse(
+          ByteArrayInputStream(pomString.getBytes("UTF-8"))
+        )
       val props = parseProperties(doc)
       val base = baseProperties(doc) ++ props
       ParsedPom(

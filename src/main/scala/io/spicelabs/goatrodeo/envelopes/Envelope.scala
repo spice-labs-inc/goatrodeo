@@ -1,4 +1,5 @@
 package io.spicelabs.goatrodeo.envelopes
+import scala.util.{Failure, Success, Try}
 
 import io.bullet.borer.Cbor
 import io.bullet.borer.Codec
@@ -19,10 +20,9 @@ trait EncodeCBOR {
 }
 
 trait DecodeCBOR[T] {
-  def decodeCBORElement(in: Element): T
-  def decodeCBOR(in: Array[Byte]): T = {
-    decodeCBORElement(Cbor.decode(in).to[Element].value)
-
+  def decodeCBORElement(in: Element): Try[T]
+  def decodeCBOR(in: Array[Byte]): Try[T] = {
+    Try(decodeCBORElement(Cbor.decode(in).to[Element].value)).flatten
   }
 }
 
@@ -63,7 +63,7 @@ final case class MD5(hash: Array[Byte]) extends EncodeCBOR {
 
 object MD5 extends DecodeCBOR[MD5] {
 
-  override def decodeCBORElement(in: Element): MD5 =
+  override def decodeCBORElement(in: Element): Try[MD5] =
     in match {
       case m: MapElem =>
         val ret = for {
@@ -87,10 +87,12 @@ object MD5 extends DecodeCBOR[MD5] {
           )
         }
         ret match {
-          case Some(ret) => ret
-          case _ => throw new IOException(f"Failed to decode ${in} as MD5")
+          case Some(md5) => Success(md5)
+          case None =>
+            Failure(new IOException(f"Failed to decode ${in} as MD5"))
         }
-      case _ => throw new IOException(f"Failed to decode ${in} as MD5")
+      case _ =>
+        Failure(new IOException(f"Failed to decode ${in} as MD5"))
     }
 
 }

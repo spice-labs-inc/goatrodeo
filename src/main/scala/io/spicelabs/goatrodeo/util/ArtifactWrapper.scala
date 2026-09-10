@@ -435,8 +435,12 @@ object ArtifactWrapper {
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
       if (size != bytes.length) {
-        throw Exception(
-          f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
+        // A corrupt or lying entry declared a different size than what the
+        // stream actually yielded. The wrapper carries the bytes that
+        // arrived; failing the whole container over a size lie is worse
+        // than wrapping the truth.
+        logger.warn(
+          f"Wrapper for ${name} expected ${size} bytes, but got ${bytes.length}; wrapping actual content"
         )
       }
       ByteWrapper(

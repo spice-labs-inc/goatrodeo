@@ -200,7 +200,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val envelope = Try { walker.open() }
+        val envelope = walker.open()
         assert(envelope.isSuccess, "Should successfully open GRD file")
       } finally {
         channel.close()
@@ -223,7 +223,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
 
         val readItem = walker.readNext()
         assert(readItem.isDefined, "Should read an item")
@@ -316,7 +316,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
 
         val readItem = walker.readNext().get
         assertEquals(readItem.connections, connections)
@@ -341,7 +341,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
 
         val readItem = walker.readNext().get
         assert(readItem.bodyAsItemMetaData.isDefined)
@@ -367,7 +367,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       try {
         val walker = new GRDWalker(channel)
         intercept[Exception] {
-          walker.open()
+          walker.open().get
         }
       } finally {
         channel.close()
