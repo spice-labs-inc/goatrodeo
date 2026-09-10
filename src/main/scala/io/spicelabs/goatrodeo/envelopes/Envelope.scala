@@ -1,6 +1,4 @@
 package io.spicelabs.goatrodeo.envelopes
-import scala.util.{Failure, Success, Try}
-
 import io.bullet.borer.Cbor
 import io.bullet.borer.Codec
 import io.bullet.borer.Decoder
@@ -13,6 +11,9 @@ import io.spicelabs.goatrodeo.omnibor.GraphManager
 import java.io.IOException
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 trait EncodeCBOR {
   def encodeCBORElement(): Element

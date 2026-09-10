@@ -15,8 +15,8 @@ import scala.collection.immutable.TreeSet
 /** Failure containment for the .NET strategy.
   *
   * '''WHAT:''' `DotnetState.beginProcessing` must NEVER throw when Cilantro
-  * cannot parse an artifact. The real-world case is a native (non-managed)
-  * DLL embedded in a fat jar, e.g. `applicationinsights-core-native-win64.dll`
+  * cannot parse an artifact. The real-world case is a native (non-managed) DLL
+  * embedded in a fat jar, e.g. `applicationinsights-core-native-win64.dll`
   * inside `azure-cosmos-spark_3-3_2-12-*.jar`: the dotnet MIME probe accepts
   * any PE-shaped file, and Cilantro's assembly reader can fail on legitimate
   * but unmapped PE debug types (`ImageDebugType` 13 = POGO). A thrown parse

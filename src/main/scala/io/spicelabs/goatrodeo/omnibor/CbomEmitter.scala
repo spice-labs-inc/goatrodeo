@@ -28,6 +28,8 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.time.Instant
 import java.util.UUID
 import scala.annotation.tailrec
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** Optional CycloneDX cryptographic bill-of-materials (CBOM) emitter.
@@ -1167,40 +1169,47 @@ object CbomEmitter {
     * following it, so a link planted at the target is replaced rather than
     * written through.
     */
-  private def safeOutputDir(dir: File): Try[File] = Try {
+  private def safeOutputDir(dir: File): Try[File] = {
     val path = pathOf(dir)
 
     if (Files.isSymbolicLink(path)) {
-      throw new IllegalArgumentException(
-        f"CBOM output directory is a symlink: $path"
-      )
-    }
-
-    if (!dir.exists()) {
-      try {
-        Files.createDirectories(
-          path,
-          PosixFilePermissions.asFileAttribute(
-            PosixFilePermissions.fromString(OutputPermissions)
-          )
+      Failure(
+        new IllegalArgumentException(
+          f"CBOM output directory is a symlink: $path"
         )
-      } catch {
-        case _: UnsupportedOperationException =>
-          dir.mkdirs()
+      )
+    } else {
+      Try {
+        if (!dir.exists()) {
+          try {
+            Files.createDirectories(
+              path,
+              PosixFilePermissions.asFileAttribute(
+                PosixFilePermissions.fromString(OutputPermissions)
+              )
+            )
+          } catch {
+            case _: UnsupportedOperationException =>
+              dir.mkdirs()
+          }
+        }
+        dir
+      }.flatMap { d =>
+        if (!d.isDirectory()) {
+          Failure(
+            new IllegalArgumentException(
+              f"CBOM output path is not a directory: $d"
+            )
+          )
+        } else if (!d.canWrite()) {
+          Failure(
+            new IllegalArgumentException(
+              f"CBOM output directory not writable: $d"
+            )
+          )
+        } else Success(d)
       }
     }
-
-    if (!dir.isDirectory()) {
-      throw new IllegalArgumentException(
-        f"CBOM output path is not a directory: $dir"
-      )
-    }
-    if (!dir.canWrite()) {
-      throw new IllegalArgumentException(
-        f"CBOM output directory not writable: $dir"
-      )
-    }
-    dir
   }
 
   /** Write a CBOM file atomically with restrictive permissions. */
@@ -1212,7 +1221,9 @@ object CbomEmitter {
     Try {
       val target = new File(dir, filename)
       val temp = File.createTempFile("cbom-", ".json.tmp", dir)
-      try {
+      (target, temp)
+    }.flatMap { case (target, temp) =>
+      Try {
         val content = compact(render(json))
         Files.writeString(pathOf(temp), content, StandardCharsets.UTF_8)
         try {
@@ -1237,12 +1248,11 @@ object CbomEmitter {
         } catch {
           case _: UnsupportedOperationException => // non-POSIX filesystem
         }
-      } catch {
-        case e: Throwable =>
-          temp.delete()
-          throw e
+        target
+      }.recoverWith { case e: Throwable =>
+        temp.delete() // best-effort cleanup; the failure stays a value
+        Failure(e)
       }
-      target
     }
   }
 

@@ -19,7 +19,9 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   */
 class MD5DecodeSuite extends GoatRodeoFunSuite {
 
-  test("MD5.decodeCBORElement - invalid element returns Failure, never throws") {
+  test(
+    "MD5.decodeCBORElement - invalid element returns Failure, never throws"
+  ) {
     val invalid = MapElem.Sized(
       StringElem("h") -> ArrayElem.Sized(IntElem(1))
     )

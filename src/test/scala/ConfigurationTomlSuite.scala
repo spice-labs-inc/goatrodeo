@@ -315,6 +315,57 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
 
   // ==================== the file's shape ====================
 
+  test("validation - threads below 1 is a Left naming the value") {
+    assert(ConfigurationToml.fromToml(parse("threads = 0")).isLeft)
+    assert(
+      ConfigurationToml
+        .fromToml(parse("threads = 0"))
+        .swap
+        .toOption
+        .get
+        .contains("threads must be >= 1, got 0")
+    )
+  }
+
+  test("validation - max_records at or below 100 is a Left") {
+    val result = ConfigurationToml.fromToml(parse("max_records = 100"))
+    assert(result.isLeft)
+    assert(
+      result.swap.toOption.get.contains("max_records must be > 100, got 100")
+    )
+  }
+
+  test("validation - invalid tag_json is a Left") {
+    val result = ConfigurationToml.fromToml(parse("""tag_json = "not json""""))
+    assert(result.isLeft)
+    assert(result.swap.toOption.get.contains("tag_json is not valid JSON"))
+  }
+
+  test("validation - invalid tag_date is a Left carrying the date error") {
+    val result =
+      ConfigurationToml.fromToml(parse("""tag_date = "not-a-date""""))
+    assert(result.isLeft)
+    assert(result.swap.toOption.get.contains("tag_date:"))
+  }
+
+  test("validation - cbom_version outside 1.6/1.7 is a Left") {
+    val result = ConfigurationToml.fromToml(parse("cbom_version = \"1.5\""))
+    assert(result.isLeft)
+    assert(
+      result.swap.toOption.get
+        .contains("cbom_version must be 1.6 or 1.7, got 1.5")
+    )
+  }
+
+  test("validation - relative paths in a config file are a Left") {
+    val result = ConfigurationToml.fromToml(parse("""out = "relative/dir""""))
+    assert(result.isLeft)
+    assert(
+      result.swap.toOption.get
+        .contains("paths in a config file must be absolute")
+    )
+  }
+
   test("settings outside a table are refused, not ignored") {
     // Bare keys at the root are how this file used to be written. Silently doing
     // nothing with them is exactly the failure this schema exists to prevent, so

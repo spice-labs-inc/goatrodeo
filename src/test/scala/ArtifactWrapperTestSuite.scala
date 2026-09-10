@@ -26,7 +26,9 @@ class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
 
   // ==================== newWrapper Tests ====================
 
-  test("newWrapper - size mismatch between declaration and content does not throw") {
+  test(
+    "newWrapper - size mismatch between declaration and content does not throw"
+  ) {
     // A corrupt/lying zip entry can declare a size that differs from what the
     // stream actually yields. The wrapper must carry the actual bytes and
     // never throw: a thrown size check inside the entry loop loses the whole

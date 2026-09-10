@@ -1,3 +1,8 @@
+import io.bullet.borer.Cbor
+import io.bullet.borer.Dom
+import io.bullet.borer.Dom.ArrayElem
+import io.bullet.borer.Dom.MapElem
+import io.bullet.borer.Dom.StringElem
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -47,6 +52,41 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   // ==================== CBOR Serialization Tests ====================
+
+  test("Item.decode - map with wrong key names fails as a value") {
+    val wrong = MapElem.Sized(
+      StringElem("rubbish") -> Dom.NullElem,
+      StringElem("body_mime_type") -> Dom.NullElem,
+      StringElem("connections") -> ArrayElem.Sized(),
+      StringElem("identifier") -> StringElem("x")
+    )
+    val bytes = Cbor.encode(wrong).toByteArray
+    val result = Item.decode(bytes)
+    assert(
+      result.isFailure,
+      "a map without the expected keys must decode to Failure, not throw"
+    )
+  }
+
+  test("Item.decode - reordered map fails as a value") {
+    // The CBOR form is positional with order validated by name in `decode`;
+    // a reordered map is rejected as a Failure, matching the strictness of
+    // the historical decoder while remaining throw-free.
+    val reordered = MapElem.Sized(
+      StringElem("identifier") -> StringElem("x"),
+      StringElem("connections") -> ArrayElem.Sized(),
+      StringElem("body_mime_type") -> StringElem(ItemMetaData.mimeType),
+      StringElem("body") -> Dom.NullElem
+    )
+    val bytes = Cbor.encode(reordered).toByteArray
+    val result = Item.decode(bytes)
+    assert(result.isFailure, s"reordered map must decode to Failure: $result")
+  }
+
+  test("Item.decode - junk bytes fail as a value") {
+    val result = Item.decode("this is not cbor".getBytes("UTF-8"))
+    assert(result.isFailure, "junk bytes must decode to Failure, not throw")
+  }
 
   test("Item - encodeCBOR produces bytes") {
     val item = createBasicItem("test-id")

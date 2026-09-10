@@ -10,7 +10,6 @@ import java.io.FileInputStream
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import scala.util.Try
 
 class GraphManagerTestSuite extends GoatRodeoFunSuite {
 

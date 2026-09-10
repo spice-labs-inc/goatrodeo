@@ -470,35 +470,20 @@ object Item {
     import io.bullet.borer.Dom
     def read(r: Reader): Item = {
       val unbounded = r.readMapOpen(4)
-      // Read "body" key
-      val bodyKey = r.readString()
-      if (bodyKey != "body")
-        throw new IllegalArgumentException(
-          s"Expected 'body' key, got '$bodyKey'"
-        )
+      // The four keys are read and discarded positionally, matching the
+      // encoder's write order. borer's own type checks reject malformed
+      // values; structured key-name validation happens in [[decode]] before
+      // this decoder is used, so a hostile map is a Failure, never a thrown
+      // exception.
+      r.readString() // "body"
       val bodyOpt: Option[Dom.Element] = if (r.hasNull) { r.readNull(); None }
       else Some(r.read[Dom.Element]())
-      // Read body_mime_type
-      val bmtKey = r.readString()
-      if (bmtKey != "body_mime_type")
-        throw new IllegalArgumentException(
-          s"Expected 'body_mime_type', got '$bmtKey'"
-        )
+      r.readString() // "body_mime_type"
       val bodyMimeType: Option[String] = if (r.hasNull) { r.readNull(); None }
       else Some(r.readString())
-      // Read connections
-      val connKey = r.readString()
-      if (connKey != "connections")
-        throw new IllegalArgumentException(
-          s"Expected 'connections', got '$connKey'"
-        )
+      r.readString() // "connections"
       val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
-      // Read identifier
-      val idKey = r.readString()
-      if (idKey != "identifier")
-        throw new IllegalArgumentException(
-          s"Expected 'identifier', got '$idKey'"
-        )
+      r.readString() // "identifier"
       val identifier = r.readString()
 
       Item(
@@ -519,14 +504,51 @@ object Item {
 
   /** Decode an Item from CBOR bytes.
     *
+    * The bytes are decoded to a Dom once so the map can be validated by key
+    * name and order; a hostile or corrupt map is a Failure value, never a
+    * thrown exception. The item is then decoded positionally from the original
+    * bytes rather than from the Dom, because re-encoding large Dom values
+    * exceeds borer's internal ElementDeque limit (a single item can carry tens
+    * of thousands of connection edges).
+    *
     * @param bytes
     *   the CBOR-encoded bytes
     * @return
     *   a Try containing the decoded Item or an error
     */
   def decode(bytes: Array[Byte]): Try[Item] = {
-    Cbor.decode(bytes).to[Item].valueTry
+    val expectedKeys = Vector(
+      io.bullet.borer.Dom.StringElem("body"),
+      io.bullet.borer.Dom.StringElem("body_mime_type"),
+      io.bullet.borer.Dom.StringElem("connections"),
+      io.bullet.borer.Dom.StringElem("identifier")
+    )
+    Try(Cbor.decode(bytes).to[io.bullet.borer.Dom.Element].value).flatMap {
+      el =>
+        mapKeys(el) match {
+          case Some(keys) if keys == expectedKeys =>
+            Try(Cbor.decode(bytes).to[Item].value)
+          case _ =>
+            val seen =
+              mapKeys(el).map(_.take(8)).getOrElse(Vector("not a CBOR map"))
+            Failure(
+              new Exception(
+                s"Expected Item map with keys body, body_mime_type, connections, identifier in encoder order, got $seen"
+              )
+            )
+        }
+    }
   }
+
+  /** The ordered keys of a Dom map, or None when the element is not a map. */
+  private def mapKeys(
+      el: io.bullet.borer.Dom.Element
+  ): Option[Vector[io.bullet.borer.Dom.Element]] =
+    el match {
+      case m: io.bullet.borer.Dom.MapElem =>
+        Some(m.members.map(_._1).toVector)
+      case _ => None
+    }
 
 }
 

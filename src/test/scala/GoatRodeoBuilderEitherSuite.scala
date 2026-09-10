@@ -2,7 +2,6 @@ import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.TomlTables
-
 import org.tomlj.Toml
 
 /** GoatRodeoBuilder.withTagDate Either-return contract.
@@ -97,10 +96,13 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("GoatRodeoBuilder - withConfiguration returns Right and applies the table") {
+  test(
+    "GoatRodeoBuilder - withConfiguration returns Right and applies the table"
+  ) {
     // The embedder seam must accept a plain configuration table and surface
     // the result as Either, not by throwing (withTagDate precedent).
-    val table = TomlTables.toPlainMap(Toml.parse("threads = 11\nmax_records = 4242"))
+    val table =
+      TomlTables.toPlainMap(Toml.parse("threads = 11\nmax_records = 4242"))
     val result = GoatRodeo
       .builder()
       .withThreads(2)
@@ -109,21 +111,32 @@ class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
     val applied = result.toOption.get
     val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
     field.setAccessible(true)
-    val config = field.get(applied).asInstanceOf[io.spicelabs.goatrodeo.util.Configuration]
+    val config =
+      field.get(applied).asInstanceOf[io.spicelabs.goatrodeo.util.Configuration]
     assertEquals(config.threads, 11)
     assertEquals(config.maxRecords, 4242)
   }
 
-  test("GoatRodeoBuilder - withConfiguration returns Left for unknown key, state unmutated") {
+  test(
+    "GoatRodeoBuilder - withConfiguration returns Left for unknown key, state unmutated"
+  ) {
     val table = TomlTables.toPlainMap(Toml.parse("thraeds = 4"))
     val builder = GoatRodeo.builder().withThreads(2)
     val result = builder.withConfiguration(table, "survey.inventory.analysis")
     assert(result.isLeft, s"an unknown key must produce Left, got $result")
     val error = result.swap.toOption.get
-    assert(error.contains("thraeds"), s"error should name the unknown key: $error")
+    assert(
+      error.contains("thraeds"),
+      s"error should name the unknown key: $error"
+    )
     val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
     field.setAccessible(true)
-    val config = field.get(builder).asInstanceOf[io.spicelabs.goatrodeo.util.Configuration]
-    assertEquals(config.threads, 2, "the builder must not be mutated by a rejected table")
+    val config =
+      field.get(builder).asInstanceOf[io.spicelabs.goatrodeo.util.Configuration]
+    assertEquals(
+      config.threads,
+      2,
+      "the builder must not be mutated by a rejected table"
+    )
   }
 }

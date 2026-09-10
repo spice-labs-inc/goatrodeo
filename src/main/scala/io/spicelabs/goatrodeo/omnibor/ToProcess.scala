@@ -1,6 +1,5 @@
 package io.spicelabs.goatrodeo.omnibor
 
-import scala.util.Try
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.strategies.*
 import io.spicelabs.goatrodeo.util.AdaptiveMimeBuilder
@@ -21,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,

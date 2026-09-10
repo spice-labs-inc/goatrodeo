@@ -153,7 +153,10 @@ class DotNetTesting extends GoatRodeoFunSuite {
     // For non-dotnet, beginProcessing must NOT throw: the parse failure is a
     // value (the state stays a no-op) so the containing walk survives.
     // See DotnetFailureContainmentSuite for the contract.
-    assert(exception.isEmpty, "A non-dotnet file must not result in an exception")
+    assert(
+      exception.isEmpty,
+      "A non-dotnet file must not result in an exception"
+    )
   }
 
   // ==================== DotnetState.formatDeps Tests ====================

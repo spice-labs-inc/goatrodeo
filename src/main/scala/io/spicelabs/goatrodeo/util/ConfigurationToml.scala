@@ -164,8 +164,6 @@ object ConfigurationToml {
     "cbom_version"
   )
 
-  private case class Invalid(message: String) extends RuntimeException(message)
-
   /** Read the environment, and a config file if there is one.
     *
     * Standalone, this is where the ladder is applied: defaults, then the
@@ -301,12 +299,17 @@ object ConfigurationToml {
         s"${prefix}unknown ${plural(unknown.size, "key")}: ${unknown.toSeq.sorted.mkString(", ")}"
       )
     else {
-      try Right(read(resolved, base))
-      catch {
-        case Invalid(message) => Left(prefix + message)
-        // A value that cannot be read names itself and the source it came from,
-        // which is more use than anything this layer could add.
-        case e: ConfigurationException => Left(e.getMessage)
+      // The value validations inside `read` are values (Left), never thrown;
+      // this catch is only for the TOML library's own ConfigurationException,
+      // which names itself and the source it came from.
+      val readResult =
+        try read(resolved, base)
+        catch {
+          case e: ConfigurationException => Left(e.getMessage)
+        }
+      readResult match {
+        case Right(c)      => Right(c)
+        case Left(message) => Left(prefix + message)
       }
     }
   }
@@ -320,112 +323,180 @@ object ConfigurationToml {
   ): Map[String, Any] =
     resolved.group(group).asScala.toMap.map { case (k, v) => k -> (v: Any) }
 
-  private def read(table: Resolution, base: Configuration): Configuration = {
-    var config = base
-    str(table, "out").foreach(v => config = config.copy(out = Some(file(v))))
-    strs(table, "build").foreach(vs =>
-      config = config.copy(build = config.build ++ vs.map(file))
-    )
-    strs(table, "file_list").foreach(vs =>
-      config = config.copy(fileList = config.fileList ++ vs.map(file))
-    )
-    str(table, "ingested").foreach(v =>
-      config = config.copy(ingested = Some(file(v)))
-    )
-    strs(table, "ignore").foreach(vs =>
-      config = config.copy(ignore = config.ignore ++ vs.map(file))
-    )
-    str(table, "block_list").foreach(v =>
-      config = config.copy(blockList = Some(file(v)))
-    )
-    strs(table, "exclude_pattern").foreach(vs =>
-      config = config.copy(exclude =
-        config.exclude ++ vs.map(p => p -> Try(Pattern.compile(p)))
+  private def read(
+      table: Resolution,
+      base: Configuration
+  ): Either[String, Configuration] = {
+    var result: Either[String, Configuration] = Right(base)
+
+    /** Apply `f` to the accumulator while no error has been raised. */
+    def run(f: Configuration => Either[String, Configuration]): Unit = {
+      result = result.flatMap(f)
+    }
+
+    run(c =>
+      str(table, "out").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(out = Some(f)))
       )
     )
-    int(table, "threads").foreach { v =>
-      if (v < 1) throw Invalid(s"threads must be >= 1, got $v")
-      config = config.copy(threads = v)
-    }
-    int(table, "max_records").foreach { v =>
-      if (v <= 100) throw Invalid(s"max_records must be > 100, got $v")
-      config = config.copy(maxRecords = v)
-    }
-    str(table, "temp_dir").foreach(v =>
-      config = config.copy(tempDir = Some(file(v)))
+    run(c =>
+      strs(table, "build").fold(Right(c))(vs =>
+        absFiles(vs).map(fs => c.copy(build = c.build ++ fs))
+      )
     )
-    bool(table, "static_metadata").foreach(v =>
-      config = config.copy(useStaticMetadata = v)
+    run(c =>
+      strs(table, "file_list").fold(Right(c))(vs =>
+        absFiles(vs).map(fs => c.copy(fileList = c.fileList ++ fs))
+      )
     )
-    bool(table, "fs_file_paths").foreach(v =>
-      config = config.copy(fsFilePaths = v)
+    run(c =>
+      str(table, "ingested").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(ingested = Some(f)))
+      )
     )
-    str(table, "dump_roots").foreach(v =>
-      config = config.copy(dumpRootDir = Some(file(v)))
+    run(c =>
+      strs(table, "ignore").fold(Right(c))(vs =>
+        absFiles(vs).map(fs => c.copy(ignore = c.ignore ++ fs))
+      )
     )
-    str(table, "dump_json").foreach(v =>
-      config = config.copy(emitJsonDir = Some(file(v)))
+    run(c =>
+      str(table, "block_list").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(blockList = Some(f)))
+      )
     )
-    strs(table, "mime_filter").foreach(vs =>
-      config = config.copy(mimeFilter = vs.foldLeft(config.mimeFilter)(_ :+ _))
+    run(c =>
+      strs(table, "exclude_pattern").fold(Right(c))(vs =>
+        Right(
+          c.copy(exclude =
+            c.exclude ++ vs.map(p => p -> Try(Pattern.compile(p)))
+          )
+        )
+      )
     )
-    str(table, "tag").foreach(v => config = config.copy(tag = Some(v)))
-    str(table, "tag_json").foreach { v =>
-      val json = Try(Json.decode(v.getBytes("UTF-8")).to[Dom.Element].value)
-      json match {
-        case scala.util.Success(value) =>
-          config = config.copy(tagJson = Some(value))
-        case scala.util.Failure(_) =>
-          throw Invalid(s"tag_json is not valid JSON: $v")
-      }
-    }
-    str(table, "tag_version").foreach(v =>
-      config = config.copy(tagVersion = Some(v))
+    run(c =>
+      int(table, "threads").fold(Right(c))(v =>
+        if (v < 1) Left(s"threads must be >= 1, got $v")
+        else Right(c.copy(threads = v))
+      )
     )
-    str(table, "tag_date").foreach { v =>
-      DateParser.parse(v) match {
-        case Right(date) => config = config.copy(tagDate = Some(date))
-        case Left(error) => throw Invalid(s"tag_date: $error")
-      }
-    }
-    bool(table, "redact_git_info").foreach(v =>
-      config = config.copy(redactGitInfo = v)
+    run(c =>
+      int(table, "max_records").fold(Right(c))(v =>
+        if (v <= 100) Left(s"max_records must be > 100, got $v")
+        else Right(c.copy(maxRecords = v))
+      )
     )
-    bool(table, "log_filenames").foreach(v =>
-      config = config.copy(logFilenames = v)
+    run(c =>
+      str(table, "temp_dir").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(tempDir = Some(f)))
+      )
     )
-    str(table, "tamper_evident_log").foreach(v =>
-      config = config.copy(tamperEvidentLog = Some(file(v)))
+    run(c =>
+      bool(table, "static_metadata").fold(Right(c))(v =>
+        Right(c.copy(useStaticMetadata = v))
+      )
     )
-    bool(table, "package_tags").foreach(v =>
-      config = config.copy(packageTags = v)
+    run(c =>
+      bool(table, "fs_file_paths").fold(Right(c))(v =>
+        Right(c.copy(fsFilePaths = v))
+      )
     )
-    bool(table, "package_tags_short_name").foreach(v =>
-      config = config.copy(packageTagsShortName = v)
+    run(c =>
+      str(table, "dump_roots").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(dumpRootDir = Some(f)))
+      )
     )
-    str(table, "emit_cbom_dir").foreach(v =>
-      config = config.copy(cbomDir = Some(file(v)))
+    run(c =>
+      str(table, "dump_json").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(emitJsonDir = Some(f)))
+      )
     )
-    str(table, "cbom_version").foreach { v =>
-      if (!Set("1.6", "1.7").contains(v))
-        throw Invalid(s"cbom_version must be 1.6 or 1.7, got $v")
-      config = config.copy(cbomVersion = v)
-    }
-    config
+    run(c =>
+      strs(table, "mime_filter").fold(Right(c))(vs =>
+        Right(c.copy(mimeFilter = vs.foldLeft(c.mimeFilter)(_ :+ _)))
+      )
+    )
+    run(c =>
+      str(table, "tag").fold(Right(c))(v => Right(c.copy(tag = Some(v))))
+    )
+    run(c =>
+      str(table, "tag_json").fold(Right(c))(v =>
+        Try(Json.decode(v.getBytes("UTF-8")).to[Dom.Element].value) match {
+          case scala.util.Success(elm) =>
+            Right(c.copy(tagJson = Some(elm)))
+          case scala.util.Failure(_) =>
+            Left(s"tag_json is not valid JSON: $v")
+        }
+      )
+    )
+    run(c =>
+      str(table, "tag_version").fold(Right(c))(v =>
+        Right(c.copy(tagVersion = Some(v)))
+      )
+    )
+    run(c =>
+      str(table, "tag_date").fold(Right(c))(v =>
+        DateParser.parse(v) match {
+          case Right(date) => Right(c.copy(tagDate = Some(date)))
+          case Left(error) => Left(s"tag_date: $error")
+        }
+      )
+    )
+    run(c =>
+      bool(table, "redact_git_info").fold(Right(c))(v =>
+        Right(c.copy(redactGitInfo = v))
+      )
+    )
+    run(c =>
+      bool(table, "log_filenames").fold(Right(c))(v =>
+        Right(c.copy(logFilenames = v))
+      )
+    )
+    run(c =>
+      str(table, "tamper_evident_log").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(tamperEvidentLog = Some(f)))
+      )
+    )
+    run(c =>
+      bool(table, "package_tags").fold(Right(c))(v =>
+        Right(c.copy(packageTags = v))
+      )
+    )
+    run(c =>
+      bool(table, "package_tags_short_name").fold(Right(c))(v =>
+        Right(c.copy(packageTagsShortName = v))
+      )
+    )
+    run(c =>
+      str(table, "emit_cbom_dir").fold(Right(c))(v =>
+        absFile(v).map(f => c.copy(cbomDir = Some(f)))
+      )
+    )
+    run(c =>
+      str(table, "cbom_version").fold(Right(c))(v =>
+        if (!Set("1.6", "1.7").contains(v))
+          Left(s"cbom_version must be 1.6 or 1.7, got $v")
+        else Right(c.copy(cbomVersion = v))
+      )
+    )
+    result
   }
 
-  /** Config files may be read from a directory the process cannot see — a
-    * container mount, say — so a relative path in one has no dependable
-    * meaning. Requiring absolute paths also lets the `spice` wrapper keep its
-    * guarantee that every path it must bind-mount is visible on the command
-    * line, since it cannot see inside a TOML table.
+  /** A config-file path must be absolute (the process may not see the caller's
+    * working directory). Failure is a value, never thrown.
     */
-  private def file(value: String): File = {
+  private def absFile(value: String): Either[String, File] = {
     val f = File(value)
     if (!f.isAbsolute())
-      throw Invalid(s"paths in a config file must be absolute, got: $value")
-    f
+      Left(s"paths in a config file must be absolute, got: $value")
+    else Right(f)
   }
+
+  private def absFiles(
+      values: Vector[String]
+  ): Either[String, Vector[File]] =
+    values.foldLeft(Right(Vector.empty[File]): Either[String, Vector[File]])(
+      (acc, v) => acc.flatMap(fs => absFile(v).map(f => fs :+ f))
+    )
 
   private def setting(table: Resolution, key: String): Option[Setting] =
     table.setting(Group, key).toScala

@@ -9,7 +9,6 @@ import java.io.FileInputStream
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import scala.util.Try
 
 /** GRDWalker.open returns Failure (not thrown exception) for wrong magic
   * number.
