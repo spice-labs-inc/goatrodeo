@@ -36,6 +36,18 @@ object LogCapture {
 
   private val lock = new Object()
 
+  /** Run `body` while no capture is active, so assertions about the ambient
+    * logger levels are not racing another suite's capture window (which raises
+    * the root logger to ALL). Holds the same lock that serialises captures, so
+    * "no capture in progress" holds for the whole body, and first waits out the
+    * SLF4J binding race — a substitute logger answers every level query with
+    * "enabled" and would fail these assertions spuriously.
+    */
+  def quiescent[T](body: => T): T = lock.synchronized {
+    loggerContext()
+    body
+  }
+
   /** A logback appender that captures events into a persistent `Vector` inside
     * an `AtomicReference`. Appends are atomic functional updates, so the event
     * list is safe to read concurrently from another thread.

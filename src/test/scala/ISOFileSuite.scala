@@ -8,6 +8,11 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
@@ -63,4 +68,38 @@ class ISOFileSuite extends GoatRodeoFunSuite {
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
 
+  test("withinArchiveStream - counts a container whose walk fails") {
+    // The batch-drain failure summary needs to know how many containers were
+    // lost wholesale. This pins the counting contract at the walk boundary:
+    // a container whose processing function throws is reported as None AND
+    // increments the run's failure counter by exactly one.
+    val dir = Files.createTempDirectory("gr-container-failure").toFile
+    try {
+      val zip = new File(dir, "boom.zip")
+      val out = new ZipOutputStream(new FileOutputStream(zip))
+      try {
+        out.putNextEntry(new ZipEntry("hello.txt"))
+        out.write("hello".getBytes("UTF-8"))
+        out.closeEntry()
+      } finally {
+        out.close()
+      }
+      val failedContainers = new AtomicInteger(0)
+      val result = FileWalker
+        .withinArchiveStream(
+          FileWrapper(zip, zip.getName(), None),
+          failedContainers
+        ) { _ =>
+          throw new RuntimeException("the walk failed")
+        }
+      assertEquals(result, None)
+      assertEquals(failedContainers.get(), 1)
+    } finally {
+      def deleteRecursively(f: File): Unit = {
+        Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
+        val _ = f.delete()
+      }
+      deleteRecursively(dir)
+    }
+  }
 }

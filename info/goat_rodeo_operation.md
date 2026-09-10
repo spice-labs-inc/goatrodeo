@@ -423,6 +423,49 @@ pkg:generic/x509/spki-sha256@0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a3
 pkg:generic/x509/cert-sha256@96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=4096&version=3
 ```
 
+
+## Logging and progress reporting
+
+### Run-start configuration echo
+
+The run begins by echoing the effective configuration to the log, one setting
+per line under a `Configuration:` header. The two fields never echoed are the
+ambient runtime environment and the progress-listener object: the first
+describes how the process was started rather than what the run was told to do,
+and a listener is an object, not a setting (as demonstrated by the tests
+`ConfigTestSuite` "Configuration - operationalSummary lists effective settings
+only" and "Configuration - operationalSummary renders the default mime
+filter").
+
+### Progress cadence
+
+The `Processed N of M` log line and the `ProgressListener` callbacks fire
+together, at most once per 30 seconds of wall time run-wide, immediately when
+a single item has taken longer than 30 seconds, and once more with the final
+count when a batch drains (as demonstrated by `ProgressListenerIntegrationTest`
+"the batch-drain final report carries the final count"). A run that finishes
+quickly therefore produces one terminal progress event with `current == total`
+and no mid-run noise. Hosts synthesizing phases from events can rely on a
+`current == total` event meaning the run's own processing is done.
+
+### Container-failure summary
+
+When a container's processing fails wholesale, the individual failure is
+logged with its exception at the failure site, and a run-wide counter is
+incremented; at completion the run reports the aggregate — "N container(s)
+failed to process; their contents are missing from this run's outputs" — so
+the log says in one line what the item counts cannot (as demonstrated by
+`ISOFileSuite` "withinArchiveStream - counts a container whose walk fails").
+
+### Third-party reader quietude
+
+The bundled logging defaults set the DEB/RPM package readers
+(`io.spicelabs.baharat`) to WARN, so package-heavy corpora do not produce one
+"Read DEB/RPM package" line per archive (as demonstrated by `LogDefaultsSuite`
+"bundled defaults keep the DEB/RPM readers at WARN"). Goat Rodeo's own
+loggers stay at INFO (as demonstrated by `LogDefaultsSuite` "bundled defaults
+keep Goat Rodeo's own loggers at INFO").
+
 ## Tuning for performance
 
 If you're processing a few hundred artifacts, don't worry. Goat Rodeo will do the right thing.

@@ -315,6 +315,7 @@ Test / testOptions += Tests.Setup(() => {
       ("iso_tests", "simple.iso", None),
       ("", "sample-tomcat-6.war", None),
       ("", "EnterpriseHelloWorld.ear", None),
+      ("", "azure-cosmos-spark_3-3_2-12-4.18.1.jar", None),
       ("apk_tests", "bitbar-sample-app.apk", None),
       ("gem_tests", "java-properties-0.3.0.gem", None),
       ("deb_tests", "hello_2.10-3_arm64.deb", None),

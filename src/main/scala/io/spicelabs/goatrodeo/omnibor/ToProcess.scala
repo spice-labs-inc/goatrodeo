@@ -14,6 +14,7 @@ import io.spicelabs.goatrodeo.util.StaticMetadata
 import io.spicelabs.goatrodeo.util.config
 
 import java.io.File
+import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -360,7 +361,8 @@ trait ToProcess {
       tag: Option[TagPass],
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
-      atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
+      atEnd: (Option[GitOID], Item) => Unit = (_, _) => (),
+      failedContainers: AtomicInteger = new AtomicInteger(0)
   )(using Configuration): Seq[GitOID] = {
     if (keepRunning()) {
 
@@ -624,40 +626,43 @@ trait ToProcess {
                 // if the gitoid has already been seen, do not recurse into the potential child
                 if (hasBeenSeen) None
                 else {
-                  FileWalker.withinArchiveStream(artifact = artifact) {
-                    rawFoundItems =>
+                  FileWalker.withinArchiveStream(
+                    artifact = artifact,
+                    failedContainers = failedContainers
+                  ) { rawFoundItems =>
 
-                      val foundItems = rawFoundItems.filter(_.size() >= 0)
+                    val foundItems = rawFoundItems.filter(_.size() >= 0)
 
-                    for {
-                      item <- foundItems
-                    } item.mimeType
+                  for {
+                    item <- foundItems
+                  } item.mimeType
 
-                    val processSet =
-                      ToProcess.strategiesForArtifacts(
-                        foundItems,
-                        x => (),
-                        false
-                      )
-                    val thisParentScope = state4.generateParentScope(
-                      artifact,
-                      answerItem,
+                  val processSet =
+                    ToProcess.strategiesForArtifacts(
+                      foundItems,
+                      x => (),
+                      false
+                    )
+                  val thisParentScope = state4.generateParentScope(
+                    artifact,
+                    answerItem,
+                    store,
+                    marker,
+                    Some(parentScope),
+                    Map()
+                  )
+                  processSet.flatMap(tp =>
+                    tp.process(
+                      Some(answerItem.identifier),
                       store,
-                      marker,
-                      Some(parentScope),
-                      Map()
+                      thisParentScope,
+                      None,
+                      blockList,
+                      keepRunning,
+                      atEnd,
+                      failedContainers
                     )
-                    processSet.flatMap(tp =>
-                      tp.process(
-                        Some(answerItem.identifier),
-                        store,
-                        thisParentScope,
-                        None,
-                        blockList,
-                        keepRunning,
-                        atEnd
-                      )
-                    )
+                  )
                   }
                 }
 
@@ -824,17 +829,22 @@ object ToProcess {
 
     val largeCnt_? = totalCnt > 100000
 
-    val by50 = (totalCnt / 50) match {
-      case 0 => 1
-      case x => x
-    }
     if (infoMsgs_? && largeCnt_?)
       logger.info("Creating strategies for artifacts")
+    // Progress for this pass is time-based: on a fast machine the loop ends
+    // long before the first 30-second tick, which is the point — these lines
+    // exist only to show that a slow setup is still working. The pass is
+    // single-threaded, so a plain local is enough.
+    var lastSetupReport = 0L
     // create the list of the files
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
-      if (idx % by50 == 0 && infoMsgs_? && largeCnt_?) {
-        logger.info(f"Initial file setup ${idx}%,d of ${totalCnt}%,d")
+      if (infoMsgs_? && largeCnt_?) {
+        val now = Instant.now().toEpochMilli()
+        if (now - lastSetupReport >= 30000) {
+          lastSetupReport = now
+          logger.info(f"Initial file setup ${idx}%,d of ${totalCnt}%,d")
+        }
       }
       f.uuid -> f
     }*)

@@ -6,7 +6,10 @@
     </appender>
                                                                                                                   
     <logger name="org.apache.tika" level="INFO" />        
-    <logger name="io.spicelabs.baharat" level="INFO" />                                                        
+    <!-- One "Read DEB/RPM package" INFO per archive drowns long runs on
+         package-heavy corpora; the archive list is already in the output
+         artifacts, so keep the library quiet. -->
+    <logger name="io.spicelabs.baharat" level="WARN" />                                                       
    
     <root level="INFO">                                                                                          
       <appender-ref ref="STDOUT" />

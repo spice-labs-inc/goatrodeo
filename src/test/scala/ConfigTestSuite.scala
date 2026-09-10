@@ -14,6 +14,7 @@ limitations under the License. */
 
 import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testsupport.LogCapture
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.ExpandFiles
@@ -461,5 +462,124 @@ class ConfigTestSuite extends GoatRodeoFunSuite {
     val config = Configuration(tempDir = Some(tempDir))
 
     assertEquals(config.tempDir, Some(tempDir))
+  }
+
+  // ==================== operational summary tests ====================
+
+  test("Configuration - operationalSummary lists effective settings only") {
+    val pattern = java.util.regex.Pattern.compile(".*\\.class")
+    val config = Configuration(
+      threads = 12,
+      build = Vector(File("/tmp/built/from/here")),
+      tag = Some("test-tag"),
+      exclude = Vector("*.class" -> scala.util.Success(pattern)),
+      logging = Map("io.spicelabs.goatrodeo" -> "DEBUG"),
+      progressListener = Some(new io.spicelabs.goatrodeo.ProgressListener {
+        def onProgress(current: Long, total: Long): Unit = ()
+      })
+    )
+    val summary = config.operationalSummary
+    assert(
+      summary.exists(_.contains("threads = 12")),
+      s"threads must appear: $summary"
+    )
+    assert(
+      summary.exists(_.contains("/tmp/built/from/here")),
+      s"build roots must appear: $summary"
+    )
+    assert(
+      summary.exists(_.contains("test-tag")),
+      s"tag must appear: $summary"
+    )
+    assert(
+      summary.exists(_.contains(".*\\.class")),
+      s"exclude patterns must appear: $summary"
+    )
+    assert(
+      summary.exists(_.contains("DEBUG")),
+      s"logging settings must appear: $summary"
+    )
+    assert(
+      !summary.exists(_.startsWith("runtime")),
+      s"ambient runtime state must not be echoed: $summary"
+    )
+    assert(
+      !summary.exists(_.startsWith("progressListener")),
+      s"the listener object must not be echoed: $summary"
+    )
+  }
+
+  test("Configuration - operationalSummary names an invalid exclude pattern") {
+    val config = Configuration(
+      exclude = Vector("bad(" -> scala.util.Failure(new RuntimeException("no")))
+    )
+    val summary = config.operationalSummary
+    assert(
+      summary.exists(_.contains("bad(")) &&
+        summary.exists(_.contains("invalid")),
+      s"invalid patterns must be visible as invalid: $summary"
+    )
+  }
+
+  test("Configuration - operationalSummary renders the default mime filter") {
+    // The default filter includes everything and must read that way in the
+    // echo, not as an object identity hash.
+    val summary = Configuration().operationalSummary
+    assert(
+      summary.exists(_.contains("no filters")),
+      s"the default filter must read as empty: $summary"
+    )
+  }
+
+  // ==================== run-start configuration echo ====================
+
+  test("Configuration - a run begins by echoing the operational summary") {
+    // The echo is a log surface; LogCapture pins the lines themselves from a
+    // real (tiny) run: the run must log a "Configuration:" header followed by
+    // one line per setting, and must not echo the ambient runtime state or
+    // the progress listener.
+    val payloadDir = Files.createTempDirectory("gr-echo-payload").toFile
+    val outputDir = Files.createTempDirectory("gr-echo-output").toFile
+    try {
+      for (i <- 0 until 5) {
+        Files.writeString(
+          new File(payloadDir, f"e$i%03d.txt").toPath,
+          s"data $i\n"
+        )
+      }
+      val (_, captured) = LogCapture.apply(() => {
+        GoatRodeo
+          .builder()
+          .withPayload(payloadDir.getAbsolutePath)
+          .withOutput(outputDir.getAbsolutePath)
+          .withThreads(2)
+          .run()
+        ()
+      })
+      val lines = captured.map(_.getFormattedMessage)
+      assert(
+        lines.exists(_.contains("Configuration:")),
+        s"a Configuration: header must be logged: $lines"
+      )
+      assert(
+        lines.exists(l => l.contains("threads = 2")),
+        s"the echo must carry the effective settings: $lines"
+      )
+      assert(
+        lines.exists(l => l.contains(payloadDir.getAbsolutePath)),
+        s"the echo must carry the build roots: $lines"
+      )
+      assert(
+        !lines.exists(_.contains("progressListener")),
+        s"the listener object must not be echoed: $lines"
+      )
+    } finally {
+      def deleteRecursively(f: File): Unit = {
+        Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
+        val _ = f.delete()
+      }
+      deleteRecursively(payloadDir)
+      deleteRecursively(outputDir)
+    }
   }
 }

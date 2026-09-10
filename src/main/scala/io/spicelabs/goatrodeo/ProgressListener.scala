@@ -18,9 +18,12 @@ import com.typesafe.scalalogging.Logger
 
 /** A callback for receiving progress notifications during a Goat Rodeo run.
   *
-  * The listener is invoked periodically while items flow through the build
-  * pipeline, at the same cadence as the existing "Processed N of M" log
-  * emission (every 1,000 items or 30 seconds, whichever fires first).
+  * The listener is invoked at the same cadence as the "Processed N of M" log
+  * emission: at most once per 30 seconds of wall time (one event for the whole
+  * run, whichever worker thread wins the window), immediately when a single
+  * item has taken longer than 30 seconds, and once more with the batch's final
+  * count when the batch drains. A run that finishes quickly therefore delivers
+  * exactly one event — the terminal one.
   *
   * No phase or boundary signals are exposed — Goat Rodeo's filesystem walk,
   * artifact processing, and per-batch output writing all overlap freely on
@@ -91,8 +94,8 @@ object ProgressListener {
     * race past their state update and call `onProgress` in the wrong order,
     * which is exactly the backwards progress the listener wants to never see.
     * The lock is uncontended outside the rare moments when multiple worker
-    * threads cross the "Processed N of M" emission cadence (every 1,000 items
-    * or 30s) simultaneously, so the cost is negligible.
+    * threads cross the 30-second progress cadence simultaneously, so the cost
+    * is negligible.
     */
   private[goatrodeo] final class Notifier(listener: Option[ProgressListener]) {
 

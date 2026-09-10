@@ -27,6 +27,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
@@ -826,6 +827,10 @@ object FileWalker {
     *
     * @param artifact
     *   -- the artifact to potentially traverse into
+    * @param failedContainers
+    *   -- run-scoped counter incremented once when a container's expansion
+    *   function fails, so the run can summarize wholesale container loss (the
+    *   per-container error stays logged at the failure site)
     * @param function
     *   -- the function that does "a thing" with the expanded artifacts
     *
@@ -833,9 +838,10 @@ object FileWalker {
     *   if the thing is a container, then `Some(T)` where T is the value
     *   returned from `function`
     */
-  def withinArchiveStream[T](artifact: ArtifactWrapper)(
-      function: Vector[ArtifactWrapper] => T
-  ): Option[T] = {
+  def withinArchiveStream[T](
+      artifact: ArtifactWrapper,
+      failedContainers: AtomicInteger = new AtomicInteger(0)
+  )(function: Vector[ArtifactWrapper] => T): Option[T] = {
     if (notArchive(artifact)) None
     else {
       val tempDirOpt: Option[Path] = artifact.tempDir match {
@@ -861,6 +867,9 @@ object FileWalker {
                   Some(function(artifacts))
                 } catch {
                   case e: Exception =>
+                    // Count wholesale container loss so the run's completion
+                    // can summarize it; the error itself stays logged here.
+                    failedContainers.incrementAndGet()
                     logger.error(
                       f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
                           .getMessage()}",

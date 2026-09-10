@@ -36,6 +36,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
@@ -92,12 +93,20 @@ object Builder {
       excludeFileRegex: Seq[java.util.regex.Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
-      preWriteDB: Vector[Storage => Boolean] = Vector()
+      preWriteDB: Vector[Storage => Boolean] = Vector(),
+      failedContainers: AtomicInteger = new AtomicInteger(0)
   )(using Configuration): Unit = {
     val totalStart = Instant.now()
     // Fresh per-run dispatcher; enforces monotonic current and catches
     // exceptions thrown by the caller-supplied ProgressListener.
     val progressNotifier = ProgressListener.notifier(config.progressListener)
+
+    // Wall-clock cadence for the "Processed N of M" progress line and the
+    // listener ticks: at most one report per 30 seconds run-wide, whichever
+    // consumer thread gets there first (CAS), plus a slow-item report and a
+    // final batch-drain report. Shared across batches so overlapping batches
+    // cannot double-report within the same window.
+    val lastProgressReport = new AtomicLong(totalStart.toEpochMilli)
 
     val runningCnt = AtomicInteger(0)
     val dead_? = AtomicBoolean(false)
@@ -238,6 +247,8 @@ object Builder {
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
         progressNotifier = progressNotifier,
+        lastProgressReport = lastProgressReport,
+        failedContainers = failedContainers,
         preWriteDB = preWriteDB,
         gitItems = gitItems
       )
@@ -308,6 +319,8 @@ object Builder {
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
       progressNotifier: ProgressListener.Notifier,
+      lastProgressReport: AtomicLong,
+      failedContainers: AtomicInteger,
       preWriteDB: Vector[Storage => Boolean] = Vector(),
       gitItems: Vector[GitRunItem] = Vector()
   )(using Configuration): Option[BatchState] = {
@@ -426,13 +439,26 @@ object Builder {
                     ParentScope.forAndWith(toProcess.main, None, byHash),
                   blockList = blockGitoids,
                   keepRunning = () => !dead_?.get(),
+                  failedContainers = failedContainers,
                   atEnd = (parent, _) => {
                     if (parent.isEmpty) {
                       val updatedCnt = cnt.addAndGet(1)
                       val theDuration = Duration
                         .between(localStart, Instant.now())
+                      val nowEpochMillis = Instant.now().toEpochMilli()
+                      val lastReport = lastProgressReport.get()
+                      // Enough to see that work is happening, not so much that
+                      // the log drowns: one report per 30 seconds of wall
+                      // time (CAS picks a single winner among the consumer
+                      // threads), or immediately when a single item has taken
+                      // more than 30 seconds.
                       if (
-                        theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
+                        theDuration.getSeconds() > 30 ||
+                        (nowEpochMillis - lastReport >= 30000 &&
+                          lastProgressReport.compareAndSet(
+                            lastReport,
+                            nowEpochMillis
+                          ))
                       ) {
 
                         // if we've got a temp dir and we're down to 10% free space, bail
@@ -555,6 +581,17 @@ object Builder {
               }
               t.join()
             }
+
+            // The cadence leaves the final items unreported (the last tick
+            // can be far from the final count), so report the batch's final
+            // numbers once all workers are done. The listener's monotonic
+            // guard makes the extra notify harmless to hosts.
+            val finalCnt = cnt.get()
+            val finalTotal = runningCnt.get()
+            logger.info(
+              f"Processed ${finalCnt}%,d of ${finalTotal}%,d, batch ${batchName} complete"
+            )
+            progressNotifier.notify(finalCnt.toLong, finalTotal.toLong)
 
             logger.info(
               f"Finished processing ${cnt.get()}%,d, vertices ${storage.size()}%,d at ${Duration

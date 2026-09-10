@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Failure
@@ -144,6 +145,13 @@ object Howdy {
     startComponents
 
     val logger = Logger(getClass())
+
+    // Echo the settings in force as the run starts, so the log alone says
+    // what this run was told to do (and what it skipped). The summary is
+    // curated: ambient process state and the progress listener are not
+    // settings and are never printed.
+    logger.info("Configuration:")
+    config.operationalSummary.foreach(line => logger.info(line))
 
     val fileListers = config.getFileListBuilders()
 
@@ -264,6 +272,7 @@ object Howdy {
           (storage: Storage) => { storage.emitAllItemsToDir(dir); true }
         )
 
+    val failedContainers = new AtomicInteger(0)
     Builder.buildDB(
       dest = dest,
       tag = (config.tag, config.tagJson) match {
@@ -276,8 +285,19 @@ object Howdy {
       excludeFileRegex = excludePatterns,
       finishedFile = onFileFinish,
       done = onRunFinish,
-      preWriteDB = preWriteDB
+      preWriteDB = preWriteDB,
+      failedContainers = failedContainers
     )
+
+    // Wholesale container loss is invisible in the counts otherwise: the
+    // items inside a failed container are never processed, while the ingested
+    // list still grows. Name the loss so the run's log tells the truth about
+    // it; each individual failure is logged (with the exception) upstream.
+    val containerFailures = failedContainers.get()
+    if (containerFailures > 0)
+      logger.warn(
+        f"${containerFailures}%,d container(s) failed to process; their contents are missing from this run's outputs"
+      )
 
   }
 

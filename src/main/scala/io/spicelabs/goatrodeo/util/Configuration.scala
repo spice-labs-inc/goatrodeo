@@ -8,6 +8,8 @@ import java.nio.file.Files
 import java.util.Date
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** The ambient process state Goat Rodeo is running in, captured once rather
@@ -167,6 +169,52 @@ case class Configuration(
     logging: Map[String, Any] = Map(),
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
+
+  /** A printable summary of the settings in force, one line per setting.
+    *
+    * For the run-start echo, so the log alone says what this run was told to
+    * do. Ambient state (`runtime`) is skipped — it describes how the process
+    * was started, not what the run was asked to do — and so is the
+    * [[ProgressListener]], which is an object, not a setting. The single
+    * formatter is shared by every field type, so a field added later is covered
+    * without anyone remembering to cover it.
+    */
+  def operationalSummary: Vector[String] = {
+    val skip = Set("runtime", "progressListener")
+    productElementNames
+      .zip(productIterator)
+      .filterNot((name, _) => skip.contains(name))
+      .map((name, value) => f"  ${name} = ${echoValue(value)}")
+      .toVector
+  }
+
+  /** Render one setting value for [[operationalSummary]], recursively for
+    * containers (option, tuple, vector, map, try). Never touches ambient
+    * process state: nothing reachable from a configuration field is secret, and
+    * the only fields that ever held process state were excluded from the
+    * summary.
+    */
+  private def echoValue(value: Any): String = value match {
+    case None        => "unset"
+    case Some(inner) => echoValue(inner)
+    case f: File     => f.getAbsolutePath()
+    case pair: Tuple2[?, ?] =>
+      f"${echoValue(pair._1)} -> ${echoValue(pair._2)}"
+    case values: Vector[?] => values.map(echoValue).mkString(", ")
+    case settings: Map[?, ?] =>
+      settings.toVector
+        .sortBy((key, _) => key.toString)
+        .map((key, value) => f"${key} -> ${echoValue(value)}")
+        .mkString(", ")
+    case p: Pattern => p.pattern()
+    case attempt: Try[?] =>
+      attempt match {
+        case Success(p: Pattern) => p.pattern()
+        case Failure(err)        => f"invalid (${err.getMessage()})"
+        case _                   => attempt.toString
+      }
+    case other => other.toString
+  }
 
   /** The settings that differ between this configuration and another.
     *
