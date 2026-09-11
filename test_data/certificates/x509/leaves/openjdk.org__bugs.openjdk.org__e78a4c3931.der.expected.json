@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/openjdk.org__bugs.openjdk.org__e78a4c3931.der",
   "description": "TLS leaf certificate from openjdk.org (bugs.openjdk.org)",
   "source": "openssl s_client -connect openjdk.org:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

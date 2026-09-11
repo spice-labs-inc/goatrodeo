@@ -53,6 +53,7 @@ class CertificatesSidecarTests extends FunSuite {
 
   private val minimalSidecar =
     """{
+      |  "id": "certificates/edge-cases/test.pem",
       |  "description": "test",
       |  "source": "test",
       |  "retrievedAt": "2026-04-24",
@@ -89,6 +90,7 @@ class CertificatesSidecarTests extends FunSuite {
   test("valid full sidecar parses including optional fields") {
     val full =
       """{
+        |  "id": "certificates/edge-cases/test.pem",
         |  "description": "Full example",
         |  "source": "https://example.com/cert.pem",
         |  "retrievedAt": "2026-04-24",
@@ -138,6 +140,7 @@ class CertificatesSidecarTests extends FunSuite {
   // from the minimal sidecar and confirms parse throws with a helpful message.
   private val requiredFields =
     List(
+      "id",
       "description",
       "source",
       "retrievedAt",

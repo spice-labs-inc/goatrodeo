@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/debian.org__www-fastly.debian.org__13a776b5f4.der",
   "description": "TLS leaf certificate from debian.org (www-fastly.debian.org)",
   "source": "openssl s_client -connect debian.org:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

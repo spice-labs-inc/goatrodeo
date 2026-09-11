@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/intermediates/cloudflare.com__gts-root-r4__76b27b80a5.der",
   "description": "Intermediate CA from TLS chain of cloudflare.com (GTS Root R4)",
   "source": "openssl s_client -connect cloudflare.com:443 -showcerts (chain idx 2)",
   "retrievedAt": "2026-04-28",

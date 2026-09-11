@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/intermediates/google.com__wr2__e6fe22bf45.der",
   "description": "Intermediate CA from TLS chain of google.com (WR2)",
   "source": "openssl s_client -connect google.com:443 -showcerts (chain idx 1)",
   "retrievedAt": "2026-04-28",

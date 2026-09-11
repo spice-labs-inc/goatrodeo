@@ -1,4 +1,5 @@
 {
+  "id": "certificates/pgp/synthetic/v4-ecdsa-p256-pub.asc",
   "description":"G1+G2 \u2014 PGP v4 ECDSA NIST P-256 primary + ECDH NIST P-256 subkey. Exercises pgpAlgIdMap entries 19 (ECDSA) and 18 (ECDH) plus pgpCurveOidMap NIST P-256 OID 1.2.840.10045.3.1.7.",
   "source":"gpg --batch --gen-key with ECDSA + ECDH on nistp256",
   "retrievedAt":"2026-05-01",

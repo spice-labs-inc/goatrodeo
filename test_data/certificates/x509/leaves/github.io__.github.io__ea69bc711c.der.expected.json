@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/github.io__.github.io__ea69bc711c.der",
   "description": "TLS leaf certificate from github.io (*.github.io)",
   "source": "openssl s_client -connect github.io:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

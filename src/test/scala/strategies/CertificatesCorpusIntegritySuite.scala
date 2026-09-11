@@ -107,6 +107,29 @@ class CertificatesCorpusIntegritySuite extends FunSuite {
     )
   }
 
+  test("every sidecar id is its corpus-relative path, and unique") {
+    // The id is the test ID Surveyor's integration tests share with this suite
+    // (tests/README.md in surveyor): `certificates/<category>/.../<fixture>`.
+    val root = CertificatesFixtureInventory.corpusRoot.getParentFile.toPath.toAbsolutePath
+    val ids = CertificatesFixtureInventory.allSidecars.map { s =>
+      val expected = root
+        .relativize(s.toPath.toAbsolutePath)
+        .toString
+        .replace(java.io.File.separatorChar, '/')
+        .stripSuffix(".expected.json")
+      val actual = scala.util.Try(CertificatesSidecar.parse(s).id).getOrElse("")
+      (s.getPath, expected, actual)
+    }
+    val wrong = ids.filter { case (_, e, a) => e != a }
+    assert(
+      wrong.isEmpty,
+      s"${wrong.size} sidecar(s) have an id that is not their path:" +
+        wrong.map { case (p, e, a) => s"$p: id=$a expected=$e" }.mkString("\n  ", "\n  ", "")
+    )
+    val dupes = ids.groupBy(_._3).collect { case (id, xs) if xs.size > 1 => id }
+    assert(dupes.isEmpty, s"duplicate sidecar ids: ${dupes.mkString(", ")}")
+  }
+
   test("every sidecar parses and declares required fields") {
     val sidecars = CertificatesFixtureInventory.allSidecars
     val errors = sidecars.flatMap { s =>
