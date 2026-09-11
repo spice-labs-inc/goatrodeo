@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/openssl.org__openssl.org__6fdfe29392.der",
   "description": "TLS leaf certificate from openssl.org (openssl.org)",
   "source": "openssl s_client -connect openssl.org:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

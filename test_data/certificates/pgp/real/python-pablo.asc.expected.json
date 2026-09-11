@@ -1,4 +1,5 @@
 {
+  "id": "certificates/pgp/real/python-pablo.asc",
   "description":"keys.openpgp.org PGP public key \u2014 Python release signing key (Pablo)",
   "source":"https://keys.openpgp.org/vks/v1/by-fingerprint/E3FF2839C048B25C084DEBE9B26995E310250568",
   "retrievedAt":"2026-04-28",

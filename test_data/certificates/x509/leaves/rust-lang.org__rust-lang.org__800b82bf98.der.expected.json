@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/rust-lang.org__rust-lang.org__800b82bf98.der",
   "description": "TLS leaf certificate from rust-lang.org (rust-lang.org)",
   "source": "openssl s_client -connect rust-lang.org:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",
