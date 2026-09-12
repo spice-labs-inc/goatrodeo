@@ -26,6 +26,8 @@ import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
 import java.nio.file.Paths
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Set as MutableSet
 import scala.util.Success
 import scala.util.Try
 
@@ -196,7 +198,7 @@ case class OpenSSLConfigState(
       ))
     }
 
-    // Phase A — cipher-suite decomposition: resolved constituent algorithms and
+    // Cipher-suite decomposition: resolved constituent algorithms and
     // per-suite entries, derived from both `CipherString` and `Ciphersuites`.
     val cipherEntries =
       data.cipherString.toVector.flatMap(
@@ -363,8 +365,8 @@ object OpenSSLConfigToProcess {
       dependencies: Map[String, Set[String]]
   ): Vector[ArtifactWrapper] = {
     val pathToArtifact = files.map(a => a.path() -> a).toMap
-    val visited = scala.collection.mutable.Set[String]()
-    val result = scala.collection.mutable.ListBuffer[String]()
+    val visited = MutableSet[String]()
+    val result = ListBuffer[String]()
 
     def visit(path: String, stack: Set[String]): Unit = {
       if (stack.contains(path)) {

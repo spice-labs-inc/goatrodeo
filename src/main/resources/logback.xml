@@ -6,7 +6,17 @@
     </appender>
                                                                                                                   
     <logger name="org.apache.tika" level="INFO" />        
-    <logger name="io.spicelabs.baharat" level="INFO" />                                                        
+    <!-- One "Read DEB/RPM package" INFO per archive drowns long runs on
+         package-heavy corpora; the archive list is already in the output
+         artifacts, so keep the library quiet. -->
+    <logger name="io.spicelabs.baharat" level="WARN" />         
+    <!-- The git-provenance capture runs jgit on every build; its internal
+         loggers (FileSnapshot, ShutdownHook, util.FS, SystemReader)
+         debug-log every probe and file stat, so keep the tree at WARN. -->
+    <logger name="org.eclipse.jgit" level="WARN" />         
+    <!-- Goat Rodeo's own loggers: explicitly INFO so their debug lines stay
+         out of the console even in the pre-configuration startup window. -->
+    <logger name="io.spicelabs.goatrodeo" level="INFO" />                                                   
    
     <root level="INFO">                                                                                          
       <appender-ref ref="STDOUT" />

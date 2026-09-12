@@ -1,24 +1,10 @@
-/* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-12See the License for the specific language governing permissions and
-limitations under the License. */
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
-/** Phase 0 (0.5) — Helpers.computeAssociatedSource OOME-safe path.
+/** Helpers.computeAssociatedSource OOME-safe path.
   *
   * ## What this tests
   *
@@ -30,14 +16,14 @@ import scala.collection.immutable.TreeSet
   *
   * ## Why this matters
   *
-  * Before the Phase 0 remediation, a corrupted class file that forced BCEL to
-  * allocate a huge array could cause an OOME crashing the entire process. The
-  * non-class path must short-circuit safely.
+  * A corrupted class file can force BCEL to allocate a huge array, causing an
+  * OOME that crashes the entire process. The non-class path must short-circuit
+  * safely.
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.5: computeAssociatedSource returns empty TreeSet for
-  * non-class MIME types without invoking BCEL.
+  * Requirement: computeAssociatedSource returns empty TreeSet for non-class
+  * MIME types without invoking BCEL.
   *
   * ## LLM-friendly summary
   *
@@ -49,15 +35,15 @@ import scala.collection.immutable.TreeSet
   * file that triggers BCEL OOME, which is not feasible in a unit test. The
   * non-class path is tested here as the primary guard.
   */
-class HelpersOomeSuite extends FunSuite {
+class HelpersOomeSuite extends GoatRodeoFunSuite {
 
   test("Helpers - computeAssociatedSource returns empty for non-class MIME") {
 
     /** What: Creates an ArtifactWrapper with a non-class MIME type and calls
       * computeAssociatedSource. Why: Non-class artifacts must not enter the
       * BCEL parsing path at all. The method should return an empty TreeSet
-      * immediately. Requirement: Phase 0 §0.5 — non-class MIME returns
-      * TreeSet.empty without BCEL invocation.
+      * immediately. Requirement: non-class MIME returns TreeSet.empty without
+      * BCEL invocation.
       */
     val artifact = ByteWrapper(
       "some text content".getBytes("UTF-8"),

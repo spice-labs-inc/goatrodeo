@@ -95,7 +95,7 @@ All metadata keys Goat Rodeo can emit, by source strategy. Keys are sorted by so
 
 ## Verification Sources
 
-- `MavenPhase2Suite`, `MavenPhase3Suite`, `MavenPhase5Suite`, `MavenPhase5ModuleInfoSuite`, `MavenPhase5CorpusSuite`
+- `MavenPomInterpolationSuite`, `MavenDependencyLicenseSuite`, `MavenJarStructureSuite`, `MavenModuleInfoSuite`, `MavenJarStructureCorpusSuite`
 - `JvmDistributionSuite`
 - `GradleLockfileSuite`
 - `MavenPropertyTests`

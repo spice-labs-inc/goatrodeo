@@ -134,7 +134,9 @@ testFatJar := {
 }
 
 // Hook fat JAR tests into `sbt test`
-Test / test := (Test / test).dependsOn(verifyJarContents, testFatJar).value
+Test / test := (Test / test)
+  .dependsOn(verifyJarContents, testFatJar)
+  .value
 
 publishMavenStyle := true
 publish / packagedArtifacts += (Artifact(
@@ -176,14 +178,19 @@ def machineRamBytes: Long = {
   }
 }
 
-Test / javaOptions ++= Seq(
-  {
-    val half = machineRamBytes / 2
-    val heap =
-      math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
-    s"-Xmx${heap}"
-  }
-)
+// The heap value is computed eagerly at build-definition load time rather than
+// as a lazy lambda inside `++=` — a generated lambda class in the meta-build
+// is what caused `NoClassDefFoundError: $<hash>$` at `Test / javaOptions`
+// evaluation on machines with a stale `project/target` (the class name changes
+// on every build.sbt edit, leaving orphaned references behind).
+val testHeap: String = {
+  val half = machineRamBytes / 2
+  val heap =
+    math.min(32L * 1024 * 1024 * 1024, math.max(1024L * 1024 * 1024, half))
+  s"-Xmx${heap}"
+}
+
+Test / javaOptions ++= Seq(testHeap)
 
 ThisBuild / scalacOptions ++=
   Seq(
@@ -218,42 +225,50 @@ lazy val root = project
     scalaVersion := scala3Version,
     semanticdbEnabled := true, // enable SemanticDB,
     semanticdbVersion := scalafixSemanticdb.revision,
-    libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.3.0",
-    libraryDependencies += "org.ow2.asm" % "asm" % "9.8",
-    libraryDependencies += "org.apache.bcel" % "bcel" % "6.11.0",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.4.0",
+    libraryDependencies += "org.ow2.asm" % "asm" % "9.10.1",
+    libraryDependencies += "org.apache.bcel" % "bcel" % "6.12.0",
     libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
-    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
-    libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "0.7.29" % Test,
-    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.18.1" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.5" % Test,
+    libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "1.3.0" % Test,
+    libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.19.0" % Test,
     libraryDependencies += "com.github.erosb" % "everit-json-schema" % "1.14.6" % Test,
-    libraryDependencies += "org.json" % "json" % "20250107" % Test,
-    libraryDependencies += "com.google.guava" % "guava" % "33.6.0-jre" % Test,
-    libraryDependencies += "commons-io" % "commons-io" % "2.18.0",
-    libraryDependencies += "io.bullet" %% "borer-derivation" % "1.14.1",
-    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "0.6.1",
+    libraryDependencies += "org.json" % "json" % "20260814" % Test,
+    libraryDependencies += "com.google.guava" % "guava" % "33.7.1-jre" % Test,
+    libraryDependencies += "commons-io" % "commons-io" % "2.22.0",
+    libraryDependencies += "io.bullet" %% "borer-derivation" % "1.17.0",
+    libraryDependencies += "com.palantir.isofilereader" % "isofilereader" % "1.3.0",
     libraryDependencies += "org.json4s" %% "json4s-native" % "4.0.7",
     libraryDependencies += "org.apache.commons" % "commons-compress" % "1.28.0",
-    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.15",
+    libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.6.3",
     libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0",
     libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
-    libraryDependencies += "org.apache.tika" % "tika-core" % "3.2.3",
-    // Config files.
+    libraryDependencies += "org.apache.tika" % "tika-core" % "3.3.2",
+    // Config files. Kept in step with pom.xml, which declares the same two: the sbt and
+    // Maven builds compile the same sources, so a dependency added to one and not the
+    // other fails whichever build CI happens to run.
     libraryDependencies += "org.tomlj" % "tomlj" % "1.1.1",
     // The naming, layering and precedence rules every Spice component shares.
     libraryDependencies += "io.spicelabs" % "spice-config" % "1.0.0",
     // Still required at the boundary: the annatto/baharat readers hand back
     // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
-    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.1.17",
+    // Spice Labs readers — current Maven Central releases (spec §1).
+    libraryDependencies += "io.spicelabs" %% "cilantro" % "0.4.0",
     // Canonical content identifiers (hashes + git blob ids) — the single source of
-    // truth shared across Spice Labs tooling. Resolved from `Resolver.mavenLocal`.
-    libraryDependencies += "io.spicelabs" % "coordinates" % "1.1.0",
+    // truth shared across Spice Labs tooling (spec §1 pins 1.2.1). Plain Java jar:
+    libraryDependencies += "io.spicelabs" % "coordinates" % "1.2.1",
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
-    // Spice Labs "readers"
-    libraryDependencies += "io.spicelabs" % "baharat" % "0.1.1",
-    libraryDependencies += "io.spicelabs" % "annatto" % "0.2.0",
-    libraryDependencies += "io.spicelabs" % "saffron" % "0.4.0",
+    // Spice Labs "readers" — current Maven Central releases (spec §1).
+    libraryDependencies += "io.spicelabs" % "baharat" % "0.2.1",
+    libraryDependencies += "io.spicelabs" % "annatto" % "0.3.0",
+    libraryDependencies += "io.spicelabs" % "saffron" % "0.5.0",
+    // Direct pins (spec §1):
+    libraryDependencies += "org.eclipse.jgit" % "org.eclipse.jgit" % "7.3.0.202506031305-r",
+    libraryDependencies += "org.xerial" % "sqlite-jdbc" % "3.53.4.0", // baharat's optional dep, opted in explicitly
+    libraryDependencies += "io.airlift" % "aircompressor" % "2.0.3",
+    libraryDependencies += "at.yawk.lz4" % "lz4-java" % "1.11.2",
     libraryDependencies += "org.bouncycastle" % "bcprov-jdk18on" % "1.85.2",
     libraryDependencies += "org.bouncycastle" % "bcpkix-jdk18on" % "1.85",
     libraryDependencies += "org.bouncycastle" % "bcpg-jdk18on" % "1.85",
@@ -300,6 +315,7 @@ Test / testOptions += Tests.Setup(() => {
       ("iso_tests", "simple.iso", None),
       ("", "sample-tomcat-6.war", None),
       ("", "EnterpriseHelloWorld.ear", None),
+      ("", "azure-cosmos-spark_3-3_2-12-4.18.1.jar", None),
       ("apk_tests", "bitbar-sample-app.apk", None),
       ("gem_tests", "java-properties-0.3.0.gem", None),
       ("deb_tests", "hello_2.10-3_arm64.deb", None),
@@ -350,6 +366,120 @@ Test / testOptions += Tests.Setup(() => {
       log.error(err)
       println(err)
       throw new MessageOnlyException(err)
+  }
+
+  // ===== pinned OCI parity fixtures =====
+  // Fetched from public registries (the source of truth for the pinned
+  // digests) only when the cache entry is missing. Nothing for these fixtures
+  // is hosted on public-test-data: a digest-pinned artifact is immutable, so
+  // the registry is the canonical location.
+  //
+  // Two artifacts per image, both pinned to the same digest:
+  //   1. the docker-save tar   (docker pull @digest + tag + docker save)
+  //   2. the OCI image layout  (ORAS, in a locked-down docker container)
+  //
+  // The sentinel records the expected config-blob digest; a mismatched cache
+  // is refetched. OCI parity fixtures are mandatory: if they cannot be
+  // fetched, the build FAILS (the parity tests must run; never skip).
+  val ociPins: Seq[(String, String, String, String)] = Vector(
+    // (image, tag, index digest, config-blob digest)
+    (
+      "alpine",
+      "3.20.6",
+      "sha256:de4fe7064d8f98419ea6b49190df1abbf43450c1702eeb864fe9ced453c1cc5f",
+      "sha256:ff221270b9fb7387b0ad9ff8f69fbbd841af263842e62217392f18c3b5226f38"
+    ),
+    (
+      "postgres",
+      "16.4",
+      "sha256:e62fbf9d3e2b49816a32c400ed2dba83e3b361e6833e624024309c35d334b412",
+      "sha256:6b14e73a48cf2518aeb37e8b758a907473bcc72727297a7353a665afa069ef10"
+    )
+  )
+
+  // The ORAS container image is pinned by digest too: the build runs it with
+  // the repo's cache directory mounted, so what it executes matters.
+  val orasImage =
+    "ghcr.io/oras-project/oras:v1.3.0@sha256:6ce045ce069a89934d6666b8b49f9c4c0145201bd6de6dbe2aee267814c55468"
+
+  if (!sys.env.get("GOATRODEO_SKIP_OCI_FETCH").contains("1")) {
+    try {
+      if (("docker info" ! log) == 0) {
+        ociPins.foreach { case (image, tag, indexDigest, configDigest) =>
+          val short = indexDigest.substring(7, 19)
+          val ociDir = file(s"./test_data/download/oci_images/${image}")
+          val sentinel = file(s"${ociDir}/.config-digest")
+          val dockerTar = file(
+            s"./test_data/download/docker_tests/${image}_${short}_docker.tar"
+          )
+          val ref = s"${image}@${indexDigest}"
+          if (!dockerTar.exists()) {
+            log.info(f"Fetching pinned docker fixture ${ref}")
+            var pulled = false
+            var attempts = 0
+            while (!pulled && attempts < 3) {
+              pulled = (s"docker pull ${ref}" ! log) == 0
+              attempts += 1
+            }
+            if (
+              pulled &&
+              (s"docker tag ${ref} ${image}:${tag}" ! log) == 0 &&
+              (s"docker save ${image}:${tag} -o ${dockerTar.getPath()}" ! log) == 0
+            ) {
+              log.info(f"Cached ${dockerTar.getName()}")
+            }
+          }
+          if (!sentinel.exists()) {
+            ociDir.mkdirs()
+            val uid = ("id -u".!!).trim
+            val gid = ("id -g".!!).trim
+            log.info(f"Fetching pinned OCI layout for ${image}")
+            val cmd = List(
+              "docker",
+              "run",
+              "--rm",
+              "-u",
+              s"${uid}:${gid}",
+              "--cap-drop",
+              "ALL",
+              "--security-opt",
+              "no-new-privileges",
+              "--tmpfs",
+              "/tmp",
+              "-v",
+              s"${ociDir.getParentFile().getAbsolutePath()}:/data",
+              "-w",
+              "/data",
+              orasImage,
+              "copy",
+              "--recursive",
+              "--platform",
+              "linux/amd64",
+              "--to-oci-layout",
+              s"docker.io/library/${image}@${indexDigest}",
+              s"/data/${image}"
+            )
+            if (cmd.!(log) == 0) {
+              IO.write(sentinel, s"${configDigest}\n")
+            }
+          }
+        }
+      } else {
+        throw new MessageOnlyException(
+          "docker is required to fetch the OCI parity fixtures (the parity tests must run)"
+        )
+      }
+    } catch {
+      case e: MessageOnlyException => throw e
+      case e: Exception =>
+        throw new MessageOnlyException(
+          f"OCI parity fixture fetch failed: ${e.getMessage()} (the parity tests must run)"
+        )
+    }
+  } else {
+    throw new MessageOnlyException(
+      "GOATRODEO_SKIP_OCI_FETCH must not be set: the OCI parity tests must run"
+    )
   }
   log.info("Test data caching complete.")
 })

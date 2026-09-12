@@ -13,22 +13,21 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
-/** Phase B — Service/transform config dialect capture + Kerberos enctypes.
+/** Service/transform config dialect capture + Kerberos enctypes.
   *
   * Verifies per-dialect parsing (OpenVPN, strongSwan, Mosquitto, WireGuard,
   * Kerberos, HAProxy/Redis/PostgreSQL/MySQL basics), the presence-only secret
   * rule (secrets are never echoed), tolerant empty parsing, and no-claim for
   * unknown files.
   */
-class ServiceCryptoSuite extends FunSuite {
+class ServiceCryptoSuite extends GoatRodeoFunSuite {
 
   private val sc = MKC.adHoc("ServiceCrypto")
   private val krb = MKC.adHoc("Kerberos")
@@ -48,7 +47,7 @@ class ServiceCryptoSuite extends FunSuite {
     new ServiceCryptoState(a).invokeBuildMetadata(a).toMap
   }
 
-  test("T-B-01 OpenVPN data-ciphers decompose into ServiceCrypto:algorithms") {
+  test("OpenVPN data-ciphers decompose into ServiceCrypto:algorithms") {
     val m = meta(
       "etc/openvpn/client.ovpn",
       """client
@@ -71,7 +70,7 @@ class ServiceCryptoSuite extends FunSuite {
     )
   }
 
-  test("T-B-02 strongSwan ike/esp transforms decompose") {
+  test("strongSwan ike/esp transforms decompose") {
     val m = meta(
       "etc/ipsec.conf",
       """conn %default
@@ -97,7 +96,7 @@ class ServiceCryptoSuite extends FunSuite {
     )
   }
 
-  test("T-B-03 Mosquitto psk_file is presence-only (no secret, no path echo)") {
+  test("Mosquitto psk_file is presence-only (no secret, no path echo)") {
     val m = meta(
       "etc/mosquitto/mosquitto.conf",
       """listener 8883
@@ -120,7 +119,7 @@ class ServiceCryptoSuite extends FunSuite {
     )
   }
 
-  test("T-B-04 WireGuard secrets are presence-only; base64 never emitted") {
+  test("WireGuard secrets are presence-only; base64 never emitted") {
     val priv = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     val psk = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
     val m = meta(
@@ -142,7 +141,7 @@ class ServiceCryptoSuite extends FunSuite {
     assert(!all.exists(_.contains(psk)), "PresharedKey value leaked")
   }
 
-  test("T-B-05 krb5.conf enctypes inventory") {
+  test("krb5.conf enctypes inventory") {
     val m = meta(
       "etc/krb5.conf",
       """[libdefaults]
@@ -160,7 +159,7 @@ class ServiceCryptoSuite extends FunSuite {
     )
   }
 
-  test("T-B-06 config without crypto settings yields empty metadata") {
+  test("config without crypto settings yields empty metadata") {
     val m = meta(
       "etc/redis.conf",
       """bind 127.0.0.1
@@ -170,7 +169,7 @@ class ServiceCryptoSuite extends FunSuite {
     assert(m.isEmpty, s"expected empty metadata, got $m")
   }
 
-  test("T-B-07 unknown service config is not claimed") {
+  test("unknown service config is not claimed") {
     assertEquals(ServiceCryptoStrategy.detectService("app.config"), None)
     assertEquals(
       ServiceCryptoStrategy.detectService("etc/nginx/nginx.conf"),
@@ -187,7 +186,7 @@ class ServiceCryptoSuite extends FunSuite {
   }
 
   test(
-    "T-B-08 property: emitted ServiceCrypto/Kerberos values carry no secrets"
+    "property: emitted ServiceCrypto/Kerberos values carry no secrets"
   ) {
     val battery = Vector(
       "etc/wireguard/wg0.conf" -> """[Interface]
@@ -217,11 +216,11 @@ class ServiceCryptoSuite extends FunSuite {
     }
   }
 
-  // Phase H — strongSwan sha3/blake2b transforms (R6).
-  //
-  // T-B-09: the five new transform parts resolve to canonical names through
+  // strongSwan sha3/blake2b transforms.
+
+  // the five new transform parts resolve to canonical names through
   // the production `transformAlgorithms` path (battery over all five).
-  test("T-B-09 strongSwan sha3/blake2b transforms decompose") {
+  test("strongSwan sha3/blake2b transforms decompose") {
     val battery: Map[String, String] = Map(
       "aes256-sha3_256-modp2048" -> "sha3-256",
       "aes256-sha3_384-ecp256" -> "sha3-384",
@@ -245,8 +244,8 @@ class ServiceCryptoSuite extends FunSuite {
     }
   }
 
-  // T-B-10: unknown transform parts still contribute nothing and never crash.
-  test("T-B-10 unknown strongSwan transform parts are still dropped") {
+  // unknown transform parts still contribute nothing and never crash.
+  test("unknown strongSwan transform parts are still dropped") {
     val algs = ServiceCryptoStrategy.transformAlgorithms(
       "aes256-foobar12-blake2b512"
     )
@@ -258,9 +257,9 @@ class ServiceCryptoSuite extends FunSuite {
     )
   }
 
-  // T-B-11: totality property — every canonical name the transform table can
+  // totality property — every canonical name the transform table can
   // emit is in the shared registry vocabulary.
-  test("T-B-11 TransformParts values are in the registry vocabulary") {
+  test("TransformParts values are in the registry vocabulary") {
     import io.spicelabs.goatrodeo.omnibor.CryptoAlgorithms
     val values =
       Vector(

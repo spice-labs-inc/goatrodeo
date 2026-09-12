@@ -13,8 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.nio.charset.StandardCharsets
 
@@ -38,7 +37,7 @@ import java.nio.charset.StandardCharsets
   *
   * LLM note: C-A-xx = test id.
   */
-class CryptoContentDetectorSuite extends FunSuite {
+class CryptoContentDetectorSuite extends GoatRodeoFunSuite {
 
   private def bytes(s: String): Array[Byte] =
     s.getBytes(StandardCharsets.ISO_8859_1)
@@ -59,21 +58,21 @@ class CryptoContentDetectorSuite extends FunSuite {
       mimes
     )
 
-  test("C-A-01 JWT content emits the crypto-token MIME") {
+  test("JWT content emits the crypto-token MIME") {
     val jwt = "header.eyJhbGciOiJIUzI1NiJ9.payload.signature"
     assert(
       augment(jwt, "token.txt").contains(CryptoContentDetector.CryptoTokensMime)
     )
   }
 
-  test("C-A-02 JWK content emits the crypto-token MIME") {
+  test("JWK content emits the crypto-token MIME") {
     val jwk = """{"kty":"RSA","n":"abc","e":"AQAB"}"""
     assert(
       augment(jwk, "key.jwk").contains(CryptoContentDetector.CryptoTokensMime)
     )
   }
 
-  test("C-A-03 usign key content emits the usign MIME") {
+  test("usign key content emits the usign MIME") {
     val usign =
       "untrusted comment: opkg key\nRWQ6dW9vbG9vZ3k\n"
     assert(
@@ -81,7 +80,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-04 binary EVP symbol emits the crypto-footprint MIME") {
+  test("binary EVP symbol emits the crypto-footprint MIME") {
     val binMimes = Set("application/x-sharedlib")
     val content = "garbage\u0000\u0001EVP_sha256\u0000more garbage"
     assert(
@@ -90,7 +89,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-05 text PEM emits the embedded-pem MIME; binaries do not") {
+  test("text PEM emits the embedded-pem MIME; binaries do not") {
     val pem =
       "config\n-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
     assert(
@@ -103,7 +102,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-06 shadow hash content emits the shadow-password MIME") {
+  test("shadow hash content emits the shadow-password MIME") {
     val shadow = "root:$1$abc$defghijklmnopqrstuv:19000:0:99999:7:::\n"
     assert(
       augment(shadow, "etc/shadow")
@@ -117,7 +116,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-07 nginx TLS config emits the tls-config MIME") {
+  test("nginx TLS config emits the tls-config MIME") {
     val nginx =
       "server {\n  ssl_certificate /etc/uhttpd.crt;\n  ssl_certificate_key /etc/uhttpd.key;\n}\n"
     assert(
@@ -126,7 +125,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-08 gradle lockfile emits its MIME by name") {
+  test("gradle lockfile emits its MIME by name") {
     val lock = "org.scala-lang:scala3-library_3:3.8.3=compileClasspath\n"
     assert(
       augment(lock, "gradle.lockfile")
@@ -134,7 +133,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-09 JVM release file emits its MIME by name + content") {
+  test("JVM release file emits its MIME by name + content") {
     val release =
       "JAVA_VERSION=\"21.0.11\"\nJAVA_RUNTIME_VERSION=\"21.0.11+10\"\n"
     assert(
@@ -147,7 +146,7 @@ class CryptoContentDetectorSuite extends FunSuite {
     )
   }
 
-  test("C-A-10 unrelated text emits no strategy MIMEs") {
+  test("unrelated text emits no strategy MIMEs") {
     val out = augment("just some prose", "notes.txt")
     assert(!out.contains(CryptoContentDetector.CryptoTokensMime))
     assert(!out.contains(CryptoContentDetector.UsignKeyMime))

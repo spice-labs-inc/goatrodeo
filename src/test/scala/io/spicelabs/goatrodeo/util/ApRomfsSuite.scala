@@ -13,8 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 
@@ -36,13 +35,13 @@ import java.io.File
   *
   * LLM note: AR-x = test id.
   */
-class ApRomfsSuite extends FunSuite {
+class ApRomfsSuite extends GoatRodeoFunSuite {
 
   private val arducopter =
     new File("test_data/firmware-images/ardupilot/arducopter")
 
   test("AR-1 ApRomfs decodes the Surveyor OT Demo trust-store certs") {
-    assume(arducopter.exists(), "arducopter fixture required")
+    assert(arducopter.exists(), "arducopter fixture required")
     val w = FileWrapper(arducopter, arducopter.getPath, None)
     val files = ApRomfs.read(w)
     assert(files.isDefined, "arducopter should be an AP_ROMFS ELF")
@@ -60,7 +59,7 @@ class ApRomfsSuite extends FunSuite {
   }
 
   test("AR-2 FileWalker treats the firmware as an archive") {
-    assume(arducopter.exists(), "arducopter fixture required")
+    assert(arducopter.exists(), "arducopter fixture required")
     val w = FileWrapper(arducopter, arducopter.getPath, None)
     val result = FileWalker.withinArchiveStream(w) { artifacts =>
       artifacts.map(_.path())

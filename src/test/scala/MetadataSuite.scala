@@ -30,7 +30,9 @@ object MetadataSuite {
   val failSop = TreeSet(StringOrPair("fail"))
 
 }
-class MetadataSuite extends munit.FunSuite {
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+
+class MetadataSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.

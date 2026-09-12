@@ -2,10 +2,9 @@
    Apache 2.0 */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -38,7 +37,7 @@ import scala.collection.immutable.TreeSet
   * manifest/filename combinations and asserts the resulting
   * groupId/artifactId/version matches a real Maven Central coordinate.
   */
-class BestPurlSuite extends FunSuite {
+class BestPurlSuite extends GoatRodeoFunSuite {
 
   /** Tests that field-level merge produces a Maven Central pURL for
     * commons-codec-1.2.jar (from wps-demo-1.3.0.war).
@@ -61,7 +60,7 @@ class BestPurlSuite extends FunSuite {
     * https://repo1.maven.org/maven2/org/apache/commons/commons-codec/1.2/ —
     * confirmed exists.
     *
-    * '''Requirement:''' Plan Test 10 — field-level merge produces pURL in Maven
+    * '''Requirement:''' Field-level merge produces a pURL that exists in Maven
     * Central.
     *
     * '''LLM context:''' This is a RED test. The current code produces
@@ -126,8 +125,8 @@ class BestPurlSuite extends FunSuite {
     * https://repo1.maven.org/maven2/org/apache/commons/commons-lang/2.4/ —
     * confirmed exists.
     *
-    * '''Requirement:''' Plan Test 10 (second case) — field-level merge produces
-    * Maven Central pURL for Bundle-SymbolicName case.
+    * '''Requirement:''' Field-level merge (second case) produces Maven Central
+    * pURL for Bundle-SymbolicName case.
     */
   test("commons-lang-2.4: field-level merge produces Maven Central pURL") {
     val state = MavenState()

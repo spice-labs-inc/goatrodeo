@@ -1,9 +1,10 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.RegexPredicate
 
 import scala.util.matching.Regex
 
-class IncExcTesting extends munit.FunSuite {
+class IncExcTesting extends GoatRodeoFunSuite {
   test("RegexPredicate - matches nothing when empty") {
     val predicates = RegexPredicate(Set[String](), Vector[Regex]())
     assert(!predicates.matches("anything"))

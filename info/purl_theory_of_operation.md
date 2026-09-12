@@ -65,8 +65,9 @@ represent dependencies bundled inside uberjar/fat JARs.
 - Secondary pURLs from sources JARs include `?packaging=sources`.
 - Secondary pURLs from javadoc JARs include `?classifier=javadoc`.
 
-**Verified by:** `Phase4SecondaryClassifierSuite` — guard test for no
-filename in secondary pURLs. `Phase7aPropertySuite` — Property 7.4.
+**Verified by:** `SecondaryPurlClassifierSuite` — guard test for no
+filename in secondary pURLs. `CanonicalSecondaryPurlPropertySuite` — secondary
+pURLs never use the filename.
 
 ## Matching Algorithm
 
@@ -83,8 +84,8 @@ JAR filename:
 
 Among same-score matches, the longest artifactId is preferred.
 
-**Verified by:** `Phase3MatchingSuite` — 13 unit tests.
-`Phase3MatchingPropertySuite` — 2 property tests.
+**Verified by:** `PurlMatchingSuite` — unit tests.
+`PurlMatchingPropertySuite` — property tests.
 
 ## Sources and Javadoc JARs
 
@@ -95,8 +96,8 @@ as standalone artifacts.
 All pURLs from sources JARs include `?packaging=sources`.
 All pURLs from javadoc JARs include `?classifier=javadoc`.
 
-**Verified by:** `Phase5MetadataParitySourcesJavadocSuite` — 53 corpus tests.
-`Phase4SecondaryClassifierPropertySuite` — Properties 4.9, 4.10.
+**Verified by:** `SourcesJavadocMetadataParitySuite` — corpus tests.
+`SecondaryPurlClassifierPropertySuite` — shared-classifier property tests.
 
 ## Metadata Parity
 
@@ -107,24 +108,23 @@ Goat Rodeo's pURLs are a superset of the reference scanner's pURLs:
 - Goat Rodeo's canonical pURLs match real Maven Central artifacts
 
 **Verified by:**
-- `MultiplePurlSuite` — 113 tests (superset)
-- `Phase6MetadataParityRegularBestPurlSuite` — 47 tests (Maven Central validation)
-- `BestPurlSuite` — 2 tests (field-level merge)
+- `MultiplePurlSuite` — superset
+- `RegularJarMetadataParitySuite` — Maven Central validation
+- `BestPurlSuite` — field-level merge
 
 ## Test Summary
 
-| Suite | Tests | What |
-|-------|-------|------|
-| MavenPhase1Suite | 60 | groupId/artifactId/version chain, filename parsing |
-| MavenPropertyTests | 37 | Property tests for interpolation, priority, parsing |
-| Phase2CanonicalPrioritySuite | 10 | Canonical pURL priority chain |
-| Phase3MatchingSuite | 13 | matchScore algorithm |
-| Phase3MatchingPropertySuite | 2 | Property tests for matching |
-| Phase4SecondaryClassifierSuite | 8 | Classifier on secondary pURLs |
-| Phase4SecondaryClassifierPropertySuite | 2 | Property tests for classifier |
-| Phase5MetadataParitySourcesJavadocSuite | 53 | Corpus tests for sources/javadoc |
-| Phase6MetadataParityRegularBestPurlSuite | 47 | Maven Central validation |
-| Phase7aPropertySuite | 5 | Cross-cutting property tests |
-| MultiplePurlSuite | 113 | Metadata parity (superset) |
-| BestPurlSuite | 2 | Field-level merge |
-| **Total pURL-related** | **352** | |
+| Suite | What |
+|-------|------|
+| MavenCoordinateResolutionSuite | groupId/artifactId/version chain, filename parsing |
+| MavenPropertyTests | Property tests for interpolation, priority, parsing |
+| CanonicalPurlPrioritySuite | Canonical pURL priority chain |
+| PurlMatchingSuite | matchScore algorithm |
+| PurlMatchingPropertySuite | Property tests for matching |
+| SecondaryPurlClassifierSuite | Classifier on secondary pURLs |
+| SecondaryPurlClassifierPropertySuite | Property tests for classifier |
+| SourcesJavadocMetadataParitySuite | Corpus tests for sources/javadoc |
+| RegularJarMetadataParitySuite | Maven Central validation |
+| CanonicalSecondaryPurlPropertySuite | Cross-cutting property tests |
+| MultiplePurlSuite | Metadata parity (superset) |
+| BestPurlSuite | Field-level merge |

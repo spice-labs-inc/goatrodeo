@@ -1,21 +1,11 @@
-/* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
+import io.spicelabs.goatrodeo.GoatRodeo
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.TomlTables
+import org.tomlj.Toml
 
-/** Phase 0 (0.3) — GoatRodeoBuilder.withTagDate Either-return contract.
+/** GoatRodeoBuilder.withTagDate Either-return contract.
   *
   * ## What this tests
   *
@@ -28,15 +18,14 @@ import munit.FunSuite
   *
   * ## Why this matters
   *
-  * Prior to the Phase 0 remediation, `withTagDate` threw an exception on
-  * unparseable dates. The Either return type allows callers to handle bad input
-  * functionally without try/catch, making the builder safe for programmatic
-  * use.
+  * `withTagDate` returns Either instead of throwing on unparseable dates,
+  * letting callers handle bad input functionally without try/catch, making the
+  * builder safe for programmatic use.
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.3: GoatRodeoBuilder.withTagDate returns Either instead of
-  * throwing on invalid date input.
+  * Requirement: GoatRodeoBuilder.withTagDate returns Either instead of throwing
+  * on invalid date input.
   *
   * ## LLM-friendly summary
   *
@@ -46,14 +35,14 @@ import munit.FunSuite
   * | valid date      | "2024-01-15"            | Right(builder)            |
   * | preserves state | invalid after valid tag | builder.tagDate unchanged |
   */
-class GoatRodeoBuilderEitherSuite extends FunSuite {
+class GoatRodeoBuilderEitherSuite extends GoatRodeoFunSuite {
 
   test("GoatRodeoBuilder - withTagDate returns Left for invalid date") {
 
     /** What: Feeds an unparseable date string to withTagDate. Why: The method
       * must not throw; it must return Left with a descriptive error so the
-      * caller can decide how to handle it. Requirement: Phase 0 §0.3 —
-      * withTagDate returns Either, not exception.
+      * caller can decide how to handle it. Requirement: — withTagDate returns
+      * Either, not exception.
       */
     val builder = new GoatRodeoBuilder()
     val result = builder.withTagDate("not-a-date")
@@ -70,7 +59,7 @@ class GoatRodeoBuilderEitherSuite extends FunSuite {
 
     /** What: Feeds a valid ISO 8601 date string to withTagDate. Why: A valid
       * date must produce Right(builder), allowing the fluent API to continue.
-      * Requirement: Phase 0 §0.3 — valid date yields Right.
+      * Requirement: valid date yields Right.
       */
     val builder = new GoatRodeoBuilder()
     val result = builder.withTagDate("2024-01-15")
@@ -88,8 +77,8 @@ class GoatRodeoBuilderEitherSuite extends FunSuite {
     /** What: Sets a valid tag and tagDate, then calls withTagDate with an
       * invalid date and verifies the builder's previous tagDate is unchanged.
       * Why: A Left result must be a no-op — the builder should not be partially
-      * mutated when date parsing fails. Requirement: Phase 0 §0.3 — Left is
-      * non-mutating; builder state is preserved.
+      * mutated when date parsing fails. Requirement: Left is non-mutating;
+      * builder state is preserved.
       */
     val builder = new GoatRodeoBuilder()
       .withTag("test-tag")
@@ -105,6 +94,50 @@ class GoatRodeoBuilderEitherSuite extends FunSuite {
     assert(
       checkResult.isRight,
       "Builder state should be preserved after Left; the good date should still be set"
+    )
+  }
+
+  test(
+    "GoatRodeoBuilder - withConfiguration returns Right and applies the table"
+  ) {
+    // The embedder seam must accept a plain configuration table and surface
+    // the result as Either, not by throwing (withTagDate precedent).
+    val table =
+      TomlTables.toPlainMap(Toml.parse("threads = 11\nmax_records = 4242"))
+    val result = GoatRodeo
+      .builder()
+      .withThreads(2)
+      .withConfiguration(table, "survey.inventory.analysis")
+    assert(result.isRight, s"a valid table must produce Right, got $result")
+    val applied = result.toOption.get
+    val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
+    field.setAccessible(true)
+    val config =
+      field.get(applied).asInstanceOf[Configuration]
+    assertEquals(config.threads, 11)
+    assertEquals(config.maxRecords, 4242)
+  }
+
+  test(
+    "GoatRodeoBuilder - withConfiguration returns Left for unknown key, state unmutated"
+  ) {
+    val table = TomlTables.toPlainMap(Toml.parse("thraeds = 4"))
+    val builder = GoatRodeo.builder().withThreads(2)
+    val result = builder.withConfiguration(table, "survey.inventory.analysis")
+    assert(result.isLeft, s"an unknown key must produce Left, got $result")
+    val error = result.swap.toOption.get
+    assert(
+      error.contains("thraeds"),
+      s"error should name the unknown key: $error"
+    )
+    val field = classOf[GoatRodeoBuilder].getDeclaredField("config")
+    field.setAccessible(true)
+    val config =
+      field.get(builder).asInstanceOf[Configuration]
+    assertEquals(
+      config.threads,
+      2,
+      "the builder must not be mutated by a rejected table"
     )
   }
 }

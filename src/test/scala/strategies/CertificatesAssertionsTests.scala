@@ -13,12 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
-
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -41,7 +40,7 @@ import scala.collection.immutable.TreeSet
   *   - `assertMetadataKeysAbsent`
   *   - `assertNoForbiddenPatterns` — the private-key leak guard
   */
-class CertificatesAssertionsTests extends FunSuite {
+class CertificatesAssertionsTests extends GoatRodeoFunSuite {
 
   private def mkItem(
       mimeTypes: Set[String] = Set.empty,
@@ -341,7 +340,7 @@ class CertificatesAssertionsTests extends FunSuite {
   }
 
   // --- extended leak-pattern coverage per Appendix C ---
-  //
+
   // The Appendix C list includes three PKCS#8 base64 prefixes and a
   // full PEM-body regex that guard against the strategy accidentally
   // serializing private-key DER bytes (either as base64 text or as

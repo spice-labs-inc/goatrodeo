@@ -1,9 +1,10 @@
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
-class SaffronTests extends munit.FunSuite {
+class SaffronTests extends GoatRodeoFunSuite {
 
   // this takes a compressed disk image file, decompresses it, then
   // tries to open it with (ultimately) saffron and

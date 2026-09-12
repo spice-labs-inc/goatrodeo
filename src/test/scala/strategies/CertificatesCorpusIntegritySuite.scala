@@ -13,8 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
+import scala.util.Try
 
 /** Structural-integrity assertions on the Certificates fixture corpus.
   *
@@ -23,10 +24,9 @@ import munit.FunSuite
   * These tests do NOT run the pipeline. They check the shape of
   * `test_data/certificates/`:
   *
-  *   - **`corpus contains at least 200 fixtures`** — traces to Phase 0's
-  *     sub-goal #2 in `certificates-strategy/phase-0-corpus.md`, which declares
-  *     200 fixtures as the floor. Fails loudly when the corpus is smaller so
-  *     Phase 0 cannot silently ship understaffed.
+  *   - **`corpus contains at least 200 fixtures`** — the corpus floor is 200
+  *     fixtures. Fails loudly when the corpus is smaller so the strategy cannot
+  *     silently ship under-tested.
   *
   *   - **`no orphan sidecars`** — every `.expected.json` must have a matching
   *     fixture file beside it. An orphan sidecar usually means a fixture was
@@ -58,16 +58,16 @@ import munit.FunSuite
   *     (phase-0-corpus.md).
   *   - Test `no orphan sidecars` → phase-0-corpus.md task #4 sourcing protocol.
   *   - Test `no orphan fixtures` → phase-0-corpus.md task #4 sourcing protocol.
-  *   - Test `every sidecar parses` → phase-0-corpus.md sub-goal #1 (schema).
+  *   - Test `every sidecar parses` → schema conformance.
   */
-class CertificatesCorpusIntegritySuite extends FunSuite {
+class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
 
   test("corpus root exists") {
     assert(
       CertificatesFixtureInventory.corpusRoot.exists(),
       s"Fixture corpus root ${CertificatesFixtureInventory.corpusRoot.getPath} " +
-        s"does not exist. Phase 0 requires this directory to be created with " +
-        s"category subdirectories — see certificates-strategy/phase-0-corpus.md."
+        s"does not exist. The corpus requires this directory to be created with " +
+        s"category subdirectories."
     )
     assert(
       CertificatesFixtureInventory.corpusRoot.isDirectory(),
@@ -110,7 +110,7 @@ class CertificatesCorpusIntegritySuite extends FunSuite {
   test("every sidecar parses and declares required fields") {
     val sidecars = CertificatesFixtureInventory.allSidecars
     val errors = sidecars.flatMap { s =>
-      scala.util.Try(CertificatesSidecar.parse(s)).failed.toOption.map { e =>
+      Try(CertificatesSidecar.parse(s)).failed.toOption.map { e =>
         s"${s.getPath}: ${e.getMessage}"
       }
     }

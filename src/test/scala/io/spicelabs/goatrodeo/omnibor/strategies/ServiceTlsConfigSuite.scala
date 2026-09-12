@@ -13,21 +13,20 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
-/** Phase A — Tests for the ServiceTlsConfig strategy's cipher-suite capture.
+/** Tests for the ServiceTlsConfig strategy's cipher-suite capture.
   *
   * Verifies that nginx/lighttpd cipher directives are captured into
   * `TLSConfig:CipherString` and decomposed into `TLSConfig:algorithms`, and
   * that UCI configs without cipher directives stay unchanged.
   */
-class ServiceTlsConfigSuite extends FunSuite {
+class ServiceTlsConfigSuite extends GoatRodeoFunSuite {
 
   private val adHoc = MKC.adHoc("TLSConfig")
 
@@ -46,7 +45,7 @@ class ServiceTlsConfigSuite extends FunSuite {
       .toMap
   }
 
-  test("T-A-08 nginx ssl_ciphers decompose into TLSConfig:algorithms") {
+  test("nginx ssl_ciphers decompose into TLSConfig:algorithms") {
     val nginx =
       """server {
         |    listen 443 ssl;
@@ -67,7 +66,7 @@ class ServiceTlsConfigSuite extends FunSuite {
     )
   }
 
-  test("T-A-08 lighttpd ssl.cipher-list decomposes") {
+  test("lighttpd ssl.cipher-list decomposes") {
     val lighttpd =
       """$SERVER["socket"] == ":443" {
         |    ssl.engine = "enable"
@@ -88,7 +87,7 @@ class ServiceTlsConfigSuite extends FunSuite {
     )
   }
 
-  test("T-A-08 UCI uhttpd without cipher directives stays unchanged") {
+  test("UCI uhttpd without cipher directives stays unchanged") {
     val uci =
       """config uhttpd 'main'
         |	option redirect_https 1

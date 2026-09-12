@@ -19,11 +19,12 @@ import io.bullet.borer.Dom
 import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationToml
+import io.spicelabs.goatrodeo.util.DateParser
 import io.spicelabs.goatrodeo.util.TomlTables
 import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.nio.file.Paths
-import java.time.Instant
+import java.util.Map as JMap
 import java.util.regex.Pattern
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
@@ -265,43 +266,9 @@ class GoatRodeoBuilder {
     *   Left(errorMessage) otherwise
     */
   def withTagDate(d: String): Either[String, GoatRodeoBuilder] = {
-    io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
+    DateParser.parse(d) match {
       case Right(date) =>
         config = config.copy(tagDate = Some(date))
-        Right(this)
-      case Left(error) =>
-        Left(error)
-    }
-  }
-
-  /** Refuse to analyze internal files modified after `cutoff`. Any archive
-    * entry whose modification time is after this instant is dropped from the
-    * ADG, along with everything that transitively contains it or is built from
-    * it (they must be at least as new), so no dangling references remain.
-    * Entries with no/unknown modification time are always kept.
-    *
-    * @param cutoff
-    *   the cutoff instant
-    * @return
-    *   this builder
-    */
-  def withCutoff(cutoff: Instant): GoatRodeoBuilder = {
-    config = config.copy(cutoff = Some(cutoff))
-    this
-  }
-
-  /** String form of [[withCutoff]] parsing a flexible date (e.g. "2026-01-01",
-    * "today").
-    *
-    * @param d
-    *   the date string
-    * @return
-    *   Right(this builder) if parsed successfully, Left(errorMessage) otherwise
-    */
-  def withCutoff(d: String): Either[String, GoatRodeoBuilder] = {
-    io.spicelabs.goatrodeo.util.DateParser.parse(d) match {
-      case Right(date) =>
-        config = config.copy(cutoff = Some(date.toInstant()))
         Right(this)
       case Left(error) =>
         Left(error)
@@ -339,7 +306,7 @@ class GoatRodeoBuilder {
     * @return
     *   this builder
     */
-  def withExtraArgs(args: java.util.Map[String, String]): GoatRodeoBuilder = {
+  def withExtraArgs(args: JMap[String, String]): GoatRodeoBuilder = {
     withExtraArgs(args.asScala.toMap)
   }
 
@@ -422,33 +389,30 @@ class GoatRodeoBuilder {
     * `withMimeFilter`) appends to it. A caller that wants to replace a list the
     * table supplied cannot do it through this builder.
     *
-    * `cutoff` is refused here: embedded, the analysis cutoff comes from the
-    * Spice Pass, which constrains what the platform will accept.
-    *
     * @param table
     *   the settings, keyed as in a Goat Rodeo config file
     * @param label
     *   the table's path in the caller's file, for error messages — e.g.
     *   `registry.analysis`
-    * @throws IllegalArgumentException
-    *   if the table has an unknown key, a value of the wrong type, or a setting
-    *   that may not be given to an embedded run
+    *
     * @return
-    *   this builder
+    *   Right(this builder) with the table applied, or Left(error) naming the
+    *   rejected key/value. Never throws.
     */
   def withConfiguration(
-      table: java.util.Map[String, Object],
+      table: JMap[String, Object],
       label: String
-  ): GoatRodeoBuilder = {
+  ): Either[String, GoatRodeoBuilder] = {
     ConfigurationToml.nestedFromToml(
       TomlTables.fromJavaMap(table),
       config,
       label
     ) match {
-      case Right(updated) => config = updated
-      case Left(error)    => throw IllegalArgumentException(error)
+      case Right(updated) =>
+        config = updated
+        Right(this)
+      case Left(error) => Left(error)
     }
-    this
   }
 
   /** Attach a progress listener that is notified at phase boundaries (Scanning,

@@ -8,18 +8,23 @@ import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.IncludeExclude
 import io.spicelabs.goatrodeo.util.StaticMetadata
 import io.spicelabs.goatrodeo.util.config
 
 import java.io.File
+import java.time.Instant
+import java.util.Date
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
 /** When processing Artifacts, knowing the Artifact type for a sequence of
   * artifacts can be helpful. For example (Java POM File, Java Sources,
@@ -359,7 +364,8 @@ trait ToProcess {
       tag: Option[TagPass],
       blockList: Set[GitOID] = Set(),
       keepRunning: () => Boolean = () => true,
-      atEnd: (Option[GitOID], Item) => Unit = (_, _) => ()
+      atEnd: (Option[GitOID], Item) => Unit = (_, _) => (),
+      failedContainers: AtomicInteger = new AtomicInteger(0)
   )(using Configuration): Seq[GitOID] = {
     if (keepRunning()) {
 
@@ -370,8 +376,7 @@ trait ToProcess {
             val itemRaw =
               Item.itemFrom(
                 artifact,
-                parentId,
-                recordModified = config.cutoff.isDefined
+                parentId
               )
 
             // in blocklist do nothing
@@ -463,7 +468,7 @@ trait ToProcess {
                     }
 
                     // Resolve date (use provided or current)
-                    val resolvedDate = info.date.getOrElse(new java.util.Date())
+                    val resolvedDate = info.date.getOrElse(new Date())
                     val dateStr = PackageTagInfo.toIso8601(resolvedDate)
 
                     // Build tag JSON using borer Dom.Element
@@ -487,7 +492,7 @@ trait ToProcess {
 
                     import io.bullet.borer.Json
                     val jsonString = Json.encode(tagJson).toUtf8String
-                    val tagGitoid = io.spicelabs.goatrodeo.util.GitOIDUtils
+                    val tagGitoid = GitOIDUtils
                       .urlForString(jsonString)
 
                     // Write tag item — unified with "tags" root
@@ -624,40 +629,43 @@ trait ToProcess {
                 // if the gitoid has already been seen, do not recurse into the potential child
                 if (hasBeenSeen) None
                 else {
-                  FileWalker.withinArchiveStream(artifact = artifact) {
-                    rawFoundItems =>
+                  FileWalker.withinArchiveStream(
+                    artifact = artifact,
+                    failedContainers = failedContainers
+                  ) { rawFoundItems =>
 
-                      val foundItems = rawFoundItems.filter(_.size() >= 0)
+                    val foundItems = rawFoundItems.filter(_.size() >= 0)
 
-                    for {
-                      item <- foundItems
-                    } item.mimeType
+                  for {
+                    item <- foundItems
+                  } item.mimeType
 
-                    val processSet =
-                      ToProcess.strategiesForArtifacts(
-                        foundItems,
-                        x => (),
-                        false
-                      )
-                    val thisParentScope = state4.generateParentScope(
-                      artifact,
-                      answerItem,
+                  val processSet =
+                    ToProcess.strategiesForArtifacts(
+                      foundItems,
+                      x => (),
+                      false
+                    )
+                  val thisParentScope = state4.generateParentScope(
+                    artifact,
+                    answerItem,
+                    store,
+                    marker,
+                    Some(parentScope),
+                    Map()
+                  )
+                  processSet.flatMap(tp =>
+                    tp.process(
+                      Some(answerItem.identifier),
                       store,
-                      marker,
-                      Some(parentScope),
-                      Map()
+                      thisParentScope,
+                      None,
+                      blockList,
+                      keepRunning,
+                      atEnd,
+                      failedContainers
                     )
-                    processSet.flatMap(tp =>
-                      tp.process(
-                        Some(answerItem.identifier),
-                        store,
-                        thisParentScope,
-                        None,
-                        blockList,
-                        keepRunning,
-                        atEnd
-                      )
-                    )
+                  )
                   }
                 }
 
@@ -824,22 +832,27 @@ object ToProcess {
 
     val largeCnt_? = totalCnt > 100000
 
-    val by50 = (totalCnt / 50) match {
-      case 0 => 1
-      case x => x
-    }
     if (infoMsgs_? && largeCnt_?)
       logger.info("Creating strategies for artifacts")
+    if (infoMsgs_? && largeCnt_?) logger.debug("Built UUID map")
+    // Progress for this pass is time-based: on a fast machine the loop ends
+    // long before the first 30-second tick, which is the point — these lines
+    // exist only to show that a slow setup is still working. The pass is
+    // single-threaded, so a plain local is enough.
+    var lastSetupReport = 0L
     // create the list of the files
     val byUUID: ByUUID = Map(artifacts.zipWithIndex.map { case (f, idx) =>
       f.mimeType
-      if (idx % by50 == 0 && infoMsgs_? && largeCnt_?) {
-        logger.info(f"Initial file setup ${idx}%,d of ${totalCnt}%,d")
+      if (infoMsgs_? && largeCnt_?) {
+        val now = Instant.now().toEpochMilli()
+        if (now - lastSetupReport >= 30000) {
+          lastSetupReport = now
+          logger.info(f"Initial file setup ${idx}%,d of ${totalCnt}%,d")
+        }
       }
       f.uuid -> f
     }*)
 
-    if (infoMsgs_? && largeCnt_?) logger.debug("Built UUID map")
     // Keyed by full path (not bare filename) so that strategies can
     // disambiguate files with the same name in different directories.
     // groupBy preserves per-key insertion order and avoids the O(n)
@@ -871,6 +884,9 @@ object ToProcess {
         )
       }
 
+    if (infoMsgs_? && largeCnt_?)
+      logger.debug("Finished setting files up")
+
     processSet
 
   }
@@ -878,7 +894,7 @@ object ToProcess {
   def buildQueueOnSeparateThread(
       fileListers: Seq[(File, () => Seq[File])],
       ignorePathList: Set[String],
-      excludeFileRegex: Seq[java.util.regex.Pattern],
+      excludeFileRegex: Seq[Pattern],
       finishedFile: File => Unit,
       tempDir: Option[File],
       count: AtomicInteger,
@@ -911,16 +927,20 @@ object ToProcess {
               excludeFileRegex.find(p => p.matcher(name).find).isEmpty
             }
 
-          } yield FileWrapper(
-            file,
-            if (fsFilePaths) {
-              val ap = file.toPath().toAbsolutePath().normalize().toString()
-              if (ap.startsWith(basePath)) ap.substring(basePathLen + 1)
-              else ap.substring(1)
-            } else file.getName(),
-            tempDir,
-            finishedFile
-          )).toVector
+            // wrap the FileWrapper creation in a try
+            wrappedFile <- Try {
+              FileWrapper(
+                file,
+                if (fsFilePaths) {
+                  val ap = file.toPath().toAbsolutePath().normalize().toString()
+                  if (ap.startsWith(basePath)) ap.substring(basePathLen + 1)
+                  else ap.substring(1)
+                } else file.getName(),
+                tempDir,
+                finishedFile
+              )
+            }.toOption.toVector
+          } yield wrappedFile).toVector
 
         logger.info(f"Found all files, count ${allFiles.length}%,d")
 
@@ -934,18 +954,16 @@ object ToProcess {
         strategiesForArtifacts(
           allFiles,
           toProcess => {
-            queue.add(toProcess)
             val total = count.addAndGet(toProcess.itemCnt)
             if (total % 1000 == 0) {
               logger.debug(
                 f"built strategies to handle ${total}%,d of ${allFiles.length}%,d"
               )
             }
+            queue.add(toProcess)
           },
           true
         )
-
-        logger.debug("Finished setting files up")
       } catch {
         case e: Exception =>
           logger.error(f"Failed to build graph ${e.getMessage()}")

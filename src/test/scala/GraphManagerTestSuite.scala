@@ -1,31 +1,18 @@
-/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.GRDWalker
 import io.spicelabs.goatrodeo.omnibor.GraphManager
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Helpers
 
+import java.io.File
 import java.io.FileInputStream
 import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
-import scala.util.Try
 
-class GraphManagerTestSuite extends munit.FunSuite {
+class GraphManagerTestSuite extends GoatRodeoFunSuite {
 
   def createTestItem(
       id: String,
@@ -100,7 +87,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
         val dataFileName = f"${Helpers.toHex(dif.dataFile)}.grd"
         val indexFileName = f"${Helpers.toHex(dif.indexFile)}.gri"
         assert(
-          new java.io.File(tempDir, dataFileName).exists() ||
+          new File(tempDir, dataFileName).exists() ||
             tempDir.listFiles().exists(_.getName().endsWith(".grd")),
           "Data file should exist"
         )
@@ -120,7 +107,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       )
       GraphManager.writeEntries(tempDir, items.iterator)
 
-      val historyFile = new java.io.File(tempDir, "history.jsonl")
+      val historyFile = new File(tempDir, "history.jsonl")
       assert(historyFile.exists(), "history.jsonl should exist")
       val content =
         new String(Files.readAllBytes(historyFile.toPath()), "UTF-8")
@@ -213,7 +200,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        val envelope = Try { walker.open() }
+        val envelope = walker.open()
         assert(envelope.isSuccess, "Should successfully open GRD file")
       } finally {
         channel.close()
@@ -236,7 +223,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
 
         val readItem = walker.readNext()
         assert(readItem.isDefined, "Should read an item")
@@ -329,7 +316,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
 
         val readItem = walker.readNext().get
         assertEquals(readItem.connections, connections)
@@ -354,7 +341,7 @@ class GraphManagerTestSuite extends munit.FunSuite {
       val channel = new FileInputStream(grdFiles.head).getChannel()
       try {
         val walker = new GRDWalker(channel)
-        walker.open()
+        walker.open().get
 
         val readItem = walker.readNext().get
         assert(readItem.bodyAsItemMetaData.isDefined)
@@ -373,14 +360,14 @@ class GraphManagerTestSuite extends munit.FunSuite {
     val tempDir = Files.createTempDirectory("invalidmagic").toFile()
     try {
       // Create a file with invalid content
-      val invalidFile = new java.io.File(tempDir, "invalid.grd")
+      val invalidFile = new File(tempDir, "invalid.grd")
       Files.write(invalidFile.toPath(), Array[Byte](0, 0, 0, 0))
 
       val channel = new FileInputStream(invalidFile).getChannel()
       try {
         val walker = new GRDWalker(channel)
         intercept[Exception] {
-          walker.open()
+          walker.open().get
         }
       } finally {
         channel.close()

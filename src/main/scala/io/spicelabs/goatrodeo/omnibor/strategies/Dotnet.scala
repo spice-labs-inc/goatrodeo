@@ -5,6 +5,8 @@ import io.spicelabs.cilantro.AssemblyDefinition
 import io.spicelabs.cilantro.AssemblyNameReference
 import io.spicelabs.cilantro.CSVersion
 import io.spicelabs.cilantro.CustomAttribute
+import io.spicelabs.coordinates.Purl
+import io.spicelabs.goatrodeo.omnibor.Augmentation
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
@@ -55,39 +57,40 @@ class DotnetState(
     streamOpt: Option[FileInputStream] = None
 ) extends ProcessingState[SingleMarker, DotnetState] {
   private val log = Logger(classOf[DotnetState])
+
+  /** Accumulates the canonical type JSON harvested from `cilantro/type` class
+    * children during child processing (Maven analog: class-derived structural
+    * metadata accumulated via accumulateInfo).
+    */
+  private var typeJsonAccum: Vector[String] = Vector()
   def beginProcessing(
       artifact: ArtifactWrapper,
       item: Item,
       marker: SingleMarker
   ): DotnetState = {
-    var fileStmOpt: Option[FileInputStream] = None
-
-    Try {
-      val stream: FileInputStream = artifact.withFile { file =>
-        FileInputStream(file)
+    // The whole assembly is not reified in memory — Cilantro lazily
+    // constructs it during the read — so opening the stream and reading
+    // is fine. readAssembly returns a Try, so compose in a
+    // for-comprehension (no .get).
+    val result: Try[DotnetState] = for {
+      fileStm <- Try {
+        artifact.withFile(file => FileInputStream(file))
       }
+      assembly <- AssemblyDefinition.readAssembly(fileStm)
+    } yield {
+      DotnetState(Some(assembly), Some(fileStm))
+    }
 
-      fileStmOpt = Some(stream)
-      val assembly = AssemblyDefinition.readAssembly(stream)
-      DotnetState(Some(assembly), fileStmOpt)
-    } match {
+    result match {
       case Failure(excpt) =>
-        fileStmOpt match {
-          case Some(fileStm) =>
-            fileStm.close()
-            log.error(
-              s"Error while reading assembly from ${artifact.path()}: ${excpt.getMessage()}"
-            )
-          case None =>
-            log.error(
-              s"Unable to open file ${artifact.path()}: ${excpt.getMessage()}"
-            )
-        }
-        throw excpt
-
-      case Success(value) => {
-        value
-      }
+        log.error(
+          s"Error while reading assembly from ${artifact.path()}: ${excpt.getMessage()}"
+        )
+        // The failure is a value: processing continues as a no-op for this
+        // artifact instead of aborting the containing walk (a native DLL or
+        // hostile PE inside a fat jar must never lose the whole jar).
+        DotnetState(None, None)
+      case Success(value) => value
     }
   }
 
@@ -95,7 +98,60 @@ class DotnetState(
       item: Item,
       artifact: ArtifactWrapper,
       store: Storage
-  ): DotnetState = this
+  ): DotnetState = {
+    // Surface Cilantro's canonical per-class JSON as readable metadata on
+    // the assembly Item (Maven-analog: accumulated child metadata is merged
+    // into the parent Item via store.write, after the children are
+    // processed).
+    if (typeJsonAccum.nonEmpty) {
+      val key =
+        MetadataKeyConstants.adHoc("cilantro")("TypeJson")
+      val data = StringOrPair(typeJsonAccum.sorted.mkString("\n"))
+      store.write(
+        item.identifier,
+        {
+          case Some(existing) =>
+            Some(
+              existing
+                .enhanceWithMetadata(
+                  extra = TreeMap(key -> TreeSet(data)),
+                  filenames = Vector.empty,
+                  mimeTypes = Vector.empty
+                )
+            )
+          case None =>
+            Some(
+              item.enhanceWithMetadata(
+                extra = TreeMap(key -> TreeSet(data)),
+                filenames = Vector.empty,
+                mimeTypes = Vector.empty
+              )
+            )
+        },
+        _ => "accumulated augmentation: cilantro:TypeJson"
+      )
+    }
+    this
+  }
+
+  /** Harvest the canonical type JSON from a `cilantro/type` class child.
+    *
+    * Called via the assembly's ParentScope.accumulateInfo for each child (the
+    * Maven analog: accumulateInfo reads child wrappers during child
+    * processing). Only children whose MIME is `cilantro/type` contribute.
+    *
+    * @param artifact
+    *   the child artifact wrapper (a class whose payload is the canonical type
+    *   JSON)
+    */
+  def accumulateTypeJson(artifact: ArtifactWrapper): Unit = {
+    if (artifact.mimeType.contains("cilantro/type")) {
+      val json = Try(
+        artifact.withStream(Helpers.slurpInputToString(_))
+      ).toOption
+      json.foreach(j => typeJsonAccum = typeJsonAccum :+ j)
+    }
+  }
 
   override def getPurls(
       artifact: ArtifactWrapper,
@@ -104,17 +160,20 @@ class DotnetState(
   ): (PurlSet, DotnetState) = {
     // Return the Purl object directly (not a string). PurlSet.canonicalStrings
     // will handle toCanonical() at the storage boundary, wrapped in Try.
-    val purlOpt: Option[io.spicelabs.coordinates.Purl] =
+    val purlOpt: Option[Purl] =
       assemblyOpt
         .flatMap { assembly =>
           val nameOpt =
-            PURLComponentSanitizer.sanitizeGenericIdentifier(assembly.name.name)
-          val versionOpt = PURLComponentSanitizer
-            .sanitizeGenericVersion(sanitizeVersion(assembly.name.version))
+            assembly.name.flatMap(n =>
+              PURLComponentSanitizer.sanitizeGenericIdentifier(n.name)
+            )
+          val versionOpt = assembly.name
+            .map(n => sanitizeVersion(n.version))
+            .flatMap(PURLComponentSanitizer.sanitizeGenericVersion(_))
           (nameOpt, versionOpt) match {
             case (Some(name), Some(version)) =>
               // nuget purls take no namespace (the spec prohibits it).
-              scala.util.Try {
+              Try {
                 PURLHelpers
                   .purl(
                     `type` = "nuget",
@@ -179,7 +238,7 @@ class DotnetState(
       // for more information.
       resOption <- Try {
         assembly.customAttributes.find(at =>
-          at.attributeType.fullName == attrName
+          at.attributeType.exists(_.fullName == attrName)
         ) match {
           case Some(v) => argZeroValueAsString(v)
           case _       => None
@@ -211,7 +270,7 @@ class DotnetState(
     assemblyOpt.flatMap(assembly =>
       maybeSOP(
         MetadataKeyConstants.SIMPLE_NAME,
-        Option(assembly.name.name)
+        assembly.name.map(_.name)
       )
     )
   }
@@ -220,7 +279,7 @@ class DotnetState(
     assemblyOpt.flatMap { assembly =>
       maybeSOP(
         MetadataKeyConstants.VERSION,
-        Option(assembly.name.version.toString())
+        assembly.name.map(_.version.toString())
       )
     }
   }
@@ -229,7 +288,7 @@ class DotnetState(
     assemblyOpt.flatMap { assembly =>
       maybeSOP(
         MetadataKeyConstants.LOCALE,
-        Option(assembly.name.culture)
+        assembly.name.map(_.culture)
       )
     }
   }
@@ -237,9 +296,7 @@ class DotnetState(
   def assemblyPublicKey: Option[(String, TreeSet[StringOrPair])] = {
     assemblyOpt.flatMap { assembly =>
       val pkStr =
-        Option(assembly.name.publicKey).map(pk =>
-          toHex(assembly.name.publicKey)
-        )
+        assembly.name.map(_.publicKey).map(pk => toHex(pk))
       maybeSOP(MetadataKeyConstants.PUBLIC_KEY, pkStr)
     }
   }
@@ -272,11 +329,15 @@ class DotnetState(
     import DotnetState.formatDeps
     assemblyOpt.flatMap(assembly => {
 
-      val refs = assembly.mainModule.assemblyReferences;
-      if (refs.length == 0) None
-      else {
-        val deps = formatDeps(refs)
-        maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+      val refsOpt = assembly.mainModule.map(_.assemblyReferences)
+      refsOpt match {
+        case None => None
+        case Some(refs) =>
+          if (refs.length == 0) None
+          else {
+            val deps = formatDeps(refs)
+            maybeSOP(MetadataKeyConstants.DEPENDENCIES, deps)
+          }
       }
     })
 
@@ -302,21 +363,60 @@ class DotnetState(
       marker: SingleMarker
   ): DotnetState = {
     streamOpt.foreach(fs => fs.close())
-    DotnetState()
+    // Return `this` (not a fresh DotnetState): the canonical type JSON
+    // accumulator (typeJsonAccum) must survive into
+    // applyAccumulatedAugmentation, which runs on this return value.
+    this
   }
+
+  /** Generate the parent scope for the assembly's children.
+    *
+    * Overrides accumulateInfo so that every child (which includes the
+    * `cilantro/type` class entries) is offered to DotnetState to harvest the
+    * canonical type JSON — the Maven analog of reading child wrappers during
+    * child processing.
+    */
+  override def generateParentScope(
+      artifact: ArtifactWrapper,
+      item: Item,
+      store: Storage,
+      marker: SingleMarker,
+      parent: Option[ParentScope],
+      augmentationByHash: Map[String, Vector[Augmentation]]
+  ): ParentScope =
+    new ParentScope(augmentationByHash) {
+      def scopeFor(): String = item.identifier
+      def parentOfParentScope(): Option[ParentScope] = parent
+      def parentScopeInformation(): String =
+        s"Dotnet Scope for ${item.identifier}${parent match {
+            case None     => ""
+            case Some(ps) => s" Parent: ${ps.parentScopeInformation()}"
+          }}"
+
+      override def accumulateInfo(
+          parentId: String,
+          item: Item,
+          artifact: ArtifactWrapper,
+          store: Storage
+      ): Unit = {
+        DotnetState.this.accumulateTypeJson(artifact)
+      }
+    }
 
   /** Generate per-package tag info for .NET assemblies.
     */
   override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
-    assemblyOpt.map { assembly =>
-      val name = assembly.name.name
-      val version = assembly.name.version.toString()
+    assemblyOpt.flatMap { assembly =>
+      assembly.name.map { an =>
+        val name = an.name
+        val version = an.version.toString()
 
-      PackageTagInfo(
-        name = name,
-        version = Some(version),
-        date = None // .NET assemblies don't have built-in build dates
-      )
+        PackageTagInfo(
+          name = name,
+          version = Some(version),
+          date = None // .NET assemblies don't have built-in build dates
+        )
+      }
     }
   }
 }
@@ -370,7 +470,7 @@ final case class DotnetFile(file: ArtifactWrapper) extends ToProcess {
 
   /** The mime type of the main artifact
     */
-  def mimeType: Set[String] = Set(DotnetDetector.DOTNET_MIME.toString())
+  def mimeType: Set[String] = Set(DotnetDetector.DOTNET_MIME_STRING)
 
   override def getElementsToProcess()
       : (Seq[(ArtifactWrapper, MarkerType)], StateType) =

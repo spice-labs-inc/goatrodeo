@@ -13,8 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -40,7 +39,7 @@ import scala.sys.process.*
   *     fixture's DER bytes
   *
   * If the script is missing or `bash` cannot be invoked the test is marked
-  * `assume(... && !ignored)` so non-Linux dev machines do not fail-spuriously.
+  * `assert(... && !ignored)` so non-Linux dev machines do not fail-spuriously.
   *
   * ## Traceability
   *
@@ -49,7 +48,7 @@ import scala.sys.process.*
   * reviewer can hand-verify against `openssl x509 -subject -nameopt RFC2253`
   * output.
   */
-class ComputeExpectedToolTests extends FunSuite {
+class ComputeExpectedToolTests extends GoatRodeoFunSuite {
 
   private val script = new File(
     "test_data/certificates/tools/compute-expected.sh"
@@ -59,11 +58,11 @@ class ComputeExpectedToolTests extends FunSuite {
   )
 
   override def beforeAll(): Unit = {
-    assume(
+    assert(
       script.exists() && script.canExecute(),
       s"compute-expected.sh missing or not executable at ${script.getPath}"
     )
-    assume(
+    assert(
       sampleFixture.exists(),
       s"sample fixture missing at ${sampleFixture.getPath}"
     )

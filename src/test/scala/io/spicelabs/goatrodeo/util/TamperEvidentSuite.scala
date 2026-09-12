@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
+import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import io.spicelabs.goatrodeo.omnibor.CbomEmitter
 import io.spicelabs.goatrodeo.omnibor.GraphManager
@@ -24,12 +24,17 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
+import org.json4s.JString
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
 import java.nio.file.Files
+import java.util.Comparator
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -39,7 +44,7 @@ import scala.collection.immutable.TreeSet
   * detection, chain-head exposure), the CBOM filename format, the `.grc` `info`
   * additions, and the run-level checksum file.
   */
-class TamperEvidentSuite extends FunSuite {
+class TamperEvidentSuite extends GoatRodeoFunSuite {
 
   private def tempDir(): File =
     Files.createTempDirectory("tamper-test").toFile()
@@ -48,7 +53,7 @@ class TamperEvidentSuite extends FunSuite {
     if (dir != null && dir.exists()) {
       Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(Files.delete(_))
       ()
     }
@@ -83,7 +88,7 @@ class TamperEvidentSuite extends FunSuite {
     * magic (4 bytes) + short envelope length (2 bytes) + CBOR envelope.
     */
   private def readClusterEnv(file: File): ClusterFileEnvelope = {
-    val dfp = new java.io.FileInputStream(file).getChannel()
+    val dfp = new FileInputStream(file).getChannel()
     try {
       val magic = Helpers.readInt(dfp)
       assertEquals(magic, GraphManager.Consts.ClusterFileMagicNumber)
@@ -91,11 +96,11 @@ class TamperEvidentSuite extends FunSuite {
       val bytes = new Array[Byte](len)
       var off = 0
       while (off < len) {
-        val r = dfp.read(java.nio.ByteBuffer.wrap(bytes, off, len - off))
+        val r = dfp.read(ByteBuffer.wrap(bytes, off, len - off))
         if (r < 0) throw new Exception("short read on cluster envelope")
         off += r
       }
-      io.bullet.borer.Cbor.decode(bytes).to[ClusterFileEnvelope].value
+      Cbor.decode(bytes).to[ClusterFileEnvelope].value
     } finally {
       dfp.close()
     }
@@ -390,8 +395,8 @@ class TamperEvidentSuite extends FunSuite {
         )
         assertEquals(
           (json \ "grcs")(0) \ "name" match {
-            case org.json4s.JString(s) => s
-            case other                 => fail(s"expected string, got $other")
+            case JString(s) => s
+            case other      => fail(s"expected string, got $other")
           },
           "2026_01_02_03_04_05_deadbeef.grc"
         )
@@ -408,7 +413,7 @@ class TamperEvidentSuite extends FunSuite {
   // appender never leaks into subsequent work in the same JVM.
   test("T-10 reset invokes the run cleanup callback") {
     TamperEvidentLog.sync.synchronized {
-      val called = new java.util.concurrent.atomic.AtomicBoolean(false)
+      val called = new AtomicBoolean(false)
       TamperEvidentLog.start("corr-id", () => None, () => called.set(true))
       TamperEvidentLog.addGrc("a.grc", "beef")
       TamperEvidentLog.reset()

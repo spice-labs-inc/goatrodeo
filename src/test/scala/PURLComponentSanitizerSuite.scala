@@ -13,8 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-class PURLComponentSanitizerSuite extends munit.FunSuite {
+class PURLComponentSanitizerSuite extends GoatRodeoFunSuite {
 
   // ==================== Maven groupId ====================
 

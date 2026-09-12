@@ -21,6 +21,25 @@ At present there are two post-processing operations that refine MIME types:
 | `text/plain` | `application/json` (when content is valid JSON) |
 | `application/x-msdownload; format=pe32` | `application/x-msdownload; format=pe32-dotnet` (for .NET assemblies) |
 
+### Producer-stamped MIME hints (spec §5)
+
+- **Producers may stamp an authoritative MIME hint** on an artifact
+  wrapper (`ArtifactWrapper.newWrapper(..., mimeHint = Some(...))`). The
+  hint is unioned into the wrapper's effective MIME set and is
+  authoritative — never re-checked against content.
+- **No hint is ever produced by content sniffing.** Detection only adds
+  MIMEs from the signatures below; it never fabricates kind MIMEs such as
+  `application/pkcs7-signature`.
+- Content sniffing of a DER PKCS#7 SignedData yields
+  `application/pkcs7-mime` (below); the authoritative
+  `application/pkcs7-signature` MIME is stamped by the producer (e.g. the
+  .NET walker's Authenticode cert children) and is what the Certificates
+  strategy claims (see the certificates strategy doc).
+
+Verified by `MimeHintSuite.T5.1–T5.8` (hint default/union/spill/
+never-sniffed/authoritative/monotonic property) and
+`CertificatesPkcs7Suite.T6.x` (claim semantics).
+
 ## CryptoDetector augmentation (Certificates strategy)
 
 Where Tika falls short for cryptographic file types — most crypto

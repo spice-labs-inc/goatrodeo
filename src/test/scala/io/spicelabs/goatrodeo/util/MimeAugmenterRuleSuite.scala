@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
-
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
@@ -39,14 +39,14 @@ import scala.jdk.CollectionConverters.*
   *
   * LLM note: R-x = test id.
   */
-class MimeAugmenterRuleSuite extends FunSuite {
+class MimeAugmenterRuleSuite extends GoatRodeoFunSuite {
 
   private def bytes(s: String): Array[Byte] =
     s.getBytes(StandardCharsets.ISO_8859_1)
 
   private def realClassFile(): Array[Byte] = {
     val jar = new ZipFile(
-      new java.io.File(
+      new File(
         "test_data/download/adg_tests/repo_ea/aop-common-1.3.2.jar"
       )
     )

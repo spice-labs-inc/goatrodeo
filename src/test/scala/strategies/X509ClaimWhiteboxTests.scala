@@ -13,16 +13,19 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
-import munit.FunSuite
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 import java.io.File
 import java.security.Security
+import java.security.cert.X509Certificate
+import java.util.Enumeration
+import scala.collection.mutable.ListBuffer
 
-/** Phase 3-4 white-box tests with **independent ground truth** for
-  * `SingleCert`, `Bundle`, `Keystore`, and `Crl` claim types.
+/** White-box tests with **independent ground truth** for `SingleCert`,
+  * `Bundle`, `Keystore`, and `Crl` claim types.
   *
   * ## Why this exists
   *
@@ -34,11 +37,10 @@ import java.security.Security
   * `parseKeystore` / `parseCrl` would re-emit the bug into the sidecar and the
   * test would still pass.
   *
-  * The Phase 5+ work introduced independent ground truth (ssh-keygen, gpg,
-  * openssl) for SSH/PGP/private-key paths. Phase 3-4 lacked the equivalent.
-  * This suite closes the cross-phase gap (P5 in the Phases-1-7 review): each
-  * white-box test pins values computed by `openssl`/`keytool` *outside* the
-  * strategy.
+  * Independent ground truth (ssh-keygen, gpg, openssl) exists for the
+  * SSH/PGP/private-key paths. This suite supplies the equivalent for the X.509
+  * paths: each white-box test pins values computed by `openssl`/`keytool`
+  * *outside* the strategy.
   *
   * ## Ground-truth recipes
   *
@@ -50,7 +52,7 @@ import java.security.Security
   * | Keystore alias enumeration         | `keytool -list -keystore <fixture> -storepass ""`                                                        |
   * | CRL DER SHA-256                    | `sha256sum <fixture>`                                                                                    |
   */
-class X509ClaimWhiteboxTests extends FunSuite {
+class X509ClaimWhiteboxTests extends GoatRodeoFunSuite {
 
   // BouncyCastle is required by the parse methods under test. Production code
   // registers it lazily via CryptoDetector / Certificates; running this suite
@@ -59,14 +61,14 @@ class X509ClaimWhiteboxTests extends FunSuite {
   // idempotent registration pattern used by the sibling test suites.
   if (Security.getProvider("BC") == null) {
     Security.addProvider(
-      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      new BouncyCastleProvider()
     )
   }
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)
 
-  // ===== SingleCert (Phase 3) =============================================
+  // ===== SingleCert  =============================================
 
   test(
     "parseSingleCert + purlsForCert: ISRG Root X1 SPKI hash matches openssl"
@@ -127,7 +129,7 @@ class X509ClaimWhiteboxTests extends FunSuite {
     )
   }
 
-  // ===== Bundle (Phase 4) ================================================
+  // ===== Bundle  ================================================
 
   test("parseBundle: goatrodeo-test-chain first-cert hash matches openssl") {
     // awk '/BEGIN CERT/,/END CERT/{print; if (/END CERT/) exit}' <fixture>
@@ -162,7 +164,7 @@ class X509ClaimWhiteboxTests extends FunSuite {
     )
   }
 
-  // ===== Keystore (Phase 4) ==============================================
+  // ===== Keystore  ==============================================
 
   test("parseKeystore: trust-only-null-password.p12 loads with null password") {
     val w = wrap(
@@ -189,8 +191,8 @@ class X509ClaimWhiteboxTests extends FunSuite {
     )
     val ks = Certificates.parseKeystore(w, "PKCS12").get
     val aliases =
-      ks.ks.get.aliases().asInstanceOf[java.util.Enumeration[String]]
-    val aliasList = scala.collection.mutable.ListBuffer[String]()
+      ks.ks.get.aliases().asInstanceOf[Enumeration[String]]
+    val aliasList = ListBuffer[String]()
     while (aliases.hasMoreElements) aliasList += aliases.nextElement
     assertEquals(aliasList.toList, List("letsencrypt-isrg-root-x1"))
   }
@@ -206,7 +208,7 @@ class X509ClaimWhiteboxTests extends FunSuite {
     val ks = Certificates.parseKeystore(w, "PKCS12").get
     val cert = ks.ks.get
       .getCertificate("letsencrypt-isrg-root-x1")
-      .asInstanceOf[java.security.cert.X509Certificate]
+      .asInstanceOf[X509Certificate]
     assertEquals(
       sha256Hex(cert.getEncoded),
       "96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6",
@@ -231,7 +233,7 @@ class X509ClaimWhiteboxTests extends FunSuite {
     assertEquals(ks.entryCount, 0)
   }
 
-  // ===== CRL (Phase 4) ===================================================
+  // ===== CRL  ===================================================
 
   test("parseCrl: digicert-global-root-g2.crl DER hash matches sha256sum") {
     // sha256sum <fixture>

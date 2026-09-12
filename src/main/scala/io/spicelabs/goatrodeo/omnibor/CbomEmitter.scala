@@ -28,6 +28,10 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.time.Instant
 import java.util.UUID
 import scala.annotation.tailrec
+import scala.collection.mutable.LinkedHashSet
+import scala.collection.mutable.Map as MutableMap
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** Optional CycloneDX cryptographic bill-of-materials (CBOM) emitter.
@@ -178,10 +182,9 @@ object CbomEmitter {
 
   /** True when the Item carries cryptographic metadata from a known strategy.
     *
-    * Includes the Phase A–G extended-capture prefixes (ServiceCrypto, Kerberos,
-    * JWT, JWK, EmbeddedKey, CryptoAlgorithms, CryptoDependency, MobileTls) so
-    * the emitter covers the same families as the captured ADG metadata can
-    * express.
+    * Includes the extended-capture prefixes (ServiceCrypto, Kerberos, JWT, JWK,
+    * EmbeddedKey, CryptoAlgorithms, CryptoDependency, MobileTls) so the emitter
+    * covers the same families as the captured ADG metadata can express.
     */
   private def isCryptoItem(item: Item): Boolean = {
     item.bodyAsItemMetaData.exists { meta =>
@@ -233,7 +236,7 @@ object CbomEmitter {
       }
       // Deduplicate synthetic algorithm components across the root by bom-ref,
       // preserving the first occurrence of each referenced algorithm.
-      val seen = scala.collection.mutable.LinkedHashSet[String]()
+      val seen = LinkedHashSet[String]()
       all.filter { c =>
         val ref = (c \ "bom-ref") match {
           case JString(s) => s
@@ -603,7 +606,7 @@ object CbomEmitter {
       extra: Map[String, Set[String]],
       chain: Vector[Item]
   ): (Option[JObject], Map[String, JObject]) = {
-    val algs = scala.collection.mutable.Map[String, JObject]()
+    val algs = MutableMap[String, JObject]()
 
     def addAlg(
         raw: String,
@@ -976,7 +979,7 @@ object CbomEmitter {
     extra.keys.exists(_.startsWith("EmbeddedCertificates:"))
   }
 
-  // Phase A–G extended-capture families (classification precedence:
+  // Extended-capture families (classification precedence:
   // EmbeddedKey, ServiceCrypto, Kerberos, JWT, JWK, CryptoAlgorithms,
   // CryptoDependency, MobileTls).
   private def hasEmbeddedKey(extra: Map[String, Set[String]]): Boolean = {
@@ -1168,40 +1171,47 @@ object CbomEmitter {
     * following it, so a link planted at the target is replaced rather than
     * written through.
     */
-  private def safeOutputDir(dir: File): Try[File] = Try {
+  private def safeOutputDir(dir: File): Try[File] = {
     val path = pathOf(dir)
 
     if (Files.isSymbolicLink(path)) {
-      throw new IllegalArgumentException(
-        f"CBOM output directory is a symlink: $path"
-      )
-    }
-
-    if (!dir.exists()) {
-      try {
-        Files.createDirectories(
-          path,
-          PosixFilePermissions.asFileAttribute(
-            PosixFilePermissions.fromString(OutputPermissions)
-          )
+      Failure(
+        new IllegalArgumentException(
+          f"CBOM output directory is a symlink: $path"
         )
-      } catch {
-        case _: UnsupportedOperationException =>
-          dir.mkdirs()
+      )
+    } else {
+      Try {
+        if (!dir.exists()) {
+          try {
+            Files.createDirectories(
+              path,
+              PosixFilePermissions.asFileAttribute(
+                PosixFilePermissions.fromString(OutputPermissions)
+              )
+            )
+          } catch {
+            case _: UnsupportedOperationException =>
+              dir.mkdirs()
+          }
+        }
+        dir
+      }.flatMap { d =>
+        if (!d.isDirectory()) {
+          Failure(
+            new IllegalArgumentException(
+              f"CBOM output path is not a directory: $d"
+            )
+          )
+        } else if (!d.canWrite()) {
+          Failure(
+            new IllegalArgumentException(
+              f"CBOM output directory not writable: $d"
+            )
+          )
+        } else Success(d)
       }
     }
-
-    if (!dir.isDirectory()) {
-      throw new IllegalArgumentException(
-        f"CBOM output path is not a directory: $dir"
-      )
-    }
-    if (!dir.canWrite()) {
-      throw new IllegalArgumentException(
-        f"CBOM output directory not writable: $dir"
-      )
-    }
-    dir
   }
 
   /** Write a CBOM file atomically with restrictive permissions. */
@@ -1213,7 +1223,9 @@ object CbomEmitter {
     Try {
       val target = new File(dir, filename)
       val temp = File.createTempFile("cbom-", ".json.tmp", dir)
-      try {
+      (target, temp)
+    }.flatMap { case (target, temp) =>
+      Try {
         val content = compact(render(json))
         Files.writeString(pathOf(temp), content, StandardCharsets.UTF_8)
         try {
@@ -1238,16 +1250,15 @@ object CbomEmitter {
         } catch {
           case _: UnsupportedOperationException => // non-POSIX filesystem
         }
-      } catch {
-        case e: Throwable =>
-          temp.delete()
-          throw e
+        target
+      }.recoverWith { case e: Throwable =>
+        temp.delete() // best-effort cleanup; the failure stays a value
+        Failure(e)
       }
-      target
     }
   }
 
   private def pathOf(f: File): Path = {
-    java.nio.file.Path.of(f.getAbsolutePath())
+    Path.of(f.getAbsolutePath())
   }
 }

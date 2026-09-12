@@ -4,6 +4,7 @@ import io.spicelabs.saffron.DiskFormat
 import io.spicelabs.saffron.container.ContainerDetector
 import io.spicelabs.saffron.container.ContainerFormat
 
+import java.nio.file.Path
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
 
@@ -37,7 +38,7 @@ object SaffronDetector {
   private def containerMime(fmt: ContainerFormat): Option[String] =
     ContainerMimes.get(fmt)
 
-  private def containerMimeOf(path: java.nio.file.Path): Option[String] = {
+  private def containerMimeOf(path: Path): Option[String] = {
     Try(ContainerDetector.detect(path)).toOption
       .flatMap(_.toScala)
       .flatMap(containerMime)

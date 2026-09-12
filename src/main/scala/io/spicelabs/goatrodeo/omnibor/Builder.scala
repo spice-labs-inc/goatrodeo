@@ -20,6 +20,8 @@ import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.ProgressListener
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.GitOIDUtils
+import io.spicelabs.goatrodeo.util.GitRunInfo
+import io.spicelabs.goatrodeo.util.GitRunItem
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import io.spicelabs.goatrodeo.util.config
@@ -34,9 +36,13 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeSet
 import scala.collection.parallel.CollectionConverters.VectorIsParallelizable
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** Build the GitOIDs the container and all the sub-elements found in the
@@ -78,24 +84,32 @@ object Builder {
     * @param done
     *   when the processing is done, true success, false failure
     *
-    * Thread count, block list, record cap, temp directory and cutoff all come
-    * from the contextual [[Configuration]] (reached as `config`) rather than
-    * being passed separately.
+    * Thread count, block list, record cap and temp directory all come from the
+    * contextual [[Configuration]] (reached as `config`) rather than being
+    * passed separately.
     */
   def buildDB(
       dest: File,
       tag: Option[TagInfo],
       fileListers: Seq[(File, () => Seq[File])],
       ignorePathSet: Set[String],
-      excludeFileRegex: Seq[java.util.regex.Pattern],
+      excludeFileRegex: Seq[Pattern],
       finishedFile: File => Unit,
       done: Boolean => Unit,
-      preWriteDB: Vector[Storage => Boolean] = Vector()
+      preWriteDB: Vector[Storage => Boolean] = Vector(),
+      failedContainers: AtomicInteger = new AtomicInteger(0)
   )(using Configuration): Unit = {
     val totalStart = Instant.now()
     // Fresh per-run dispatcher; enforces monotonic current and catches
     // exceptions thrown by the caller-supplied ProgressListener.
     val progressNotifier = ProgressListener.notifier(config.progressListener)
+
+    // Wall-clock cadence for the "Processed N of M" progress line and the
+    // listener ticks: at most one report per 30 seconds run-wide, whichever
+    // consumer thread gets there first (CAS), plus a slow-item report and a
+    // final batch-drain report. Shared across batches so overlapping batches
+    // cannot double-report within the same window.
+    val lastProgressReport = new AtomicLong(totalStart.toEpochMilli)
 
     val runningCnt = AtomicInteger(0)
     val dead_? = AtomicBoolean(false)
@@ -152,6 +166,19 @@ object Builder {
     val jsonString = Json.encode(json).toUtf8String
 
     TagPass(GitOIDUtils.urlForString(jsonString), jsonString, json)
+    }
+
+    // Git provenance capture : tagged runs only, JGit-only,
+    // never fails the run. Captured once, written per batch alongside the
+    // tag.
+    val gitItems: Vector[GitRunItem] = fullTag match {
+      case None => Vector.empty
+      case Some(_) =>
+        GitRunInfo.capture(
+          config.build,
+          redact = config.redactGitInfo,
+          scanRoots = config.build
+        )
     }
 
     // Get the gitoids to block
@@ -223,7 +250,10 @@ object Builder {
         loopStart = loopStart,
         writeThreadCnt = writeThreadCnt,
         progressNotifier = progressNotifier,
-        preWriteDB = preWriteDB
+        lastProgressReport = lastProgressReport,
+        failedContainers = failedContainers,
+        preWriteDB = preWriteDB,
+        gitItems = gitItems
       )
       logger.info(
         f"Starting multi-thread consumer loop ${loopCnt}%,d at ${Duration
@@ -292,7 +322,10 @@ object Builder {
       loopStart: Instant,
       writeThreadCnt: AtomicInteger,
       progressNotifier: ProgressListener.Notifier,
-      preWriteDB: Vector[Storage => Boolean] = Vector()
+      lastProgressReport: AtomicLong,
+      failedContainers: AtomicInteger,
+      preWriteDB: Vector[Storage => Boolean] = Vector(),
+      gitItems: Vector[GitRunItem] = Vector()
   )(using Configuration): Option[BatchState] = {
 
     val liveWorkers = AtomicInteger(0)
@@ -324,6 +357,30 @@ object Builder {
             ),
           x => "tags"
         )
+        gitItems.foreach { gi =>
+          storage.write(
+            gi.gitoid,
+            item =>
+              Some(
+                Item(
+                  gi.gitoid,
+                  TreeSet(EdgeType.tagFrom -> tag.gitoid),
+                  Some(ItemTagData.mimeType),
+                  Some(ItemTagData(gi.json))
+                )
+              ),
+            _ => "git provenance item"
+          )
+          // tag -> git item edge (merge-style so multiple batches merge)
+          storage.write(
+            tag.gitoid,
+            itemOpt =>
+              itemOpt.map(item =>
+                item.withConnection(EdgeType.tagTo, gi.gitoid)
+              ),
+            _ => "git provenance tagTo"
+          )
+        }
     }
 
     // start time
@@ -385,13 +442,26 @@ object Builder {
                     ParentScope.forAndWith(toProcess.main, None, byHash),
                   blockList = blockGitoids,
                   keepRunning = () => !dead_?.get(),
+                  failedContainers = failedContainers,
                   atEnd = (parent, _) => {
                     if (parent.isEmpty) {
                       val updatedCnt = cnt.addAndGet(1)
                       val theDuration = Duration
                         .between(localStart, Instant.now())
+                      val nowEpochMillis = Instant.now().toEpochMilli()
+                      val lastReport = lastProgressReport.get()
+                      // Enough to see that work is happening, not so much that
+                      // the log drowns: one report per 30 seconds of wall
+                      // time (CAS picks a single winner among the consumer
+                      // threads), or immediately when a single item has taken
+                      // more than 30 seconds.
                       if (
-                        theDuration.getSeconds() > 30 || updatedCnt % 1000 == 0
+                        theDuration.getSeconds() > 30 ||
+                        (nowEpochMillis - lastReport >= 30000 &&
+                          lastProgressReport.compareAndSet(
+                            lastReport,
+                            nowEpochMillis
+                          ))
                       ) {
 
                         // if we've got a temp dir and we're down to 10% free space, bail
@@ -515,6 +585,17 @@ object Builder {
               t.join()
             }
 
+            // The cadence leaves the final items unreported (the last tick
+            // can be far from the final count), so report the batch's final
+            // numbers once all workers are done. The listener's monotonic
+            // guard makes the extra notify harmless to hosts.
+            val finalCnt = cnt.get()
+            val finalTotal = runningCnt.get()
+            logger.info(
+              f"Processed ${finalCnt}%,d of ${finalTotal}%,d, batch ${batchName} complete"
+            )
+            progressNotifier.notify(finalCnt.toLong, finalTotal.toLong)
+
             logger.info(
               f"Finished processing ${cnt.get()}%,d, vertices ${storage.size()}%,d at ${Duration
                   .between(start, Instant.now())}"
@@ -535,11 +616,11 @@ object Builder {
                     cbomDir,
                     TamperEvidentLog.correlationId
                   ) match {
-                  case scala.util.Success(files) =>
+                  case Success(files) =>
                     logger.info(
                       f"Wrote ${files.length}%,d CBOM file(s) to ${cbomDir}"
                     )
-                  case scala.util.Failure(e) =>
+                  case Failure(e) =>
                     logger.error(
                       f"Failed to emit CBOMs to ${cbomDir}: ${e.getMessage()}",
                       e
@@ -551,7 +632,7 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                writeGoatRodeoFiles(lf, config.cutoff)
+                writeGoatRodeoFiles(lf)
               case _ => logger.error("Didn't write"); None
             }
 
@@ -577,70 +658,8 @@ object Builder {
 
   }
 
-  /** Enforce an cutoff cutoff on the fully-assembled graph: drop every node
-    * whose recorded file-modification time is after `cutoff`, plus every node
-    * that transitively contains it or is built from it (they must be at least
-    * as new), then strip any resulting dangling edges so no references to
-    * removed nodes remain. Nodes without a recorded modification time are
-    * always kept.
-    */
-  def pruneExpired(items: Vector[Item], cutoff: Instant): Vector[Item] = {
-    def earliestModified(item: Item): Option[Instant] = item.body match {
-      case Some(m: ItemMetaData) =>
-        m.extra
-          .get(Item.FileModifiedKey)
-          .flatMap { values =>
-            values.iterator
-              .collect { case StringOf(s) => s }
-              .flatMap(s => Try(Instant.ofEpochMilli(s.toLong)).toOption)
-              .minByOption(_.toEpochMilli())
-          }
-      case _ => None
-    }
-
-    val pastCutoff: Set[String] =
-      items.iterator
-        .filter(i => earliestModified(i).exists(_.isAfter(cutoff)))
-        .map(_.identifier)
-        .toSet
-
-    if (pastCutoff.isEmpty) items
-    else {
-      val byId = items.iterator.map(i => i.identifier -> i).toMap
-      val removed = scala.collection.mutable.Set.from(pastCutoff)
-      val queue = scala.collection.mutable.Queue.from(pastCutoff)
-      while (queue.nonEmpty) {
-        byId.get(queue.dequeue()).foreach { item =>
-          item.connections.foreach { case (edgeType, target) =>
-            // A removed node's dependents: its containers, artifacts built from it, its aliases.
-            val dependent =
-              EdgeType.isContainedByUp(edgeType) || EdgeType
-                .isBuildsTo(edgeType) ||
-                EdgeType.isAliasFrom(edgeType) || EdgeType.isAliasTo(edgeType)
-            if (dependent && removed.add(target)) queue.enqueue(target)
-          }
-        }
-      }
-
-      val survivors = items.filterNot(i => removed.contains(i.identifier))
-      val cleaned = survivors.map { i =>
-        val kept =
-          i.connections.filterNot { case (_, target) =>
-            removed.contains(target)
-          }
-        if (kept.size == i.connections.size) i
-        else i.copy(connections = kept)
-      }
-      logger.info(
-        f"Cutoff ${cutoff}: removed ${removed.size}%,d nodes (${pastCutoff.size}%,d modified after cutoff, ${removed.size - pastCutoff.size}%,d dependents)"
-      )
-      cleaned
-    }
-  }
-
   def writeGoatRodeoFiles(
-      store: ListFileNames & Storage,
-      cutoff: Option[Instant] = None
+      store: ListFileNames & Storage
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
@@ -678,10 +697,7 @@ object Builder {
           f"Post-sort at ${Duration.between(start, Instant.now())}"
         )
 
-        val finalItems = cutoff match {
-          case Some(cutoff) => pruneExpired(sorted, cutoff)
-          case None         => sorted
-        }
+        val finalItems = sorted
 
         finalItems.par.foreach(_.cachedCBOR)
 

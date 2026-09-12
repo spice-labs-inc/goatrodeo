@@ -3,6 +3,9 @@ package io.spicelabs.goatrodeo.omnibor
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
+import io.bullet.borer.Dom.Element
+import io.bullet.borer.Dom.MapElem
+import io.bullet.borer.Dom.StringElem
 import io.bullet.borer.Encoder
 import io.bullet.borer.Reader
 import io.bullet.borer.Writer
@@ -12,6 +15,7 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.GitOIDUtils
 import io.spicelabs.goatrodeo.util.Helpers
 
+import java.util.Date
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.*
@@ -346,12 +350,6 @@ case class Item(
 object Item {
   protected val logger: Logger = Logger(getClass())
 
-  /** `ItemMetaData.extra` key under which an internal file's modification time
-    * (epoch milliseconds) is recorded. Populated only when an cutoff cutoff is
-    * configured, and consumed by the cutoff filter in the graph writer.
-    */
-  val FileModifiedKey = "file_modified_epoch_millis"
-
   /** Given an ArtifactWrapper, create an `Item` based on the hashes/gitoids for
     * the artifact
     *
@@ -365,21 +363,10 @@ object Item {
     */
   def itemFrom(
       artifact: ArtifactWrapper,
-      container: Option[GitOID],
-      recordModified: Boolean = false
+      container: Option[GitOID]
   ): Item = {
     val (id, hashes) = GitOIDUtils.computeAllHashes(artifact)
-    val extra: TreeMap[String, TreeSet[StringOrPair]] =
-      if (recordModified) artifact.lastModified match {
-        case Some(t) =>
-          TreeMap(
-            Item.FileModifiedKey -> TreeSet[StringOrPair](
-              StringOf(t.toEpochMilli().toString)
-            )
-          )
-        case None => TreeMap.empty
-      }
-      else TreeMap.empty
+    val extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap.empty
     Item(
       id,
       // Item.noopLocationReference,
@@ -487,35 +474,20 @@ object Item {
     import io.bullet.borer.Dom
     def read(r: Reader): Item = {
       val unbounded = r.readMapOpen(4)
-      // Read "body" key
-      val bodyKey = r.readString()
-      if (bodyKey != "body")
-        throw new IllegalArgumentException(
-          s"Expected 'body' key, got '$bodyKey'"
-        )
+      // The four keys are read and discarded positionally, matching the
+      // encoder's write order. borer's own type checks reject malformed
+      // values; structured key-name validation happens in [[decode]] before
+      // this decoder is used, so a hostile map is a Failure, never a thrown
+      // exception.
+      r.readString() // "body"
       val bodyOpt: Option[Dom.Element] = if (r.hasNull) { r.readNull(); None }
       else Some(r.read[Dom.Element]())
-      // Read body_mime_type
-      val bmtKey = r.readString()
-      if (bmtKey != "body_mime_type")
-        throw new IllegalArgumentException(
-          s"Expected 'body_mime_type', got '$bmtKey'"
-        )
+      r.readString() // "body_mime_type"
       val bodyMimeType: Option[String] = if (r.hasNull) { r.readNull(); None }
       else Some(r.readString())
-      // Read connections
-      val connKey = r.readString()
-      if (connKey != "connections")
-        throw new IllegalArgumentException(
-          s"Expected 'connections', got '$connKey'"
-        )
+      r.readString() // "connections"
       val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
-      // Read identifier
-      val idKey = r.readString()
-      if (idKey != "identifier")
-        throw new IllegalArgumentException(
-          s"Expected 'identifier', got '$idKey'"
-        )
+      r.readString() // "identifier"
       val identifier = r.readString()
 
       Item(
@@ -536,14 +508,50 @@ object Item {
 
   /** Decode an Item from CBOR bytes.
     *
+    * The bytes are decoded to a Dom once so the map can be validated by key
+    * name and order; a hostile or corrupt map is a Failure value, never a
+    * thrown exception. The item is then decoded positionally from the original
+    * bytes rather than from the Dom, because re-encoding large Dom values
+    * exceeds borer's internal ElementDeque limit (a single item can carry tens
+    * of thousands of connection edges).
+    *
     * @param bytes
     *   the CBOR-encoded bytes
     * @return
     *   a Try containing the decoded Item or an error
     */
   def decode(bytes: Array[Byte]): Try[Item] = {
-    Cbor.decode(bytes).to[Item].valueTry
+    val expectedKeys = Vector(
+      StringElem("body"),
+      StringElem("body_mime_type"),
+      StringElem("connections"),
+      StringElem("identifier")
+    )
+    Try(Cbor.decode(bytes).to[Element].value).flatMap { el =>
+      mapKeys(el) match {
+        case Some(keys) if keys == expectedKeys =>
+          Try(Cbor.decode(bytes).to[Item].value)
+        case _ =>
+          val seen =
+            mapKeys(el).map(_.take(8)).getOrElse(Vector("not a CBOR map"))
+          Failure(
+            new Exception(
+              s"Expected Item map with keys body, body_mime_type, connections, identifier in encoder order, got $seen"
+            )
+          )
+      }
+    }
   }
+
+  /** The ordered keys of a Dom map, or None when the element is not a map. */
+  private def mapKeys(
+      el: Element
+  ): Option[Vector[Element]] =
+    el match {
+      case m: MapElem =>
+        Some(m.members.map(_._1).toVector)
+      case _ => None
+    }
 
 }
 
@@ -554,7 +562,7 @@ object Item {
   * @param extra
   *   optional additional JSON/CBOR data to include with the tag
   */
-case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])
+case class TagInfo(name: String, extra: Option[Element])
 
 /** Information for per-package tagging.
   *
@@ -568,7 +576,7 @@ case class TagInfo(name: String, extra: Option[io.bullet.borer.Dom.Element])
 case class PackageTagInfo(
     name: String,
     version: Option[String],
-    date: Option[java.util.Date]
+    date: Option[Date]
 )
 
 object PackageTagInfo {
@@ -588,7 +596,7 @@ object PackageTagInfo {
   def toJson(info: PackageTagInfo): String = {
     val dateStr = info.date
       .map(formatDateISO8601)
-      .getOrElse(formatDateISO8601(new java.util.Date()))
+      .getOrElse(formatDateISO8601(new Date()))
 
     val json = info.version match {
       case Some(ver) =>
@@ -605,9 +613,9 @@ object PackageTagInfo {
 
   /** Format a Date as ISO 8601 string (public version).
     */
-  def toIso8601(date: java.util.Date): String = formatDateISO8601(date)
+  def toIso8601(date: Date): String = formatDateISO8601(date)
 
-  private def formatDateISO8601(date: java.util.Date): String = {
+  private def formatDateISO8601(date: Date): String = {
     val tz = TimeZone.getTimeZone("UTC")
     val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
     df.setTimeZone(tz)

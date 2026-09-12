@@ -13,19 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.FunSuite
-import munit.ScalaCheckSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
-/** Phase 2 — Unit tests for `JavaSecurityDetector`.
+/** Unit tests for `JavaSecurityDetector`.
   *
   * These tests verify that the MIME augmenter detects Java security properties
   * files by their content, ignores non-security text and binary data, and is
   * purely additive.
   */
-class JavaSecurityDetectorSuite extends FunSuite with ScalaCheckSuite {
+class JavaSecurityDetectorSuite extends GoatRodeoScalaCheckSuite {
 
   private val expectedMime = JavaSecurityDetector.JavaSecurityMimeType
 

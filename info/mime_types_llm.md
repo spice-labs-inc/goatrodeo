@@ -21,6 +21,25 @@ At present there are two post-processing operations that refine MIME types:
 | `text/plain` | `application/json` (when content is valid JSON) |
 | `application/x-msdownload; format=pe32` | `application/x-msdownload; format=pe32-dotnet` (for .NET assemblies) |
 
+### Producer-stamped MIME hints (spec §5)
+
+- **Producers may stamp an authoritative MIME hint** on an artifact
+  wrapper (`ArtifactWrapper.newWrapper(..., mimeHint = Some(...))`). The
+  hint is unioned into the wrapper's effective MIME set and is
+  authoritative — never re-checked against content.
+- **No hint is ever produced by content sniffing.** Detection only adds
+  MIMEs from the signatures below; it never fabricates kind MIMEs such as
+  `application/pkcs7-signature`.
+- Content sniffing of a DER PKCS#7 SignedData yields
+  `application/pkcs7-mime` (below); the authoritative
+  `application/pkcs7-signature` MIME is stamped by the producer (e.g. the
+  .NET walker's Authenticode cert children) and is what the Certificates
+  strategy claims (see the certificates strategy doc).
+
+Verified by `MimeHintSuite.T5.1–T5.8` (hint default/union/spill/
+never-sniffed/authoritative/monotonic property) and
+`CertificatesPkcs7Suite.T6.x` (claim semantics).
+
 ## CryptoDetector augmentation (Certificates strategy)
 
 Where Tika falls short for cryptographic file types — most crypto
@@ -41,6 +60,31 @@ downstream filtering chooses what to act on.
 [`CertificatesStubTests::[INVARIANT] CryptoDetector.mimeTypeAugmenter never strips MIME types beginning with text/`](../src/test/scala/strategies/CertificatesStubTests.scala)
 +
 [`...is always a superset of input (additive)`](../src/test/scala/strategies/CertificatesStubTests.scala).
+
+### Per-augmenter applicability rules
+
+Every registered augmenter carries its own block-shaped MIME rule
+(`addMimeTypeAugmenter(rule)(fn)` in `ArtifactWrapper`; `noneOf` helper), so a
+new augmenter is added without touching any global skip logic. Rules only
+block MIMEs that provably cannot match — unknown or degenerate MIMEs (inner
+package fragments, future ecosystems) are always probed, so a wrong rule can
+only cost performance, never a false negative.
+
+| Augmenter | Blocked MIMEs |
+|-----------|---------------|
+| `CryptoDetector` | `application/java-vm` |
+| `CryptoContentDetector` | `application/java-vm` |
+| `OpenSSLConfigDetector` | media (`image/`·`audio/`·`video/`), class mimes, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` |
+| `JavaSecurityDetector` | same as OpenSSLConfigDetector |
+| `JavaArchiveDetector` | `text/*`, `application/xml`, `application/java-vm` |
+| `DotnetDetector` | `text/*`, `application/xml`, `application/java-vm` |
+| `SaffronDetector` | `application/java-vm` only (text families stay probed: Tika mislabels `.vhd` as `text/x-vhdl` and Saffron exists to re-check those) |
+| `CarvedCertAugmenter` | `text/*`, `application/xml`, `application/json`, `application/java-vm` (probes binaries/unknown fragments for carved DER X.509 certs) |
+
+Verified by `MimeAugmenterRuleSuite` (R-1 rule table, R-2 class files
+augment nothing, R-3 XML keeps crypto detection while skipping
+binary/text-config augmenters, R-4 degenerate fragments stay probed, R-5
+binary PEM carriers still detected).
 
 ### Detection signature inventory
 

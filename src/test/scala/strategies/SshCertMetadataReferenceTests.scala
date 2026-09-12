@@ -13,9 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
 
@@ -42,7 +41,7 @@ import java.io.File
   * If the fixture bytes ever change, the expected values must be regenerated
   * from `ssh-keygen -L -f <fixture>` and committed alongside the fixture.
   */
-class SshCertMetadataReferenceTests extends FunSuite {
+class SshCertMetadataReferenceTests extends GoatRodeoFunSuite {
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)
@@ -58,7 +57,7 @@ class SshCertMetadataReferenceTests extends FunSuite {
     }.toMap
   }
 
-  test("user-cert-ed25519: full metadata table matches ssh-keygen -L (G6)") {
+  test("user-cert-ed25519: full metadata table matches ssh-keygen -L") {
     val w = wrap("test_data/certificates/ssh/synthetic/user-cert-ed25519.pub")
     val cert = Certificates.parseSshCert(w).get
     val m = md(cert, w)
@@ -124,7 +123,7 @@ class SshCertMetadataReferenceTests extends FunSuite {
     )
   }
 
-  test("host-cert-rsa-signed-by-ed25519: cross-algorithm fields (G6)") {
+  test("host-cert-rsa-signed-by-ed25519: cross-algorithm fields") {
     val w = wrap(
       "test_data/certificates/ssh/synthetic/host-cert-rsa-signed-by-ed25519.pub"
     )

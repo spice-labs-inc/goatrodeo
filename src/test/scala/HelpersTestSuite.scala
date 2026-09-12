@@ -1,18 +1,6 @@
-/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -27,13 +15,35 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class HelpersTestSuite extends munit.FunSuite {
+class HelpersTestSuite extends GoatRodeoFunSuite {
+
+  test("Helpers - readCBOR short read returns Failure, never throws") {
+    // A channel with fewer bytes than the declared length is a corrupt or
+    // truncated record. readCBOR must surface that as a Failure value, not a
+    // thrown exception (a throw inside the reader would escape the walk).
+    val temp = Files.createTempFile("readcbor-short", ".bin").toFile()
+    try {
+      Files.write(temp.toPath(), Array[Byte](1, 2))
+      val channel = new FileInputStream(temp).getChannel()
+      try {
+        val result = Helpers.readCBOR[Item](
+          channel,
+          8
+        )
+        assert(
+          result.isFailure,
+          "a short read must be a Failure, not a thrown exception"
+        )
+      } finally channel.close()
+    } finally temp.delete()
+  }
 
   // ==================== Hash Functions Tests ====================
 

@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -25,9 +26,7 @@ import scala.jdk.CollectionConverters.*
   * is synthetic — just over a thousand tiny text files, sized to clear the
   * production-cadence throttle of 1,000 items between emissions.
   */
-class ProgressListenerIntegrationTest extends munit.FunSuite {
-
-  override val munitTimeout = scala.concurrent.duration.Duration(2, "minutes")
+class ProgressListenerIntegrationTest extends GoatRodeoFunSuite {
 
   private class Recorder extends ProgressListener {
     private val events = new ConcurrentLinkedQueue[(Long, Long)]()
@@ -47,7 +46,9 @@ class ProgressListenerIntegrationTest extends munit.FunSuite {
     val payloadDir = Files.createTempDirectory("gr-progress-payload").toFile
     val outputDir = Files.createTempDirectory("gr-progress-output").toFile
     try {
-      // Just over the 1,000-item throttle so at least one event is guaranteed.
+      // Cadence is time-based now (30s wall or a single slow item), so a fast
+      // small run gets no mid-run ticks; the at-least-one-event guarantee
+      // comes from the batch-drain final report, pinned by the next test.
       writeTinyFiles(payloadDir, 1050)
 
       val recorder = new Recorder
@@ -75,6 +76,41 @@ class ProgressListenerIntegrationTest extends munit.FunSuite {
         assert(c >= 1L, s"current must be >= 1, got $c")
         assert(t >= c, s"total ($t) must be >= current ($c)")
       }
+    } finally {
+      deleteRecursively(payloadDir)
+      deleteRecursively(outputDir)
+    }
+  }
+
+  test("the batch-drain final report carries the final count") {
+    // When a run finishes before the 30-second cadence ever ticks, the only
+    // progress event is the one emitted as the single batch drains; it must
+    // name the run's final numbers (current == total), not a mid-run count.
+    // This is the deterministic, timing-free surface of the time-based
+    // cadence: hosts can rely on a terminal event with current == total to
+    // mean "the run's own processing is done".
+    val payloadDir = Files.createTempDirectory("gr-progress-final").toFile
+    val outputDir = Files.createTempDirectory("gr-progress-output").toFile
+    try {
+      writeTinyFiles(payloadDir, 1050)
+
+      val recorder = new Recorder
+      GoatRodeo
+        .builder()
+        .withPayload(payloadDir.getAbsolutePath)
+        .withOutput(outputDir.getAbsolutePath)
+        .withThreads(4)
+        .withProgressListener(recorder)
+        .run()
+
+      val events = recorder.recorded
+      assert(
+        events.nonEmpty,
+        "expected at least one progress event for a 1050-file payload"
+      )
+      val (lastCurrent, lastTotal) = events.last
+      assertEquals(lastCurrent, 1050L, "final event must report the full count")
+      assertEquals(lastTotal, 1050L, "final event must report the full total")
     } finally {
       deleteRecursively(payloadDir)
       deleteRecursively(outputDir)

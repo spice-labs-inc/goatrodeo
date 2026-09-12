@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Arrays
+import scala.collection.mutable.HashSet
 import scala.util.Try
 
 /** MIME augmentation and carving for DER X.509 certificates embedded at
@@ -192,7 +193,7 @@ object CarvedCertAugmenter {
       maxCerts: Int
   ): (Vector[X509Certificate], Boolean) = {
     val limit = math.min(bytes.length - 2, maxBytes)
-    val seen = scala.collection.mutable.HashSet[String]()
+    val seen = HashSet[String]()
     val out = Vector.newBuilder[X509Certificate]
     var capExceeded = false
     var count = 0

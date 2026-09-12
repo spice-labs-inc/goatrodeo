@@ -9,6 +9,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.JsonDSL
 import org.json4s.JsonDSL.*
+import org.json4s.native.JsonMethods
 
 import java.io.File
 import java.io.FileOutputStream
@@ -22,7 +23,10 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import scala.collection.immutable.TreeMap
 import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 /** Manages persistence and retrieval of Artifact Dependency Graph (ADG) data.
   *
@@ -271,13 +275,13 @@ object GraphManager {
     // travels as JSON text rather than as a nested object. Rendered with json4s
     // -- which this file already uses below -- rather than concatenated, so that
     // quoting and escaping are the library's problem and not this function's.
-    val sha256Json = org.json4s.native.JsonMethods.compact(
-      org.json4s.native.JsonMethods.render(
+    val sha256Json = JsonMethods.compact(
+      JsonMethods.render(
         ("grd" -> fileSet.map(_.dataFileSha256).toVector) ~
           ("gri" -> fileSet.map(_.indexFileSha256).toVector)
       )
     )
-    val info = scala.collection.immutable.TreeMap[String, String](
+    val info = TreeMap[String, String](
       "correlation_id" -> TamperEvidentLog.correlationId,
       "sha256" -> sha256Json
     ) ++ TamperEvidentLog.currentChainHead.map("log_chain_head" -> _)
@@ -362,18 +366,19 @@ class GRDWalker(source: FileChannel) {
     * @return
     *   a Try containing the envelope on success, or an error on failure
     */
-  def open(): DataFileEnvelope = {
+  def open(): Try[DataFileEnvelope] = {
     val magic_? = Helpers.readInt(source)
     if (magic_? != GraphManager.Consts.DataFileMagicNumber) {
-      throw new Exception(f"Found incorrect magic number ${magic_?}")
+      Failure(new Exception(f"Found incorrect magic number ${magic_?}"))
     } else {
       val len = Helpers.readShort(source)
       val ba = ByteBuffer.allocate(len)
-      val readLen = source.read(ba)
-      if (len != readLen) {
-        throw new Exception(f"Wanted ${len} bytes got ${readLen}")
-      } else {
-        DataFileEnvelope.decode(ba.position(0).array())
+      Try(source.read(ba)).flatMap { readLen =>
+        if (len != readLen) {
+          Failure(new Exception(f"Wanted ${len} bytes got ${readLen}"))
+        } else {
+          Try(DataFileEnvelope.decode(ba.position(0).array()))
+        }
       }
     }
   }
@@ -388,20 +393,28 @@ class GRDWalker(source: FileChannel) {
       None
     } else {
       val entryLen = Helpers.readInt(source)
-      if (entryLen == -1) {
+      if (entryLen < 0) {
         None
       } else {
-        val entryByteBuffer = ByteBuffer.allocate(entryLen)
-        source.read(entryByteBuffer)
+        val remaining = source.size() - source.position()
+        if (entryLen.toLong > remaining) {
+          // a positive length that exceeds the remaining bytes is
+          // end-of-data (a corrupt/foreign tail) — never allocate at the
+          // declared size
+          None
+        } else {
+          val entryByteBuffer = ByteBuffer.allocate(entryLen)
+          source.read(entryByteBuffer)
 
-        val entryBytes = entryByteBuffer.array()
-        Item.decode(entryBytes) match {
-          case scala.util.Success(entry) => Some(entry)
-          case scala.util.Failure(err) =>
-            logger.warn(
-              s"Corrupt CBOR entry at position ${source.position()}: ${err.getMessage}"
-            )
-            None
+          val entryBytes = entryByteBuffer.array()
+          Item.decode(entryBytes) match {
+            case Success(entry) => Some(entry)
+            case Failure(err) =>
+              logger.warn(
+                s"Corrupt CBOR entry at position ${source.position()}: ${err.getMessage}"
+              )
+              None
+          }
         }
       }
     }

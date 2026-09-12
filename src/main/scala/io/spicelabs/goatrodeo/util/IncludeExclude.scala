@@ -36,6 +36,24 @@ import scala.util.matching.Regex
   *   the predicates for items to exclude
   */
 class IncludeExclude(include: RegexPredicate, exclude: RegexPredicate) {
+
+  /** A readable summary of the predicates for logs and the run-start
+    * configuration echo. The empty filter "includes everything" and reads that
+    * way in logs rather than as an object identity.
+    */
+  override def toString: String = {
+    def pred(name: String, p: RegexPredicate): String = {
+      val parts = p.exact.toVector.sorted ++ p.regexes.map(_.regex)
+      if (parts.isEmpty) "" else f"${name}=[${parts.mkString(", ")}]"
+    }
+    val parts =
+      Vector(pred("include", include), pred("exclude", exclude)).filter(
+        _.nonEmpty
+      )
+    if (parts.isEmpty) "IncludeExclude(no filters)"
+    else parts.mkString("IncludeExclude(", ", ", ")")
+  }
+
   def this(
       incExact: Set[String],
       incRegex: Vector[Regex],

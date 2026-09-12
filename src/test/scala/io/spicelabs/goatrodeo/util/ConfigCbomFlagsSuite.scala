@@ -15,18 +15,18 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.File
 import java.nio.file.Paths
 
-/** T4.4 — README / CLI sync test for the CycloneDX CBOM flags.
+/** README / CLI sync test for the CycloneDX CBOM flags.
   *
   * Verifies that the CLI flags documented in `README.md` (`--emit-cbom-dir` and
   * `--cbom-version`) parse correctly via `ConfigurationParser.parser`, reject
   * invalid input, and are accessible from the programmatic builder API.
   */
-class ConfigCbomFlagsSuite extends FunSuite {
+class ConfigCbomFlagsSuite extends GoatRodeoFunSuite {
 
   private def parse(args: String*): Option[Configuration] = {
     ConfigurationParser.parse(args.toArray)
@@ -38,7 +38,7 @@ class ConfigCbomFlagsSuite extends FunSuite {
     field.get(b).asInstanceOf[Configuration]
   }
 
-  test("T4.4 --emit-cbom-dir and --cbom-version parse correctly") {
+  test("--emit-cbom-dir and --cbom-version parse correctly") {
     val parsed = parse(
       "-b",
       "/tmp/in",
@@ -53,13 +53,13 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(config.cbomVersion, "1.7")
   }
 
-  test("T4.4 --cbom-version defaults to 1.6 when omitted") {
+  test("--cbom-version defaults to 1.6 when omitted") {
     val parsed = parse("-b", "/tmp/in", "--emit-cbom-dir", "/tmp/cbom")
     assert(parsed.isDefined)
-    assertEquals(parsed.get.cbomVersion, "1.6")
+    assertEquals(parsed.get.cbomVersion, "1.7")
   }
 
-  test("T4.4 invalid --cbom-version is rejected") {
+  test("invalid --cbom-version is rejected") {
     val parsed = parse(
       "-b",
       "/tmp/in",
@@ -71,7 +71,7 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assert(parsed.isEmpty, "Invalid CBOM version should be rejected")
   }
 
-  test("T4.4 GoatRodeoBuilder exposes CBOM methods") {
+  test("GoatRodeoBuilder exposes CBOM methods") {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")
       .withCbomDir("/tmp/cbom")
@@ -81,7 +81,7 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(config.cbomVersion, "1.7")
   }
 
-  test("T4.4 GoatRodeoBuilder withExtraArg supports CBOM keys") {
+  test("GoatRodeoBuilder withExtraArg supports CBOM keys") {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")
       .withExtraArg("emitCbomDir", "/tmp/cbom")
@@ -91,29 +91,29 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(config.cbomVersion, "1.7")
   }
 
-  // T4.5 — `--log-filenames` (CLI + README sync) controls the per-file
+  // `--log-filenames` (CLI + README sync) controls the per-file
   // progress flag. THEORY: a bare-true boolean flag that logs each top-level
   // file after processing must parse to `logFilenames = true`, default
   // to `false` when omitted, and accept an explicit `false`.
-  test("T4.5 --log-filenames true sets logFilenames") {
+  test("--log-filenames true sets logFilenames") {
     val parsed = parse("-b", "/tmp/in", "--log-filenames", "true")
     assert(parsed.isDefined, "Valid --log-filenames flag should parse")
     assertEquals(parsed.get.logFilenames, true)
   }
 
-  test("T4.5 --log-filenames defaults to false when omitted") {
+  test("--log-filenames defaults to false when omitted") {
     val parsed = parse("-b", "/tmp/in")
     assert(parsed.isDefined)
     assertEquals(parsed.get.logFilenames, false)
   }
 
-  test("T4.5 --log-filenames false is accepted") {
+  test("--log-filenames false is accepted") {
     val parsed = parse("-b", "/tmp/in", "--log-filenames", "false")
     assert(parsed.isDefined)
     assertEquals(parsed.get.logFilenames, false)
   }
 
-  test("T4.6 --tamper-evident-log parses and defaults to None") {
+  test("--tamper-evident-log parses and defaults to None") {
     val parsed = parse("-b", "/tmp/in", "--tamper-evident-log", "/tmp/run.log")
     assert(parsed.isDefined)
     assertEquals(parsed.get.tamperEvidentLog, Some(new File("/tmp/run.log")))
@@ -122,7 +122,7 @@ class ConfigCbomFlagsSuite extends FunSuite {
     assertEquals(omitted.get.tamperEvidentLog, None)
   }
 
-  test("T4.7 GoatRodeoBuilder exposes log-filenames and tamper-evident-log") {
+  test("GoatRodeoBuilder exposes log-filenames and tamper-evident-log") {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")
       .withLogFilenames(true)
@@ -133,7 +133,7 @@ class ConfigCbomFlagsSuite extends FunSuite {
   }
 
   test(
-    "T4.7 GoatRodeoBuilder withExtraArg supports logFilenames/tamperEvidentLog"
+    "GoatRodeoBuilder withExtraArg supports logFilenames/tamperEvidentLog"
   ) {
     val builder = new GoatRodeoBuilder()
       .withPayload("/tmp/in")

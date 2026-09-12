@@ -13,11 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.File
+import java.nio.file.Files
 
 /** Strategy-level SSH parser tests that cross-check fingerprints computed by
   * `Certificates.sshFingerprintB64` against the canonical `ssh-keygen -lf`
@@ -33,13 +33,12 @@ import java.io.File
   *
   * ## Why these tests matter
   *
-  * The Phase-5 acceptance criterion is "All SSH fixtures pass sidecar
-  * assertions". Sidecars were materialized from the strategy's own output
-  * (tautological by design — same as Phase 4). These tests provide an
-  * independent ground-truth anchor by comparing against `ssh-keygen` (Phase-0
-  * corpus generator) output that's been hand- verified.
+  * Sidecars were materialized from the strategy's own output (tautological by
+  * design). These tests provide an independent ground-truth anchor by comparing
+  * against `ssh-keygen` (the corpus generator) output that's been
+  * hand-verified.
   */
-class SshStrategyParserTests extends FunSuite {
+class SshStrategyParserTests extends GoatRodeoFunSuite {
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)
@@ -103,14 +102,14 @@ class SshStrategyParserTests extends FunSuite {
   // 0xFFFFFFFFFFFFFFFFL to mean "never expires" and 0L to mean "valid
   // always from the past". Both must render as their literal sentinel,
   // not as wrapped epoch dates (1970-01-01 / 1969-12-31).
-  test("sshCertTimeLabel: 0xFFFFFFFFFFFFFFFF emits 'forever' (G1)") {
+  test("sshCertTimeLabel: 0xFFFFFFFFFFFFFFFF emits 'forever'") {
     assertEquals(
       Certificates.sshCertTimeLabel(-1L, "forever"),
       "forever"
     )
   }
 
-  test("sshCertTimeLabel: 0L emits 'always' (G1)") {
+  test("sshCertTimeLabel: 0L emits 'always'") {
     assertEquals(
       Certificates.sshCertTimeLabel(0L, "always"),
       "always"
@@ -128,10 +127,10 @@ class SshStrategyParserTests extends FunSuite {
   // exercising the parser's None-on-bad-input contract. Required because
   // all 34 corpus fixtures parse successfully — an inadvertently-permissive
   // parser would pass every per-fixture test.
-  test("parseSshPubkey: garbage input returns None (G11)") {
-    val tmp = java.io.File.createTempFile("garbage", ".pub")
+  test("parseSshPubkey: garbage input returns None") {
+    val tmp = File.createTempFile("garbage", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       "not-an-algo AAAA comment\n".getBytes("UTF-8")
     )
@@ -139,22 +138,22 @@ class SshStrategyParserTests extends FunSuite {
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  test("parseSshPubkey: empty file returns None (G11)") {
-    val tmp = java.io.File.createTempFile("empty", ".pub")
+  test("parseSshPubkey: empty file returns None") {
+    val tmp = File.createTempFile("empty", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(tmp.toPath, "".getBytes("UTF-8"))
+    Files.write(tmp.toPath, "".getBytes("UTF-8"))
     val w = FileWrapper(tmp, tmp.getName, None)
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  test("parseSshPubkey: alg/wire mismatch returns None (G11)") {
+  test("parseSshPubkey: alg/wire mismatch returns None") {
     // Wire blob says "ssh-ed25519" but file's first token claims "ssh-rsa"
     // → `innerAlg == alg` sanity check rejects it.
     val ed25519WireB64 =
       "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
-    val tmp = java.io.File.createTempFile("mismatch", ".pub")
+    val tmp = File.createTempFile("mismatch", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       s"ssh-rsa $ed25519WireB64 fake-comment\n".getBytes("UTF-8")
     )
@@ -167,12 +166,12 @@ class SshStrategyParserTests extends FunSuite {
   // out-of-scope; they silently return None. This test pins that
   // contract so future refactors don't accidentally start claiming
   // option-prefixed lines (which could produce wrong fingerprints).
-  test("parseSshPubkey: authorized_keys option-prefix line returns None (G7)") {
-    val tmp = java.io.File.createTempFile("auth-keys", ".pub")
+  test("parseSshPubkey: authorized_keys option-prefix line returns None") {
+    val tmp = File.createTempFile("auth-keys", ".pub")
     tmp.deleteOnExit()
     val ed25519B64 =
       "AAAAC3NzaC1lZDI1NTE5AAAAIC7ScYYTQq7gc3vqK4JyYx+7tHymW8rlqydjgU3etW+o"
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       s"from=\"1.2.3.4\",no-pty ssh-ed25519 $ed25519B64 user@host\n".getBytes(
         "UTF-8"
@@ -182,10 +181,10 @@ class SshStrategyParserTests extends FunSuite {
     assertEquals(Certificates.parseSshPubkey(w), None)
   }
 
-  test("parseSshCert: garbage input returns None (G11)") {
-    val tmp = java.io.File.createTempFile("garbage", ".pub")
+  test("parseSshCert: garbage input returns None") {
+    val tmp = File.createTempFile("garbage", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       "not-an-algo-cert-v01@openssh.com AAAA\n".getBytes("UTF-8")
     )

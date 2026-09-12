@@ -1,0 +1,38 @@
+{
+  "description": "Detached PKCS#7 SignedData (certificates only) — the Authenticode certificate-blob shape",
+  "source": "openssl req -x509 ... ; openssl crl2pkcs7 -nocrl -certfile t.pem ; openssl pkcs7 -outform DER",
+  "retrievedAt": "2026-09-02",
+  "itemCount": 1,
+  "mimeTypes": {
+    "mustContain": [
+      "application/pkcs7-signature",
+      "application/pkix-cert"
+    ]
+  },
+  "purls": {
+    "mustContain": [
+      "pkg:generic/x509/cert-sha256@54bfba2b597e1760c0ce3e9e47d0498b032bc7a55a8f00d9c7777ff74e37bd10?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=2048&version=3",
+      "pkg:generic/x509/spki-sha256@d836000994ecd4a0a2aa2c386df681ff90350aed7a201f34bbf61fc160e2a9e7?alg=rsa&size=2048&version=3"
+    ]
+  },
+  "metadata": {
+    "mustContain": {
+      "Name": "detached.p7b",
+      "Certificates:KeystoreType": "pem-bundle",
+      "Certificates:EntryCount": "1",
+      "Certificates:CertCount": "1",
+      "Certificates:Cert:0:SubjectDN": "O=Spice Labs,CN=GoatRodeo Test Root",
+      "Certificates:Cert:0:IssuerDN": "O=Spice Labs,CN=GoatRodeo Test Root",
+      "Certificates:Cert:0:SelfSigned": "true",
+      "Certificates:Cert:0:IsCA": "true",
+      "Certificates:Cert:0:KeyAlgorithm": "rsa",
+      "Certificates:Cert:0:KeySize": "2048"
+    }
+  },
+  "forbiddenMetadataKeys": [
+    "Certificates:PrivateKey"
+  ],
+  "forbiddenMetadataPatterns": [
+    ".*PRIVATE KEY.*"
+  ]
+}

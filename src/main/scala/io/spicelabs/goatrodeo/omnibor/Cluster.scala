@@ -37,7 +37,7 @@ object IndexFile {
         )
       }
 
-      val indexEnv: IndexFileEnvelope = Helpers.readLenAndCBOR(ipf)
+      val indexEnv: IndexFileEnvelope = Helpers.readLenAndCBOR(ipf).get
       val indexPos = ipf.position()
       IndexFile(indexEnv, file, indexPos)
     }
@@ -54,7 +54,7 @@ case class DataFile(
     this.synchronized {
       file.position(pos)
       val itemLen = Helpers.readInt(file)
-      val item: Item = Helpers.readCBOR[Item](file, itemLen)
+      val item: Item = Helpers.readCBOR[Item](file, itemLen).get
 
       item
     }
@@ -79,7 +79,7 @@ object DataFile {
         )
       }
 
-      val dataEnv: DataFileEnvelope = Helpers.readLenAndCBOR(ipf)
+      val dataEnv: DataFileEnvelope = Helpers.readLenAndCBOR(ipf).get
       val indexPos = ipf.position()
       DataFile(dataEnv, FileInputStream(file).getChannel(), indexPos)
     }
@@ -125,7 +125,7 @@ object GoatRodeoCluster {
         )
       }
 
-      val env: ClusterFileEnvelope = Helpers.readLenAndCBOR(dfp)
+      val env: ClusterFileEnvelope = Helpers.readLenAndCBOR(dfp).get
 
       if (env.magic != GraphManager.Consts.ClusterFileMagicNumber) {
         throw Exception(

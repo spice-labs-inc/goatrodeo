@@ -2,26 +2,27 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.Arrays
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
-/** ScalaCheck properties over the Phase-7 corpus.
+/** ScalaCheck properties over the private-key corpus.
   *
   * ## What these tests test
   *
-  * Phase 7's hard rules apply uniformly across every private-key fixture. These
+  * The hard rules apply uniformly across every private-key fixture. These
   * properties pin those uniform invariants so a new fixture added later is
   * automatically covered:
   *
@@ -47,7 +48,7 @@ import scala.collection.immutable.TreeSet
   * or a log message about encryption status beyond what's in the metadata."
   * These properties pin the uniform parts of that contract.
   */
-class PrivateKeyPropertyTests extends ScalaCheckSuite {
+class PrivateKeyPropertyTests extends GoatRodeoScalaCheckSuite {
 
   private val pkFixtures: Seq[File] = {
     val root = Paths.get("test_data/certificates/private-keys")
@@ -103,14 +104,14 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
           ax.keySize == bx.keySize &&
           ax.curve == bx.curve &&
           ax.params == bx.params &&
-          java.util.Arrays.equals(ax.spkiBytes, bx.spkiBytes)
+          Arrays.equals(ax.spkiBytes, bx.spkiBytes)
         case (
               Some(ax: Certificates.PrivateKeyPlaintextOpenSsh),
               Some(bx: Certificates.PrivateKeyPlaintextOpenSsh)
             ) =>
           ax.algName == bx.algName &&
           ax.rsaModulusBits == bx.rsaModulusBits &&
-          java.util.Arrays.equals(ax.wireBytes, bx.wireBytes)
+          Arrays.equals(ax.wireBytes, bx.wireBytes)
         case (
               Some(ax: Certificates.PrivateKeyPlaintextPgp),
               Some(bx: Certificates.PrivateKeyPlaintextPgp)
@@ -134,7 +135,7 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
   }
 
   property(
-    "[PROP] encrypted private keys produce zero pURLs (Phase 7 hard rule)"
+    "[PROP] encrypted private keys produce zero pURLs (hard rule)"
   ) {
     forAll(genFixture) { f =>
       Certificates.classifyAndParse(wrap(f)) match {
@@ -178,11 +179,10 @@ class PrivateKeyPropertyTests extends ScalaCheckSuite {
           val state = new CertificatesState(wrap(f), Some(claim))
           // getMetadata runs assertNoLeak internally. If it raises,
           // the property fails.
-          scala.util
-            .Try {
-              val _ = state.getMetadata(wrap(f), stubItem(), SingleMarker())
-              true
-            }
+          Try {
+            val _ = state.getMetadata(wrap(f), stubItem(), SingleMarker())
+            true
+          }
             .getOrElse(false)
       }
     }

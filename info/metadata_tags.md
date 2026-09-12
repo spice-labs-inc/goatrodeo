@@ -79,15 +79,15 @@ Standard tags are defined in MetadataKeyConstants
 | CanonicalPurl | CanonicalPurl | The canonical pURL for the artifact, resolved via field-level merge of pom.properties, pom.xml, MANIFEST.MF, and filename | String, pURL format `pkg:maven/groupId/artifactId@version` |
 
 **Verified by:**
-- `MavenPhase2Suite` — `MavenState getMetadata includes POM name as NAME key`, `getMetadata includes POM description as DESCRIPTION key`, `getMetadata includes POM URL as URL key`, `getMetadata includes organization as PUBLISHER key`, `getMetadata includes SCM URL as adHoc key`.
-- `MavenPhase2Suite` — `Bundle-License from JAR manifest appears in metadata`.
-- `MavenPhase3Suite` — `MavenState - dependencies appear in metadata as JSON`, `MavenState - no Dependencies key when no deps`, `RuntimeDependencies excludes test and provided scope`, `All deps include scope in metadata JSON`, `MavenState - extracts Plugin-License-Name from MANIFEST`.
-- `MavenPhase5Suite` — `MavenState - extracts full OSGi headers including Export-Package`.
-- `MavenPhase5ModuleInfoSuite` — `MavenState - extracts module-info.class metadata via BCEL`.
-- `MavenPhase5CorpusSuite` — corpus integration tests for all 10 structural JAR types.
+- `MavenPomInterpolationSuite` — `MavenState getMetadata includes POM name as NAME key`, `getMetadata includes POM description as DESCRIPTION key`, `getMetadata includes POM URL as URL key`, `getMetadata includes organization as PUBLISHER key`, `getMetadata includes SCM URL as adHoc key`.
+- `MavenPomInterpolationSuite` — `Bundle-License from JAR manifest appears in metadata`.
+- `MavenDependencyLicenseSuite` — `MavenState - dependencies appear in metadata as JSON`, `MavenState - no Dependencies key when no deps`, `RuntimeDependencies excludes test and provided scope`, `All deps include scope in metadata JSON`, `MavenState - extracts Plugin-License-Name from MANIFEST`.
+- `MavenJarStructureSuite` — `MavenState - extracts full OSGi headers including Export-Package`.
+- `MavenModuleInfoSuite` — `MavenState - extracts module-info.class metadata via BCEL`.
+- `MavenJarStructureCorpusSuite` — corpus integration tests for all 10 structural JAR types.
 - `MavenPropertyTests` — `resolveGroupIdArtifactIdVersion: embeddedProps always wins when complete`, `resolveGroupIdArtifactIdVersion: falls through each layer deterministically`, `field-merge: monotonicity — per-field priority is respected across all sources`, `field-merge: filename artifactId beats manifest Implementation-Title`.
 - `BestPurlSuite` — `commons-codec-1.2: field-level merge produces Maven Central pURL`, `commons-lang-2.4: field-level merge produces Maven Central pURL`.
-- `MavenPhase1Suite` — `field-merge: filename artifactId beats manifest Implementation-Title`, `field-merge: swap verification`, `field-merge: manifest provides groupId/version when no artifactId headers`, `security: version masking — manifest version with pom.properties identity`.
+- `MavenCoordinateResolutionSuite` — `field-merge: filename artifactId beats manifest Implementation-Title`, `field-merge: swap verification`, `field-merge: manifest provides groupId/version when no artifactId headers`, `security: version masking — manifest version with pom.properties identity`.
 - `JvmDistributionSuite` — `JvmState - parses release file with all fields`, `JvmState - generates pURL for JDK`, `corpus adoptium-jdk21 produces pURL and metadata`.
 - `GradleLockfileSuite` — `GradleLockfile - parses modern lockfile format`, `GradleLockfile - generates pURLs for each dependency`, `GradleLockfile - preserves configuration list in metadata`.
 

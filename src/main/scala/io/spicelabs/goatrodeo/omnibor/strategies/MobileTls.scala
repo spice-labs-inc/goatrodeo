@@ -30,6 +30,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 
 import java.nio.charset.StandardCharsets
+import java.util.Arrays
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -44,7 +45,8 @@ import scala.util.Try
   *   - JDK `crypto.policy` (`crypto.policy=unlimited`).
   *
   * Emits `MobileTls:` flags and `java.security:crypto_policy`. Policy files
-  * carry no secrets; T-F-10 asserts no private-key/base64 material.
+  * carry no secrets; the leak-sweep tests assert no private-key/base64
+  * material.
   */
 object MobileTlsStrategy {
   private val logger = Logger(getClass())
@@ -85,7 +87,7 @@ object MobileTlsStrategy {
       val bytes = a.withStream { s =>
         val buf = new Array[Byte](MaxReadBytes)
         val n = s.read(buf, 0, MaxReadBytes)
-        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+        if (n <= 0) Array.emptyByteArray else Arrays.copyOf(buf, n)
       }
       new String(bytes, StandardCharsets.ISO_8859_1)
     }.getOrElse("")

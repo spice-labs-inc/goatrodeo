@@ -2,6 +2,8 @@ package io.spicelabs.goatrodeo.util
 
 import io.spicelabs.coordinates.Purl
 
+import java.util.LinkedHashMap
+
 /** Helpers related to Package URLs.
   *
   * Package URLs are produced via `io.spicelabs.coordinates.Purl`, the canonical
@@ -67,7 +69,7 @@ object PURLHelpers {
       case None    => null.asInstanceOf[A]
     }
 
-    val q = new java.util.LinkedHashMap[String, String]()
+    val q = new LinkedHashMap[String, String]()
     for ((k, v) <- qualifiers) q.put(k, v)
 
     new Purl(

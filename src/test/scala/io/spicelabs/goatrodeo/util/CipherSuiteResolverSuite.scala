@@ -13,13 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.FunSuite
-import munit.ScalaCheckSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
-/** Phase A — Tests for `CipherSuiteResolver` (cipher-suite decomposition).
+/** Tests for `CipherSuiteResolver` (cipher-suite decomposition).
   *
   * Verifies that concrete OpenSSL and TLS 1.3 suite names decompose into their
   * constituent algorithms, that grammar keywords and unknown tokens stay
@@ -27,9 +25,9 @@ import org.scalacheck.Prop.forAll
   * deduplicated, and that every resolved algorithm belongs to the closed
   * vocabulary.
   */
-class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
+class CipherSuiteResolverSuite extends GoatRodeoScalaCheckSuite {
 
-  test("T-A-01 ECDHE-RSA-AES128-GCM-SHA256 decomposes to its algorithms") {
+  test("ECDHE-RSA-AES128-GCM-SHA256 decomposes to its algorithms") {
     val entries = CipherSuiteResolver.resolveCipherString(
       "ECDHE-RSA-AES128-GCM-SHA256"
     )
@@ -44,7 +42,7 @@ class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
     )
   }
 
-  test("T-A-02 grammar keywords HIGH/!aNULL stay name-only (no invention)") {
+  test("grammar keywords HIGH/!aNULL stay name-only (no invention)") {
     val entries = CipherSuiteResolver.resolveCipherString("HIGH:!aNULL")
     assertEquals(entries.map(_.name), Vector("HIGH", "!aNULL"))
     assert(
@@ -53,19 +51,19 @@ class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
     )
   }
 
-  test("T-A-03 TLS 1.3 suite TLS_AES_256_GCM_SHA384 resolves") {
+  test("TLS 1.3 suite TLS_AES_256_GCM_SHA384 resolves") {
     val algs = CipherSuiteResolver.resolveToken("TLS_AES_256_GCM_SHA384")
     assertEquals(algs, Some(Vector("aes-256-gcm", "sha-384")))
   }
 
-  test("T-A-04 DEFAULT@SECLEVEL=2 parses without error and invents nothing") {
+  test("DEFAULT@SECLEVEL=2 parses without error and invents nothing") {
     val entries = CipherSuiteResolver.resolveCipherString("DEFAULT@SECLEVEL=2")
     assertEquals(entries.size, 1)
     assertEquals(entries.head.name, "DEFAULT@SECLEVEL=2")
     assertEquals(entries.head.algorithms, Vector.empty)
   }
 
-  test("T-A-05 unknown token FOO-BAR stays name-only") {
+  test("unknown token FOO-BAR stays name-only") {
     val algs = CipherSuiteResolver.resolveToken("FOO-BAR")
     assertEquals(algs, None)
     val entries =
@@ -79,7 +77,7 @@ class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
     assertEquals(entries.head.algorithms, Vector.empty)
   }
 
-  test("T-A-06 output is deterministic, ordered, and deduplicated") {
+  test("output is deterministic, ordered, and deduplicated") {
     val s = "ECDHE-RSA-AES128-GCM-SHA256:AES128-SHA:AES128-SHA"
     val a = CipherSuiteResolver.resolveCipherString(s)
     val b = CipherSuiteResolver.resolveCipherString(s)
@@ -97,7 +95,7 @@ class CipherSuiteResolverSuite extends FunSuite with ScalaCheckSuite {
   }
 
   property(
-    "T-A-07 property: resolved algorithms are in the closed vocabulary"
+    "property: resolved algorithms are in the closed vocabulary"
   ) {
     val tokenGen = Gen.oneOf(
       "ECDHE-RSA-AES128-GCM-SHA256",
