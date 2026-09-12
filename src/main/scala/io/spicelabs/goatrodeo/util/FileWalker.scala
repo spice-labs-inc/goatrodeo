@@ -21,7 +21,6 @@ import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -93,20 +92,19 @@ object FileWalker {
               .iterator()
               .asScala
               .filter(v => { !v.isDirectory() })
-              .map(v => {
+              .flatMap(v => {
                 val name = v.getName()
                 val size = v.getSize()
-                val modified =
-                  Option(v.getLastModifiedTime()).map(_.toInstant())
+
                 ArtifactWrapper
                   .newWrapper(
                     name,
                     size,
                     zipFile.getInputStream(v),
                     in.tempDir,
-                    tempDir,
-                    lastModified = modified
+                    tempDir
                   )
+                  .toOption
               })
               .toVector
             Some(
@@ -150,13 +148,16 @@ object FileWalker {
                 case f: PayloadEntry.FileEntry => Some(f)
                 case _                         => None
               }
-            } yield ArtifactWrapper.newWrapper(
-              file.path(),
-              file.size(),
-              file.content(),
-              in.tempDir,
-              tempPath
-            )
+              wrapper <- ArtifactWrapper
+                .newWrapper(
+                  file.path(),
+                  file.size(),
+                  file.content(),
+                  in.tempDir,
+                  tempPath
+                )
+                .toOption
+            } yield wrapper
             Some(wrappers.toVector -> "RPM")
           }
         })
@@ -195,8 +196,9 @@ object FileWalker {
             isoFileReader.convertTreeFilesToFlatList(files).asScala.toVector
 
           val wrappers =
-            for (cycleFile <- flatList)
-              yield {
+            for {
+              cycleFile <- flatList
+              wrapper <- {
 
                 val nameWithThing = cycleFile.getFullFileName('/')
                 val name =
@@ -214,7 +216,8 @@ object FileWalker {
                   in.tempDir,
                   tempPath
                 )
-              }
+              }.toOption
+            } yield wrapper
 
           isoFileReader.close()
 
@@ -341,14 +344,8 @@ object FileWalker {
       tempPath: Path
   ): OptionalArchiveStream = {
     ApRomfs.read(in).map { files =>
-      val wrappers = files.map { case (name, data) =>
-        ArtifactWrapper.newWrapper(
-          name,
-          data.length.toLong,
-          new ByteArrayInputStream(data),
-          in.tempDir,
-          tempPath
-        )
+      val wrappers = files.flatMap { case (name, data) =>
+        Some(ByteWrapper(data, name, in.tempDir))
       }.toVector
       wrappers -> "ArduPilot ROMFS"
     }
@@ -390,16 +387,18 @@ object FileWalker {
         try {
           AssemblyWalker
             .withinAssemblyStream(in.withFile(f => f.toPath)) { entries =>
-              val wrappers = entries.map { e =>
+              val wrappers = entries.flatMap { e =>
                 e.processStream { stream =>
-                  ArtifactWrapper.newWrapper(
-                    nominalPath = e.name,
-                    size = e.length,
-                    data = stream,
-                    tempDir = in.tempDir,
-                    tempPath = tempDir,
-                    mimeHint = e.mimeHint
-                  )
+                  ArtifactWrapper
+                    .newWrapper(
+                      nominalPath = e.name,
+                      size = e.length,
+                      data = stream,
+                      tempDir = in.tempDir,
+                      tempPath = tempDir,
+                      mimeHint = e.mimeHint.toSet
+                    )
+                    .toOption
                 }
               }
               wrappers.toVector -> "Cilantro .NET assembly"
@@ -475,15 +474,16 @@ object FileWalker {
                 .flatMap(fileSystemEntry => {
                   fileSystemEntry match {
                     case regular: RegularFile =>
-                      Some(
-                        ArtifactWrapper.newWrapper(
+                      ArtifactWrapper
+                        .newWrapper(
                           regular.path(),
                           regular.size(),
                           regular.openStream(),
                           None,
                           tempPath
                         )
-                      )
+                        .toOption
+
                     case _ => None
                   }
                 })
@@ -544,21 +544,18 @@ object FileWalker {
             ) { (outcome: Try[Option[PDBView]]) =>
               outcome match {
                 case Success(Some(view)) =>
-                  val wrappers = view.sources.map { src =>
+                  val wrappers = view.sources.flatMap { src =>
                     val name = src.name
                     val bytes = src.processStream { stream =>
                       val bos = new ByteArrayOutputStream()
                       Helpers.copy(stream, bos)
                       bos.toByteArray()
                     }
-                    ArtifactWrapper.newWrapper(
-                      nominalPath = name,
-                      size = bytes.length.toLong,
-                      data = new ByteArrayInputStream(bytes),
-                      tempDir = in.tempDir,
-                      tempPath = tempDir,
-                      mimeHint = Some("text/plain")
+
+                    Some(
+                      ByteWrapper(bytes, name, in.tempDir, Set("text/plain"))
                     )
+
                   }
                   Some(wrappers.toVector -> "Portable PDB")
                 case _ =>
@@ -605,12 +602,10 @@ object FileWalker {
       val theIterator = Helpers
         .iteratorFor(input)
         .filter(!_.isDirectory())
-        .map(ae => {
+        .flatMap(ae => {
           val artifactName = ae.getName()
 
           val size = ae.getSize()
-
-          val modified = Option(ae.getLastModifiedDate()).map(_.toInstant())
 
           ArtifactWrapper
             .newWrapper(
@@ -618,9 +613,9 @@ object FileWalker {
               size,
               input,
               tempPath,
-              tempDir,
-              lastModified = modified
+              tempDir
             )
+            .toOption
         })
         .toVector
       input.close()

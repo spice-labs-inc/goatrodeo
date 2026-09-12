@@ -33,7 +33,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
   private def emitFor(
       bytes: Array[Byte],
       name: String,
-      hint: Option[String]
+      hint: Set[String]
   ): String = {
     val wrapper: ArtifactWrapper =
       ByteWrapper(bytes, name, None, mimeHint = hint)
@@ -58,7 +58,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
 
   test("pkcs7CertAppearsInCbom") {
     val bytes = readFixture("test_data/certificates/pkcs7/detached.p7b.der")
-    val cbom = emitFor(bytes, "signed.p7b", Some(Certificates.CertPkcs7Mime))
+    val cbom = emitFor(bytes, "signed.p7b", Set(Certificates.CertPkcs7Mime))
     assert(
       cbom.contains("cryptographic-asset"),
       s"cbom must contain a crypto asset:\n$cbom"
@@ -79,7 +79,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
 
   test("bundleMetadataRecorded") {
     val bytes = readFixture("test_data/certificates/pkcs7/detached.p7b.der")
-    val cbom = emitFor(bytes, "signed.p7b", Some(Certificates.CertPkcs7Mime))
+    val cbom = emitFor(bytes, "signed.p7b", Set(Certificates.CertPkcs7Mime))
     // bundle keys ride as properties-from-extra
     assert(
       cbom.contains("Certificates:EntryCount"),
@@ -102,10 +102,10 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
     val p7 = emitFor(
       readFixture("test_data/certificates/pkcs7/detached.p7b.der"),
       "signed.p7b",
-      Some(Certificates.CertPkcs7Mime)
+      Set(Certificates.CertPkcs7Mime)
     )
     val pemBytes = readFixture("test_data/certificates/pkcs7/t.pem")
-    val pem = emitFor(pemBytes, "t.pem", Some("application/x-pem-bundle"))
+    val pem = emitFor(pemBytes, "t.pem", Set("application/x-pem-bundle"))
     // both carry the same subject/issuer/format:
     assert(
       p7.contains("GoatRodeo Test Root") && pem.contains("GoatRodeo Test Root")
@@ -119,7 +119,7 @@ class Pkcs7CbomSuite extends GoatRodeoFunSuite {
 
   test("invalidBlobNeverInCbomAsCertificate") {
     val junk = Array.tabulate[Byte](64)(i => (i * 7 + 1).toByte)
-    val cbom = emitFor(junk, "junk.p7b", Some(Certificates.CertPkcs7Mime))
+    val cbom = emitFor(junk, "junk.p7b", Set(Certificates.CertPkcs7Mime))
     // The invalid blob is claimed but yields no certs; the item carries no
     // Certificates:Cert: metadata, so the CBOM has no certificate component.
     assert(

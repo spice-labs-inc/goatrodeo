@@ -22,7 +22,7 @@ class SingleCertificatesStrategySuite extends GoatRodeoFunSuite {
 
   private def nonTerminalClaimers(hint: String): Vector[Int] = {
     val wrapper =
-      ByteWrapper("x".getBytes("UTF-8"), "b.p7b", None, mimeHint = Some(hint))
+      ByteWrapper("x".getBytes("UTF-8"), "b.p7b", None, mimeHint = Set(hint))
     val byUUID: Map[String, ArtifactWrapper] =
       Map(wrapper.uuid -> wrapper)
     val byName: Map[String, Vector[ArtifactWrapper]] =

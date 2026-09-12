@@ -44,14 +44,16 @@ class DotnetPdbContainerSuite extends GoatRodeoFunSuite {
         try in.readAllBytes()
         finally in.close()
       val tempDir = Files.createTempDirectory("pdbnupkg")
-      ArtifactWrapper.newWrapper(
-        nominalPath = "Polly.pdb",
-        size = bytes.length.toLong,
-        data = new ByteArrayInputStream(bytes),
-        tempDir = Some(tempDir.toFile),
-        tempPath = tempDir,
-        mimeHint = Some("pe/debug; format=mpdb")
-      )
+      ArtifactWrapper
+        .newWrapper(
+          nominalPath = "Polly.pdb",
+          size = bytes.length.toLong,
+          data = new ByteArrayInputStream(bytes),
+          tempDir = Some(tempDir.toFile),
+          tempPath = tempDir,
+          mimeHint = Set("pe/debug; format=mpdb")
+        )
+        .get
     } finally zip.close()
   }
 
@@ -96,14 +98,16 @@ class DotnetPdbContainerSuite extends GoatRodeoFunSuite {
   test("PDB-3 a fake pe/debug;format=mpdb blob is rejected, not thrown") {
     val tempDir = Files.createTempDirectory("fakepdb")
     try {
-      val fake = ArtifactWrapper.newWrapper(
-        nominalPath = "fake.pdb",
-        size = 4,
-        data = new ByteArrayInputStream(Array[Byte](1, 2, 3, 4)),
-        tempDir = Some(tempDir.toFile),
-        tempPath = tempDir,
-        mimeHint = Some("pe/debug; format=mpdb")
-      )
+      val fake = ArtifactWrapper
+        .newWrapper(
+          nominalPath = "fake.pdb",
+          size = 4,
+          data = new ByteArrayInputStream(Array[Byte](1, 2, 3, 4)),
+          tempDir = Some(tempDir.toFile),
+          tempPath = tempDir,
+          mimeHint = Set("pe/debug; format=mpdb")
+        )
+        .get
       val walked = Try(
         FileWalker.withinArchiveStream(artifact = fake) { found =>
           found

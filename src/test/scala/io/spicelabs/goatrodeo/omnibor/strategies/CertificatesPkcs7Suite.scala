@@ -39,7 +39,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
       bytes: Array[Byte],
       name: String,
       mimes: Set[String],
-      hint: Option[String]
+      hint: Set[String]
   ): ArtifactWrapper = {
     // Use ByteWrapper directly with an explicit MIME set override is not
     // possible; instead drive through a MIME-set-carrying wrapper by
@@ -52,7 +52,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
   private def claimed(
       bytes: Array[Byte],
       name: String,
-      hint: Option[String]
+      hint: Set[String]
   ): Boolean = {
     val w = wrapperFor(bytes, name, Set(), hint)
     Certificates.isCertificateCandidate(
@@ -64,7 +64,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     Certificates.classifyAndParse(w)
 
   test("pkcs7SignatureMimeIsClaimed") {
-    val w = wrapperFor("x".getBytes, "b.p7b", Set(), Some(pkcs7Mime))
+    val w = wrapperFor("x".getBytes, "b.p7b", Set(), Set(pkcs7Mime))
     assert(
       Certificates.isCertificateCandidate(w.mimeType),
       s"pkcs7-signature must be claimed; mimes=${w.mimeType}"
@@ -74,7 +74,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
   test("pkcs7MimeLegacyIsNotClaimed") {
     // The PEM/CMS mime (application/pkcs7-mime) is NOT the claim target;
     // only the authoritative pkcs7-signature MIME triggers the claim.
-    val w = wrapperFor("x".getBytes, "b.p7b", Set(), Some(pkcs7MimeLegacy))
+    val w = wrapperFor("x".getBytes, "b.p7b", Set(), Set(pkcs7MimeLegacy))
     assert(
       !Certificates.isCertificateCandidate(w.mimeType),
       s"pkcs7-mime must not be claimed; mimes=${w.mimeType}"
@@ -120,7 +120,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
     // claimed (the MIME authoritatively says so), but parsing yields None
     // (clean skip) — never mislabeled as a certificate.
     val junk = Array.tabulate[Byte](64)(i => (i * 7 + 1).toByte)
-    val w = wrapperFor(junk, "junk.bin", Set(), Some(pkcs7Mime))
+    val w = wrapperFor(junk, "junk.bin", Set(), Set(pkcs7Mime))
     assert(Certificates.isCertificateCandidate(w.mimeType))
     assertEquals(
       parse(w),
@@ -137,7 +137,7 @@ class CertificatesPkcs7Suite extends GoatRodeoFunSuite {
       0x03.toByte,
       0x00.toByte
     ) // truncated SEQUENCE
-    val w = wrapperFor(bad, "bad.p7b", Set(), Some(pkcs7Mime))
+    val w = wrapperFor(bad, "bad.p7b", Set(), Set(pkcs7Mime))
     Try(parse(w)) match {
       case Success(v) => assertEquals(v, None)
       case Failure(e) =>

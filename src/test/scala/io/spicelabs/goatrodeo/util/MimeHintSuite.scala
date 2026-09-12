@@ -26,30 +26,33 @@ class MimeHintSuite extends GoatRodeoFunSuite {
 
   test("hintDefaultsToNone") {
     val bytes = "hello".getBytes("UTF-8")
-    val w = ArtifactWrapper.newWrapper(
-      "plain.txt",
-      bytes.length.toLong,
-      new ByteArrayInputStream(bytes),
-      None,
-      Files.createTempDirectory("mh").toAbsolutePath
-    )
-    assertEquals(w.mimeHint, None)
+    val w = ArtifactWrapper
+      .newWrapper(
+        "plain.txt",
+        bytes.length.toLong,
+        new ByteArrayInputStream(bytes),
+        None,
+        Files.createTempDirectory("mh").toAbsolutePath
+      )
+      .get
+
     // MIME set is the ordinary detected set: text/plain
     assert(w.mimeType.contains("text/plain"), s"got ${w.mimeType}")
   }
 
   test("hintIsUnionedIntoEffectiveSet") {
     val bytes = "hello".getBytes("UTF-8")
-    val w = ArtifactWrapper.newWrapper(
-      "blob.bin",
-      bytes.length.toLong,
-      new ByteArrayInputStream(bytes),
-      None,
-      Files.createTempDirectory("mh").toAbsolutePath,
-      lastModified = None,
-      mimeHint = Some(hint)
-    )
-    assertEquals(w.mimeHint, Some(hint))
+    val w = ArtifactWrapper
+      .newWrapper(
+        "blob.bin",
+        bytes.length.toLong,
+        new ByteArrayInputStream(bytes),
+        None,
+        Files.createTempDirectory("mh").toAbsolutePath,
+        mimeHint = Set(hint)
+      )
+      .get
+
     assert(
       w.mimeType.contains(hint),
       s"hint must be in the effective set: ${w.mimeType}"
@@ -63,80 +66,71 @@ class MimeHintSuite extends GoatRodeoFunSuite {
   test("hintSurvivesWrappersAndSpill") {
     val dir = Files.createTempDirectory("mh").toAbsolutePath
     // small in-memory wrapper
-    val small = ArtifactWrapper.newWrapper(
-      "small.bin",
-      4L,
-      new ByteArrayInputStream("data".getBytes("UTF-8")),
-      None,
-      dir,
-      lastModified = None,
-      mimeHint = Some(hint)
-    )
-    assertEquals(small.mimeHint, Some(hint))
+    val small = ArtifactWrapper
+      .newWrapper(
+        "small.bin",
+        4L,
+        new ByteArrayInputStream("data".getBytes("UTF-8")),
+        None,
+        dir,
+        mimeHint = Set(hint)
+      )
+      .get
+    assert(small.mimeType.contains(hint))
     // big enough to spill to a temp file (newWrapper spills above the
     // in-memory cap)
     val bigBytes = new Array[Byte](40 * 1024 * 1024) // 40 MiB
     bigBytes(0) = 1
-    val big = ArtifactWrapper.newWrapper(
-      "big.bin",
-      bigBytes.length.toLong,
-      new ByteArrayInputStream(bigBytes),
-      None,
-      dir,
-      lastModified = None,
-      mimeHint = Some(hint)
-    )
-    assertEquals(big.mimeHint, Some(hint), "hint must survive the spill path")
+    val big = ArtifactWrapper
+      .newWrapper(
+        "big.bin",
+        bigBytes.length.toLong,
+        new ByteArrayInputStream(bigBytes),
+        None,
+        dir,
+        mimeHint = Set(hint)
+      )
+      .get
+    assert(big.mimeType.contains(hint), "hint must survive the spill path")
   }
 
   test("hintNeverSniffed") {
     // a blob whose CONTENT contains the literal MIME string must not gain
     // the MIME — sniffing never produces hints/kind MIMEs
     val bytes = s"prefix ${hint} suffix".getBytes("UTF-8")
-    val w = ArtifactWrapper.newWrapper(
-      "fake.txt",
-      bytes.length.toLong,
-      new ByteArrayInputStream(bytes),
-      None,
-      Files.createTempDirectory("mh").toAbsolutePath
-    )
+    val w = ArtifactWrapper
+      .newWrapper(
+        "fake.txt",
+        bytes.length.toLong,
+        new ByteArrayInputStream(bytes),
+        None,
+        Files.createTempDirectory("mh").toAbsolutePath
+      )
+      .get
     assert(
       !w.mimeType.contains(hint),
       s"content sniffing must not stamp the hint MIME: ${w.mimeType}"
     )
-    assertEquals(w.mimeHint, None)
+
   }
 
   test("hintWithOctetStreamDetection") {
     // random binary that detects as octet-stream; the hint still lands
     val bytes = Array[Byte](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-    val w = ArtifactWrapper.newWrapper(
-      "rand.bin",
-      bytes.length.toLong,
-      new ByteArrayInputStream(bytes),
-      None,
-      Files.createTempDirectory("mh").toAbsolutePath,
-      lastModified = None,
-      mimeHint = Some(hint)
-    )
+    val w = ArtifactWrapper
+      .newWrapper(
+        "rand.bin",
+        bytes.length.toLong,
+        new ByteArrayInputStream(bytes),
+        None,
+        Files.createTempDirectory("mh").toAbsolutePath,
+        mimeHint = Set(hint)
+      )
+      .get
     assert(
       w.mimeType.contains(hint),
       s"hint must land even when detection yields octet-stream: ${w.mimeType}"
     )
-  }
-
-  test(
-    "newWrapperConstructorCompat — default None, existing callers unchanged"
-  ) {
-    val dir = Files.createTempDirectory("mh").toAbsolutePath
-    val w = ArtifactWrapper.newWrapper(
-      "x.txt",
-      3L,
-      new ByteArrayInputStream("abc".getBytes("UTF-8")),
-      None,
-      dir
-    )
-    assertEquals(w.mimeHint, None)
   }
 
   test("property hintUnionIsMonotonic") {
@@ -152,15 +146,16 @@ class MimeHintSuite extends GoatRodeoFunSuite {
       Gen.option(Gen.oneOf(hint, "pe/resource", "pe/debug", "cilantro/type"))
     val prop = forAll(genMime, genHint) { (detected, hintOpt) =>
       val bytes = "z".getBytes("UTF-8")
-      val w = ArtifactWrapper.newWrapper(
-        "x.bin",
-        bytes.length.toLong,
-        new ByteArrayInputStream(bytes),
-        None,
-        Files.createTempDirectory("mh").toAbsolutePath,
-        lastModified = None,
-        mimeHint = hintOpt
-      )
+      val w = ArtifactWrapper
+        .newWrapper(
+          "x.bin",
+          bytes.length.toLong,
+          new ByteArrayInputStream(bytes),
+          None,
+          Files.createTempDirectory("mh").toAbsolutePath,
+          mimeHint = hintOpt.toSet
+        )
+        .get
       // the hint, when present, is always in the effective set:
       hintOpt.forall(h => w.mimeType.contains(h)) &&
       // the detected content MIME is always present:

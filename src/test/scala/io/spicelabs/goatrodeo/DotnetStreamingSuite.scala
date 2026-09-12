@@ -170,7 +170,7 @@ class DotnetStreamingSuite extends GoatRodeoFunSuite {
                 data = stream,
                 tempDir = Some(tempDir.toFile),
                 tempPath = tempDir,
-                mimeHint = e.mimeHint
+                mimeHint = e.mimeHint.toSet
               )
             }
             assert(wrapped != null, s"wrapper for ${e.name} should construct")
@@ -221,18 +221,18 @@ class DotnetStreamingSuite extends GoatRodeoFunSuite {
     val kids = containerChildren(asm).get
     // classes surfaced with the cilantro/type hint
     assert(
-      kids.exists(_.mimeHint.contains("cilantro/type")),
-      s"expected a class entry with cilantro/type; got ${kids.map(_.mimeHint)}"
+      kids.exists(_.mimeType.contains("cilantro/type")),
+      s"expected a class entry with cilantro/type; got ${kids.map(_.mimeType)}"
     )
     // win32 resource surfaced with pe/resource hint
     assert(
-      kids.exists(_.mimeHint.contains("pe/resource")),
-      s"expected a win32 resource with pe/resource; got ${kids.map(_.mimeHint)}"
+      kids.exists(_.mimeType.contains("pe/resource")),
+      s"expected a win32 resource with pe/resource; got ${kids.map(_.mimeType)}"
     )
     // debug blob surfaced with pe/debug hint
     assert(
-      kids.exists(_.mimeHint.contains("pe/debug")),
-      s"expected a debug blob with pe/debug; got ${kids.map(_.mimeHint)}"
+      kids.exists(_.mimeType.contains("pe/debug")),
+      s"expected a debug blob with pe/debug; got ${kids.map(_.mimeType)}"
     )
   }
 
