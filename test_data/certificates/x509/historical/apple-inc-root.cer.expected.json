@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/historical/apple-inc-root.cer",
   "description": "Historical / pinned-vendor CA root: Apple Inc. Root Certificate",
   "source": "https://www.apple.com/appleca/AppleIncRootCertificate.cer",
   "retrievedAt": "2026-04-28",

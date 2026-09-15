@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/pqc/composite/mldsa65-rsa3072-pss-sha512.der",
   "description": "IETF Hackathon BC r5: Composite ML-DSA-65 + RSA-3072-PSS-SHA512 trust anchor",
   "source": "https://github.com/IETF-Hackathon/pqc-certificates/raw/master/providers/bc/artifacts_certs_r5.zip#artifacts/MLDSA65-RSA3072-PSS-SHA512-1.3.6.1.5.5.7.6.41_ta.der",
   "retrievedAt": "2026-04-28",

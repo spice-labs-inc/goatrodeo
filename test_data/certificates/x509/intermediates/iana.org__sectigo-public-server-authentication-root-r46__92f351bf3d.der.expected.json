@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/intermediates/iana.org__sectigo-public-server-authentication-root-r46__92f351bf3d.der",
   "description": "Intermediate CA from TLS chain of iana.org (Sectigo Public Server Authentication Root R46)",
   "source": "openssl s_client iana.org:443 (chain idx 2)",
   "retrievedAt": "2026-04-28",

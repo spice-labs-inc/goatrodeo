@@ -1,4 +1,5 @@
 {
+  "id": "certificates/crls/real/digicert-assured-id-g2.crl",
   "description":"DigiCert Assured ID Root G2 CRL (DER)",
   "source":"http://crl3.digicert.com/DigiCertAssuredIDRootG2.crl",
   "retrievedAt":"2026-04-28",

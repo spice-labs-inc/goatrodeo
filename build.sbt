@@ -273,6 +273,26 @@ lazy val root = project
       }
     ),
     buildInfoPackage := "hellogoat",
+
+    // Provenance for Surveyor: META-INF/git/<artifact>.properties names the commit this
+    // jar was built from (same file the Maven components write via git-commit-id).
+    Compile / resourceGenerators += Def.task {
+      def sh(cmd: String): String =
+        scala.util.Try(scala.sys.process.Process(cmd).!!.trim).getOrElse("")
+      val f = (Compile / resourceManaged).value / "META-INF" / "git" / s"${moduleName.value}_${scalaBinaryVersion.value}.properties"
+      val dirty = if (sh("git status --porcelain").nonEmpty) "true" else "false"
+      IO.write(
+        f,
+        s"""git.commit.id.full=${sh("git rev-parse HEAD")}
+           |git.commit.id.describe=${sh("git describe --tags --always --dirty")}
+           |git.commit.time=${sh("git log -1 --format=%cI")}
+           |git.branch=${sh("git rev-parse --abbrev-ref HEAD")}
+           |git.dirty=$dirty
+           |git.build.version=${version.value}
+           |""".stripMargin
+      )
+      Seq(f)
+    }.taskValue,
     // Don't bundle logback.xml in the library jar — consumers provide their own
     Compile / packageBin / mappings ~= { _.filter(_._2 != "logback.xml") }
   )

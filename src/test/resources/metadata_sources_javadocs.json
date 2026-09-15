@@ -1,5 +1,6 @@
 [
   {
+    "id": "adg_tests/repo_ea/AddOnJavaAntTasks-2.11-sources.jar",
     "name": "AddOnJavaAntTasks-2.11-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/AddOnJavaAntTasks-2.11-sources.jar",
     "purls": [
@@ -7,6 +8,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/abris_2.12-3.1.1-sources.jar",
     "name": "abris_2.12-3.1.1-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/abris_2.12-3.1.1-sources.jar",
     "purls": [
@@ -14,6 +16,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/ac-localtools-3.0.2-sources.jar",
     "name": "ac-localtools-3.0.2-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/ac-localtools-3.0.2-sources.jar",
     "purls": [
@@ -21,6 +24,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/ac-verifier-3.8.0-sources.jar",
     "name": "ac-verifier-3.8.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/ac-verifier-3.8.0-sources.jar",
     "purls": [
@@ -28,6 +32,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/accumulo-rest-1.10.2-sources.jar",
     "name": "accumulo-rest-1.10.2-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/accumulo-rest-1.10.2-sources.jar",
     "purls": [
@@ -35,6 +40,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/accumulo-rest-2.0.0-alpha-0.3-sources.jar",
     "name": "accumulo-rest-2.0.0-alpha-0.3-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/accumulo-rest-2.0.0-alpha-0.3-sources.jar",
     "purls": [
@@ -42,6 +48,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/accumulo-store-1.20.0-sources.jar",
     "name": "accumulo-store-1.20.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/accumulo-store-1.20.0-sources.jar",
     "purls": [
@@ -49,6 +56,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/activities-1.3.0-RELEASE-sources.jar",
     "name": "activities-1.3.0-RELEASE-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/activities-1.3.0-RELEASE-sources.jar",
     "purls": [
@@ -56,6 +64,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/adif-processor-1.0.55-sources.jar",
     "name": "adif-processor-1.0.55-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/adif-processor-1.0.55-sources.jar",
     "purls": [
@@ -63,6 +72,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/adifweb-1.0.2-sources.jar",
     "name": "adifweb-1.0.2-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/adifweb-1.0.2-sources.jar",
     "purls": [
@@ -70,6 +80,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/aeron-client-0.2.3-sources.jar",
     "name": "aeron-client-0.2.3-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/aeron-client-0.2.3-sources.jar",
     "purls": [
@@ -77,6 +88,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/affiliate-sdk-java-20.1.1-sources.jar",
     "name": "affiliate-sdk-java-20.1.1-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/affiliate-sdk-java-20.1.1-sources.jar",
     "purls": [
@@ -84,6 +96,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/agent-core_2.11-0.6.3-sources.jar",
     "name": "agent-core_2.11-0.6.3-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/agent-core_2.11-0.6.3-sources.jar",
     "purls": [
@@ -91,6 +104,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/agent-core_2.12-1.2.1-sources.jar",
     "name": "agent-core_2.12-1.2.1-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/agent-core_2.12-1.2.1-sources.jar",
     "purls": [
@@ -98,6 +112,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/aim-all-1.2.0-sources.jar",
     "name": "aim-all-1.2.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/aim-all-1.2.0-sources.jar",
     "purls": [
@@ -107,6 +122,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/aim-cluster-1.4.5-sources.jar",
     "name": "aim-cluster-1.4.5-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/aim-cluster-1.4.5-sources.jar",
     "purls": [
@@ -114,6 +130,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/aim-starter-1.4.5-sources.jar",
     "name": "aim-starter-1.4.5-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/aim-starter-1.4.5-sources.jar",
     "purls": [
@@ -121,6 +138,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/akka-logitechmediaserver_2.12-1.0.0-sources.jar",
     "name": "akka-logitechmediaserver_2.12-1.0.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/akka-logitechmediaserver_2.12-1.0.0-sources.jar",
     "purls": [
@@ -128,6 +146,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/akkaeventhubs_2.12-0.9.6-sources.jar",
     "name": "akkaeventhubs_2.12-0.9.6-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/akkaeventhubs_2.12-0.9.6-sources.jar",
     "purls": [
@@ -135,6 +154,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/alchemy-collections-1.1-sources.jar",
     "name": "alchemy-collections-1.1-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/alchemy-collections-1.1-sources.jar",
     "purls": [
@@ -142,6 +162,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/alchemy-kotlin-1.3.7-sources.jar",
     "name": "alchemy-kotlin-1.3.7-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/alchemy-kotlin-1.3.7-sources.jar",
     "purls": [
@@ -149,6 +170,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/alerting-storm-1.1.0-sources.jar",
     "name": "alerting-storm-1.1.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/alerting-storm-1.1.0-sources.jar",
     "purls": [
@@ -156,6 +178,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/alita-validator-0.7-sources.jar",
     "name": "alita-validator-0.7-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/alita-validator-0.7-sources.jar",
     "purls": [
@@ -163,6 +186,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/alpine-common-2.2.2-sources.jar",
     "name": "alpine-common-2.2.2-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/alpine-common-2.2.2-sources.jar",
     "purls": [
@@ -170,6 +194,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/amd64-10.5-sources.jar",
     "name": "amd64-10.5-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/amd64-10.5-sources.jar",
     "purls": [
@@ -177,6 +202,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/amp-errors-9.11-sources.jar",
     "name": "amp-errors-9.11-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/amp-errors-9.11-sources.jar",
     "purls": [
@@ -184,6 +210,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/analytics-functions-1.19.0-sources.jar",
     "name": "analytics-functions-1.19.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/analytics-functions-1.19.0-sources.jar",
     "purls": [
@@ -191,6 +218,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/android-api-0.2.0-sources.jar",
     "name": "android-api-0.2.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/android-api-0.2.0-sources.jar",
     "purls": [
@@ -198,6 +226,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/android-live-stream-0.1.3-sources.jar",
     "name": "android-live-stream-0.1.3-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/android-live-stream-0.1.3-sources.jar",
     "purls": [
@@ -205,6 +234,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/androidlib-17.7-sources.jar",
     "name": "androidlib-17.7-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/androidlib-17.7-sources.jar",
     "purls": [
@@ -212,6 +242,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/annotations-1.0.4-sources.jar",
     "name": "annotations-1.0.4-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/annotations-1.0.4-sources.jar",
     "purls": [
@@ -219,6 +250,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/antlr4-runtime-4.5.3-CUSTOM-sources.jar",
     "name": "antlr4-runtime-4.5.3-CUSTOM-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/antlr4-runtime-4.5.3-CUSTOM-sources.jar",
     "purls": [
@@ -226,6 +258,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/api-0.16.1-alpha-sources.jar",
     "name": "api-0.16.1-alpha-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/api-0.16.1-alpha-sources.jar",
     "purls": [
@@ -233,6 +266,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/api-proto-0.1.6-sources.jar",
     "name": "api-proto-0.1.6-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/api-proto-0.1.6-sources.jar",
     "purls": [
@@ -240,6 +274,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/app_runtime_with_db-lib_2.11-1.0.4-sources.jar",
     "name": "app_runtime_with_db-lib_2.11-1.0.4-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/app_runtime_with_db-lib_2.11-1.0.4-sources.jar",
     "purls": [
@@ -247,6 +282,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/appcompat-0.3.0-sources.jar",
     "name": "appcompat-0.3.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/appcompat-0.3.0-sources.jar",
     "purls": [
@@ -254,6 +290,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/application-utilities-1.0.31-sources.jar",
     "name": "application-utilities-1.0.31-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/application-utilities-1.0.31-sources.jar",
     "purls": [
@@ -261,6 +298,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/applikation-runtime-android-1.3.30-sources.jar",
     "name": "applikation-runtime-android-1.3.30-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-android-1.3.30-sources.jar",
     "purls": [
@@ -268,6 +306,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/applikation-runtime-iosx64-1.5.3-sources.jar",
     "name": "applikation-runtime-iosx64-1.5.3-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-iosx64-1.5.3-sources.jar",
     "purls": [
@@ -275,6 +314,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/applikation-runtime-linuxarm32hfp-1.4.61-sources.jar",
     "name": "applikation-runtime-linuxarm32hfp-1.4.61-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-linuxarm32hfp-1.4.61-sources.jar",
     "purls": [
@@ -282,6 +322,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/applikation-runtime-metadata-1.2.0-sources.jar",
     "name": "applikation-runtime-metadata-1.2.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/applikation-runtime-metadata-1.2.0-sources.jar",
     "purls": [
@@ -289,6 +330,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/ar_runtime_web_console-lib_2.11-1.0.0-sources.jar",
     "name": "ar_runtime_web_console-lib_2.11-1.0.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/ar_runtime_web_console-lib_2.11-1.0.0-sources.jar",
     "purls": [
@@ -296,6 +338,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/argo-analysis-engine-archetype-1.0-sources.jar",
     "name": "argo-analysis-engine-archetype-1.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/argo-analysis-engine-archetype-1.0-sources.jar",
     "purls": [
@@ -303,6 +346,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/arknights-helper-1.3.4-sources.jar",
     "name": "arknights-helper-1.3.4-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/arknights-helper-1.3.4-sources.jar",
     "purls": [
@@ -310,6 +354,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/aroma-thrift-2.0-sources.jar",
     "name": "aroma-thrift-2.0-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/aroma-thrift-2.0-sources.jar",
     "purls": [
@@ -317,6 +362,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artcodes-scanner-3.4.2-sources.jar",
     "name": "artcodes-scanner-3.4.2-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artcodes-scanner-3.4.2-sources.jar",
     "purls": [
@@ -324,6 +370,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-binary-entrypoint-codecs-0.124-sources.jar",
     "name": "artio-binary-entrypoint-codecs-0.124-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-binary-entrypoint-codecs-0.124-sources.jar",
     "purls": [
@@ -331,6 +378,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-binary-entrypoint-impl-0.122-sources.jar",
     "name": "artio-binary-entrypoint-impl-0.122-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-binary-entrypoint-impl-0.122-sources.jar",
     "purls": [
@@ -338,6 +386,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-binary-entrypoint-system-tests-0.120-sources.jar",
     "name": "artio-binary-entrypoint-system-tests-0.120-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-binary-entrypoint-system-tests-0.120-sources.jar",
     "purls": [
@@ -345,6 +394,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-codecs-0.119-sources.jar",
     "name": "artio-codecs-0.119-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-codecs-0.119-sources.jar",
     "purls": [
@@ -352,6 +402,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-codecs-0.47-sources.jar",
     "name": "artio-codecs-0.47-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-codecs-0.47-sources.jar",
     "purls": [
@@ -359,6 +410,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-codecs-0.99-sources.jar",
     "name": "artio-codecs-0.99-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-codecs-0.99-sources.jar",
     "purls": [
@@ -366,6 +418,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-core-0.26-sources.jar",
     "name": "artio-core-0.26-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-core-0.26-sources.jar",
     "purls": [
@@ -373,6 +426,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-core-0.83-sources.jar",
     "name": "artio-core-0.83-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-core-0.83-sources.jar",
     "purls": [
@@ -380,6 +434,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-ilink3-codecs-0.136.1-sources.jar",
     "name": "artio-ilink3-codecs-0.136.1-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-ilink3-codecs-0.136.1-sources.jar",
     "purls": [
@@ -387,6 +442,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/artio-ilink3-codecs-0.94-sources.jar",
     "name": "artio-ilink3-codecs-0.94-sources.jar",
     "path": "test_data/download/adg_tests/repo_ea/artio-ilink3-codecs-0.94-sources.jar",
     "purls": [
@@ -394,6 +450,7 @@
     ]
   },
   {
+    "id": "test_data/wps_war_test/wps-demo-1.3.0-javadoc.jar",
     "name": "wps-demo-1.3.0-javadoc.jar",
     "path": "test_data/wps_war_test/wps-demo-1.3.0-javadoc.jar",
     "purls": [
@@ -401,6 +458,7 @@
     ]
   },
   {
+    "id": "test_data/wps_war_test/wps-demo-1.3.0-sources.jar",
     "name": "wps-demo-1.3.0-sources.jar",
     "path": "test_data/wps_war_test/wps-demo-1.3.0-sources.jar",
     "purls": [

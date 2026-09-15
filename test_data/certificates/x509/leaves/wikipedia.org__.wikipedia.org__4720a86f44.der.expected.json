@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/wikipedia.org__.wikipedia.org__4720a86f44.der",
   "description": "TLS leaf certificate from wikipedia.org (*.wikipedia.org)",
   "source": "openssl s_client -connect wikipedia.org:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

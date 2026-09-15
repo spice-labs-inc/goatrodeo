@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/curl.se__curl.se__8b021b88b8.der",
   "description": "TLS leaf certificate from curl.se (curl.se)",
   "source": "openssl s_client -connect curl.se:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

@@ -1,4 +1,5 @@
 {
+  "id": "certificates/crls/real/sectigo-public-server-auth.crl",
   "description":"Sectigo Public Server Authentication Root R46 CRL (DER)",
   "source":"http://crl.sectigo.com/SectigoPublicServerAuthenticationRootR46.crl",
   "retrievedAt":"2026-04-28",

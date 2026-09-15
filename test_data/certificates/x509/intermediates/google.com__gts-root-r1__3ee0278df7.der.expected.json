@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/intermediates/google.com__gts-root-r1__3ee0278df7.der",
   "description": "Intermediate CA from TLS chain of google.com (GTS Root R1)",
   "source": "openssl s_client -connect google.com:443 -showcerts (chain idx 2)",
   "retrievedAt": "2026-04-28",

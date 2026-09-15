@@ -1,0 +1,110 @@
+{
+  "$comment": [
+    "What Surveyor's integration tests take from this repository, at the commit its jar was built",
+    "from (./build-surveyor expectations). tests[]: unit-test source roots; expectations[]: the data",
+    "files that drive tests (their id field is the test ID); fixtures[]: paths to export by tier",
+    "(0 committed and small, 1 nightly, 2 full corpora); downloads[]: fetched at the given tier."
+  ],
+  "schemaVersion": 1,
+  "component": "goatrodeo",
+  "tests": [
+    "src/test/scala"
+  ],
+  "expectations": [
+    {
+      "glob": "test_data/certificates/**/*.expected.json",
+      "format": "goatrodeo-certificates-sidecar",
+      "idField": "id",
+      "fixture": {
+        "strip": ".expected.json"
+      }
+    },
+    {
+      "glob": "src/test/resources/metadata_*.json",
+      "format": "goatrodeo-metadata-groundtruth",
+      "cases": "$[*]",
+      "idField": "id"
+    },
+    {
+      "glob": "src/test/resources/cbom-golden/*.json",
+      "format": "goatrodeo-cbom-golden"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "test_data/certificates",
+      "tier": 0
+    },
+    {
+      "path": "src/test/resources",
+      "tier": 0
+    },
+    {
+      "path": "test_data/basicvhdx.zip",
+      "tier": 0
+    },
+    {
+      "path": "test_data/alsobasic.zip",
+      "tier": 0
+    },
+    {
+      "path": "test_data/smallqemu.zip",
+      "tier": 0
+    },
+    {
+      "path": "test_data/smallvm.zip",
+      "tier": 0
+    },
+    {
+      "path": "test_data/raw.zip",
+      "tier": 0
+    },
+    {
+      "path": "test_data/rawgz.zip",
+      "tier": 0
+    },
+    {
+      "path": "test_data/Smoke.dll",
+      "tier": 0
+    },
+    {
+      "path": "test_data/hackproj.dll",
+      "tier": 0
+    },
+    {
+      "path": "test_data/awesomeassertions.9.3.0.nupkg",
+      "tier": 0
+    },
+    {
+      "path": "test_data/newtonsoft.json.13.0.4.nupkg",
+      "tier": 0
+    },
+    {
+      "path": "test_data/alpine-minimal.squashfs",
+      "tier": 0
+    },
+    {
+      "path": "test_data/openssl_configs",
+      "tier": 0
+    },
+    {
+      "path": "test_data",
+      "tier": 2,
+      "lfs": [
+        "*.jar",
+        "*.tar"
+      ]
+    }
+  ],
+  "downloads": [
+    {
+      "url": "https://public-test-data.spice-labs.dev/adg_tests/repo_ea.tgz",
+      "dest": "test_data/download/adg_tests/repo_ea.tgz",
+      "tier": 2,
+      "extract": {
+        "kind": "tgz",
+        "into": "test_data/download/adg_tests"
+      }
+    }
+  ]
+}
