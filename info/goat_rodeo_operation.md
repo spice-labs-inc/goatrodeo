@@ -220,6 +220,55 @@ Threads consume CPU, but there are also intermediate data structures (e.g., in-m
 consume memory. In terms of choosing the number of threads, it's not simply the number of logical CPUs, it's
 also the amount of RAM.
 
+## Supported Formats and Cryptographic Materials
+
+Goat Rodeo traverses containers recursively (an ISO that contains a tar that contains a zip that contains a JAR will be processed at every level) and extracts metadata from the package formats and cryptographic materials listed below.
+
+### Containers Goat Rodeo traverses into
+
+- ZIP-family archives: ZIP, JAR, WAR, Android APK
+- Docker/OCI images: `docker save` tarballs (`manifest.json`, config, layer tarballs) and pure OCI image layouts (`oci-layout`, `index.json`, `blobs/sha256/...`, including nested manifest indexes)
+- Tar-family archives and compression wrappers: tar, tar.gz, tar.bz2, 7z, cpio, ar, and other formats auto-detected by Apache Commons; single-file compression wrappers (gzip, bzip2, xz, lzma, zstd, etc.) are decompressed and the result is tested as a container
+- RPM packages (payload files)
+- ISO 9660 images
+- Disk images: qcow2, vmdk, vhd, vhdx, vdi, raw, AMI, GCP (gzip-wrapped raw)
+- Filesystems on disk images (including across MBR/GPT partitions, LVM volume groups, and the UBI layer): ext4, FAT32, exFAT, NTFS, XFS, btrfs, SquashFS, HFS+, APFS, JFFS2, CramFS, YAFFS2, UBIFS
+- Embedded binary containers: Linux kernel images, FIT images, device tree blobs (DTB), ELF files, Raspberry Pi firmware, Android boot images, WIM, DMG
+- .NET assemblies (.dll/.exe): classes, embedded resources, certificates, win32 resources, debug blobs
+- Portable PDB files (embedded source files)
+- ArduPilot `AP_ROMFS` embedded file stores (ELF firmware)
+
+### Package formats metadata is extracted from
+
+- Maven/JVM archives: `.jar`, `.war`, `.ear`, `.par`, `.sar`, `.nar`, `.jpi`, `.hpi`, `.kar`, `.far`, `.lpkg`, `.rar` (Java), `.zap`, processed as units with companion `.pom`, `maven-metadata.xml`, `-sources.jar` and `-javadoc.jar` files. JAR internals: MANIFEST.MF, `pom.properties`, embedded POMs, Spring Boot fat-jar structure (BOOT-INF), WAR structure (WEB-INF), EAR modules (application.xml), multi-release versions, `module-info.class`, OSGi headers, Jenkins plugin markers, GraalVM native-image properties, ServiceLoader providers, and signature files
+- Docker/OCI images: platform (os/architecture/variant), environment variables, labels (OCI and label-schema), entrypoint, command, build history, layer count, repository digests, image size
+- Linux packages: RPM, Debian (`.deb`), Pacman (`.pkg.tar.xz` / `.pkg.tar.zst`), Alpine APK, FreeBSD `.pkg`, OpenBSD `.tgz`
+- Language ecosystem packages: CocoaPods, Conda, CPAN, Crates (Rust), Go modules, Hex (Elixir), LuaRocks, npm, Packagist (PHP), PyPI, RubyGems
+- .NET assemblies: name, version, locale, public key, custom attributes (copyright, trademark, description), assembly references, canonical type JSON. `.nupkg` files are traversed as zip containers
+- Gradle lockfiles: `gradle.lockfile`, `buildscript-gradle.lockfile`, `dependency-locks/*.lockfile`
+- JVM distributions: the `release` file (vendor, version, JDK vs JRE, OS, libc, JVM variant, source repos)
+- Dependency lockfiles: `Cargo.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `go.sum`, `requirements.txt` (including a curated crypto-library mapping)
+
+### Cryptographic materials
+
+- X.509 certificates, X.509 CA certificates, PKCS#7 signatures, PEM files and multi-certificate PEM bundles, certificate revocation lists (CRLs)
+- Keystores: JKS, JCEKS, PKCS#12, BKS
+- OpenSSH public keys and CA-issued SSH certificates (user and host)
+- SSH key files: `authorized_keys`, `ssh_host_*` host keys, Dropbear host keys, `.pub` files
+- PGP key rings (public and secret)
+- Private keys: plaintext PKCS#8 and legacy PEM, OpenSSH v1 format, PGP secret keys. Encrypted private keys and encrypted keystores are opaque: envelope-only metadata (KDF, cipher, salt) is emitted, no pURL, and no decryption is ever attempted
+- Unix password files: `/etc/shadow`, `/etc/gshadow`, `/etc/passwd`, `/etc/group`, with crypt(3) hash algorithm identification
+- usign/signify keys (OpenWrt)
+- Service TLS configuration: OpenWrt UCI (`/etc/config/`), nginx, lighttpd, apache2, httpd
+- Mobile and JVM TLS policy files: Android `network_security_config.xml`, `AndroidManifest.xml` (cleartext traffic), Apple `Info.plist` ATS, JDK `crypto.policy`
+- JWT and JWK tokens
+- Embedded PEM material in text files; carved certificates in binaries; embedded certificate material in shared libraries (mbedTLS, OpenSSL, wolfSSL, GnuTLS, and similar)
+- Crypto footprints in binaries: OpenSSL `EVP_*` symbols, Go `crypto/...` package paths, Rust crate names, .NET `System.Security.Cryptography.*` types
+- Cloud-managed key references: AWS KMS, Azure Key Vault, GCP Cloud KMS, HashiCorp Vault (Terraform, JSON, YAML, properties, env files)
+- OpenSSL configuration files (`.cnf`): key/value pairs, sections, `.include` references, `oid_section`
+- Java security properties files (`java.security` and included siblings)
+- SQLCipher and DB-encryption markers in code and configuration
+
 ## Cryptographic Configuration Capture and CBOM Output
 
 Goat Rodeo captures three kinds of cryptographic material as ADG metadata and can emit a CycloneDX Cryptographic Bill of Materials (CBOM) for each top-level input.
