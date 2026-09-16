@@ -97,8 +97,14 @@ class DotnetState(
 
     result match {
       case Failure(excpt) =>
-        log.error(
-          s"Error while reading assembly from ${artifact.path()}: ${excpt.getMessage()}"
+        // Expected, recoverable condition (a native DLL or hostile PE is
+        // simply not a readable assembly), so WARN not ERROR: corpora with
+        // many such files must not drown the log in one line each. The
+        // exception class is included because Cilantro's message is often
+        // null.
+        log.warn(
+          s"Error while reading assembly from ${artifact.path()}: " +
+            s"${excpt.getClass.getSimpleName} ${excpt.getMessage()}"
         )
         // The failure is a value: processing continues as a no-op for this
         // artifact instead of aborting the containing walk (a native DLL or

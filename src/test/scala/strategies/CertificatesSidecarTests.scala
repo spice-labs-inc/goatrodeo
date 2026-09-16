@@ -52,7 +52,6 @@ class CertificatesSidecarTests extends GoatRodeoFunSuite {
 
   private val minimalSidecar =
     """{
-      |  "id": "certificates/edge-cases/test.pem",
       |  "description": "test",
       |  "source": "test",
       |  "retrievedAt": "2026-04-24",
@@ -72,6 +71,7 @@ class CertificatesSidecarTests extends GoatRodeoFunSuite {
   test("valid minimal sidecar parses") {
     val f = writeSidecar(minimalSidecar)
     val sc = CertificatesSidecar.parse(f)
+    assertEquals(sc.id, None)
     assertEquals(sc.description, "test")
     assertEquals(sc.source, "test")
     assertEquals(sc.retrievedAt, "2026-04-24")
@@ -113,6 +113,7 @@ class CertificatesSidecarTests extends GoatRodeoFunSuite {
         |  ]
         |}""".stripMargin
     val sc = CertificatesSidecar.parse(writeSidecar(full))
+    assertEquals(sc.id, Some("certificates/edge-cases/test.pem"))
     assertEquals(sc.mimeTypes.mustContain, List("application/x-pem-file"))
     assertEquals(sc.mimeTypes.mustNotContain, List("text/plain"))
     assertEquals(
@@ -139,7 +140,6 @@ class CertificatesSidecarTests extends GoatRodeoFunSuite {
   // from the minimal sidecar and confirms parse throws with a helpful message.
   private val requiredFields =
     List(
-      "id",
       "description",
       "source",
       "retrievedAt",

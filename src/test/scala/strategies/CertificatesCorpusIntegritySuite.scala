@@ -107,19 +107,26 @@ class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
     )
   }
 
-  test("every sidecar id is its corpus-relative path, and unique") {
+  test(
+    "every sidecar id, when present, is its corpus-relative path, and unique"
+  ) {
     // The id is the test ID the integration tests share with this suite
-    // (tests/README.md): `certificates/<category>/.../<fixture>`.
+    // (tests/README.md): `certificates/<category>/.../<fixture>`. An absent
+    // id means the fixture is deliberately not shared; only declared ids are
+    // validated.
     val root =
       CertificatesFixtureInventory.corpusRoot.getParentFile.toPath.toAbsolutePath
-    val ids = CertificatesFixtureInventory.allSidecars.map { s =>
+    val ids = CertificatesFixtureInventory.allSidecars.flatMap { s =>
       val expected = root
         .relativize(s.toPath.toAbsolutePath)
         .toString
         .replace(java.io.File.separatorChar, '/')
         .stripSuffix(".expected.json")
-      val actual = scala.util.Try(CertificatesSidecar.parse(s).id).getOrElse("")
-      (s.getPath, expected, actual)
+      scala.util
+        .Try(CertificatesSidecar.parse(s).id)
+        .toOption
+        .flatten
+        .map(id => (s.getPath, expected, id))
     }
     val wrong = ids.filter { case (_, e, a) => e != a }
     assert(

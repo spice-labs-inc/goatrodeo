@@ -32,6 +32,9 @@ import scala.util.Try
   * ## LLM-friendly summary
   *
   * A sidecar is a JSON object with a fixed schema. The schema defines:
+  *   - `id` — OPTIONAL test ID shared with the integration tests: the fixture's
+  *     path relative to `test_data/`. Absent when the fixture is deliberately
+  *     not shared.
   *   - `description`, `source`, `retrievedAt` — provenance
   *   - `itemCount` — exact number of Items the pipeline must emit for this
   *     fixture
@@ -53,9 +56,10 @@ import scala.util.Try
   */
 final case class CertificatesSidecar(
     /** Test ID shared with the integration tests: the fixture's path relative
-      * to `test_data/` (e.g. `certificates/x509/mozilla/foo.pem`).
+      * to `test_data/` (e.g. `certificates/x509/mozilla/foo.pem`). None when
+      * the fixture is deliberately not shared.
       */
-    id: String,
+    id: Option[String] = None,
     description: String,
     source: String,
     retrievedAt: String,
@@ -118,7 +122,7 @@ final case class NumericRange(min: String, max: String)
   *
   * Optional fields default to empty collections: `mimeTypes.mustNotContain`,
   * `purls.mustNotContain`, `metadata.mustContainRanges`,
-  * `forbiddenMetadataKeys`.
+  * `forbiddenMetadataKeys`; `id` is optional and defaults to None.
   *
   * A sidecar missing any required field produces a `SidecarParseError` with a
   * message identifying which field was missing. This surfaces authoring
@@ -157,7 +161,7 @@ object CertificatesSidecar {
     }
 
     CertificatesSidecar(
-      id = req("id")(asString),
+      id = opt("id")(asString),
       description = req("description")(asString),
       source = req("source")(asString),
       retrievedAt = req("retrievedAt")(asString),

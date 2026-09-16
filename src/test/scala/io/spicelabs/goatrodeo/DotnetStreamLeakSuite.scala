@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo
 
+import ch.qos.logback.classic.Level
 import io.spicelabs.goatrodeo.omnibor.Edge
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
@@ -7,6 +8,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.DotnetState
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
+import org.slf4j.LoggerFactory
 
 import java.lang.management.ManagementFactory
 import java.nio.file.Files
@@ -54,10 +56,21 @@ class DotnetStreamLeakSuite extends GoatRodeoFunSuite {
     val iterations = 300
     val before = unix.getOpenFileDescriptorCount
     var maxGrowth = 0L
-    for (_ <- 1 to iterations) {
-      DotnetState().beginProcessing(artifact, item, SingleMarker())
-      maxGrowth = math.max(maxGrowth, unix.getOpenFileDescriptorCount - before)
-    }
+    // 300 deliberate failures would otherwise log 300 lines; mute the
+    // strategy's logger for the loop (restored afterwards, inherited level
+    // when it was never explicitly set).
+    val dotnetLogger = LoggerFactory
+      .getLogger("io.spicelabs.goatrodeo.omnibor.strategies.DotnetState")
+      .asInstanceOf[ch.qos.logback.classic.Logger]
+    val savedLevel = dotnetLogger.getLevel
+    dotnetLogger.setLevel(Level.OFF)
+    try {
+      for (_ <- 1 to iterations) {
+        DotnetState().beginProcessing(artifact, item, SingleMarker())
+        maxGrowth =
+          math.max(maxGrowth, unix.getOpenFileDescriptorCount - before)
+      }
+    } finally dotnetLogger.setLevel(savedLevel)
     assert(
       maxGrowth < 50,
       s"open file descriptors grew by $maxGrowth during $iterations failed reads: the stream is not closed on failure"
