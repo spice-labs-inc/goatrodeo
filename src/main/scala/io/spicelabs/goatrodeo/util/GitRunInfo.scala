@@ -22,9 +22,10 @@ final case class GitRunItem(gitoid: String, json: Dom.MapElem)
 /** Git provenance capture for tagged runs .
   *
   * WHAT: for each unique containing repository discovered beneath the base
-  * directories, capture the HEAD commit, the HEAD tree, the worktree tree, and
-  * the parent commit(s) as content-addressed Items (gitoid of the hash itself),
-  * with the git metadata as the body.
+  * directories, capture exactly two content-addressed Items (gitoid of the
+  * hash itself) with the git metadata as the body: the HEAD commit and the
+  * HEAD tree. No worktree walk, no synthesized trees, no parent Items — that
+  * broader capture was deliberately removed from the design.
   *
   * WHY: spec §6 — tagged runs record provenance; untagged runs do nothing;
   * capture never fails the run; redaction on by default.
