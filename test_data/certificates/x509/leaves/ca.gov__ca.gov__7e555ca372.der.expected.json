@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/ca.gov__ca.gov__7e555ca372.der",
   "description": "TLS leaf certificate from ca.gov (ca.gov)",
   "source": "openssl s_client -connect ca.gov:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

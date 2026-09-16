@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/historical/microsoft-ecc-root-2017.crt",
   "description": "Historical / pinned-vendor CA root: Microsoft ECC Root Certificate Authority 2017",
   "source": "https://www.microsoft.com/pkiops/certs/Microsoft%20ECC%20Root%20Certificate%20Authority%202017.crt",
   "retrievedAt": "2026-04-28",

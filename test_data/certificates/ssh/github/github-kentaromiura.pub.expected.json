@@ -1,4 +1,5 @@
 {
+  "id": "certificates/ssh/github/github-kentaromiura.pub",
   "description":"Real-world SSH public key \u2014 github.com/kentaromiura",
   "source":"https://github.com/kentaromiura.keys",
   "retrievedAt":"2026-04-28",

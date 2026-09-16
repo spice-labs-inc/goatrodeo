@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/microsoft.com__microsoft.com__24c0737a55.der",
   "description": "TLS leaf certificate from microsoft.com (microsoft.com)",
   "source": "openssl s_client -connect microsoft.com:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

@@ -111,12 +111,18 @@ kind="$(detect_type "$first4k")"
 
 now_date="$(date -u +%Y-%m-%d)"
 
+# The sidecar id is the test ID shared with Surveyor's integration tests: the
+# fixture's path relative to test_data/.
+sidecar_id="$(cd "$(dirname "$fixture")" && pwd -P)/$(basename "$fixture")"
+sidecar_id="${sidecar_id#*/test_data/}"
+
 emit_header() {
   local descr="$1"
   local src="$2"
   local itemCount="$3"
   cat <<EOF
 {
+  "id": "${sidecar_id}",
   "description": "${descr}",
   "source": "${src}",
   "retrievedAt": "${now_date}",

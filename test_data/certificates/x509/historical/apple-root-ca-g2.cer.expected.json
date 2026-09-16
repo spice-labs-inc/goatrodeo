@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/historical/apple-root-ca-g2.cer",
   "description": "Historical / pinned-vendor CA root: Apple Root CA - G2",
   "source": "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer",
   "retrievedAt": "2026-04-28",

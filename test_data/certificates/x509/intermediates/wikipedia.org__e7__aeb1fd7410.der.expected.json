@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/intermediates/wikipedia.org__e7__aeb1fd7410.der",
   "description": "Intermediate CA from TLS chain of wikipedia.org (E7)",
   "source": "openssl s_client -connect wikipedia.org:443 -showcerts (chain idx 1)",
   "retrievedAt": "2026-04-28",

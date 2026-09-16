@@ -1,4 +1,5 @@
 {
+  "id": "certificates/x509/leaves/europa.eu__europa.eu__803ed6ec7f.der",
   "description": "TLS leaf certificate from europa.eu (europa.eu)",
   "source": "openssl s_client -connect europa.eu:443 -showcerts (chain idx 0)",
   "retrievedAt": "2026-04-28",

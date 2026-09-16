@@ -1,5 +1,6 @@
 [
   {
+    "id": "adg_tests/repo_ea/AddOnJavaAntTasks-2.11.jar",
     "name": "AddOnJavaAntTasks-2.11.jar",
     "path": "test_data/download/adg_tests/repo_ea/AddOnJavaAntTasks-2.11.jar",
     "purls": [
@@ -7,6 +8,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/AddRemoveComboBox-0.5.jar",
     "name": "AddRemoveComboBox-0.5.jar",
     "path": "test_data/download/adg_tests/repo_ea/AddRemoveComboBox-0.5.jar",
     "purls": [
@@ -14,6 +16,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/Agrona-0.1.jar",
     "name": "Agrona-0.1.jar",
     "path": "test_data/download/adg_tests/repo_ea/Agrona-0.1.jar",
     "purls": [
@@ -21,6 +24,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/Allen4J-1.0.1.jar",
     "name": "Allen4J-1.0.1.jar",
     "path": "test_data/download/adg_tests/repo_ea/Allen4J-1.0.1.jar",
     "purls": [
@@ -28,6 +32,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/AnnotationSummariser-1.2.0.jar",
     "name": "AnnotationSummariser-1.2.0.jar",
     "path": "test_data/download/adg_tests/repo_ea/AnnotationSummariser-1.2.0.jar",
     "purls": [
@@ -35,6 +40,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/ArgoWirelineFormat-0.3.1.jar",
     "name": "ArgoWirelineFormat-0.3.1.jar",
     "path": "test_data/download/adg_tests/repo_ea/ArgoWirelineFormat-0.3.1.jar",
     "purls": [
@@ -42,6 +48,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/abris-0.0.1.jar",
     "name": "abris-0.0.1.jar",
     "path": "test_data/download/adg_tests/repo_ea/abris-0.0.1.jar",
     "purls": [
@@ -49,6 +56,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/absa-shaded-jackson-0.0.1.jar",
     "name": "absa-shaded-jackson-0.0.1.jar",
     "path": "test_data/download/adg_tests/repo_ea/absa-shaded-jackson-0.0.1.jar",
     "purls": [
@@ -56,6 +64,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/abstraction-models-1.0.48.jar",
     "name": "abstraction-models-1.0.48.jar",
     "path": "test_data/download/adg_tests/repo_ea/abstraction-models-1.0.48.jar",
     "purls": [
@@ -63,6 +72,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/ac-client-2.0.0.jar",
     "name": "ac-client-2.0.0.jar",
     "path": "test_data/download/adg_tests/repo_ea/ac-client-2.0.0.jar",
     "purls": [
@@ -70,6 +80,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/access-system-0.0.14.jar",
     "name": "access-system-0.0.14.jar",
     "path": "test_data/download/adg_tests/repo_ea/access-system-0.0.14.jar",
     "purls": [
@@ -77,6 +88,7 @@
     ]
   },
   {
+    "id": "adg_tests/repo_ea/acpgeo-0.0.2.jar",
     "name": "acpgeo-0.0.2.jar",
     "path": "test_data/download/adg_tests/repo_ea/acpgeo-0.0.2.jar",
     "purls": [
