@@ -363,6 +363,15 @@ object FileWalker {
     * entry is wrapped into an ArtifactWrapper carrying the entry's mimeHint,
     * inside the walk callback (entries are usable only while the walk is open).
     *
+    * The walk runs INSIDE `withFile`: the file handed to Cilantro may be a
+    * temporary one created for an in-memory artifact (a `ByteWrapper`), and
+    * `ByteWrapper.withFile` deletes it when its scope closes. Escaping the
+    * `Path` from the scope — as an earlier version did — handed Cilantro a path
+    * to a file that no longer existed, so in-memory assemblies silently never
+    * expanded as containers. The wrappers built inside the walk callback are
+    * self-contained (bytes copied or fresh temp files in the walk's own temp
+    * dir), so none of them outlive the file.
+    *
     * @param in
     *   the artifact; only acted on when its MIME is the dotnet MIME
     * @param tempDir
@@ -385,24 +394,26 @@ object FileWalker {
       if (!probeOk) None
       else {
         try {
-          AssemblyWalker
-            .withinAssemblyStream(in.withFile(f => f.toPath)) { entries =>
-              val wrappers = entries.flatMap { e =>
-                e.processStream { stream =>
-                  ArtifactWrapper
-                    .newWrapper(
-                      nominalPath = e.name,
-                      size = e.length,
-                      data = stream,
-                      tempDir = in.tempDir,
-                      tempPath = tempDir,
-                      mimeHint = e.mimeHint.toSet
-                    )
-                    .toOption
+          in.withFile(f =>
+            AssemblyWalker
+              .withinAssemblyStream(f.toPath) { entries =>
+                val wrappers = entries.flatMap { e =>
+                  e.processStream { stream =>
+                    ArtifactWrapper
+                      .newWrapper(
+                        nominalPath = e.name,
+                        size = e.length,
+                        data = stream,
+                        tempDir = in.tempDir,
+                        tempPath = tempDir,
+                        mimeHint = e.mimeHint.toSet
+                      )
+                      .toOption
+                  }
                 }
+                wrappers.toVector -> "Cilantro .NET assembly"
               }
-              wrappers.toVector -> "Cilantro .NET assembly"
-            }
+          )
         } catch {
           case _: Exception => None
         }

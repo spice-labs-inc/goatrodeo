@@ -123,7 +123,7 @@ Claims in `info/cbom_enhancements.md`:
 | Claim | Verified By |
 |-------|-------------|
 | ArduPilot `AP_ROMFS` is treated as an archive: its embedded files become inner artifacts (read via `withStream` only, bounded). | `ApRomfsSuite.AR-1`, `AR-2`, `AR-3` |
-| The Surveyor-OT-Demo trust-store certs (RSA-1024) surface in the CBOM with `KeySize 1024` and `goatrodeo:path`. | ``CbomEmitterSuite` `ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024`` |
+| The OT-Demo trust-store certs (RSA-1024) surface in the CBOM with `KeySize 1024` and `goatrodeo:path`. | ``CbomEmitterSuite` `ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024`` |
 | Corpus: ArduPilot + PX4 images under `test_data/firmware-images/`. | fixture presence + AR-1 |
 
 ## MIME Hints + PKCS#7 Certificates (2026-09-02)

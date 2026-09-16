@@ -31,8 +31,10 @@ object MetadataGroundTruth {
       name: String,
       path: String,
       purls: List[String],
-      /** Test ID shared with Surveyor's integration tests (the path under test_data/download/). */
-      id: String = ""
+      /** Test ID shared with the integration tests (the path under
+        * test_data/download/). None when the row is not shared.
+        */
+      id: Option[String] = None
   )
 
   /** Load metadata ground truth from a JSON resource file.
@@ -76,7 +78,6 @@ object MetadataGroundTruth {
             .find(_._1 == "id")
             .map(_._2)
             .collect { case JString(s) => s }
-            .getOrElse("")
           MetadataEntry(name, path, purls, id)
         }.toVector
       case _ => Vector.empty

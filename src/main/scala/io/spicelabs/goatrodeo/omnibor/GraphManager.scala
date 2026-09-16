@@ -31,7 +31,7 @@ import scala.util.Try
 /** Manages persistence and retrieval of Artifact Dependency Graph (ADG) data.
   *
   * The graph data is stored in three types of files:
-  *   - GRD (Goat Rodeo Data): Contains CBOR-encoded Item data
+  *   - GRD (Goat Rodeo Database): Contains CBOR-encoded Item data
   *   - GRI (Goat Rodeo Index): Contains an index for looking up Items by hash
   *   - GRC (Goat Rodeo Cluster): Metadata about a set of GRD/GRI files
   *
@@ -346,7 +346,7 @@ object GraphManager {
 
 }
 
-/** A walker for reading Items from a GRD (Goat Rodeo Data) file.
+/** A walker for reading Items from a GRD (Goat Rodeo Database) file.
   *
   * Provides sequential access to Items stored in a GRD file. Use `open()` to
   * validate the file and read the envelope, then `readNext()` or `items()` to

@@ -26,7 +26,7 @@ import java.io.File
   * WHY: ArduPilot firmware embeds its ROMFS (including TLS trust-store
   * certificates) as compressed structs — not a self-describing container — so
   * nothing could reach the certs. The corpus fixture
-  * `test_data/firmware-images/ardupilot/arducopter` is a Surveyor-OT-Demo build
+  * `test_data/firmware-images/ardupilot/arducopter` is an OT-Demo build
   * carrying `etc/ssl/certs/root-ca.crt` (RSA-1024).
   *
   * THEORY: the AP_ROMFS struct layout is fixed by ArduPilot (raw-DEFLATE
@@ -40,7 +40,7 @@ class ApRomfsSuite extends GoatRodeoFunSuite {
   private val arducopter =
     new File("test_data/firmware-images/ardupilot/arducopter")
 
-  test("AR-1 ApRomfs decodes the Surveyor OT Demo trust-store certs") {
+  test("AR-1 ApRomfs decodes the OT Demo trust-store certs") {
     assert(arducopter.exists(), "arducopter fixture required")
     val w = FileWrapper(arducopter, arducopter.getPath, None)
     val files = ApRomfs.read(w)

@@ -38,6 +38,12 @@ enum DockerMarkers extends ProcessingMarker {
   /** The manifest.json file listing all image configurations. */
   case Manifest
 
+  /** The `oci-layout` marker file of an OCI image layout. It carries no
+    * metadata and no pURLs; it exists so that every input file of the layout
+    * appears in the graph.
+    */
+  case OciLayout
+
   /** A layer tarball containing filesystem changes.
     *
     * @param hash
@@ -682,11 +688,15 @@ case class DockerState(
   *   list of configuration files with their parsed info
   * @param layers
   *   map of layer hashes to their artifacts
+  * @param ociLayout
+  *   the `oci-layout` marker file, present when the claim was a pure OCI image
+  *   layout (None for docker-save claims)
   */
 final case class DockerToProcess(
     manifest: ArtifactWrapper,
     config: List[ManifestInfo],
-    layers: Map[String, ArtifactWrapper]
+    layers: Map[String, ArtifactWrapper],
+    ociLayout: Option[ArtifactWrapper] = None
 ) extends ToProcess {
   type MarkerType = DockerMarkers
   type StateType = DockerState
@@ -697,12 +707,14 @@ final case class DockerToProcess(
 
   override def mimeType: Set[String] = manifest.mimeType
 
-  override def itemCnt: Int = 1 + config.size + layers.size
+  override def itemCnt: Int =
+    1 + config.size + layers.size + ociLayout.size
 
   override def markSuccessfulCompletion(): Unit = {
     manifest.finished()
     layers.foreach { case (_, wrapper) => wrapper.finished() }
     config.foreach(mi => mi.configFile.finished())
+    ociLayout.foreach(_.finished())
   }
 
   override def getElementsToProcess()
@@ -710,7 +722,9 @@ final case class DockerToProcess(
     .map(v => v -> DockerMarkers.Layer(v.path()))
     .toList ::: List(manifest -> DockerMarkers.Manifest) ::: config.map(m =>
     m.configFile -> DockerMarkers.Config(m)
-  )) -> DockerState(
+  ) ::: ociLayout
+    .map(a => List(a -> DockerMarkers.OciLayout))
+    .getOrElse(Nil)) -> DockerState(
     Map()
   )
 
@@ -1154,7 +1168,13 @@ object DockerToProcess {
             case _                                => Nil
           }
           configPath = blobPath(configDigest)
-          configArt <- byName.get(configPath).flatMap(_.headOption).toList
+          configArt <- byName
+            .get(configPath)
+            // Unambiguous only: duplicate blobs sharing the config path would
+            // otherwise be removed from byName with just the first emitted.
+            .filter(_.length == 1)
+            .flatMap(_.headOption)
+            .toList
           configJson <- readJsonCapped(configArt, MaxOciJsonBytes).toList
         } yield {
           val layerPaths = (manifestJson \ "layers") match {
@@ -1198,14 +1218,17 @@ object DockerToProcess {
               art <- byName.get(layer).flatMap(_.headOption)
             } yield layer -> art)*
           )
+          val ociLayoutArt: Option[ArtifactWrapper] =
+            byName.get("oci-layout").filter(_.length == 1).flatMap(_.headOption)
           val claimedNames =
-            Set("index.json", "oci-layout") ++
+            Set("index.json") ++ ociLayoutArt.map(_ => "oci-layout") ++
               infos.flatMap(i => i.configPath :: i.layers)
           val claimedUuids =
-            Set(index.uuid) ++ infos.map(_.configFile.uuid) ++
+            Set(index.uuid) ++ ociLayoutArt.map(_.uuid) ++
+              infos.map(_.configFile.uuid) ++
               layerMap.values.map(_.uuid)
           (
-            Vector(DockerToProcess(index, infos, layerMap)),
+            Vector(DockerToProcess(index, infos, layerMap, ociLayoutArt)),
             byUUID -- claimedUuids,
             byName -- claimedNames,
             "Docker"

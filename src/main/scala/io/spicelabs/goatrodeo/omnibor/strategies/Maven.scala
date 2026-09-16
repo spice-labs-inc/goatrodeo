@@ -2200,9 +2200,16 @@ case class MavenState(
             }}"
 
         /** Override accumulateInfo to collect archive-structure metadata from
-          * child entries. This is called for each child artifact found inside
-          * the JAR/Sources/JavaDocs archive during the processing pipeline. The
-          * child's path determines what kind of metadata to accumulate.
+          * direct child entries. This is called for each child artifact found
+          * inside the JAR/Sources/JavaDocs archive during the processing
+          * pipeline. The child's path determines what kind of metadata to
+          * accumulate.
+          *
+          * The scope accepts only children whose `parentId` equals its own
+          * item: `ParentScope.passToParent` also offers every child to the
+          * grandparent scope, and without this guard a nested JAR's
+          * manifest/pom.properties would clobber the outer JAR's accumulator
+          * (e.g. a Spring Boot fat jar absorbing BOOT-INF/lib manifests).
           *
           * This override delegates to MavenState.accumulateInfo, which mutates
           * the JarAccumulatedState fields directly.
@@ -2213,7 +2220,9 @@ case class MavenState(
             artifact: ArtifactWrapper,
             store: Storage
         ): Unit = {
-          MavenState.this.accumulateInfo(parentId, item, artifact, store)
+          if (parentId == scopeFor()) {
+            MavenState.this.accumulateInfo(parentId, item, artifact, store)
+          }
         }
 
         override def finalAugmentation(
@@ -2312,12 +2321,30 @@ object MavenToProcess {
     !lower.endsWith("-javadoc.jar")
   }
 
+  /** A companion file is claimed only when the path key holds exactly one
+    * wrapper: duplicate entries (legal in zip/tar, reachable from hostile
+    * inputs) would otherwise be removed from byName with only the first emitted
+    * and the rest silently dropped. Ambiguity refuses the claim and the files
+    * fall through to the generic strategy.
+    */
+  private def sole(wrappers: Vector[ArtifactWrapper]): Option[ArtifactWrapper] =
+    wrappers match {
+      case Vector(single) => Some(single)
+      case _              => None
+    }
+
   def computeMavenFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val jars = byName.toVector.filter { case (name, artifacts) =>
+      // Unambiguous only: a path key holding several wrappers (duplicate
+      // entries are legal in zip/tar and reachable from hostile inputs)
+      // would otherwise be removed from byName with just the first emitted —
+      // the rest silently vanish. Ambiguity refuses the claim and the files
+      // fall through to the generic strategy.
       isMavenArchive(name) &&
+      artifacts.length == 1 &&
       artifacts.exists(_.mimeType.contains("application/java-archive"))
     }
 
@@ -2344,9 +2371,9 @@ object MavenToProcess {
           val javaDocName = noExtName + "-javadoc.jar"
           val sourcesName = noExtName + "-sources.jar"
 
-          val poms = byName.get(pomName).toVector.flatten
-          val javaDocs = byName.get(javaDocName).toVector.flatten
-          val sources = byName.get(sourcesName).toVector.flatten
+          val poms = sole(byName.get(pomName).toVector.flatten).toVector
+          val javaDocs = sole(byName.get(javaDocName).toVector.flatten).toVector
+          val sources = sole(byName.get(sourcesName).toVector.flatten).toVector
           val revisedById =
             Vector(artifacts, poms, sources, javaDocs).flatten.foldLeft(byId) {
               case (byId, artifact) => byId - artifact.uuid
@@ -2421,8 +2448,7 @@ object MavenToProcess {
             .stripSuffix("-javadocs.jar")
             .stripSuffix(".jar")
           val pomName = baseName + ".pom"
-          val companionPom =
-            afterMetaFilter.get(pomName).toVector.flatten.headOption
+          val companionPom = sole(afterMetaFilter.get(pomName).toVector.flatten)
           artifacts.map(a => MavenToProcess(a, companionPom, None, None, None))
         } else Vector.empty
       case _ => Vector.empty

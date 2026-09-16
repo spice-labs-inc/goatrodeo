@@ -1,7 +1,7 @@
 {
   "$comment": [
-    "What Surveyor's integration tests take from this repository, at the commit its jar was built",
-    "from (./build-surveyor expectations). tests[]: unit-test source roots; expectations[]: the data",
+    "What the integration tests take from this repository, at the commit its jar was built",
+    "from the expectations-export step. tests[]: unit-test source roots; expectations[]: the data",
     "files that drive tests (their id field is the test ID); fixtures[]: paths to export by tier",
     "(0 committed and small, 1 nightly, 2 full corpora); downloads[]: fetched at the given tier."
   ],
