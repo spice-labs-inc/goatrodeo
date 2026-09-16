@@ -289,12 +289,13 @@ lazy val root = project
     ),
     buildInfoPackage := "hellogoat",
 
-    // Provenance for Surveyor: META-INF/git/<artifact>.properties names the commit this
+    // Provenance: META-INF/git/<artifact>.properties names the commit this
     // jar was built from (same file the Maven components write via git-commit-id).
     Compile / resourceGenerators += Def.task {
       def sh(cmd: String): String =
         scala.util.Try(scala.sys.process.Process(cmd).!!.trim).getOrElse("")
-      val f = (Compile / resourceManaged).value / "META-INF" / "git" / s"${moduleName.value}_${scalaBinaryVersion.value}.properties"
+      val f =
+        (Compile / resourceManaged).value / "META-INF" / "git" / s"${moduleName.value}_${scalaBinaryVersion.value}.properties"
       val dirty = if (sh("git status --porcelain").nonEmpty) "true" else "false"
       IO.write(
         f,

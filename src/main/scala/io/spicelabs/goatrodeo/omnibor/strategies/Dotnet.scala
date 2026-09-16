@@ -72,14 +72,28 @@ class DotnetState(
     // constructs it during the read — so opening the stream and reading
     // is fine. readAssembly returns a Try, so compose in a
     // for-comprehension (no .get).
-    val result: Try[DotnetState] = for {
-      fileStm <- Try {
+    val result: Try[DotnetState] =
+      Try {
         artifact.withFile(file => FileInputStream(file))
+      }.flatMap { fileStm =>
+        AssemblyDefinition.readAssembly(fileStm) match {
+          case Success(assembly) =>
+            // On success the stream is deliberately kept open: it stays
+            // alive until postChildProcessing closes it.
+            Success(DotnetState(Some(assembly), Some(fileStm)))
+          case Failure(excpt) =>
+            // The for-comprehension form made the stream unreachable on
+            // failure, so every unreadable assembly (native DLLs inside fat
+            // jars are the common case) leaked a file descriptor for the
+            // rest of the run. Close it here; Cilantro does not.
+            try {
+              fileStm.close()
+            } catch {
+              case _: Exception => ()
+            }
+            Failure(excpt)
+        }
       }
-      assembly <- AssemblyDefinition.readAssembly(fileStm)
-    } yield {
-      DotnetState(Some(assembly), Some(fileStm))
-    }
 
     result match {
       case Failure(excpt) =>
@@ -371,10 +385,15 @@ class DotnetState(
 
   /** Generate the parent scope for the assembly's children.
     *
-    * Overrides accumulateInfo so that every child (which includes the
+    * Overrides accumulateInfo so that every DIRECT child (which includes the
     * `cilantro/type` class entries) is offered to DotnetState to harvest the
     * canonical type JSON — the Maven analog of reading child wrappers during
     * child processing.
+    *
+    * The scope accepts only children whose `parentId` equals its own item:
+    * `ParentScope.passToParent` also offers every child to the grandparent
+    * scope, and without this guard a nested assembly's `cilantro/type` children
+    * would be accumulated onto the outer assembly's item.
     */
   override def generateParentScope(
       artifact: ArtifactWrapper,
@@ -399,7 +418,9 @@ class DotnetState(
           artifact: ArtifactWrapper,
           store: Storage
       ): Unit = {
-        DotnetState.this.accumulateTypeJson(artifact)
+        if (parentId == scopeFor()) {
+          DotnetState.this.accumulateTypeJson(artifact)
+        }
       }
     }
 

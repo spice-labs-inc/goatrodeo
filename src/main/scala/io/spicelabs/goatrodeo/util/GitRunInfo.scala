@@ -82,26 +82,60 @@ object GitRunInfo {
       redact: Boolean = true,
       scanRoots: Seq[File] = Vector.empty
   ): Vector[GitRunItem] = {
+    // Canonicalize the scan roots once, at the boundary: the repo roots
+    // discovered by [[discoverRepos]] are canonical, and every consumer of the
+    // scan roots (containment, matchedScanRoot, redacted relativization)
+    // compares against them. A root reached through a symlink (e.g. /tmp →
+    // /private/tmp on macOS) must resolve to the same namespace or the repo is
+    // silently skipped — and the redacted repo_root falls back to an absolute
+    // path, leaking it.
+    val roots = scanRoots.map(canonicalOrSelf)
     val repos = discoverRepos(bases)
     repos.flatMap { repoRoot =>
-      captureRepo(repoRoot, redact, scanRoots)
+      captureRepo(repoRoot, redact, roots)
     }
   }
 
-  /** Capture for a single repo. All-or-nothing per repo; never throws. */
+  /** Resolve a scan root to its canonical file, falling back to the path as
+    * given when canonicalization fails (e.g. a dangling symlink).
+    */
+  private def canonicalOrSelf(f: File): File =
+    Try(f.getCanonicalFile).toOption.getOrElse(f)
+
+  /** Capture for a single repo. All-or-nothing per repo; never throws.
+    *
+    * Every step — opening the repository, resolving HEAD, parsing the commit —
+    * can throw (e.g. `MissingObjectException` when HEAD names an object that is
+    * absent from the object store), and `Builder.buildDB` calls this unguarded,
+    * so an escaping exception would abort the whole run. The whole body is
+    * therefore Try-wrapped: any failure skips the repo (the same outcome as the
+    * deliberate refusal paths in [[captureRepoChecked]]) and is logged as a
+    * warning.
+    */
   private def captureRepo(
       repoRoot: File,
       redact: Boolean,
       scanRoots: Seq[File]
   ): Vector[GitRunItem] = {
-    val builder = new FileRepositoryBuilder()
-    builder.setWorkTree(repoRoot)
-    builder.findGitDir(repoRoot)
-    builder.setMustExist(true)
-    val repository = builder.build()
-    try {
-      captureRepoChecked(repository, repoRoot, redact, scanRoots)
-    } finally repository.close()
+    Try {
+      val builder = new FileRepositoryBuilder()
+      builder.setWorkTree(repoRoot)
+      builder.findGitDir(repoRoot)
+      builder.setMustExist(true)
+      val repository = builder.build()
+      try {
+        captureRepoChecked(repository, repoRoot, redact, scanRoots)
+      } finally repository.close()
+    }.fold(
+      failure => {
+        log.warn(
+          s"Git provenance: failed to capture ${repoRoot} — skipping",
+          failure
+        )
+        Vector.empty
+      },
+      identity
+    )
   }
 
   /** The guarded core of [[captureRepo]]: every refusal path returns

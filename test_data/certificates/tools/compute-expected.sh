@@ -111,7 +111,7 @@ kind="$(detect_type "$first4k")"
 
 now_date="$(date -u +%Y-%m-%d)"
 
-# The sidecar id is the test ID shared with Surveyor's integration tests: the
+# The sidecar id is the test ID shared with the integration tests: the
 # fixture's path relative to test_data/.
 sidecar_id="$(cd "$(dirname "$fixture")" && pwd -P)/$(basename "$fixture")"
 sidecar_id="${sidecar_id#*/test_data/}"

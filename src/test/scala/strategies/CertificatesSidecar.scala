@@ -52,8 +52,8 @@ import scala.util.Try
   * absence checks; `itemCount` is an exact match.
   */
 final case class CertificatesSidecar(
-    /** Test ID shared with Surveyor's integration tests: the fixture's path relative to
-      * `test_data/` (e.g. `certificates/x509/mozilla/foo.pem`).
+    /** Test ID shared with the integration tests: the fixture's path relative
+      * to `test_data/` (e.g. `certificates/x509/mozilla/foo.pem`).
       */
     id: String,
     description: String,

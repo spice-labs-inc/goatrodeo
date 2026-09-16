@@ -375,7 +375,7 @@ class GoatRodeoBuilder {
 
   /** Apply a table of settings written in Goat Rodeo's config-file schema.
     *
-    * This is how an embedding program — `spice`, Allspice — passes Goat Rodeo's
+    * This is how an embedding program — e.g. `spice` — passes Goat Rodeo's
     * settings through from its own config file without knowing what they mean.
     * The table arrives as a plain nested map, which is what the plugin SPI
     * carries so that it can stay dependency-free; see [[TomlTables]].

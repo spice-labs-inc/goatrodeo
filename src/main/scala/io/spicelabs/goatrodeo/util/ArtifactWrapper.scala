@@ -91,8 +91,11 @@ sealed trait ArtifactWrapper {
       }
     }.toOption.getOrElse(Set("application/octet-stream"))
     val base2 = mimeHint ++ base
+    // The hint is authoritative (never re-checked against content), so an
+    // augmenter failure must not drop it: fall back to base2 (hint ++
+    // detected), not to the detected set alone.
     Try { ArtifactWrapper.augmentMimeTypes(this, base2) }.toOption
-      .getOrElse(base)
+      .getOrElse(base2)
   }
 
   def isRealFile(): Boolean = false

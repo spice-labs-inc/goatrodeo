@@ -1154,7 +1154,13 @@ object DockerToProcess {
             case _                                => Nil
           }
           configPath = blobPath(configDigest)
-          configArt <- byName.get(configPath).flatMap(_.headOption).toList
+          configArt <- byName
+            .get(configPath)
+            // Unambiguous only: duplicate blobs sharing the config path would
+            // otherwise be removed from byName with just the first emitted.
+            .filter(_.length == 1)
+            .flatMap(_.headOption)
+            .toList
           configJson <- readJsonCapped(configArt, MaxOciJsonBytes).toList
         } yield {
           val layerPaths = (manifestJson \ "layers") match {
@@ -1199,7 +1205,7 @@ object DockerToProcess {
             } yield layer -> art)*
           )
           val claimedNames =
-            Set("index.json", "oci-layout") ++
+            Set("index.json") ++
               infos.flatMap(i => i.configPath :: i.layers)
           val claimedUuids =
             Set(index.uuid) ++ infos.map(_.configFile.uuid) ++

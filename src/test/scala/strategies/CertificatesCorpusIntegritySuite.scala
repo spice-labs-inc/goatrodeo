@@ -108,9 +108,10 @@ class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
   }
 
   test("every sidecar id is its corpus-relative path, and unique") {
-    // The id is the test ID Surveyor's integration tests share with this suite
-    // (tests/README.md in surveyor): `certificates/<category>/.../<fixture>`.
-    val root = CertificatesFixtureInventory.corpusRoot.getParentFile.toPath.toAbsolutePath
+    // The id is the test ID the integration tests share with this suite
+    // (tests/README.md): `certificates/<category>/.../<fixture>`.
+    val root =
+      CertificatesFixtureInventory.corpusRoot.getParentFile.toPath.toAbsolutePath
     val ids = CertificatesFixtureInventory.allSidecars.map { s =>
       val expected = root
         .relativize(s.toPath.toAbsolutePath)
@@ -124,7 +125,9 @@ class CertificatesCorpusIntegritySuite extends GoatRodeoFunSuite {
     assert(
       wrong.isEmpty,
       s"${wrong.size} sidecar(s) have an id that is not their path:" +
-        wrong.map { case (p, e, a) => s"$p: id=$a expected=$e" }.mkString("\n  ", "\n  ", "")
+        wrong
+          .map { case (p, e, a) => s"$p: id=$a expected=$e" }
+          .mkString("\n  ", "\n  ", "")
     )
     val dupes = ids.groupBy(_._3).collect { case (id, xs) if xs.size > 1 => id }
     assert(dupes.isEmpty, s"duplicate sidecar ids: ${dupes.mkString(", ")}")

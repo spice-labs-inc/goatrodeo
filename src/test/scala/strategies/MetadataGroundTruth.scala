@@ -31,7 +31,9 @@ object MetadataGroundTruth {
       name: String,
       path: String,
       purls: List[String],
-      /** Test ID shared with Surveyor's integration tests (the path under test_data/download/). */
+      /** Test ID shared with the integration tests (the path under
+        * test_data/download/).
+        */
       id: String = ""
   )
 

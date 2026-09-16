@@ -228,7 +228,14 @@ abstract class ParentScope(
   }
 
   /** Called from `passToParent` and supports storing metadata extracted from
-    * kids
+    * kids.
+    *
+    * Contract for overrides: accept only children whose `parentId` equals
+    * `scopeFor()`. `passToParent` offers every child to its parent scope AND
+    * (via the grandparent hop) to the parent's parent scope, so an override
+    * that ignores `parentId` lets a nested container's children (a fat jar's
+    * BOOT-INF/lib jar, a nested .NET assembly) be accumulated onto the outer
+    * container's item. The generic scope's default implementation is a no-op.
     */
   def accumulateInfo(
       parentId: String,

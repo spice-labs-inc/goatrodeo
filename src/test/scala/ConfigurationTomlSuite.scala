@@ -406,7 +406,7 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     // tomlj's contract lets a caller write toList().get(0).asInstanceOf[TomlTable],
     // and every other accessor here wraps nested values to honour it. toList did
     // not, which nothing could notice until a config file had an array of tables
-    // in it — Allspice's [[repositories]] is the first.
+    // in it — [[repositories]] is the first.
     val table = TomlTables.fromMap(
       Map(
         "repositories" -> JList.of(

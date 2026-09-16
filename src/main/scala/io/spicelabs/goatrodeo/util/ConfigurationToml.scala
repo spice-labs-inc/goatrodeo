@@ -29,16 +29,17 @@ import scala.util.Try
   *
   * WHY a table rather than a file: this is the same schema whether it is the
   * whole of a Goat Rodeo config file or one nested table inside a larger
-  * `spice` or Allspice config. Taking a `TomlTable` means both cases run the
-  * same code, with no "am I nested?" branch, and it is what lets an outer
-  * program carry Goat Rodeo's settings verbatim without understanding them.
+  * embedding program's config (e.g. `spice`). Taking a `TomlTable` means both
+  * cases run the same code, with no "am I nested?" branch, and it is what lets
+  * an outer program carry Goat Rodeo's settings verbatim without understanding
+  * them.
   *
   * WHY unknown keys are an error: a mistyped key that is silently ignored is
   * how a config file becomes undebuggable — the value the user wrote is simply
   * not in force and nothing says so. The previous attempt at cross-program
   * configuration failed in exactly this family: an allowlist of Goat Rodeo
-  * flags maintained inside Allspice drifted until it permitted flags Goat Rodeo
-  * does not have.
+  * flags maintained inside the enclosing config component drifted until it
+  * permitted flags Goat Rodeo does not have.
   *
   * Keys are the snake_case spelling of the corresponding command-line flag, and
   * the mapping is mechanical in both directions: `max_records` is
@@ -53,8 +54,8 @@ object ConfigurationToml {
 
   /** The configuration group these settings belong to.
     *
-    * Named for the job rather than for this component, and the same group
-    * `spice` and Allspice carry, so `[analysis] threads = 16` means one thing
+    * Named for the job rather than for this component, and the same group the
+    * embedding programs carry, so `[analysis] threads = 16` means one thing
     * wherever it is written. A standalone Goat Rodeo config file therefore has
     * an `[analysis]` table too, rather than bare keys — one shape to learn.
     */

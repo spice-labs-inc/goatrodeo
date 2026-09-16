@@ -91,13 +91,13 @@ https://stackoverflow.com/questions/62664761/probability-of-hash-collision
 
 There are three classes of file that Goat Rodeo will emit:
 
-* The OmniBOR Entry file (Goat Rodeo Data or `.grd`) which contains the substance of the data. **EOF semantics:** the entry stream is terminated by a
+* The OmniBOR Entry file (Goat Rodeo Database or `.grd`) which contains the substance of the data. **EOF semantics:** the entry stream is terminated by a
   −1 marker followed by a back-pointer long; reading treats **any negative entry length** as end-of-file, and a positive length that exceeds the
-  remaining file bytes is end-of-data (a corrupt/foreign tail) — never an allocation at the declared size. Verified by `GrdEofSuite.T13.1–T13.3`. The Goat Rodeo Data file should be named-based
+  remaining file bytes is end-of-data (a corrupt/foreign tail) — never an allocation at the declared size. Verified by `GrdEofSuite.T13.1–T13.3`. The Goat Rodeo Database file should be named based
   on the hex value of the 8 most significant bytes of the file's SHA256 hash. This allows for a quick check. Every `.grd` file shall contain
   a back-pointer to the previous file (except the original file). Given that the database is accretive, newer files will reference
   previous files. 
-* The Index file which contains the MD5 hash of the primary key, the Goat Rodeo Data (`.grd`) file that contains the entry, and the offset in that file. These files will be named based on the hex of 8 most significant bytes of the file's SHA256 hash with `.gri` appended.
+* The Index file which contains the MD5 hash of the primary key, the Goat Rodeo Database (`.grd`) file that contains the entry, and the offset in that file. These files will be named based on the hex of 8 most significant bytes of the file's SHA256 hash with `.gri` appended.
   This is the Goat Rodeo Index `.gri` file. The indexes should be in ascending order.
 * The Goat Rodeo Cluster (`.grc`) file which contains the ordered list of `.grd` files including SHA256 hash, the set of `.gri` files with SHA256 hash
   and database metadata. The `.grc` file will be named based on the time the file was created and hex value of the most significant 8 bytes of the SHA256 of the file's hash. For example `2024_04_30_18_23_07_334f42bf1be490ee.grc` The timestamp prefix allows for determining the newest or most
