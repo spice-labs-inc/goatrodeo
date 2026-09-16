@@ -6,6 +6,7 @@ import io.spicelabs.goatrodeo.omnibor.ConnectionAugmentation
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.json4s.*
+import org.json4s.JValue
 import org.json4s.native.JsonMethods.*
 
 import java.io.ByteArrayOutputStream
@@ -294,7 +295,7 @@ object StaticMetadataResult {
 class StaticMetadataResult(private val process: ProcessBuilder, dir: String) {
   val startedAt = System.currentTimeMillis()
   @volatile private var running = false
-  @volatile private var answer: Option[(String, org.json4s.JValue)] = None
+  @volatile private var answer: Option[(String, JValue)] = None
   @volatile private var theProcess: Option[Process] = None
   @volatile private var processExitCode: Option[Int] = None
 

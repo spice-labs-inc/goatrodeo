@@ -31,6 +31,7 @@ import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 
 import java.nio.charset.StandardCharsets
+import java.util.Arrays
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -279,7 +280,7 @@ class CloudKeyState(artifact: ArtifactWrapper)
         val buf = new Array[Byte](CloudKeyStrategy.MaxReadBytes)
         val n = stream.read(buf, 0, CloudKeyStrategy.MaxReadBytes)
         if (n <= 0) Array.emptyByteArray
-        else java.util.Arrays.copyOf(buf, n)
+        else Arrays.copyOf(buf, n)
       }
     }.getOrElse(Array.emptyByteArray)
 

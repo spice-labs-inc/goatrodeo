@@ -13,9 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.FunSuite
-import munit.ScalaCheckSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import org.apache.commons.io.FileUtils
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
@@ -25,14 +23,14 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import scala.collection.immutable.TreeSet
 
-/** Phase 2 — Unit tests for `JavaSecurityParser`.
+/** Unit tests for `JavaSecurityParser`.
   *
   * These tests verify that the parser extracts the five security-relevant
   * properties, tokenizes comma-separated lists, handles Java properties
   * conventions (line continuations, escapes, whitespace), tolerates malformed
   * input, and respects the read budget.
   */
-class JavaSecurityParserSuite extends FunSuite with ScalaCheckSuite {
+class JavaSecurityParserSuite extends GoatRodeoScalaCheckSuite {
 
   private def parse(text: String): JavaSecurityData = {
     JavaSecurityParser.parseString(text).get

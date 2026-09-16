@@ -2,19 +2,20 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
 import java.math.BigInteger
+import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -28,7 +29,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
 
-/** Phase 0 (0.1) — Keystore with private key entry produces cert metadata only.
+/** Keystore with private key entry produces cert metadata only.
   *
   * ==What this tests==
   *
@@ -52,7 +53,7 @@ import scala.jdk.CollectionConverters.*
   * certificate chains. If the strategy accidentally emitted private key
   * material (e.g., via `getKey(alias)` instead of
   * `getCertificateChain(alias)`), it would leak secrets into the ADG metadata,
-  * violating the core Phase 0 invariant.
+  * violating the core invariant.
   *
   * This test is the FIRST test that exercises the key-entry code path with a
   * real KeyStore object. The existing `CertificatesFilterLeaksSuite` tests
@@ -61,8 +62,8 @@ import scala.jdk.CollectionConverters.*
   *
   * ==Requirement trace==
   *
-  * Phase 0 item 0.1: Keystore with private key entry produces cert metadata
-  * only — no private key material in output.
+  * Requirement: Keystore with private key entry produces cert metadata only —
+  * no private key material in output.
   *
   * ==LLM-friendly summary==
   *
@@ -73,16 +74,15 @@ import scala.jdk.CollectionConverters.*
   * | key entry metadata has no long hex on non-allowlisted keys | same                             | filterLeaks(metadata) == metadata                 |
   * | cert-only entry vs key entry                               | keystore with both entry types   | CertCount includes chain certs, KeyEntryCount > 0 |
   */
-class CertificatesKeystoreKeyEntrySuite extends FunSuite {
+class CertificatesKeystoreKeyEntrySuite extends GoatRodeoFunSuite {
 
   if (Security.getProvider("BC") == null) {
     Security.addProvider(
-      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      new BouncyCastleProvider()
     )
   }
 
-  private def generateSelfSignedCert()
-      : (java.security.KeyPair, X509Certificate) = {
+  private def generateSelfSignedCert(): (KeyPair, X509Certificate) = {
     val kpg = KeyPairGenerator.getInstance("RSA", "BC")
     kpg.initialize(2048, new SecureRandom())
     val kp = kpg.generateKeyPair()
@@ -159,10 +159,10 @@ class CertificatesKeystoreKeyEntrySuite extends FunSuite {
     *
     * WHAT NOT: Does NOT emit any private key bytes or PEM headers.
     *
-    * WHY: This is the core Phase 0 invariant for keystores: private key
-    * material must never appear in metadata. The metadata must describe the
-    * certificate chain only, allowing operators to see what certs are in the
-    * keystore without exposing secrets.
+    * WHY: This is the core invariant for keystores: private key material must
+    * never appear in metadata. The metadata must describe the certificate chain
+    * only, allowing operators to see what certs are in the keystore without
+    * exposing secrets.
     *
     * REQUIREMENT: Keystore with private key entry produces cert metadata only.
     */

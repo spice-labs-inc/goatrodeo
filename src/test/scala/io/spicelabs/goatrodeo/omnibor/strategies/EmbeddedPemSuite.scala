@@ -13,28 +13,30 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
-import munit.FunSuite
 
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.util.Base64
+import java.util.Base64.getEncoder
 import scala.collection.immutable.TreeSet
 
-/** Phase D — Base64-embedded PEM capture (redaction-first).
+/** Base64-embedded PEM capture (redaction-first).
   *
   * Decodes certificates/private keys embedded as base64 data fields or inline
   * PEM in text configs using the real certificate/key corpus, and verifies the
   * hard constraint: private key bytes are never emitted and only public SPKI
   * hashes are recorded.
   */
-class EmbeddedPemSuite extends FunSuite {
+class EmbeddedPemSuite extends GoatRodeoFunSuite {
 
   private val certAdHoc = MKC.adHoc("Certificates")
   private val keyAdHoc = MKC.adHoc("EmbeddedKey")
@@ -53,7 +55,7 @@ class EmbeddedPemSuite extends FunSuite {
     )
 
   private def b64(s: String): String =
-    java.util.Base64.getEncoder.withoutPadding
+    getEncoder.withoutPadding
       .encodeToString(s.getBytes(StandardCharsets.UTF_8))
 
   private def artifact(name: String, content: String): ByteWrapper =
@@ -71,7 +73,7 @@ class EmbeddedPemSuite extends FunSuite {
     m.values.toVector.flatMap(_.toVector.map(_.value))
 
   test(
-    "T-D-01 kubeconfig certificate-authority-data yields a certificate item"
+    "kubeconfig certificate-authority-data yields a certificate item"
   ) {
     val m = meta(
       "kubeconfig.yaml",
@@ -101,7 +103,7 @@ class EmbeddedPemSuite extends FunSuite {
   }
 
   test(
-    "T-D-02 kubeconfig client-key-data yields a private-key envelope, zero key bytes"
+    "kubeconfig client-key-data yields a private-key envelope, zero key bytes"
   ) {
     val m = meta(
       "kubeconfig.yaml",
@@ -135,7 +137,7 @@ class EmbeddedPemSuite extends FunSuite {
     )
   }
 
-  test("T-D-03 inline PEM block inside YAML yields a certificate item") {
+  test("inline PEM block inside YAML yields a certificate item") {
     val yaml =
       "kind: Secret\napiVersion: v1\nstringData:\n  tls.crt: |-\n    " +
         certPem.replace("\n", "\n    ") + "\n"
@@ -147,8 +149,8 @@ class EmbeddedPemSuite extends FunSuite {
     assertEquals(m(keyAdHoc("kind")).head.value, "certificate")
   }
 
-  test("T-D-04 oversized base64 blob is skipped without OOM") {
-    val big = java.util.Base64.getEncoder
+  test("oversized base64 blob is skipped without OOM") {
+    val big = Base64.getEncoder
       .encodeToString(
         Array.fill[Byte](EmbeddedPemStrategy.MaxDecodeBytes + 1)(0x41)
       )
@@ -163,7 +165,7 @@ class EmbeddedPemSuite extends FunSuite {
     assert(!m.contains(certAdHoc("SubjectDN")), "oversize blob must not decode")
   }
 
-  test("T-D-05 malformed base64 is tolerated, no item, no panic") {
+  test("malformed base64 is tolerated, no item, no panic") {
     val m = meta(
       "kubeconfig.yaml",
       "certificate-authority-data: " + ("A" * 24) + "%\nclient-key-data: \"not-base64!!\"\n"
@@ -171,7 +173,7 @@ class EmbeddedPemSuite extends FunSuite {
     assert(m.isEmpty, s"malformed input must not produce metadata: $m")
   }
 
-  test("T-D-06 property: emitted values are short tags, never secrets") {
+  test("property: emitted values are short tags, never secrets") {
     val battery = Vector(
       "kubeconfig.yaml" ->
         ("certificate-authority-data: " + b64(
@@ -203,13 +205,13 @@ class EmbeddedPemSuite extends FunSuite {
     }
   }
 
-  test("T-D-07 certificate SPKI hash is the public key hash, not the secret") {
+  test("certificate SPKI hash is the public key hash, not the secret") {
     val cf = CertificateFactory.getInstance("X.509")
     val cert = cf
       .generateCertificate(
         new ByteArrayInputStream(certPem.getBytes(StandardCharsets.ISO_8859_1))
       )
-      .asInstanceOf[java.security.cert.X509Certificate]
+      .asInstanceOf[X509Certificate]
     val m = meta(
       "kubeconfig.yaml",
       "certificate-authority-data: " + b64(certPem) + "\n"

@@ -4,12 +4,15 @@ import com.palantir.isofilereader.isofilereader.IsoFileReader
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.rpm.RpmReader
 import io.spicelabs.baharat.rpm.payload.PayloadEntry
+import io.spicelabs.cilantro.AssemblyWalker
+import io.spicelabs.cilantro.DotnetAssemblyProbe
+import io.spicelabs.cilantro.PDBView
+import io.spicelabs.cilantro.PortablePdbFile
 import io.spicelabs.saffron.DiskReader
 import io.spicelabs.saffron.SaffronProbe
 import io.spicelabs.saffron.container.BinaryContainerMount
+import io.spicelabs.saffron.fs.FileSystem
 import io.spicelabs.saffron.fs.FileSystemEntry
-import io.spicelabs.saffron.fs.FileSystemEntry.EntryType
-import io.spicelabs.saffron.fs.FileSystemEntry.RegularFile
 import io.spicelabs.saffron.fs.FileSystemMount
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
@@ -18,17 +21,23 @@ import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
-import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Arrays
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
+import scala.util.Success
 import scala.util.Try
 import scala.util.Using
+
+import FileSystemEntry.EntryType
+import FileSystemEntry.RegularFile
 
 /** Utilities for traversing and extracting files from various archive formats.
   *
@@ -83,20 +92,19 @@ object FileWalker {
               .iterator()
               .asScala
               .filter(v => { !v.isDirectory() })
-              .map(v => {
+              .flatMap(v => {
                 val name = v.getName()
                 val size = v.getSize()
-                val modified =
-                  Option(v.getLastModifiedTime()).map(_.toInstant())
+
                 ArtifactWrapper
                   .newWrapper(
                     name,
                     size,
                     zipFile.getInputStream(v),
                     in.tempDir,
-                    tempDir,
-                    lastModified = modified
+                    tempDir
                   )
+                  .toOption
               })
               .toVector
             Some(
@@ -132,24 +140,25 @@ object FileWalker {
     if (rpmMimeTypes.intersect(in.mimeType).nonEmpty) {
       try {
         in.withFile(f => {
-          Using.resource(RpmReader.streamPayload(f.toPath())) {
-            import scala.jdk.CollectionConverters.IteratorHasAsScala
-            payload =>
-              val wrappers = for {
-                entry <- payload.iterator().asScala
+          Using.resource(RpmReader.streamPayload(f.toPath())) { payload =>
+            val wrappers = for {
+              entry <- payload.iterator().asScala
 
-                file <- entry match {
-                  case f: PayloadEntry.FileEntry => Some(f)
-                  case _                         => None
-                }
-              } yield ArtifactWrapper.newWrapper(
-                file.path(),
-                file.size(),
-                file.content(),
-                in.tempDir,
-                tempPath
-              )
-              Some(wrappers.toVector -> "RPM")
+              file <- entry match {
+                case f: PayloadEntry.FileEntry => Some(f)
+                case _                         => None
+              }
+              wrapper <- ArtifactWrapper
+                .newWrapper(
+                  file.path(),
+                  file.size(),
+                  file.content(),
+                  in.tempDir,
+                  tempPath
+                )
+                .toOption
+            } yield wrapper
+            Some(wrappers.toVector -> "RPM")
           }
         })
       } catch {
@@ -187,8 +196,9 @@ object FileWalker {
             isoFileReader.convertTreeFilesToFlatList(files).asScala.toVector
 
           val wrappers =
-            for (cycleFile <- flatList)
-              yield {
+            for {
+              cycleFile <- flatList
+              wrapper <- {
 
                 val nameWithThing = cycleFile.getFullFileName('/')
                 val name =
@@ -206,7 +216,8 @@ object FileWalker {
                   in.tempDir,
                   tempPath
                 )
-              }
+              }.toOption
+            } yield wrapper
 
           isoFileReader.close()
 
@@ -281,7 +292,7 @@ object FileWalker {
         val r = s.read(buf, total, n - total)
         if (r <= 0) done = true else total += r
       }
-      if (total == n) buf else java.util.Arrays.copyOf(buf, total)
+      if (total == n) buf else Arrays.copyOf(buf, total)
     }
 
   /** Read the last up-to-`n` bytes of the artifact through a fresh stream.
@@ -304,7 +315,7 @@ object FileWalker {
         val r = s.read(buf, total, want - total)
         if (r <= 0) done = true else total += r
       }
-      if (total == want) buf else java.util.Arrays.copyOf(buf, total)
+      if (total == want) buf else Arrays.copyOf(buf, total)
     }
 
   /** Cheap, spill-free probe: read bounded byte ranges via `withStream` and ask
@@ -333,16 +344,69 @@ object FileWalker {
       tempPath: Path
   ): OptionalArchiveStream = {
     ApRomfs.read(in).map { files =>
-      val wrappers = files.map { case (name, data) =>
-        ArtifactWrapper.newWrapper(
-          name,
-          data.length.toLong,
-          new ByteArrayInputStream(data),
-          in.tempDir,
-          tempPath
-        )
+      val wrappers = files.flatMap { case (name, data) =>
+        Some(ByteWrapper(data, name, in.tempDir))
       }.toVector
       wrappers -> "ArduPilot ROMFS"
+    }
+  }
+
+  /** Try to construct an `OptionalArchiveStream` from a .NET assembly.
+    *
+    * The new Cilantro (0.3.1) exposes a .NET assembly as an ordinary container:
+    * probe, then walk, then wrap. The container walk mirrors the zip/saffron
+    * pattern: a cheap MIME gate (the dotnet MIME) then a cheap probe
+    * (`DotnetAssemblyProbe.isDotnetAssembly`, bounded, no withFile), then the
+    * walk (`AssemblyWalker.withinAssemblyStream`) which yields entries
+    * (classes, embedded resources, certificates, win32 resources, debug blobs —
+    * but NOT the PDB-as-container, which awaits a Cilantro enhancement). Each
+    * entry is wrapped into an ArtifactWrapper carrying the entry's mimeHint,
+    * inside the walk callback (entries are usable only while the walk is open).
+    *
+    * @param in
+    *   the artifact; only acted on when its MIME is the dotnet MIME
+    * @param tempDir
+    *   the walk temp dir
+    * @return
+    *   Some(Vector[ArtifactWrapper]) of the assembly's entries, or None if the
+    *   artifact is not a parseable assembly.
+    */
+  private def asDotnetAssemblyContainer(
+      in: ArtifactWrapper,
+      tempDir: Path
+  ): OptionalArchiveStream = {
+    val dotnetMime = DotnetDetector.DOTNET_MIME_STRING
+    val isDotnetMime = in.mimeType.contains(dotnetMime)
+    if (!isDotnetMime) None
+    else {
+      // Cheap probe: bounded, never throws, no withFile.
+      val probeOk =
+        in.withStream(s => DotnetAssemblyProbe.isDotnetAssembly(s))
+      if (!probeOk) None
+      else {
+        try {
+          AssemblyWalker
+            .withinAssemblyStream(in.withFile(f => f.toPath)) { entries =>
+              val wrappers = entries.flatMap { e =>
+                e.processStream { stream =>
+                  ArtifactWrapper
+                    .newWrapper(
+                      nominalPath = e.name,
+                      size = e.length,
+                      data = stream,
+                      tempDir = in.tempDir,
+                      tempPath = tempDir,
+                      mimeHint = e.mimeHint.toSet
+                    )
+                    .toOption
+                }
+              }
+              wrappers.toVector -> "Cilantro .NET assembly"
+            }
+        } catch {
+          case _: Exception => None
+        }
+      }
     }
   }
 
@@ -374,8 +438,7 @@ object FileWalker {
           // name it. `Saffron EXT4` says which reader produced these artifacts
           // and a bare `Saffron` does not, and the name is only reachable from
           // the `disk` handle, which does not outlive this block.
-          val (diskSystems, diskFormat)
-              : (Vector[io.spicelabs.saffron.fs.FileSystem], Option[String]) =
+          val (diskSystems, diskFormat): (Vector[FileSystem], Option[String]) =
             if (
               mimes.intersect(saffronMimeTypes).nonEmpty ||
               Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
@@ -388,7 +451,7 @@ object FileWalker {
                 )
               }.getOrElse((Vector(), None))
             } else (Vector(), None)
-          val containerSystems: Vector[io.spicelabs.saffron.fs.FileSystem] =
+          val containerSystems: Vector[FileSystem] =
             if (mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty) {
               Try {
                 BinaryContainerMount.mount(path).toScala.toVector
@@ -411,15 +474,16 @@ object FileWalker {
                 .flatMap(fileSystemEntry => {
                   fileSystemEntry match {
                     case regular: RegularFile =>
-                      Some(
-                        ArtifactWrapper.newWrapper(
+                      ArtifactWrapper
+                        .newWrapper(
                           regular.path(),
                           regular.size(),
                           regular.openStream(),
                           None,
                           tempPath
                         )
-                      )
+                        .toOption
+
                     case _ => None
                   }
                 })
@@ -435,6 +499,79 @@ object FileWalker {
         }
       })
     } else None
+  }
+
+  /** Try to construct an `OptionalArchiveStream` from a portable PDB.
+    *
+    * A PDB is an ordinary container of embedded source files. The assembly walk
+    * stamps a type-17 debug-blob wrapper with the `pe/debug; format=mpdb` MIME
+    * (cilantro-owned); this branch is keyed on that MIME only. Inside a single
+    * `withFile`, `PortablePdbFile.withPdb` spools/parses the PDB and the
+    * callback wraps `view.sources` into ArtifactWrappers (their name and
+    * content). The spool dir is a uniquely-named subdir of the walk's temp dir;
+    * cilantro never creates/owns/deletes the caller's dir, and GR's scope-exit
+    * delete removes the tree.
+    *
+    * A PDB that is not a portable PDB (withPdb -> Success(None)) or a hostile
+    * one (Failure) is rejected as a container: no children, no throw.
+    *
+    * @param in
+    *   the ArtifactWrapper whose MIME is `pe/debug; format=mpdb` (a PDB)
+    * @param tempDir
+    *   the walk temp dir (spool location for the decompressed PDB)
+    * @return
+    *   Some(Vector[ArtifactWrapper]) of the PDB's source files, or None if the
+    *   artifact is not a parseable portable PDB.
+    */
+  private def asPdbContainer(
+      in: ArtifactWrapper,
+      tempDir: Path
+  ): OptionalArchiveStream = {
+    val pdbMime = "pe/debug; format=mpdb"
+    val isPdbMime = in.mimeType.contains(pdbMime)
+    if (!isPdbMime) None
+    else {
+      in.withFile { file =>
+        try {
+          val spoolDir =
+            Files.createTempDirectory(tempDir, "cilantro")
+          val result: Try[
+            Option[Option[(Vector[ArtifactWrapper], String)]]
+          ] =
+            PortablePdbFile.withPdb[Option[(Vector[ArtifactWrapper], String)]](
+              file,
+              Some(spoolDir)
+            ) { (outcome: Try[Option[PDBView]]) =>
+              outcome match {
+                case Success(Some(view)) =>
+                  val wrappers = view.sources.flatMap { src =>
+                    val name = src.name
+                    val bytes = src.processStream { stream =>
+                      val bos = new ByteArrayOutputStream()
+                      Helpers.copy(stream, bos)
+                      bos.toByteArray()
+                    }
+
+                    Some(
+                      ByteWrapper(bytes, name, in.tempDir, Set("text/plain"))
+                    )
+
+                  }
+                  Some(wrappers.toVector -> "Portable PDB")
+                case _ =>
+                  // Not a portable PDB, or hostile: not a container.
+                  None
+              }
+            }
+          result match {
+            case Success(Some(inner)) => inner
+            case _                    => None
+          }
+        } catch {
+          case _: Exception => None
+        }
+      }
+    }
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
@@ -465,12 +602,10 @@ object FileWalker {
       val theIterator = Helpers
         .iteratorFor(input)
         .filter(!_.isDirectory())
-        .map(ae => {
+        .flatMap(ae => {
           val artifactName = ae.getName()
 
           val size = ae.getSize()
-
-          val modified = Option(ae.getLastModifiedDate()).map(_.toInstant())
 
           ArtifactWrapper
             .newWrapper(
@@ -478,9 +613,9 @@ object FileWalker {
               size,
               input,
               tempPath,
-              tempDir,
-              lastModified = modified
+              tempDir
             )
+            .toOption
         })
         .toVector
       input.close()
@@ -609,6 +744,8 @@ object FileWalker {
         ret
       }.orElse(asRPMWrapper(in, tempDir))
         .orElse(asApRomfs(in, tempDir))
+        .orElse(asDotnetAssemblyContainer(in, tempDir))
+        .orElse(asPdbContainer(in, tempDir))
         .orElse(asSaffronFilesystem(in, tempDir))
         .orElse(
           asISOWrapper(in, tempDir)
@@ -688,6 +825,10 @@ object FileWalker {
     *
     * @param artifact
     *   -- the artifact to potentially traverse into
+    * @param failedContainers
+    *   -- run-scoped counter incremented once when a container's expansion
+    *   function fails, so the run can summarize wholesale container loss (the
+    *   per-container error stays logged at the failure site)
     * @param function
     *   -- the function that does "a thing" with the expanded artifacts
     *
@@ -695,9 +836,10 @@ object FileWalker {
     *   if the thing is a container, then `Some(T)` where T is the value
     *   returned from `function`
     */
-  def withinArchiveStream[T](artifact: ArtifactWrapper)(
-      function: Vector[ArtifactWrapper] => T
-  ): Option[T] = {
+  def withinArchiveStream[T](
+      artifact: ArtifactWrapper,
+      failedContainers: AtomicInteger = new AtomicInteger(0)
+  )(function: Vector[ArtifactWrapper] => T): Option[T] = {
     if (notArchive(artifact)) None
     else {
       val tempDirOpt: Option[Path] = artifact.tempDir match {
@@ -723,6 +865,9 @@ object FileWalker {
                   Some(function(artifacts))
                 } catch {
                   case e: Exception =>
+                    // Count wholesale container loss so the run's completion
+                    // can summarize it; the error itself stays logged here.
+                    failedContainers.incrementAndGet()
                     logger.error(
                       f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
                           .getMessage()}",

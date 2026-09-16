@@ -13,8 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
+import io.spicelabs.goatrodeo.omnibor.strategies.GenericFileState
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-/** Phase 2 TDD Tests: ProcessingState.maybePackageTag contract
+/** ProcessingState.maybePackageTag contract
   *
   * These tests verify:
   *   - ProcessingState trait has maybePackageTag method
@@ -23,9 +25,9 @@ package io.spicelabs.goatrodeo.omnibor
   *     tagging)
   *
   * Requirement Traceability:
-  *   - R7: Certificates and Generic excluded from per-package tagging
+  *   - Certificates and Generic excluded from per-package tagging
   */
-class PackageTagContractSuite extends munit.FunSuite {
+class PackageTagContractSuite extends GoatRodeoFunSuite {
 
   // ==================== Trait Contract Tests ====================
 
@@ -37,7 +39,7 @@ class PackageTagContractSuite extends munit.FunSuite {
     // This test verifies compilation - the fact that it compiles means the method exists
     // We use GenericFileState which inherits from ProcessingState
     val genericState =
-      new io.spicelabs.goatrodeo.omnibor.strategies.GenericFileState()
+      new GenericFileState()
 
     // This should compile and return None (the default)
     val result = genericState.maybePackageTag(SingleMarker())

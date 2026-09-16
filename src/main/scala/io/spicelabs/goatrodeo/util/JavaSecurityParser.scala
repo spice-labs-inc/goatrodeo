@@ -16,6 +16,7 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 
+import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.util.Properties
 import scala.collection.immutable.TreeSet
@@ -87,7 +88,7 @@ object JavaSecurityParser {
     */
   def parseString(content: String): Try[JavaSecurityData] = Try {
     val props = new Properties()
-    props.load(new java.io.StringReader(content))
+    props.load(new StringReader(content))
     JavaSecurityData(
       disabledAlgorithms =
         tokenize(Option(props.getProperty(KeyDisabledAlgorithms))),

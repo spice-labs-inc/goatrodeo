@@ -30,8 +30,11 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
+import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.pkcs.RSAPrivateKey
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.openssl.PEMKeyPair
 import org.bouncycastle.openssl.PEMParser
 
@@ -39,6 +42,7 @@ import java.io.ByteArrayInputStream
 import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.security.KeyFactory
+import java.security.PublicKey
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
@@ -46,7 +50,9 @@ import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Arrays
 import java.util.Base64
+import java.util.Date
 import javax.security.auth.x500.X500Principal
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -166,10 +172,10 @@ object EmbeddedPemStrategy {
     KeyAlgorithmNames.getOrElse(oid, oid)
 
   private def ecSize(
-      algId: org.bouncycastle.asn1.x509.AlgorithmIdentifier
+      algId: AlgorithmIdentifier
   ): Option[Int] =
     Option(algId.getParameters)
-      .collect { case oid: org.bouncycastle.asn1.ASN1ObjectIdentifier =>
+      .collect { case oid: ASN1ObjectIdentifier =>
         oid.getId
       }
       .flatMap(EllipticCurves.get)
@@ -233,7 +239,7 @@ object EmbeddedPemStrategy {
   ): Option[DerivedKey] =
     Try(
       PrivateKeyInfo.getInstance(
-        org.bouncycastle.asn1.ASN1Primitive.fromByteArray(bytes)
+        ASN1Primitive.fromByteArray(bytes)
       )
     ).toOption.flatMap { pri =>
       Try(pri.getPrivateKeyAlgorithm).toOption.flatMap(v => Option(v)).map {
@@ -249,14 +255,14 @@ object EmbeddedPemStrategy {
   private def dn(name: X500Principal): String =
     name.getName(X500Principal.RFC2253)
 
-  private def isoUtc(d: java.util.Date): String =
+  private def isoUtc(d: Date): String =
     DateTimeFormatter.ISO_INSTANT
       .withZone(ZoneOffset.UTC)
       .format(d.toInstant)
       .replaceAll("\\.\\d+Z$", "Z")
 
   private def keyAlgAndSize(
-      pub: java.security.PublicKey
+      pub: PublicKey
   ): (String, Option[Int], Option[String]) =
     pub match {
       case rsa: RSAPublicKey =>
@@ -350,7 +356,7 @@ object EmbeddedPemStrategy {
     val bytes = a.withStream { s =>
       val buf = new Array[Byte](DetectReadBytes)
       val n = s.read(buf, 0, DetectReadBytes)
-      if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+      if (n <= 0) Array.emptyByteArray else Arrays.copyOf(buf, n)
     }
     new String(bytes, StandardCharsets.ISO_8859_1)
   }
@@ -359,7 +365,7 @@ object EmbeddedPemStrategy {
     val bytes = a.withStream { s =>
       val buf = new Array[Byte](MaxReadBytes)
       val n = s.read(buf, 0, MaxReadBytes)
-      if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+      if (n <= 0) Array.emptyByteArray else Arrays.copyOf(buf, n)
     }
     new String(bytes, StandardCharsets.ISO_8859_1)
   }

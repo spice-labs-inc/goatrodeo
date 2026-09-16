@@ -24,6 +24,9 @@ import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
 
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -150,11 +153,11 @@ object JvmDistribution {
   private def hasSiblingJavac(artifact: ArtifactWrapper): Boolean = {
     val file = artifact match {
       case fw: FileWrapper => fw.wrappedFile
-      case _               => new java.io.File(artifact.path())
+      case _               => new File(artifact.path())
     }
     val parent = file.getParentFile
     if (parent == null) false
-    else new java.io.File(parent, "bin/javac").exists()
+    else new File(parent, "bin/javac").exists()
   }
 
   /** Compute files to process for JVM distributions. Claims files named
@@ -271,7 +274,7 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
       cleanVersion <- PURLComponentSanitizer.sanitizeGenericVersion(ver)
     } yield {
       val qualifier = releaseData.sourceRepo.toSeq.map("repository_url" -> _)
-      scala.util.Try {
+      Try {
         PURLHelpers
           .purl(
             `type` = "generic",
@@ -359,7 +362,7 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
   override def maybePackageTag(
       marker: SingleMarker
   ): Option[PackageTagInfo] = {
-    val date: Option[java.util.Date] =
+    val date: Option[Date] =
       releaseData.javaVersionDate.flatMap(JavaDateParser.parse)
 
     Some(
@@ -376,7 +379,7 @@ class JvmState(artifact: ArtifactWrapper, releaseData: JvmReleaseData)
   * None on unparseable input.
   */
 private object JavaDateParser {
-  def parse(str: String): Option[java.util.Date] = {
+  def parse(str: String): Option[Date] = {
     val formats = Seq(
       "yyyy-MM-dd",
       "yyyy/MM/dd",
@@ -384,8 +387,8 @@ private object JavaDateParser {
       "dd/MM/yyyy"
     )
     formats.view.flatMap { fmt =>
-      scala.util.Try {
-        new java.text.SimpleDateFormat(fmt).parse(str)
+      Try {
+        new SimpleDateFormat(fmt).parse(str)
       }.toOption
     }.headOption
   }

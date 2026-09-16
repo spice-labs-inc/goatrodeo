@@ -22,12 +22,11 @@ import java.util.zip.ZipOutputStream
   * instances, and processing those bundles through the full pipeline via
   * `buildGraphForToProcess`.
   *
-  * '''Why this exists:''' Prior to Phase 1, tests used
-  * `buildGraphFromArtifactWrapper` (single JAR, no companion POM) or called
-  * methods directly. This made it impossible to test companion POM weight
-  * (REQ-3) or verify processing order (REQ-4). These helpers bridge the gap by
-  * setting up realistic directory structures that mirror how Goat Rodeo
-  * processes real Maven artifacts.
+  * '''Why this exists:''' `buildGraphFromArtifactWrapper` (single JAR, no
+  * companion POM) and direct method calls cannot test companion POM weight or
+  * processing order. These helpers bridge the gap by setting up realistic
+  * directory structures that mirror how Goat Rodeo processes real Maven
+  * artifacts.
   *
   * '''Usage:'''
   * {{{

@@ -13,17 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
 import java.nio.file.Files
+import java.util.Comparator
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** CBOM emission for the Phase A–G extended-capture families.
+/** CBOM emission for the extended-capture families.
   *
   * ## LLM-friendly summary
   *
@@ -43,7 +43,7 @@ import scala.collection.immutable.TreeSet
   *
   * Private-key markers are emitted faithfully as properties (no redaction).
   */
-class ExtendedCaptureCbomSuite extends FunSuite {
+class ExtendedCaptureCbomSuite extends GoatRodeoFunSuite {
 
   private implicit val formats: Formats = DefaultFormats
 
@@ -82,7 +82,7 @@ class ExtendedCaptureCbomSuite extends FunSuite {
     if (dir != null && dir.exists()) {
       Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(Files.delete(_))
       ()
     }

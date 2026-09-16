@@ -1,3 +1,6 @@
+import io.spicelabs.goatrodeo.GoatRodeo
+import io.spicelabs.goatrodeo.GoatRodeoBuilder
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.ConfigurationToml
@@ -5,23 +8,16 @@ import io.spicelabs.goatrodeo.util.TomlTables
 import org.tomlj.Toml
 import org.tomlj.TomlTable
 
+import java.lang.Boolean as JBoolean
+import java.lang.Long as JLong
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.List as JList
+import java.util.Map as JMap
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
-/** WHAT: covers reading a [[Configuration]] from TOML — the schema itself, the
-  * precedence of the command line over the file, the rules that keep a config
-  * file from becoming a second way to say something it should not, and the
-  * map-backed [[TomlTables]] adapter the plugin SPI hands tables through.
-  *
-  * WHY: this schema is now published in three places — the parser, the docs,
-  * and the templates Allspice generates. Tests are what stop those drifting.
-  * The previous cross-program configuration channel failed exactly there: an
-  * allowlist of Goat Rodeo flags kept inside Allspice drifted until it
-  * permitted flags Goat Rodeo does not have, and nothing noticed because
-  * nothing checked.
-  */
-class ConfigurationTomlSuite extends munit.FunSuite {
+class ConfigurationTomlSuite extends GoatRodeoFunSuite {
 
   private def parse(toml: String): TomlTable = {
     val result = Toml.parse(toml)
@@ -127,28 +123,6 @@ class ConfigurationTomlSuite extends munit.FunSuite {
 
   // ==================== nesting ====================
 
-  test("cutoff is refused in Goat Rodeo's own config file too") {
-    // An entitlement, not a preference: --cutoff is the only way to ask for one when
-    // standalone, so that the embedded rule has no second spelling to be forgotten by.
-    val error = read("""cutoff = "2026-01-01"""").left
-      .getOrElse(fail("expected an error"))
-    assert(error.contains("cutoff"), error)
-    assert(error.contains("not settable here"), error)
-  }
-
-  test("cutoff is refused in a table nested inside another program's config") {
-    // Embedded, the cutoff is the Spice Pass's `x-cutoff`: it constrains what the
-    // platform will accept, so a config file must not be able to widen it.
-    val result = ConfigurationToml.nestedFromToml(
-      parse("""cutoff = "2026-01-01""""),
-      Configuration(),
-      "registry.analysis"
-    )
-    val error = result.left.getOrElse(fail("expected an error"))
-    assert(error.contains("Spice Pass"), error)
-    assert(error.contains("registry.analysis"), error)
-  }
-
   test("errors name the table the user wrote, not an internal component") {
     val error = ConfigurationToml
       .nestedFromToml(
@@ -187,7 +161,7 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     // The file and the environment are resolved together, so crediting the file
     // for everything the command line displaces names the wrong loser whenever
     // the value came from a variable.
-    val reported = scala.collection.mutable.ArrayBuffer[String]()
+    val reported = ArrayBuffer[String]()
     withConfigFile("[analysis]\nthreads = 4\nmax_records = 999999\n") { path =>
       ConfigurationToml
         .fromSources(
@@ -274,7 +248,7 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   }
 
   test("the environment beats the config file, and says so") {
-    val reported = scala.collection.mutable.ArrayBuffer[String]()
+    val reported = ArrayBuffer[String]()
     withConfigFile("[analysis]\nthreads = 4\n") { path =>
       val config = ConfigurationToml
         .fromFile(
@@ -348,6 +322,57 @@ class ConfigurationTomlSuite extends munit.FunSuite {
 
   // ==================== the file's shape ====================
 
+  test("validation - threads below 1 is a Left naming the value") {
+    assert(ConfigurationToml.fromToml(parse("threads = 0")).isLeft)
+    assert(
+      ConfigurationToml
+        .fromToml(parse("threads = 0"))
+        .swap
+        .toOption
+        .get
+        .contains("threads must be >= 1, got 0")
+    )
+  }
+
+  test("validation - max_records at or below 100 is a Left") {
+    val result = ConfigurationToml.fromToml(parse("max_records = 100"))
+    assert(result.isLeft)
+    assert(
+      result.swap.toOption.get.contains("max_records must be > 100, got 100")
+    )
+  }
+
+  test("validation - invalid tag_json is a Left") {
+    val result = ConfigurationToml.fromToml(parse("""tag_json = "not json""""))
+    assert(result.isLeft)
+    assert(result.swap.toOption.get.contains("tag_json is not valid JSON"))
+  }
+
+  test("validation - invalid tag_date is a Left carrying the date error") {
+    val result =
+      ConfigurationToml.fromToml(parse("""tag_date = "not-a-date""""))
+    assert(result.isLeft)
+    assert(result.swap.toOption.get.contains("tag_date:"))
+  }
+
+  test("validation - cbom_version outside 1.6/1.7 is a Left") {
+    val result = ConfigurationToml.fromToml(parse("cbom_version = \"1.5\""))
+    assert(result.isLeft)
+    assert(
+      result.swap.toOption.get
+        .contains("cbom_version must be 1.6 or 1.7, got 1.5")
+    )
+  }
+
+  test("validation - relative paths in a config file are a Left") {
+    val result = ConfigurationToml.fromToml(parse("""out = "relative/dir""""))
+    assert(result.isLeft)
+    assert(
+      result.swap.toOption.get
+        .contains("paths in a config file must be absolute")
+    )
+  }
+
   test("settings outside a table are refused, not ignored") {
     // Bare keys at the root are how this file used to be written. Silently doing
     // nothing with them is exactly the failure this schema exists to prevent, so
@@ -384,9 +409,9 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     // in it — Allspice's [[repositories]] is the first.
     val table = TomlTables.fromMap(
       Map(
-        "repositories" -> java.util.List.of(
-          java.util.Map.of("id", "one"),
-          java.util.Map.of("id", "two")
+        "repositories" -> JList.of(
+          JMap.of("id", "one"),
+          JMap.of("id", "two")
         )
       )
     )
@@ -418,8 +443,8 @@ class ConfigurationTomlSuite extends munit.FunSuite {
       )
     )
 
-    assertEquals(table.getLong("threads"), java.lang.Long.valueOf(16L))
-    assertEquals(table.getBoolean("static_metadata"), java.lang.Boolean.TRUE)
+    assertEquals(table.getLong("threads"), JLong.valueOf(16L))
+    assertEquals(table.getBoolean("static_metadata"), JBoolean.TRUE)
     assertEquals(
       table.getString("tag"),
       "42",
@@ -583,49 +608,41 @@ class ConfigurationTomlSuite extends munit.FunSuite {
   test("a table applied through the builder reaches the configuration") {
     // This is the whole point of the exercise: `spice` hands its
     // `[survey.inventory.analysis]` table over without knowing what is in it.
-    val builder = io.spicelabs.goatrodeo.GoatRodeo
+    val builder = GoatRodeo
       .builder()
       .withThreads(2)
       .withConfiguration(
         TomlTables.toPlainMap(parse("threads = 11\nmax_records = 4242")),
         "survey.inventory.analysis"
       )
+      .toOption
+      .get
     val applied = builderConfig(builder)
     assertEquals(applied.threads, 11)
     assertEquals(applied.maxRecords, 4242)
   }
 
-  test("the builder refuses a cutoff from an embedding program's config file") {
-    val error = intercept[IllegalArgumentException] {
-      io.spicelabs.goatrodeo.GoatRodeo
-        .builder()
-        .withConfiguration(
-          TomlTables.toPlainMap(parse("cutoff = \"2026-01-01\"")),
-          "survey.inventory.analysis"
-        )
-    }
-    assert(error.getMessage().contains("Spice Pass"), error.getMessage())
-  }
-
   test("the builder rejects an unknown key rather than ignoring it") {
-    val error = intercept[IllegalArgumentException] {
-      io.spicelabs.goatrodeo.GoatRodeo
-        .builder()
-        .withConfiguration(
-          TomlTables.toPlainMap(parse("thraeds = 4")),
-          "survey.inventory.analysis"
-        )
-    }
-    assert(error.getMessage().contains("thraeds"), error.getMessage())
+    val result = GoatRodeo
+      .builder()
+      .withConfiguration(
+        TomlTables.toPlainMap(parse("thraeds = 4")),
+        "survey.inventory.analysis"
+      )
+    assert(result.isLeft, s"an unknown key must produce Left, got $result")
+    assert(
+      result.swap.toOption.get.contains("thraeds"),
+      result.swap.toOption.get
+    )
   }
 
   /** The builder keeps its configuration private; tests read it reflectively
     * rather than widening the API for their own convenience.
     */
   private def builderConfig(
-      b: io.spicelabs.goatrodeo.GoatRodeoBuilder
+      b: GoatRodeoBuilder
   ): Configuration = {
-    val field = classOf[io.spicelabs.goatrodeo.GoatRodeoBuilder]
+    val field = classOf[GoatRodeoBuilder]
       .getDeclaredField("config")
     field.setAccessible(true)
     field.get(b).asInstanceOf[Configuration]
@@ -635,8 +652,8 @@ class ConfigurationTomlSuite extends munit.FunSuite {
     val original = parse("empty = []")
     val adapted = TomlTables.fromJavaMap(TomlTables.toPlainMap(original))
     assertEquals(
-      adapted.getArray("empty").containsStrings(),
-      original.getArray("empty").containsStrings()
+      adapted.getArray("empty").toList(),
+      original.getArray("empty").toList()
     )
     assertEquals(adapted.getArray("empty").isEmpty(), true)
   }

@@ -13,20 +13,20 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
+import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CarvedCertAugmenter
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
-import munit.ScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 
 import java.io.File
+import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -47,7 +47,7 @@ import scala.collection.immutable.TreeSet
   *
   * LLM note: C-x = test id.
   */
-class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
+class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
 
   private val dir = "test_data/carved-certs"
 
@@ -89,7 +89,7 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
       f.exists(),
       "carved corpus fixtures required — run gen_carved_elf_corpus.sh"
     )
-    val bytes = java.nio.file.Files.readAllBytes(f.toPath())
+    val bytes = Files.readAllBytes(f.toPath())
     val (certs, cap) = CarvedCertAugmenter.carveCertificates(
       bytes,
       CarvedCertAugmenter.MaxScanBytes,
@@ -175,10 +175,9 @@ class CarvedCertificatesSuite extends FunSuite with ScalaCheckSuite {
     val b = FileWrapper(fixture("elf-no-certs"), "elf-no-certs", None)
     a.mimeType
     b.mimeType
-    val byUUID: Map[String, io.spicelabs.goatrodeo.util.ArtifactWrapper] =
+    val byUUID: Map[String, ArtifactWrapper] =
       Map(a.uuid -> a, b.uuid -> b)
-    val byName
-        : Map[String, Vector[io.spicelabs.goatrodeo.util.ArtifactWrapper]] =
+    val byName: Map[String, Vector[ArtifactWrapper]] =
       Map(a.path() -> Vector(a), b.path() -> Vector(b))
     val (claimed, _, _, name) =
       CarvedCertificatesStrategy.computeCarvedCertificateFiles(byUUID, byName)

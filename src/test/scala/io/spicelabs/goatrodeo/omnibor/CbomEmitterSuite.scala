@@ -15,23 +15,29 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import _root_.strategies.CertificatesPipelineRunner
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
+import org.everit.json.schema.Schema
 import org.everit.json.schema.ValidationException
+import org.everit.json.schema.loader.SchemaClient
+import org.everit.json.schema.loader.SchemaLoader
+import org.json.JSONObject
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.Comparator
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class CbomEmitterSuite extends FunSuite {
+class CbomEmitterSuite extends GoatRodeoFunSuite {
 
   private lazy val schema16 = loadEveritSchema("bom-1.6.schema.json")
   private lazy val schema17 = loadEveritSchema("bom-1.7.schema.json")
@@ -50,9 +56,9 @@ class CbomEmitterSuite extends FunSuite {
     * `jsf-0.82.schema.json`, `cryptography-defs.schema.json`) from the test
     * classpath via a `SchemaClient`, so the schema resolves without a network.
     */
-  private def loadEveritSchema(name: String): org.everit.json.schema.Schema = {
-    val client = new org.everit.json.schema.loader.SchemaClient {
-      override def get(url: String): java.io.InputStream = {
+  private def loadEveritSchema(name: String): Schema = {
+    val client = new SchemaClient {
+      override def get(url: String): InputStream = {
         val base = "http://cyclonedx.org/schema/"
         val resource =
           if (url.startsWith(base)) {
@@ -65,10 +71,10 @@ class CbomEmitterSuite extends FunSuite {
         is
       }
     }
-    org.everit.json.schema.loader.SchemaLoader
+    SchemaLoader
       .builder()
-      .schemaJson(new org.json.JSONObject(schemaResource(name)))
-      .httpClient(client)
+      .schemaJson(new JSONObject(schemaResource(name)))
+      .schemaClient(client)
       .build()
       .load()
       .build()
@@ -79,10 +85,10 @@ class CbomEmitterSuite extends FunSuite {
     */
   private def validate(
       json: String,
-      schema: org.everit.json.schema.Schema
+      schema: Schema
   ): Set[String] = {
     try {
-      schema.validate(new org.json.JSONObject(json))
+      schema.validate(new JSONObject(json))
       Set.empty
     } catch {
       case e: ValidationException =>
@@ -102,7 +108,7 @@ class CbomEmitterSuite extends FunSuite {
     if (dir != null && dir.exists()) {
       Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(Files.delete(_))
       ()
     }
@@ -208,9 +214,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.1 / T3.17 CLI parsing
+  // CLI parsing
   // ----------------------------------------------------------------------
-  test("T3.1 CLI flags parse correctly") {
+  test("CLI flags parse correctly") {
     val c1 =
       parseConfig("--emit-cbom-dir", "/tmp/cbom", "--cbom-version", "1.7").get
     assertEquals(c1.cbomDir, Some(new File("/tmp/cbom")))
@@ -218,21 +224,21 @@ class CbomEmitterSuite extends FunSuite {
 
     val c2 = parseConfig("--emit-cbom-dir", "/tmp/cbom").get
     assertEquals(c2.cbomDir, Some(new File("/tmp/cbom")))
-    assertEquals(c2.cbomVersion, "1.6")
+    assertEquals(c2.cbomVersion, "1.7")
 
     val c3 = parseConfig().get
     assertEquals(c3.cbomDir, None)
   }
 
-  test("T3.17 invalid --cbom-version rejected") {
+  test("invalid --cbom-version rejected") {
     assert(parseConfig("--cbom-version", "1.5").isEmpty)
     assert(parseConfig("--cbom-version", "2.0").isEmpty)
   }
 
   // ----------------------------------------------------------------------
-  // T3.2 / T3.11 / T3.12 empty CBOM
+  // empty CBOM
   // ----------------------------------------------------------------------
-  test("T3.2 empty CBOM emitted for root with no crypto material") {
+  test("empty CBOM emitted for root with no crypto material") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -261,9 +267,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.3 / T3.13 single-certificate CBOM
+  // single-certificate CBOM
   // ----------------------------------------------------------------------
-  test("T3.3 single certificate produces a valid CBOM component") {
+  test("single certificate produces a valid CBOM component") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -381,9 +387,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.4 OpenSSL config CBOM
+  // OpenSSL config CBOM
   // ----------------------------------------------------------------------
-  test("T3.4 OpenSSL config produces a protocol component") {
+  test("OpenSSL config produces a protocol component") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -447,9 +453,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.5 Java security CBOM
+  // Java security CBOM
   // ----------------------------------------------------------------------
-  test("T3.5 Java security produces a component with disabled algorithms") {
+  test("Java security produces a component with disabled algorithms") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -499,9 +505,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.6 CycloneDX 1.7 emission
+  // CycloneDX 1.7 emission
   // ----------------------------------------------------------------------
-  test("T3.6 --cbom-version 1.7 emits a valid 1.7 CBOM") {
+  test("--cbom-version 1.7 emits a valid 1.7 CBOM") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -540,9 +546,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.7 nested archive traversal
+  // nested archive traversal
   // ----------------------------------------------------------------------
-  test("T3.7 crypto material inside nested archives appears in root CBOM") {
+  test("crypto material inside nested archives appears in root CBOM") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -595,9 +601,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.8 filename stability
+  // filename stability
   // ----------------------------------------------------------------------
-  test("T3.8 CBOM filenames are stable across runs") {
+  test("CBOM filenames are stable across runs") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -626,9 +632,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.10 I/O failure handling
+  // I/O failure handling
   // ----------------------------------------------------------------------
-  test("T3.10 CBOM write failure is captured in Try") {
+  test("CBOM write failure is captured in Try") {
     val dir = tempDir()
     try {
       dir.setReadOnly()
@@ -648,9 +654,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.14 multi-root CBOM
+  // multi-root CBOM
   // ----------------------------------------------------------------------
-  test("T3.14 two roots produce two CBOM files") {
+  test("two roots produce two CBOM files") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -676,9 +682,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.15 cyclic contains graph
+  // cyclic contains graph
   // ----------------------------------------------------------------------
-  test("T3.15 cyclic contains graph does not hang the emitter") {
+  test("cyclic contains graph does not hang the emitter") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -724,9 +730,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.16 duplicate GitOID component
+  // duplicate GitOID component
   // ----------------------------------------------------------------------
-  test("T3.16 duplicate GitOID reached via multiple paths appears once") {
+  test("duplicate GitOID reached via multiple paths appears once") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -779,9 +785,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.18 output directory auto-creation
+  // output directory auto-creation
   // ----------------------------------------------------------------------
-  test("T3.18 non-existent CBOM output directory is created") {
+  test("non-existent CBOM output directory is created") {
     val parent = Files.createTempDirectory("cbom-parent").toFile()
     val dir = new File(new File(parent, "nested"), "output")
     try {
@@ -800,11 +806,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.18b — a symlink anywhere above the output directory is fine. On macOS
+  // a symlink anywhere above the output directory is fine. On macOS
   // `/tmp` and `/var` are symlinks into `/private`, so refusing them made
   // --emit-cbom-dir unusable with the system temporary directory; on Linux the
   // same is true of bind mounts and automounted homes.
-  test("T3.18b a symlinked ancestor of the output directory is accepted") {
+  test("a symlinked ancestor of the output directory is accepted") {
     val real = Files.createTempDirectory("cbom-real").toFile()
     val linkParent = Files.createTempDirectory("cbom-link").toFile()
     val link = new File(linkParent, "via-link")
@@ -832,11 +838,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.18c — the property the removed ancestor check was reaching for, pinned
+  // the property the removed ancestor check was reaching for, pinned
   // where it actually holds. A symlink planted at the target file must be
   // replaced, not written through: Files.move acts on the final path entry
   // rather than following it.
-  test("T3.18c a symlink planted at the target is replaced, not followed") {
+  test("a symlink planted at the target is replaced, not followed") {
     val dir = Files.createTempDirectory("cbom-target").toFile()
     val victimDir = Files.createTempDirectory("cbom-victim").toFile()
     try {
@@ -875,9 +881,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.19 private-key-marker Items are emitted faithfully (no redaction)
+  // private-key-marker Items are emitted faithfully (no redaction)
   // ----------------------------------------------------------------------
-  test("T3.19 private-key-marker Items are emitted faithfully") {
+  test("private-key-marker Items are emitted faithfully") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -947,9 +953,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.20 CBOM size-limit
+  // CBOM size-limit
   // ----------------------------------------------------------------------
-  test("T3.20 oversized CBOM is truncated to 100,000 components") {
+  test("oversized CBOM is truncated to 100,000 components") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -999,9 +1005,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.21 symlink rejection
+  // symlink rejection
   // ----------------------------------------------------------------------
-  test("T3.21 symlink in CBOM output path is rejected") {
+  test("symlink in CBOM output path is rejected") {
     val parent = Files.createTempDirectory("cbom-symlink").toFile()
     val realDir = new File(parent, "real")
     val linkDir = new File(parent, "link")
@@ -1022,12 +1028,12 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.21b — a dangling symlink is still a symlink. The previous check guarded
+  // a dangling symlink is still a symlink. The previous check guarded
   // `isSymbolicLink` behind `Files.exists`, which follows links and is
   // therefore false when the link's target does not exist -- so a link planted
   // at a path before anything is created there, the usual shape of the attack,
   // was exempt from the very check meant to catch it.
-  test("T3.21b a dangling symlink as the output directory is rejected") {
+  test("a dangling symlink as the output directory is rejected") {
     val parent = Files.createTempDirectory("cbom-dangling").toFile()
     val linkDir = new File(parent, "link")
     try {
@@ -1050,9 +1056,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.22 atomic write and no leftover temp files
+  // atomic write and no leftover temp files
   // ----------------------------------------------------------------------
-  test("T3.22 CBOM write is atomic and leaves no temp files") {
+  test("CBOM write is atomic and leaves no temp files") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1084,9 +1090,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.23 related-crypto-material public key references its algorithm
+  // related-crypto-material public key references its algorithm
   // ----------------------------------------------------------------------
-  test("T3.23 public key material emits algorithmRef and size") {
+  test("public key material emits algorithmRef and size") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1172,9 +1178,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.24 CRL references its signature algorithm
+  // CRL references its signature algorithm
   // ----------------------------------------------------------------------
-  test("T3.24 CRL emits signature algorithmRef and algorithm component") {
+  test("CRL emits signature algorithmRef and algorithm component") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1233,9 +1239,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.25 certificate with EC public key exposes curve in algorithm component
+  // certificate with EC public key exposes curve in algorithm component
   // ----------------------------------------------------------------------
-  test("T3.25 EC certificate promotes curve into algorithmProperties") {
+  test("EC certificate promotes curve into algorithmProperties") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1293,9 +1299,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.26 password hash file references hash algorithm component
+  // password hash file references hash algorithm component
   // ----------------------------------------------------------------------
-  test("T3.26 password hash file emits algorithmRef for hash family") {
+  test("password hash file emits algorithmRef for hash family") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1361,9 +1367,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.27 usign key emits ed25519 algorithmRef and key size
+  // usign key emits ed25519 algorithmRef and key size
   // ----------------------------------------------------------------------
-  test("T3.27 usign key emits ed25519 algorithmRef and size") {
+  test("usign key emits ed25519 algorithmRef and size") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1448,9 +1454,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.28 md5 password hash emits hash algorithmRef
+  // md5 password hash emits hash algorithmRef
   // ----------------------------------------------------------------------
-  test("T3.28 md5 password hash emits hash algorithmRef") {
+  test("md5 password hash emits hash algorithmRef") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1508,9 +1514,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.9 no CBOM without flag
+  // no CBOM without flag
   // ----------------------------------------------------------------------
-  test("T3.9 no CBOM files are written without --emit-cbom-dir") {
+  test("no CBOM files are written without --emit-cbom-dir") {
     val inputDir = Files.createTempDirectory("cbom-input").toFile()
     val outputDir = Files.createTempDirectory("cbom-output").toFile()
     try {
@@ -1551,7 +1557,7 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // Phase H — expanded hashing coverage (T3.29 .. T3.34)
+  // expanded hashing coverage
   // ----------------------------------------------------------------------
 
   /** Build a crypto Item of the `CryptoAlgorithms:` family. */
@@ -1572,7 +1578,7 @@ class CbomEmitterSuite extends FunSuite {
       )
     )
 
-  test("T3.29 new hash names classify as hash and validate in 1.6 and 1.7") {
+  test("new hash names classify as hash and validate in 1.6 and 1.7") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1613,7 +1619,7 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  test("T3.30 parameterSetIdentifier correctness for new hash names") {
+  test("parameterSetIdentifier correctness for new hash names") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1678,7 +1684,7 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  test("T3.31 PasswordHash argon2id/nt-hash/apr1 flow into hash assets") {
+  test("PasswordHash argon2id/nt-hash/apr1 flow into hash assets") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1732,7 +1738,7 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  test("T3.32 ServiceCrypto blake2b/sha3 algorithms classify as hash assets") {
+  test("ServiceCrypto blake2b/sha3 algorithms classify as hash assets") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -1800,7 +1806,7 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.33 golden byte-identity for pre-existing fixtures
+  // golden byte-identity for pre-existing fixtures
   // ----------------------------------------------------------------------
 
   private val GoldenRootId =
@@ -1967,7 +1973,7 @@ class CbomEmitterSuite extends FunSuite {
   private def goldenResourcePath(version: String): String =
     s"/cbom-golden/cbom-golden-$version.json"
 
-  test("T3.33 pre-existing fixture families are byte-identical (golden)") {
+  test("pre-existing fixture families are byte-identical (golden)") {
     val dir = tempDir()
     try {
       val storage = goldenStorage()
@@ -2001,9 +2007,9 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.34 hostile JWT alg must not mint a hash asset
+  // hostile JWT alg must not mint a hash asset
   // ----------------------------------------------------------------------
-  test("T3.34 crafted JWT alg never mints a hash asset") {
+  test("crafted JWT alg never mints a hash asset") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2052,7 +2058,7 @@ class CbomEmitterSuite extends FunSuite {
   }
 
   // ----------------------------------------------------------------------
-  // T3.35..T3.37 SWHID identifiers on artifact-backed components
+  // SWHID identifiers on artifact-backed components
   // ----------------------------------------------------------------------
 
   private val SwhidRootId =
@@ -2082,7 +2088,7 @@ class CbomEmitterSuite extends FunSuite {
     )
   }
 
-  // T3.35 — the component's bom-ref is the sha256 GitOID, and the SWHID
+  // the component's bom-ref is the sha256 GitOID, and the SWHID
   // (`swh:1:cnt:<sha1>`) is emitted as the `swhid:core` property derived
   // from the item's `alias:from` `gitoid:blob:sha1:<hex>` edge. `swhid:core`
   // is always paired with `omnibor:core` (the item's own `gitoid:blob:sha256`
@@ -2090,7 +2096,7 @@ class CbomEmitterSuite extends FunSuite {
   // with a different prefix, so no extra hashing is needed — the pass only
   // translates the identifier the Item already carries. Output must stay
   // valid against CycloneDX 1.6 and 1.7.
-  test("T3.35 artifact-backed component carries its SWHID and OmniBOR core") {
+  test("artifact-backed component carries its SWHID and OmniBOR core") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2125,13 +2131,13 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.44 — `swhid:core` and `omnibor:core` are always emitted together, and
+  // `swhid:core` and `omnibor:core` are always emitted together, and
   // `swhid:core` always equals the final (leaf) node of `goatrodeo:swhid-path`
   // while `omnibor:core` equals the final node of `goatrodeo:omnibor-path`.
   // THEORY: the core identifiers must describe the item itself (never a third,
   // unrelated id), so each core must correspond to the item's own node in the
   // traversal path.
-  test("T3.44 swhid:core/omnibor:core pair always agree with the path leaf") {
+  test("swhid:core/omnibor:core pair always agree with the path leaf") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2166,11 +2172,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.36 — an item with no `gitoid:blob:sha1:` alias emits no `swhid:core`
+  // an item with no `gitoid:blob:sha1:` alias emits no `swhid:core`
   // property and stays schema-valid. THEORY: the property must be optional;
   // items built before the alias was captured (or without it) must not gain
   // a fabricated identifier.
-  test("T3.36 no SWHID property without a sha1 alias") {
+  test("no SWHID property without a sha1 alias") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2197,11 +2203,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.37 — malformed sha1 aliases (non-hex, wrong length, uppercase) are
+  // malformed sha1 aliases (non-hex, wrong length, uppercase) are
   // ignored rather than emitted as bogus SWHIDs. THEORY: alias values come
   // from a trusted internal pass, but the emitter must not mint an invalid
   // `swh:1:cnt:` identifier if a bad value ever arrives.
-  test("T3.37 malformed sha1 aliases are ignored") {
+  test("malformed sha1 aliases are ignored") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2245,13 +2251,13 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.38 — keys detected inside a keystore become algorithm assets: every
+  // keys detected inside a keystore become algorithm assets: every
   // `Certificates:Entry:<alias>:KeyAlgorithm` (plus KeySize/Curve) emitted by
   // the certificates strategy is registered as an `alg:` component and the
   // keystore component references it. THEORY: detecting keys is only useful
   // if the CBOM represents them; keystores previously emitted a `key`-typed
   // component with no algorithmRef at all.
-  test("T3.38 keystore-detected keys emit algorithm assets") {
+  test("keystore-detected keys emit algorithm assets") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2328,11 +2334,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.39 — trusted-cert entries are certificates, not keys: their per-cert
+  // trusted-cert entries are certificates, not keys: their per-cert
   // `Entry:<alias>:KeyAlgorithm` metadata must NOT mint a key algorithm
   // asset. THEORY: key detection discriminates on the presence of `Chain:`
   // metadata, which only key entries carry.
-  test("T3.39 trusted-cert entries never mint key assets") {
+  test("trusted-cert entries never mint key assets") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2387,13 +2393,13 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.40 — end-to-end: a real JKS v1 corpus file runs the full pipeline
+  // end-to-end: a real JKS v1 corpus file runs the full pipeline
   // (MIME detection → Certificates strategy → Item metadata) and the emitted
   // CBOM contains the keystore component with its detected key as an
-  // algorithm asset. THEORY: T3.38 pins the CBOM mapping with synthetic
+  // algorithm asset. THEORY: the CBOM mapping is pinned with synthetic
   // metadata and K-C-* pins the parser with the corpus; this test proves the
   // two halves join — real file bytes in, keystore key in the CBOM out.
-  test("T3.40 real JKS v1 corpus file flows into the CBOM") {
+  test("real JKS v1 corpus file flows into the CBOM") {
     val dir = tempDir()
     try {
       val fixture =
@@ -2480,11 +2486,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.41 — end-to-end: a docker-built ELF containing a carved RSA-1024 DER
+  // end-to-end: a docker-built ELF containing a carved RSA-1024 DER
   // certificate flows through the full pipeline (MIME probe → carve strategy
   // → metadata) and the CBOM contains a certificate component with
   // KeySize 1024 plus an `alg:pke:rsa` asset parameterized 1024.
-  test("T3.41 carved RSA-1024 cert in an ELF surfaces in the CBOM") {
+  test("carved RSA-1024 cert in an ELF surfaces in the CBOM") {
     val dir = tempDir()
     try {
       val fixture =
@@ -2561,10 +2567,10 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.42 — every item-backed component carries the traversal-derived paths
+  // every item-backed component carries the traversal-derived paths
   // (`goatrodeo:path`, `goatrodeo:omnibor-path`, `goatrodeo:swhid-path`) built
   // from the ADG `contains` hierarchy from the root down to the item.
-  test("T3.42 nested components carry traversal-derived paths") {
+  test("nested components carry traversal-derived paths") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2638,10 +2644,10 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.43 — end-to-end: an ArduPilot firmware ELF's AP_ROMFS is treated as a
+  // end-to-end: an ArduPilot firmware ELF's AP_ROMFS is treated as a
   // container, so its embedded trust-store certs (RSA-1024) surface in the
   // CBOM with KeySize 1024 and the traversal-derived goatrodeo:path.
-  test("T3.43 ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024") {
+  test("ArduPilot AP_ROMFS trust-store certs surface with KeySize 1024") {
     val dir = tempDir()
     try {
       val fixture =
@@ -2702,13 +2708,13 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.38 — keys detected inside a keystore become algorithm assets: every
+  // keys detected inside a keystore become algorithm assets: every
   // `Certificates:Entry:<alias>:KeyAlgorithm` (plus KeySize/Curve) emitted by
   // the certificates strategy is registered as an `alg:` component and the
   // keystore component references it. THEORY: detecting keys is only useful
   // if the CBOM represents them; keystores previously emitted a `key`-typed
   // component with no algorithmRef at all.
-  test("T3.38 keystore-detected keys emit algorithm assets") {
+  test("keystore-detected keys emit algorithm assets") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2785,11 +2791,11 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.39 — trusted-cert entries are certificates, not keys: their per-cert
+  // trusted-cert entries are certificates, not keys: their per-cert
   // `Entry:<alias>:KeyAlgorithm` metadata must NOT mint a key algorithm
   // asset. THEORY: key detection discriminates on the presence of `Chain:`
   // metadata, which only key entries carry.
-  test("T3.39 trusted-cert entries never mint key assets") {
+  test("trusted-cert entries never mint key assets") {
     val dir = tempDir()
     try {
       val storage = MemStorage(None)
@@ -2844,13 +2850,13 @@ class CbomEmitterSuite extends FunSuite {
     }
   }
 
-  // T3.40 — end-to-end: a real JKS v1 corpus file runs the full pipeline
+  // end-to-end: a real JKS v1 corpus file runs the full pipeline
   // (MIME detection → Certificates strategy → Item metadata) and the emitted
   // CBOM contains the keystore component with its detected key as an
-  // algorithm asset. THEORY: T3.38 pins the CBOM mapping with synthetic
+  // algorithm asset. THEORY: the CBOM mapping is pinned with synthetic
   // metadata and K-C-* pins the parser with the corpus; this test proves the
   // two halves join — real file bytes in, keystore key in the CBOM out.
-  test("T3.40 real JKS v1 corpus file flows into the CBOM") {
+  test("real JKS v1 corpus file flows into the CBOM") {
     val dir = tempDir()
     try {
       val fixture =

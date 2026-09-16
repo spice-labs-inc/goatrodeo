@@ -1,10 +1,9 @@
 package bcel_probe
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.apache.bcel.classfile.Attribute
 import org.apache.bcel.classfile.JavaClass
 
-class BcelModuleProbe extends FunSuite {
+class BcelModuleProbe extends GoatRodeoFunSuite {
   test("JavaClass has getAttributes") {
     val jcClazz = classOf[JavaClass]
     val methods = jcClazz.getMethods.map(_.getName)

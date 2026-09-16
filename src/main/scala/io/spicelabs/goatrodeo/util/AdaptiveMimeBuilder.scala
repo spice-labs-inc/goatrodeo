@@ -76,20 +76,9 @@ object AdaptiveMimeBuilder {
 
   /** Escape C0/C1 control characters in a path so an untrusted corpus cannot
     * inject terminal escapes or fake log lines. Every other character passes
-    * through unchanged.
+    * through unchanged. The escape set is defined once in [[Sanitize.path]].
     */
-  def sanitizePath(raw: String): String = {
-    val sb = new StringBuilder(raw.length)
-    raw.foreach { ch =>
-      val c = ch.toInt
-      if (c < 0x20 || (c >= 0x7f && c <= 0x9f)) {
-        sb.append(f"\\u${c}%04x")
-      } else {
-        sb.append(ch)
-      }
-    }
-    sb.toString
-  }
+  def sanitizePath(raw: String): String = Sanitize.path(raw)
 
   private def dirOf(path: String): String = {
     val idx = path.lastIndexOf('/')

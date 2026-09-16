@@ -13,13 +13,15 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import io.spicelabs.goatrodeo.util.SshWireReader
-import munit.ScalaCheckSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Prop.propBoolean
+
+import java.io.ByteArrayOutputStream
+import scala.util.Random
 
 /** Property-based tests for the RFC 4251 SSH wire-format reader.
   *
@@ -46,20 +48,20 @@ import org.scalacheck.Prop.propBoolean
   * example-based test caught because no fixture happened to have that value.
   * Property #2 — "uint64 round-trip including sentinels" — would have caught
   * it. The other properties guard related classes of bugs in the byte-pumping
-  * path that drives all of Phase 5's fingerprinting and metadata extraction.
+  * path that drives all fingerprinting and metadata extraction.
   */
-class SshWireFormatPropertyTests extends ScalaCheckSuite {
+class SshWireFormatPropertyTests extends GoatRodeoScalaCheckSuite {
 
   // --- byte writers used to build wire blobs from generated values ---
 
-  private def writeUInt32(out: java.io.ByteArrayOutputStream, v: Long): Unit = {
+  private def writeUInt32(out: ByteArrayOutputStream, v: Long): Unit = {
     out.write(((v >>> 24) & 0xff).toInt)
     out.write(((v >>> 16) & 0xff).toInt)
     out.write(((v >>> 8) & 0xff).toInt)
     out.write((v & 0xff).toInt)
   }
 
-  private def writeUInt64(out: java.io.ByteArrayOutputStream, v: Long): Unit = {
+  private def writeUInt64(out: ByteArrayOutputStream, v: Long): Unit = {
     out.write(((v >>> 56) & 0xff).toInt)
     out.write(((v >>> 48) & 0xff).toInt)
     out.write(((v >>> 40) & 0xff).toInt)
@@ -71,7 +73,7 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
   }
 
   private def writeString(
-      out: java.io.ByteArrayOutputStream,
+      out: ByteArrayOutputStream,
       b: Array[Byte]
   ): Unit = {
     writeUInt32(out, b.length.toLong)
@@ -113,9 +115,9 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
 
   // --- properties ---
 
-  property("[PROP] uint32 round-trip (G5 #1)") {
+  property("[PROP] uint32 round-trip") {
     forAll(genUInt32) { v =>
-      val out = new java.io.ByteArrayOutputStream()
+      val out = new ByteArrayOutputStream()
       writeUInt32(out, v)
       val r = new SshWireReader(out.toByteArray)
       r.readUInt32() == Some(v)
@@ -123,28 +125,28 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
   }
 
   property(
-    "[PROP] uint64 round-trip including sentinels 0 and 0xFFFF…FFFF (G5 #2 / G1 regression guard)"
+    "[PROP] uint64 round-trip including sentinels 0 and 0xFFFF…FFFF "
   ) {
     forAll(genUInt64) { v =>
-      val out = new java.io.ByteArrayOutputStream()
+      val out = new ByteArrayOutputStream()
       writeUInt64(out, v)
       val r = new SshWireReader(out.toByteArray)
       r.readUInt64() == Some(v)
     }
   }
 
-  property("[PROP] string round-trip preserves bytes (G5 #3)") {
+  property("[PROP] string round-trip preserves bytes") {
     forAll(genBytes) { b =>
-      val out = new java.io.ByteArrayOutputStream()
+      val out = new ByteArrayOutputStream()
       writeString(out, b)
       val r = new SshWireReader(out.toByteArray)
       r.readString().map(_.toSeq) == Some(b.toSeq)
     }
   }
 
-  property("[PROP] readString returns None on truncated input (G5 #4)") {
+  property("[PROP] readString returns None on truncated input") {
     forAll(Gen.choose(1, 1024)) { claimedLen =>
-      val out = new java.io.ByteArrayOutputStream()
+      val out = new ByteArrayOutputStream()
       writeUInt32(out, claimedLen.toLong)
       val r = new SshWireReader(out.toByteArray)
       assert(
@@ -155,12 +157,12 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
   }
 
   property(
-    "[PROP] mpintBitLength matches BigInt.bitLength for non-negative inputs (G5 #5)"
+    "[PROP] mpintBitLength matches BigInt.bitLength for non-negative inputs "
   ) {
     forAll(Gen.choose(0, 4096), Arbitrary.arbitrary[Long]) { (bits, seed) =>
       val n =
         if (bits == 0) BigInt(0)
-        else BigInt(bits, new scala.util.Random(seed)).abs
+        else BigInt(bits, new Random(seed)).abs
       val mpint = writeMpintBytes(n)
       val ours = SshWireReader.mpintBitLength(mpint)
       val expected = n.bitLength
@@ -168,13 +170,13 @@ class SshWireFormatPropertyTests extends ScalaCheckSuite {
     }
   }
 
-  property("[PROP] string-list round-trip preserves elements (G5 #6)") {
+  property("[PROP] string-list round-trip preserves elements") {
     val genStr = Gen.alphaNumStr // ASCII, no embedded whitespace surprises
     val genList = Gen.choose(0, 16).flatMap(n => Gen.listOfN(n, genStr))
     forAll(genList) { ss =>
-      val inner = new java.io.ByteArrayOutputStream()
+      val inner = new ByteArrayOutputStream()
       ss.foreach(s => writeString(inner, s.getBytes("UTF-8")))
-      val outer = new java.io.ByteArrayOutputStream()
+      val outer = new ByteArrayOutputStream()
       writeString(outer, inner.toByteArray)
       val r = new SshWireReader(outer.toByteArray)
       r.readStringList().getOrElse(Vector.empty).toList == ss

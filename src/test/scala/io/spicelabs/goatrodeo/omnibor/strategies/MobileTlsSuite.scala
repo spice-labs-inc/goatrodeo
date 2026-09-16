@@ -13,20 +13,19 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
-/** Phase F — Mobile / JVM TLS policy config detection.
+/** Mobile / JVM TLS policy config detection.
   *
   * Verifies Android network-security-config cleartext/trust flags, manifest
   * usesCleartextTraffic, Apple ATS exceptions, and JDK crypto.policy capture.
   */
-class MobileTlsSuite extends FunSuite {
+class MobileTlsSuite extends GoatRodeoFunSuite {
 
   private val mt = MKC.adHoc("MobileTls")
   private val js = MKC.adHoc("java.security")
@@ -42,7 +41,7 @@ class MobileTlsSuite extends FunSuite {
     new MobileTlsState(a).invokeBuildMetadata(a).toMap
   }
 
-  test("T-F-07 network_security_config.xml cleartext + custom CA + TOFU") {
+  test("network_security_config.xml cleartext + custom CA + TOFU") {
     val m = meta(
       "res/xml/network_security_config.xml",
       """<network-security-config>
@@ -60,7 +59,7 @@ class MobileTlsSuite extends FunSuite {
     assertEquals(m(mt("trust_on_first_use")).head.value, "true")
   }
 
-  test("T-F-08 AndroidManifest usesCleartextTraffic") {
+  test("AndroidManifest usesCleartextTraffic") {
     val m = meta(
       "AndroidManifest.xml",
       """<manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -72,7 +71,7 @@ class MobileTlsSuite extends FunSuite {
     assertEquals(m(mt("manifest_cleartext")).head.value, "true")
   }
 
-  test("T-F-09 Info.plist ATS arbitrary loads + exception domains") {
+  test("Info.plist ATS arbitrary loads + exception domains") {
     val m = meta(
       "Foo.app/Info.plist",
       """<?xml version="1.0" encoding="UTF-8"?>
@@ -91,7 +90,7 @@ class MobileTlsSuite extends FunSuite {
     assertEquals(m(mt("ats_exceptions")).head.value, "true")
   }
 
-  test("T-F-09b JDK crypto.policy") {
+  test("JDK crypto.policy") {
     val m = meta(
       "jvm/conf/security/crypto.policy",
       "crypto.policy=unlimited\n"
@@ -99,7 +98,7 @@ class MobileTlsSuite extends FunSuite {
     assertEquals(m(js("crypto_policy")).head.value, "unlimited")
   }
 
-  test("T-F-10 policy configs carry no secrets") {
+  test("policy configs carry no secrets") {
     val battery = Vector(
       "res/xml/network_security_config.xml" ->
         """<network-security-config><base-config cleartextTrafficPermitted="true">

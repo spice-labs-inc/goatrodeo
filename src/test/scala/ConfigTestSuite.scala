@@ -13,15 +13,22 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 import io.spicelabs.goatrodeo.GoatRodeo
+import io.spicelabs.goatrodeo.ProgressListener
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testsupport.LogCapture
 import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.ExpandFiles
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.VectorOfStrings
 
 import java.io.File
 import java.nio.file.Files
+import java.util.regex.Pattern
+import scala.util.Failure
+import scala.util.Success
 
-class ConfigTestSuite extends munit.FunSuite {
+class ConfigTestSuite extends GoatRodeoFunSuite {
 
   // ==================== Configuration Defaults Tests ====================
 
@@ -311,7 +318,6 @@ class ConfigTestSuite extends munit.FunSuite {
 
   test("Configuration - exclude patterns can be added") {
     import scala.util.Try
-    import java.util.regex.Pattern
 
     val pattern = ".*\\.html$"
     val config =
@@ -320,6 +326,131 @@ class ConfigTestSuite extends munit.FunSuite {
     assertEquals(config.exclude.length, 1)
     assertEquals(config.exclude.head._1, pattern)
     assert(config.exclude.head._2.isSuccess)
+  }
+
+  test("Configuration - multiple --exclude-pattern flags all apply") {
+    // The CLI must accept one --exclude-pattern per pattern. Each occurrence
+    // appends to `Configuration.exclude`; a second occurrence must not be
+    // rejected as an unknown option (scopt treats a repeated non-unbounded
+    // option that way) and must not abort the run.
+    val parsed = ConfigurationParser.parse(
+      Array(
+        "-b",
+        "/tmp/exclude-pattern-in",
+        "--exclude-pattern",
+        "html$",
+        "--exclude-pattern",
+        "maven-metadata.xml$",
+        "--exclude-pattern",
+        "reify-state.json$"
+      )
+    )
+    assert(
+      parsed.isDefined,
+      "multiple --exclude-pattern flags must parse without being rejected"
+    )
+    val config = parsed.get
+    val patterns = config.exclude.map(_._1)
+    assertEquals(
+      patterns,
+      Vector("html$", "maven-metadata.xml$", "reify-state.json$")
+    )
+    assert(
+      config.exclude.forall(_._2.isSuccess),
+      "every pattern must compile as a regular expression"
+    )
+  }
+
+  test("Configuration - multiple -b/--build flags all apply") {
+    // Each occurrence of -b/--build must append its directory to
+    // `Configuration.build`; a second occurrence must not be rejected.
+    val dirA = Files.createTempDirectory("build-a").toFile()
+    val dirB = Files.createTempDirectory("build-b").toFile()
+    val parsed =
+      ConfigurationParser.parse(Array("-b", dirA.getPath, "-b", dirB.getPath))
+    assert(parsed.isDefined, "multiple --build flags must parse")
+    val config = parsed.get
+    assert(config.build.contains(dirA), "first build directory must be kept")
+    assert(config.build.contains(dirB), "second build directory must be kept")
+  }
+
+  test("Configuration - multiple --ignore flags all apply") {
+    // Each occurrence of --ignore must append its file to `Configuration.ignore`.
+    val fileA = Files.createTempFile("ignore-a", ".txt").toFile()
+    val fileB = Files.createTempFile("ignore-b", ".txt").toFile()
+    val parsed = ConfigurationParser.parse(
+      Array("--ignore", fileA.getPath, "--ignore", fileB.getPath)
+    )
+    assert(parsed.isDefined, "multiple --ignore flags must parse")
+    val config = parsed.get
+    assert(config.ignore.contains(fileA), "first ignore file must be kept")
+    assert(config.ignore.contains(fileB), "second ignore file must be kept")
+  }
+
+  test("Configuration - multiple --file-list flags all apply") {
+    // Each occurrence of --file-list must append its file to
+    // `Configuration.fileList`.
+    val fileA = Files.createTempFile("file-list-a", ".txt").toFile()
+    val fileB = Files.createTempFile("file-list-b", ".txt").toFile()
+    val parsed = ConfigurationParser.parse(
+      Array("--file-list", fileA.getPath, "--file-list", fileB.getPath)
+    )
+    assert(parsed.isDefined, "multiple --file-list flags must parse")
+    val config = parsed.get
+    assert(config.fileList.contains(fileA), "first file-list must be kept")
+    assert(config.fileList.contains(fileB), "second file-list must be kept")
+  }
+
+  test("Configuration - multiple --mime-filter flags all apply") {
+    // Each occurrence of --mime-filter must append its predicate to the
+    // IncludeExclude; a second occurrence must not be rejected.
+    val parsed = ConfigurationParser.parse(
+      Array(
+        "-b",
+        "/tmp/mime-filter-in",
+        "--mime-filter",
+        "-application/octet-stream",
+        "--mime-filter",
+        "-text/x-crypto-shape"
+      )
+    )
+    assert(parsed.isDefined, "multiple --mime-filter flags must parse")
+    val config = parsed.get
+    assert(
+      !config.mimeFilter.shouldInclude(Set("application/octet-stream")),
+      "first mime-filter predicate must be active"
+    )
+    assert(
+      !config.mimeFilter.shouldInclude(Set("text/x-crypto-shape")),
+      "second mime-filter predicate must be active"
+    )
+  }
+
+  test("Configuration - multiple --mime-filter-file flags all apply") {
+    // Each occurrence of --mime-filter-file must append its lines as
+    // predicates; a second occurrence must not be rejected.
+    val fileA = Files.createTempFile("mime-filter-a", ".txt").toFile()
+    val fileB = Files.createTempFile("mime-filter-b", ".txt").toFile()
+    Files.writeString(fileA.toPath(), "-alpha\n")
+    Files.writeString(fileB.toPath(), "-beta\n")
+    val parsed = ConfigurationParser.parse(
+      Array(
+        "--mime-filter-file",
+        fileA.getPath,
+        "--mime-filter-file",
+        fileB.getPath
+      )
+    )
+    assert(parsed.isDefined, "multiple --mime-filter-file flags must parse")
+    val config = parsed.get
+    assert(
+      !config.mimeFilter.shouldInclude(Set("alpha")),
+      "first mime-filter-file lines must be active"
+    )
+    assert(
+      !config.mimeFilter.shouldInclude(Set("beta")),
+      "second mime-filter-file lines must be active"
+    )
   }
 
   test("Configuration - blockList can be set") {
@@ -334,5 +465,137 @@ class ConfigTestSuite extends munit.FunSuite {
     val config = Configuration(tempDir = Some(tempDir))
 
     assertEquals(config.tempDir, Some(tempDir))
+  }
+
+  // ==================== operational summary tests ====================
+
+  test("Configuration - operationalSummary lists non-default settings only") {
+    val pattern = Pattern.compile(".*\\.class")
+    val config = Configuration(
+      threads = 12,
+      build = Vector(File("/tmp/built/from/here")),
+      tag = Some("test-tag"),
+      exclude = Vector("*.class" -> Success(pattern)),
+      logging = Map("io.spicelabs.goatrodeo" -> "DEBUG"),
+      progressListener = Some(new ProgressListener {
+        def onProgress(current: Long, total: Long): Unit = ()
+      })
+    )
+    val summary = config.operationalSummary
+    // one line, comma-separated, only the settings that differ from defaults
+    assert(
+      summary.contains("threads = 12"),
+      s"threads must appear: $summary"
+    )
+    assert(
+      summary.contains("/tmp/built/from/here"),
+      s"build roots must appear: $summary"
+    )
+    assert(
+      summary.contains("test-tag"),
+      s"tag must appear: $summary"
+    )
+    assert(
+      summary.contains(".*\\.class"),
+      s"exclude patterns must appear: $summary"
+    )
+    assert(
+      summary.contains("DEBUG"),
+      s"logging settings must appear: $summary"
+    )
+    assert(
+      !summary.contains("maxRecords"),
+      s"default settings must be omitted: $summary"
+    )
+    assert(
+      !summary.contains("cbomVersion"),
+      s"default settings must be omitted: $summary"
+    )
+    assert(
+      !summary.contains("runtime"),
+      s"ambient runtime state must not be echoed: $summary"
+    )
+    assert(
+      !summary.contains("progressListener"),
+      s"the listener object must not be echoed: $summary"
+    )
+  }
+
+  test("Configuration - operationalSummary names an invalid exclude pattern") {
+    val config = Configuration(
+      exclude = Vector("bad(" -> Failure(new RuntimeException("no")))
+    )
+    val summary = config.operationalSummary
+    assert(
+      summary.contains("bad(") && summary.contains("invalid"),
+      s"invalid patterns must be visible as invalid: $summary"
+    )
+  }
+
+  test("Configuration - operationalSummary is empty for a default run") {
+    // Defaults are omitted, so an untouched configuration summarizes to an
+    // empty string — the run-start line then reads "all defaults".
+    val summary = Configuration().operationalSummary
+    assertEquals(summary, "", s"defaults must be omitted: $summary")
+  }
+
+  // ==================== run-start configuration echo ====================
+
+  test("Configuration - a run begins by echoing the operational summary") {
+    // The echo is a log surface; LogCapture pins the lines themselves from a
+    // real (tiny) run: the run must log a "Configuration:" header followed by
+    // one line per setting, and must not echo the ambient runtime state or
+    // the progress listener.
+    val payloadDir = Files.createTempDirectory("gr-echo-payload").toFile
+    val outputDir = Files.createTempDirectory("gr-echo-output").toFile
+    try {
+      for (i <- 0 until 5) {
+        Files.writeString(
+          new File(payloadDir, f"e$i%03d.txt").toPath,
+          s"data $i\n"
+        )
+      }
+      // INFO capture only: the assertion needs the run's own INFO lines, and
+      // raising the root level (as LogCapture.apply does) would leak every
+      // concurrently-running suite's DEBUG output into the console.
+      val (_, captured) = LogCapture.applyWithoutRaise(() => {
+        GoatRodeo
+          .builder()
+          .withPayload(payloadDir.getAbsolutePath)
+          .withOutput(outputDir.getAbsolutePath)
+          .withThreads(2)
+          .run()
+        ()
+      })
+      val lines = captured.map(_.getFormattedMessage)
+      val echoLines = lines.filter(_.startsWith("Configuration"))
+      assert(
+        echoLines.size == 1,
+        s"the echo must be exactly one line: $lines"
+      )
+      assert(
+        echoLines.head.contains("threads = 2"),
+        s"the echo must carry the effective settings: $lines"
+      )
+      assert(
+        echoLines.head.contains(payloadDir.getAbsolutePath),
+        s"the echo must carry the build roots: $lines"
+      )
+      assert(
+        !echoLines.head.contains("maxRecords"),
+        s"default settings must be omitted from the echo: $echoLines"
+      )
+      assert(
+        !echoLines.head.contains("progressListener"),
+        s"the listener object must not be echoed: $lines"
+      )
+    } finally {
+      def deleteRecursively(f: File): Unit = {
+        Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
+        val _ = f.delete()
+      }
+      deleteRecursively(payloadDir)
+      deleteRecursively(outputDir)
+    }
   }
 }

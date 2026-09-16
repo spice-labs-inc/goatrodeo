@@ -1,23 +1,10 @@
-/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
@@ -28,7 +15,7 @@ import java.nio.file.Files
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-class ToProcessTestSuite extends munit.FunSuite {
+class ToProcessTestSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.
@@ -326,13 +313,12 @@ class ToProcessTestSuite extends munit.FunSuite {
   test(
     "computeToProcess - registers each required strategy and keeps Generic last"
   ) {
-    // Refactored from a hardcoded count assertion to a structural one
-    // (per invariant #4 discussion / user-approved option 2 of the
-    // Phase 1 invariant-#4 stop): assert the dispatch chain CONTAINS
+    // Refactored from a hardcoded count assertion to a structural one:
+    // assert the dispatch chain CONTAINS
     // each strategy the project depends on, and that Generic is the
     // terminal entry. This is resilient to new strategies being added
     // without churning a brittle integer.
-    //
+
     // Closure-identity equality on eta-expanded ProcessFuncs is
     // unreliable across Scala 3 eta-expansions, so we invoke each
     // registered fn with empty inputs and compare the dispatch-label

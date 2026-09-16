@@ -53,6 +53,9 @@ Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects
 * `--tag-version <version>` : Set a version field in the top-level tag JSON (requires `--tag`). The version string is included as-is in the tag output.
 * `--tag-date <date>` : Set a date field in the top-level tag JSON (requires `--tag`). The date is parsed flexibly and always output in ISO 8601 format.
   Supported formats include: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SSZ`, `MM/DD/YYYY`, `DD/MM/YYYY`, `MMM D YYYY`, and relative terms like `today`, `yesterday`, `now`.
+* `--no-redact-git-info` : Do not redact git provenance metadata (author/committer emails stored raw and repo paths absolute). Git provenance is
+  captured for tagged runs (see `git_provenance.md`); by default emails are replaced by a pseudonymous `sha256:` digest and repo roots are
+  relativized. `--tag-date` and a user JSON `date` override are carried verbatim into the git provenance Items.
 * `--package-tags` : Create per-package tags for identified packages (Maven, Docker, Baharat, Annatto, Dotnet, JDK/JRE). Each package gets a tag Item
   with fields: `tag` (package name), `version` (package version), and `date` (build/publish date in ISO 8601 format). The `version` field
   is omitted if not available. Tag items are linked from a `packages` index Item and linked to the main package artifact.
@@ -67,7 +70,7 @@ Sub-tags are created automatically with `--package-tags` when Goat Rodeo detects
    to generate a list of files to process (e.g., exclude html files that may have been downloaded as part of a site crawl)
 * `--exclude-pattern` : A regular expression pattern that can be used to exclude files, for example `html$` will exclude all files that end in `html`
 * `--emit-cbom-dir <dir>` : Emit one CycloneDX cryptographic bill-of-materials (CBOM) JSON file per top-level input file into this directory. The directory is created if it does not exist. CBOM emission is disabled when this flag is omitted.
-* `--cbom-version <1.6|1.7>` : CycloneDX CBOM specification version to emit when `--emit-cbom-dir` is set. Accepts only `1.6` (default) or `1.7`.
+* `--cbom-version <1.6|1.7>` : CycloneDX CBOM specification version to emit when `--emit-cbom-dir` is set. Accepts only `1.6` (legacy) or `1.7` (default).
 * `-V` or `--version`: Print the version and exit
 
 ## Operation
@@ -216,6 +219,55 @@ choosing `--maxrecords` number (the default is 50,000) that will comfortably fit
 Threads consume CPU, but there are also intermediate data structures (e.g., in-memory `ArtifactWrappers`) that
 consume memory. In terms of choosing the number of threads, it's not simply the number of logical CPUs, it's
 also the amount of RAM.
+
+## Supported Formats and Cryptographic Materials
+
+Goat Rodeo traverses containers recursively (an ISO that contains a tar that contains a zip that contains a JAR will be processed at every level) and extracts metadata from the package formats and cryptographic materials listed below.
+
+### Containers Goat Rodeo traverses into
+
+- ZIP-family archives: ZIP, JAR, WAR, Android APK
+- Docker/OCI images: `docker save` tarballs (`manifest.json`, config, layer tarballs) and pure OCI image layouts (`oci-layout`, `index.json`, `blobs/sha256/...`, including nested manifest indexes)
+- Tar-family archives and compression wrappers: tar, tar.gz, tar.bz2, 7z, cpio, ar, and other formats auto-detected by Apache Commons; single-file compression wrappers (gzip, bzip2, xz, lzma, zstd, etc.) are decompressed and the result is tested as a container
+- RPM packages (payload files)
+- ISO 9660 images
+- Disk images: qcow2, vmdk, vhd, vhdx, vdi, raw, AMI, GCP (gzip-wrapped raw)
+- Filesystems on disk images (including across MBR/GPT partitions, LVM volume groups, and the UBI layer): ext4, FAT32, exFAT, NTFS, XFS, btrfs, SquashFS, HFS+, APFS, JFFS2, CramFS, YAFFS2, UBIFS
+- Embedded binary containers: Linux kernel images, FIT images, device tree blobs (DTB), ELF files, Raspberry Pi firmware, Android boot images, WIM, DMG
+- .NET assemblies (.dll/.exe): classes, embedded resources, certificates, win32 resources, debug blobs
+- Portable PDB files (embedded source files)
+- ArduPilot `AP_ROMFS` embedded file stores (ELF firmware)
+
+### Package formats metadata is extracted from
+
+- Maven/JVM archives: `.jar`, `.war`, `.ear`, `.par`, `.sar`, `.nar`, `.jpi`, `.hpi`, `.kar`, `.far`, `.lpkg`, `.rar` (Java), `.zap`, processed as units with companion `.pom`, `maven-metadata.xml`, `-sources.jar` and `-javadoc.jar` files. JAR internals: MANIFEST.MF, `pom.properties`, embedded POMs, Spring Boot fat-jar structure (BOOT-INF), WAR structure (WEB-INF), EAR modules (application.xml), multi-release versions, `module-info.class`, OSGi headers, Jenkins plugin markers, GraalVM native-image properties, ServiceLoader providers, and signature files
+- Docker/OCI images: platform (os/architecture/variant), environment variables, labels (OCI and label-schema), entrypoint, command, build history, layer count, repository digests, image size
+- Linux packages: RPM, Debian (`.deb`), Pacman (`.pkg.tar.xz` / `.pkg.tar.zst`), Alpine APK, FreeBSD `.pkg`, OpenBSD `.tgz`
+- Language ecosystem packages: CocoaPods, Conda, CPAN, Crates (Rust), Go modules, Hex (Elixir), LuaRocks, npm, Packagist (PHP), PyPI, RubyGems
+- .NET assemblies: name, version, locale, public key, custom attributes (copyright, trademark, description), assembly references, canonical type JSON. `.nupkg` files are traversed as zip containers
+- Gradle lockfiles: `gradle.lockfile`, `buildscript-gradle.lockfile`, `dependency-locks/*.lockfile`
+- JVM distributions: the `release` file (vendor, version, JDK vs JRE, OS, libc, JVM variant, source repos)
+- Dependency lockfiles: `Cargo.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `go.sum`, `requirements.txt` (including a curated crypto-library mapping)
+
+### Cryptographic materials
+
+- X.509 certificates, X.509 CA certificates, PKCS#7 signatures, PEM files and multi-certificate PEM bundles, certificate revocation lists (CRLs)
+- Keystores: JKS, JCEKS, PKCS#12, BKS
+- OpenSSH public keys and CA-issued SSH certificates (user and host)
+- SSH key files: `authorized_keys`, `ssh_host_*` host keys, Dropbear host keys, `.pub` files
+- PGP key rings (public and secret)
+- Private keys: plaintext PKCS#8 and legacy PEM, OpenSSH v1 format, PGP secret keys. Encrypted private keys and encrypted keystores are opaque: envelope-only metadata (KDF, cipher, salt) is emitted, no pURL, and no decryption is ever attempted
+- Unix password files: `/etc/shadow`, `/etc/gshadow`, `/etc/passwd`, `/etc/group`, with crypt(3) hash algorithm identification
+- usign/signify keys (OpenWrt)
+- Service TLS configuration: OpenWrt UCI (`/etc/config/`), nginx, lighttpd, apache2, httpd
+- Mobile and JVM TLS policy files: Android `network_security_config.xml`, `AndroidManifest.xml` (cleartext traffic), Apple `Info.plist` ATS, JDK `crypto.policy`
+- JWT and JWK tokens
+- Embedded PEM material in text files; carved certificates in binaries; embedded certificate material in shared libraries (mbedTLS, OpenSSL, wolfSSL, GnuTLS, and similar)
+- Crypto footprints in binaries: OpenSSL `EVP_*` symbols, Go `crypto/...` package paths, Rust crate names, .NET `System.Security.Cryptography.*` types
+- Cloud-managed key references: AWS KMS, Azure Key Vault, GCP Cloud KMS, HashiCorp Vault (Terraform, JSON, YAML, properties, env files)
+- OpenSSL configuration files (`.cnf`): key/value pairs, sections, `.include` references, `oid_section`
+- Java security properties files (`java.security` and included siblings)
+- SQLCipher and DB-encryption markers in code and configuration
 
 ## Cryptographic Configuration Capture and CBOM Output
 
@@ -419,6 +471,57 @@ pkg:generic/x509/cert-sha256@d49630047cf9a19fb479d261dbd392fad25ce034f504f7a4cf7
 pkg:generic/x509/spki-sha256@0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a39dad301c5afc3?alg=rsa&size=4096&version=3
 pkg:generic/x509/cert-sha256@96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6?alg=rsa&self-signed=true&sig-alg=sha256-rsa&size=4096&version=3
 ```
+
+
+## Logging and progress reporting
+
+### Run-start configuration echo
+
+The run begins by echoing the effective configuration to the log as a single
+line under a `Configuration:` prefix; settings equal to their defaults are
+omitted, so a default run reads "Configuration: (all defaults)". The two
+fields never echoed are the ambient runtime environment and the
+progress-listener object: the first describes how the process was started
+rather than what the run was told to do, and a listener is an object, not a
+setting (as demonstrated by the tests `ConfigTestSuite` "Configuration -
+operationalSummary lists non-default settings only", "Configuration -
+operationalSummary is empty for a default run", and "Configuration - a run
+begins by echoing the operational summary"). An unparseable exclude pattern
+appears in the echo as `invalid (...)` rather than vanishing (as demonstrated
+by `ConfigTestSuite` "Configuration - operationalSummary names an invalid
+exclude pattern").
+
+### Progress cadence
+
+The `Processed N of M` log line and the `ProgressListener` callbacks fire
+together, at most once per 30 seconds of wall time run-wide, immediately when
+a single item has taken longer than 30 seconds, and once more with the final
+count when a batch drains (as demonstrated by `ProgressListenerIntegrationTest`
+"the batch-drain final report carries the final count"). A run that finishes
+quickly therefore produces one terminal progress event with `current == total`
+and no mid-run noise. Hosts synthesizing phases from events can rely on a
+`current == total` event meaning the run's own processing is done.
+
+### Container-failure summary
+
+When a container's processing fails wholesale, the individual failure is
+logged with its exception at the failure site, and a run-wide counter is
+incremented; at completion the run reports the aggregate — "N container(s)
+failed to process; their contents are missing from this run's outputs" — so
+the log says in one line what the item counts cannot (as demonstrated by
+`ISOFileSuite` "withinArchiveStream - counts a container whose walk fails").
+
+### Third-party reader quietude
+
+The bundled logging defaults set the DEB/RPM package readers
+(`io.spicelabs.baharat`) to WARN, so package-heavy corpora do not produce one
+"Read DEB/RPM package" line per archive (as demonstrated by `LogDefaultsSuite`
+"bundled defaults keep the DEB/RPM readers at WARN"). Goat Rodeo's own
+loggers stay at INFO (as demonstrated by `LogDefaultsSuite` "bundled defaults
+keep Goat Rodeo's own loggers at INFO"). The git-provenance
+library is kept at WARN as well (`org.eclipse.jgit` debug-logs every probe and
+file stat; as demonstrated by `LogDefaultsSuite` "bundled defaults keep the
+git library at WARN").
 
 ## Tuning for performance
 

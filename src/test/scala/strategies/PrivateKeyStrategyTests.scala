@@ -13,14 +13,19 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
-import munit.FunSuite
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.security.MessageDigest
+import java.util.Base64
 
-/** Strategy-level tests for Phase 7's private-key parsers + emitters.
+/** Strategy-level tests for the private-key parsers and emitters.
   *
   * ## What these tests test
   *
@@ -36,11 +41,11 @@ import java.io.File
   *
   * ## Why this matters (HS-3)
   *
-  * Phase 6's first-pass remediation (G5) flagged that materializer- sourced
-  * sidecar assertions are tautological: a regression in the strategy would
-  * re-emit the bug into the sidecar and the test would still pass. Independent
-  * ground truth (here: `openssl`'s public-key derivation, run at
-  * fixture-creation time) breaks the tautology.
+  * A gap analysis flagged that materializer-sourced sidecar assertions are
+  * tautological: a regression in the strategy would re-emit the bug into the
+  * sidecar and the test would still pass. Independent ground truth (here:
+  * `openssl`'s public-key derivation, run at fixture-creation time) breaks the
+  * tautology.
   *
   * ## Ground-truth recipe
   *
@@ -59,7 +64,7 @@ import java.io.File
   * assertions on the materialized sidecar which iterates the entire
   * openssh-key-v1 envelope.
   */
-class PrivateKeyStrategyTests extends FunSuite {
+class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
 
   private def wrap(path: String): FileWrapper =
     FileWrapper(new File(path), path, None)
@@ -202,7 +207,7 @@ class PrivateKeyStrategyTests extends FunSuite {
   }
 
   // ===== UNENCRYPTED OpenSSH — structural assertions =====================
-  //
+
   // Cross-check via openssh-key-v1 envelope itself (the public-key wire
   // blob is in the clear; we read it directly). System ssh-keygen on
   // this host rejects these fixtures (libcrypto mismatch); the
@@ -227,15 +232,15 @@ class PrivateKeyStrategyTests extends FunSuite {
     )
   }
 
-  // D2 — Phase-7 second-pass remediation: independent SSH SHA-256
-  // ground truth via Python (grandfathered for test_data tooling).
+  // Independent SSH SHA-256 ground truth via Python (grandfathered
+  // for test_data tooling).
   // System ssh-keygen rejects these fixtures ("error in libcrypto");
   // the values below were computed by a Python script that re-implements
   // the openssh-key-v1 envelope unpack + SHA-256(pubkey-wire-blob)
   // logic from scratch. Recipe in test_data/certificates/tools/
   // openssh_v1_fingerprint.py.
   test(
-    "parseOpenSshPrivateKey: openssh-ed25519 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-ed25519 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-ed25519-unencrypted"
@@ -244,9 +249,9 @@ class PrivateKeyStrategyTests extends FunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
+    val md = MessageDigest.getInstance("SHA-256")
     val sha = md.digest(p.wireBytes)
-    val b64 = java.util.Base64.getEncoder.withoutPadding.encodeToString(sha)
+    val b64 = Base64.getEncoder.withoutPadding.encodeToString(sha)
     assertEquals(
       b64,
       "oNA+weKy3joG5Lk8DyILmfET8o25s9dl6b7ZwXgZ1Lg",
@@ -257,7 +262,7 @@ class PrivateKeyStrategyTests extends FunSuite {
   }
 
   test(
-    "parseOpenSshPrivateKey: openssh-rsa-2048 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-rsa-2048 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-rsa-2048-unencrypted"
@@ -266,14 +271,14 @@ class PrivateKeyStrategyTests extends FunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
-    val b64 = java.util.Base64.getEncoder.withoutPadding
+    val md = MessageDigest.getInstance("SHA-256")
+    val b64 = Base64.getEncoder.withoutPadding
       .encodeToString(md.digest(p.wireBytes))
     assertEquals(b64, "t0/kOgTYoKNs5SqVqWSLJPoXV2gsRUIlrprl3Osdlfc")
   }
 
   test(
-    "parseOpenSshPrivateKey: openssh-rsa-4096 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-rsa-4096 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-rsa-4096-unencrypted"
@@ -282,14 +287,14 @@ class PrivateKeyStrategyTests extends FunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
-    val b64 = java.util.Base64.getEncoder.withoutPadding
+    val md = MessageDigest.getInstance("SHA-256")
+    val b64 = Base64.getEncoder.withoutPadding
       .encodeToString(md.digest(p.wireBytes))
     assertEquals(b64, "mnO0vOy97kw6cBAygwUoutkpQCBrhs66SJlfgJEbeLg")
   }
 
   test(
-    "parseOpenSshPrivateKey: openssh-ecdsa-p256 SHA-256 matches Python ground truth (D2)"
+    "parseOpenSshPrivateKey: openssh-ecdsa-p256 SHA-256 matches Python ground truth "
   ) {
     val w = wrap(
       "test_data/certificates/private-keys/synthetic/openssh-ecdsa-p256-unencrypted"
@@ -298,8 +303,8 @@ class PrivateKeyStrategyTests extends FunSuite {
       .classifyAndParse(w)
       .get
       .asInstanceOf[Certificates.PrivateKeyPlaintextOpenSsh]
-    val md = java.security.MessageDigest.getInstance("SHA-256")
-    val b64 = java.util.Base64.getEncoder.withoutPadding
+    val md = MessageDigest.getInstance("SHA-256")
+    val b64 = Base64.getEncoder.withoutPadding
       .encodeToString(md.digest(p.wireBytes))
     assertEquals(b64, "K0sk7wZe1Bj1TfmlBhuiUqc8/7l7Ty0FemZog9NUeUQ")
   }
@@ -443,7 +448,7 @@ class PrivateKeyStrategyTests extends FunSuite {
     )
   }
 
-  // ===== PGP SECRET KEY (Phase 7 inline) =================================
+  // ===== PGP SECRET KEY ================================================
 
   test(
     "parsePgpKeyOrSecretKeyRing: unencrypted PGP secret key (Ed25519 + ECDH cv25519 subkey) — gpg ground truth"
@@ -531,7 +536,7 @@ class PrivateKeyStrategyTests extends FunSuite {
     val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     val purls = purlSet.canonicalStrings
     assertEquals(
@@ -552,13 +557,13 @@ class PrivateKeyStrategyTests extends FunSuite {
     val (md, _) = state.getMetadata(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     assert(md.contains("Certificates:Envelope"))
     assertEquals(md("Certificates:Envelope").head.value, "plaintext")
     assert(md.contains("Certificates:DerivedFromPrivateKey"))
     assertEquals(md("Certificates:DerivedFromPrivateKey").head.value, "true")
-    // Per-key fields (Phase 6 metadata structure preserved):
+    // Per-key fields (metadata structure preserved):
     assert(md.contains("Certificates:PgpKeyCount"))
     assertEquals(md("Certificates:PgpKeyCount").head.value, "2")
   }
@@ -576,7 +581,7 @@ class PrivateKeyStrategyTests extends FunSuite {
     val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     val purls = purlSet.canonicalStrings
     assertEquals(
@@ -597,7 +602,7 @@ class PrivateKeyStrategyTests extends FunSuite {
     val (purlSet, _) = state.getPurls(
       w,
       stubItem(),
-      io.spicelabs.goatrodeo.omnibor.SingleMarker()
+      SingleMarker()
     )
     val purls = purlSet.canonicalStrings
     assertEquals(purls.length, 1)
@@ -611,14 +616,14 @@ class PrivateKeyStrategyTests extends FunSuite {
   test(
     "[HARD RULE] no metadata value matches a forbidden private-key pattern (full corpus sweep)"
   ) {
-    val pkRoot = java.nio.file.Paths.get("test_data/certificates/private-keys")
-    if (java.nio.file.Files.exists(pkRoot)) {
+    val pkRoot = Paths.get("test_data/certificates/private-keys")
+    if (Files.exists(pkRoot)) {
       import scala.jdk.CollectionConverters.*
-      val files = java.nio.file.Files
+      val files = Files
         .walk(pkRoot)
         .iterator()
         .asScala
-        .filter(p => java.nio.file.Files.isRegularFile(p))
+        .filter(p => Files.isRegularFile(p))
         .filter(p => !p.toString.endsWith(".expected.json"))
         .toVector
       assert(files.nonEmpty, "expected at least one private-key fixture")
@@ -632,7 +637,7 @@ class PrivateKeyStrategyTests extends FunSuite {
           val _ = state.getMetadata(
             w,
             stubItem(),
-            io.spicelabs.goatrodeo.omnibor.SingleMarker()
+            SingleMarker()
           )
         }
       }
@@ -641,7 +646,7 @@ class PrivateKeyStrategyTests extends FunSuite {
 
   // ===== Stub Item helper ================================================
 
-  private def stubItem(): io.spicelabs.goatrodeo.omnibor.Item = {
+  private def stubItem(): Item = {
     import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData}
     import scala.collection.immutable.{TreeMap, TreeSet}
     Item(

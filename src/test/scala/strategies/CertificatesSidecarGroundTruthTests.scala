@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.security.cert.CertificateFactory
@@ -29,12 +29,12 @@ import scala.util.Try
   *
   * ## Why this suite exists
   *
-  * Phase 0b shipped 200 sidecars whose values were computed by
-  * `tools/cert_sidecar.py` (Python + the `cryptography` package, itself a
-  * wrapper over OpenSSL). If that computation had a bug, or if someone edited a
-  * sidecar by hand without regenerating, or if a fixture file was swapped
-  * without updating the sidecar — every such drift is a silent source of false
-  * green or false red downstream.
+  * The 200 committed sidecars were computed by `tools/cert_sidecar.py` (Python
+  * + the `cryptography` package, itself a wrapper over OpenSSL). If that
+  * computation had a bug, or if someone edited a sidecar by hand without
+  * regenerating, or if a fixture file was swapped without updating the sidecar
+  * — every such drift is a silent source of false green or false red
+  * downstream.
   *
   * This suite uses **the JDK's built-in** `java.security.cert.
   * CertificateFactory` — a completely separate X.509 parser from the one that
@@ -63,11 +63,11 @@ import scala.util.Try
   *   - "every X.509 fixture's SubjectDN matches JDK's RFC-2253 rendering of the
   *     parsed subject" — DN formatting cross-check.
   */
-class CertificatesSidecarGroundTruthTests extends FunSuite {
+class CertificatesSidecarGroundTruthTests extends GoatRodeoFunSuite {
 
   /** One X.509 fixture that has cert/SPKI/DN sidecar fields to verify. */
   private case class X509CheckCase(
-      fixture: java.io.File,
+      fixture: File,
       sidecar: CertificatesSidecar
   )
 
@@ -160,7 +160,7 @@ class CertificatesSidecarGroundTruthTests extends FunSuite {
     // `cryptography` may differ on attribute ordering for multi-RDN
     // names — but for the canonical single-RDN cases that dominate
     // the corpus (CN/O/C), the strings are identical.
-    //
+
     // We report mismatches rather than failing hard, because DN
     // formatting has legitimate vendor variation. Mismatch count > 0
     // is information, not necessarily a defect. Failing threshold:

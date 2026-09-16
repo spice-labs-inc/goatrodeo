@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
+import java.lang.Double as JDouble
+import java.util.Arrays
 
 /** An adaptive concurrency controller for I/O-heavy passes.
   *
@@ -46,9 +48,8 @@ package io.spicelabs.goatrodeo.util
   * reads no clock, so it can be driven by synthetic traces in tests.
   *
   * Construction (via the companion `apply`) never raises: out-of-range or
-  * non-finite parameters are clamped to sane values (pinned by
-  * `AdaptiveParallelismSuite.T-AP-02`); the production defaults are exactly the
-  * defaults below.
+  * non-finite parameters are clamped to sane values (pinned by the clamping
+  * tests); the production defaults are exactly the defaults below.
   */
 final class AdaptiveParallelism private (
     val min: Int,
@@ -104,7 +105,7 @@ final class AdaptiveParallelism private (
     */
   def record(completionNanos: Long): Unit = synchronized {
     if (count == times.length) {
-      times = java.util.Arrays.copyOf(times, times.length * 2)
+      times = Arrays.copyOf(times, times.length * 2)
     }
     times(count) = math.max(0L, completionNanos)
     count += 1
@@ -124,7 +125,7 @@ final class AdaptiveParallelism private (
     }
     val n = count
     count = 0
-    java.util.Arrays.sort(times, 0, n)
+    Arrays.sort(times, 0, n)
     val median: Double =
       if (n % 2 == 1) times(n / 2).toDouble
       else (times(n / 2 - 1).toDouble + times(n / 2).toDouble) / 2.0
@@ -190,7 +191,7 @@ object AdaptiveParallelism {
       hi: Double,
       dflt: Double
   ): Double = {
-    if (java.lang.Double.isFinite(v) && v >= lo && v <= hi) v else dflt
+    if (JDouble.isFinite(v) && v >= lo && v <= hi) v else dflt
   }
 
   /** Build a controller with clamped parameters (never raises). See the class

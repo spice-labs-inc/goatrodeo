@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
@@ -20,7 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters.*
 
-class ProgressListenerTest extends munit.FunSuite {
+class ProgressListenerTest extends GoatRodeoFunSuite {
 
   /** A listener that records every event it receives. Thread-safe; events land
     * in arrival order because the underlying queue is FIFO.

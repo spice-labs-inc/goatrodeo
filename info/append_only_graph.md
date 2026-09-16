@@ -91,7 +91,9 @@ https://stackoverflow.com/questions/62664761/probability-of-hash-collision
 
 There are three classes of file that Goat Rodeo will emit:
 
-* The OmniBOR Entry file (Goat Rodeo Data or `.grd`) which contains the substance of the data. The Goat Rodeo Data file should be named-based
+* The OmniBOR Entry file (Goat Rodeo Data or `.grd`) which contains the substance of the data. **EOF semantics:** the entry stream is terminated by a
+  −1 marker followed by a back-pointer long; reading treats **any negative entry length** as end-of-file, and a positive length that exceeds the
+  remaining file bytes is end-of-data (a corrupt/foreign tail) — never an allocation at the declared size. Verified by `GrdEofSuite.T13.1–T13.3`. The Goat Rodeo Data file should be named-based
   on the hex value of the 8 most significant bytes of the file's SHA256 hash. This allows for a quick check. Every `.grd` file shall contain
   a back-pointer to the previous file (except the original file). Given that the database is accretive, newer files will reference
   previous files. 

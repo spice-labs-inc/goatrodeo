@@ -2,15 +2,17 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
+import java.nio.file.Files
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
-/** Phase 8 — coverage matrix completeness suite.
+/** coverage matrix completeness suite.
   *
   * Per `certificates-strategy/phases-8-9-tests-docs.md` lines 39-66:
   *
@@ -28,7 +30,7 @@ import scala.jdk.CollectionConverters.*
   * (sig-alg), (cert-type), (envelope), (mime), (Phase-2 detector), etc. Then
   * check each required cell against the observed set.
   */
-class CertificatesCoverageSuite extends FunSuite {
+class CertificatesCoverageSuite extends GoatRodeoFunSuite {
 
   private val corpusRoot = new File("test_data/certificates")
 
@@ -44,7 +46,7 @@ class CertificatesCoverageSuite extends FunSuite {
   )
 
   private def parseSidecar(file: File): Sidecar = {
-    val raw = scala.io.Source.fromFile(file, "UTF-8").mkString
+    val raw = Source.fromFile(file, "UTF-8").mkString
     val json = parse(raw)
 
     def getStringSet(jval: JValue): Set[String] = jval match {
@@ -82,7 +84,7 @@ class CertificatesCoverageSuite extends FunSuite {
   private def discoverSidecars(): Vector[Sidecar] = {
     if (!corpusRoot.exists()) Vector.empty
     else {
-      val all = java.nio.file.Files.walk(corpusRoot.toPath).iterator().asScala
+      val all = Files.walk(corpusRoot.toPath).iterator().asScala
       all
         .filter(p => p.toString.endsWith(".expected.json"))
         .map(p => parseSidecar(p.toFile))
@@ -134,7 +136,7 @@ class CertificatesCoverageSuite extends FunSuite {
   // ===== Sanity: corpus exists ===========================================
 
   test(
-    "[COVERAGE] corpus has at least 100 sidecars (Phase 0b minimum carried forward)"
+    "[COVERAGE] corpus has at least 100 sidecars"
   ) {
     assert(
       sidecars.length >= 100,
@@ -142,7 +144,7 @@ class CertificatesCoverageSuite extends FunSuite {
     )
   }
 
-  // ===== Required matrix per Phase 8 ===============================
+  // ===== Required coverage matrix ===================================
 
   private def x509SpkiOrCertPurls: Vector[Map[String, String]] =
     purlsByScheme
@@ -431,14 +433,12 @@ class CertificatesCoverageSuite extends FunSuite {
     )
   }
 
-  // A4 in v2 review: Phase-7 second-pass remediation introduced two
-  // additional envelope values that the original Phase-8 spec didn't
-  // know about: `pem-legacy-encrypted` (RFC 1421 legacy PEM with
-  // Proc-Type:4,ENCRYPTED) and `pgp-encrypted-secret-key`. Coverage
-  // matrix must require these so a future contributor who removes
-  // the matching fixtures fails the build.
+  // Two additional envelope values are required: `pem-legacy-encrypted`
+  // (RFC 1421 legacy PEM with Proc-Type:4,ENCRYPTED) and
+  // `pgp-encrypted-secret-key`. The coverage matrix must require these so
+  // a future contributor who removes the matching fixtures fails the build.
   test(
-    "[COVERAGE] Private key envelope — pem-legacy-encrypted (RFC 1421 / Phase-7 path)"
+    "[COVERAGE] Private key envelope — pem-legacy-encrypted (RFC 1421)"
   ) {
     val envelopes =
       sidecars.flatMap(_.metadataContains.get("Certificates:Envelope")).toSet
@@ -449,7 +449,7 @@ class CertificatesCoverageSuite extends FunSuite {
   }
 
   test(
-    "[COVERAGE] Private key envelope — pgp-encrypted-secret-key (Phase-7 second-pass remediation)"
+    "[COVERAGE] Private key envelope — pgp-encrypted-secret-key"
   ) {
     val envelopes =
       sidecars.flatMap(_.metadataContains.get("Certificates:Envelope")).toSet
@@ -499,7 +499,7 @@ class CertificatesCoverageSuite extends FunSuite {
     }
     val unencrypted = keystoreSidecars.exists { s =>
       val cnt = s.metadataContains.get("Certificates:EntryCount")
-      cnt.exists(c => scala.util.Try(c.toInt).toOption.exists(_ > 0))
+      cnt.exists(c => Try(c.toInt).toOption.exists(_ > 0))
     }
     assert(encrypted, "no encrypted keystore fixture")
     assert(

@@ -24,6 +24,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.ShadowPasswordStrategy
 import io.spicelabs.goatrodeo.omnibor.strategies.UsignKeysStrategy
 
 import java.nio.charset.StandardCharsets
+import java.util.Arrays
 import scala.util.Try
 
 /** MIME augmentation for content-based strategy claiming.
@@ -76,7 +77,7 @@ object CryptoContentDetector {
       val bytes = a.withStream { s =>
         val buf = new Array[Byte](ReadBytes)
         val n = s.read(buf, 0, ReadBytes)
-        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+        if (n <= 0) Array.emptyByteArray else Arrays.copyOf(buf, n)
       }
       new String(bytes, StandardCharsets.ISO_8859_1)
     }.getOrElse("")

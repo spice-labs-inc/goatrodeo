@@ -13,7 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
-
 import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -21,6 +20,7 @@ import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenMarkers
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenState
 import io.spicelabs.goatrodeo.omnibor.strategies.MavenToProcess
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
@@ -31,7 +31,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.xml.NodeSeq
 
-class MavenTestSuite extends munit.FunSuite {
+class MavenTestSuite extends GoatRodeoFunSuite {
 
   val pomXml = """<?xml version="1.0" encoding="UTF-8"?>
 <project>
@@ -382,8 +382,8 @@ class MavenTestSuite extends munit.FunSuite {
     // Simulate ByteWrapper returning correct mime type
     val tempDir = Files.createTempDirectory("maventest")
     try {
-      val jarFile = new java.io.File(tempDir.toFile(), "test.jar")
-      val pomFile = new java.io.File(tempDir.toFile(), "test.pom")
+      val jarFile = new File(tempDir.toFile(), "test.jar")
+      val pomFile = new File(tempDir.toFile(), "test.pom")
 
       // Create minimal valid JAR (just zip header)
       Helpers.writeOverFile(
@@ -418,8 +418,8 @@ class MavenTestSuite extends munit.FunSuite {
   test("computeMavenFiles - excludes -sources.jar from main jars") {
     val tempDir = Files.createTempDirectory("mavenexclude")
     try {
-      val mainJar = new java.io.File(tempDir.toFile(), "test.jar")
-      val sourcesJar = new java.io.File(tempDir.toFile(), "test-sources.jar")
+      val mainJar = new File(tempDir.toFile(), "test.jar")
+      val sourcesJar = new File(tempDir.toFile(), "test-sources.jar")
 
       val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00,
         0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -456,7 +456,7 @@ class MavenTestSuite extends munit.FunSuite {
   test("computeMavenFiles - handles war files") {
     val tempDir = Files.createTempDirectory("mavenwar")
     try {
-      val warFile = new java.io.File(tempDir.toFile(), "test.war")
+      val warFile = new File(tempDir.toFile(), "test.war")
       val jarHeader = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00,
         0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)

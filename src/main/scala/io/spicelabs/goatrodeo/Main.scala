@@ -14,6 +14,7 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo
 
+import ch.qos.logback.classic.LoggerContext
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.spicelabs.config.LogbackLogging
@@ -29,11 +30,16 @@ import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import io.spicelabs.goatrodeo.util.config
+import org.slf4j.Logger.ROOT_LOGGER_NAME
 import org.slf4j.LoggerFactory
 
 import java.io.File
+import java.io.FileWriter
+import java.nio.charset.Charset
 import java.nio.file.Files
+import java.util.Map as JMap
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
 import scala.util.Failure
@@ -100,7 +106,7 @@ object Howdy {
     }
     LogbackLogging.apply(
       Resolution.of(
-        java.util.Map.of(Logging.GROUP, settings.asJava),
+        JMap.of(Logging.GROUP, settings.asJava),
         Origin.embedded(Logging.GROUP)
       ),
       // Fully qualified because it names a logger, not a type: this is the
@@ -144,6 +150,16 @@ object Howdy {
     startComponents
 
     val logger = Logger(getClass())
+
+    // Echo the non-default settings in force as the run starts, one line, so
+    // the log alone says what this run was told to do (and what it skipped).
+    // The summary is curated: ambient process state and the progress listener
+    // are not settings and are never printed.
+    val echo = config.operationalSummary
+    logger.info(
+      if (echo.isEmpty) "Configuration: (all defaults)"
+      else f"Configuration: ${echo}"
+    )
 
     val fileListers = config.getFileListBuilders()
 
@@ -195,9 +211,9 @@ object Howdy {
                   f"Completed, exporting ${success.length}%,d ingested items to ${destFile}"
                 )
 
-                val out = java.io.FileWriter(
+                val out = FileWriter(
                   destFile,
-                  java.nio.charset.Charset.forName("UTF-8"),
+                  Charset.forName("UTF-8"),
                   true
                 )
                 for { f <- success } {
@@ -264,6 +280,7 @@ object Howdy {
           (storage: Storage) => { storage.emitAllItemsToDir(dir); true }
         )
 
+    val failedContainers = new AtomicInteger(0)
     Builder.buildDB(
       dest = dest,
       tag = (config.tag, config.tagJson) match {
@@ -276,8 +293,19 @@ object Howdy {
       excludeFileRegex = excludePatterns,
       finishedFile = onFileFinish,
       done = onRunFinish,
-      preWriteDB = preWriteDB
+      preWriteDB = preWriteDB,
+      failedContainers = failedContainers
     )
+
+    // Wholesale container loss is invisible in the counts otherwise: the
+    // items inside a failed container are never processed, while the ingested
+    // list still grows. Name the loss so the run's log tells the truth about
+    // it; each individual failure is logged (with the exception) upstream.
+    val containerFailures = failedContainers.get()
+    if (containerFailures > 0)
+      logger.warn(
+        f"${containerFailures}%,d container(s) failed to process; their contents are missing from this run's outputs"
+      )
 
   }
 
@@ -312,13 +340,13 @@ object Howdy {
     config.tamperEvidentLog.foreach { file =>
       val lc = LoggerFactory
         .getILoggerFactory()
-        .asInstanceOf[ch.qos.logback.classic.LoggerContext]
+        .asInstanceOf[LoggerContext]
       val appender = new ChainAppender()
       appender.setContext(lc)
       appender.setFile(file)
       appender.start()
       val root =
-        lc.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
+        lc.getLogger(ROOT_LOGGER_NAME)
       root.addAppender(appender)
       chainHead = () => Some(appender.currentChainHead())
       cleanup = () => {

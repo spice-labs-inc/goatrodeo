@@ -13,21 +13,20 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
 import scala.collection.immutable.TreeSet
 
-/** Phase G — Lockfile crypto inventory.
+/** Lockfile crypto inventory.
   *
   * Verifies CryptoDependency metadata for cargo/npm/go/requirements lockfiles,
   * precision (non-crypto deps are not emitted), version capture, the
   * recognized-but-unmapped flag, and the totality of the mapping table.
   */
-class CryptoDependencySuite extends FunSuite {
+class CryptoDependencySuite extends GoatRodeoFunSuite {
 
   private val adHoc = MKC.adHoc("CryptoDependency")
 
@@ -42,7 +41,7 @@ class CryptoDependencySuite extends FunSuite {
     new CryptoDependencyState(a).invokeBuildMetadata(a).toMap
   }
 
-  test("T-G-01 Cargo.lock maps ring to families; webpki is kept unmapped") {
+  test("Cargo.lock maps ring to families; webpki is kept unmapped") {
     val m = meta(
       "Cargo.lock",
       """version = 3
@@ -72,7 +71,7 @@ class CryptoDependencySuite extends FunSuite {
     assertEquals(m(adHoc("ecosystem")).head.value, "cargo")
   }
 
-  test("T-G-02 package-lock.json maps jsonwebtoken") {
+  test("package-lock.json maps jsonwebtoken") {
     val m = meta(
       "package-lock.json",
       """{
@@ -97,7 +96,7 @@ class CryptoDependencySuite extends FunSuite {
     assertEquals(m(adHoc("ecosystem")).head.value, "npm")
   }
 
-  test("T-G-03 non-crypto dependencies are not emitted") {
+  test("non-crypto dependencies are not emitted") {
     val m = meta(
       "package-lock.json",
       """{ "name": "app", "version": "1.0.0",
@@ -107,7 +106,7 @@ class CryptoDependencySuite extends FunSuite {
     assert(m.isEmpty, s"no crypto dependency expected: $m")
   }
 
-  test("T-G-04 go.sum versions are captured") {
+  test("go.sum versions are captured") {
     val m = meta(
       "go.sum",
       """golang.org/x/crypto v0.23.0 h1:xxxx=
@@ -123,7 +122,7 @@ class CryptoDependencySuite extends FunSuite {
   }
 
   test(
-    "T-G-05 recognized-but-unmapped crypto library is flagged mapped=false"
+    "recognized-but-unmapped crypto library is flagged mapped=false"
   ) {
     val m = meta(
       "Cargo.lock",
@@ -137,7 +136,7 @@ class CryptoDependencySuite extends FunSuite {
     assert(!m.contains(adHoc("algorithms")), "no fabricated family for webpki")
   }
 
-  test("T-G-06 property: mapping table is total and canonical") {
+  test("property: mapping table is total and canonical") {
     // Every family the table can emit is in the closed enum and lowercase.
     for {
       name <- CryptoDependencyStrategy.FamilyTable.keys.toVector.sorted

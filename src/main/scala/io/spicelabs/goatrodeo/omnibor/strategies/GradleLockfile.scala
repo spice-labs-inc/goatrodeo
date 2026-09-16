@@ -244,7 +244,7 @@ class GradleLockfileState(deps: Vector[GradleDependency])
         PURLComponentSanitizer.sanitizeMavenVersion(d.version)
       (groupIdOpt, artifactIdOpt, versionOpt) match {
         case (Some(groupId), Some(artifactId), Some(version)) =>
-          scala.util.Try {
+          Try {
             PURLHelpers
               .purl(
                 `type` = "maven",

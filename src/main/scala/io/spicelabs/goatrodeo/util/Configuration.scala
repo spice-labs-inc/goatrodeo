@@ -5,10 +5,11 @@ import io.spicelabs.goatrodeo.ProgressListener
 
 import java.io.File
 import java.nio.file.Files
-import java.time.Instant
 import java.util.Date
 import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.*
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 /** The ambient process state Goat Rodeo is running in, captured once rather
@@ -119,25 +120,11 @@ inline def config(using configuration: Configuration): Configuration =
   *   processing loop. Set via
   *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withProgressListener]]; not
   *   exposed on the command line.
-  * @param cutoff
-  *   refuse to analyze internal files modified after this instant; dependents
-  *   are dropped too. Set only via `--cutoff` or
-  *   [[io.spicelabs.goatrodeo.GoatRodeoBuilder.withCutoff]] — there is
-  *   deliberately no system-property or environment channel, so the CLI and
-  *   library paths behave identically.
   * @param cbomDir
   *   optional directory to emit CycloneDX cryptographic bill-of-materials
   *   (CBOM) files, one per top-level input
   * @param cbomVersion
   *   CycloneDX CBOM specification version to emit ("1.6" or "1.7")
-  * @param logFilenames
-  *   log the path of each top-level file once it has been processed, one line
-  *   per file. Named for what it does: the line goes through the logger, so it
-  *   is subject to the log level and is captured by a `tamperEvidentLog`
-  * @param tamperEvidentLog
-  *   optional file to write a hash-chained, tamper-evident log of this run to.
-  *   The chain head is embedded in the run's `.grc` files and its final
-  *   checksum; see `info/tamper_evident_logging.md`
   * @param configFile
   *   the TOML file this configuration was read from, when `--config` named one
   * @param runtime
@@ -169,16 +156,71 @@ case class Configuration(
     packageTagsShortName: Boolean = false,
     tagVersion: Option[String] = None,
     tagDate: Option[Date] = None,
+    // Git provenance redaction : on by default (pseudonymous
+    // email digests + relativized repo roots); `--no-redact-git-info` / TOML
+    // `redact_git_info = false` disables for raw capture.
+    redactGitInfo: Boolean = true,
     progressListener: Option[ProgressListener] = None,
-    cutoff: Option[Instant] = None,
     cbomDir: Option[File] = None,
-    cbomVersion: String = "1.6",
+    cbomVersion: String = "1.7",
     logFilenames: Boolean = false,
     tamperEvidentLog: Option[File] = None,
     configFile: Option[File] = None,
     logging: Map[String, Any] = Map(),
     runtime: RuntimeEnvironment = RuntimeEnvironment.default
 ) {
+
+  /** A printable summary of the non-default settings in force.
+    *
+    * For the run-start echo, so the log alone says what this run was told to
+    * do. Settings equal to the defaults are omitted (a default run reads
+    * "Configuration: " with nothing after it), and ambient state (`runtime`) is
+    * skipped — it describes how the process was started, not what the run was
+    * asked to do — as is the [[ProgressListener]], which is an object, not a
+    * setting. The single formatter is shared by every field type, so a field
+    * added later is covered without anyone remembering to cover it.
+    */
+  def operationalSummary: String = {
+    val defaults = Configuration()
+    val skip = Set("runtime", "progressListener")
+    productElementNames
+      .zip(productIterator)
+      .zip(defaults.productIterator)
+      .filterNot { case ((name, _), _) => skip.contains(name) }
+      .collect {
+        case ((name, mine), theirs) if echoValue(mine) != echoValue(theirs) =>
+          f"${name} = ${echoValue(mine)}"
+      }
+      .mkString(", ")
+  }
+
+  /** Render one setting value for [[operationalSummary]], recursively for
+    * containers (option, tuple, vector, map, try). Never touches ambient
+    * process state: nothing reachable from a configuration field is secret, and
+    * the only fields that ever held process state were excluded from the
+    * summary.
+    */
+  private def echoValue(value: Any): String = value match {
+    case None        => "unset"
+    case Some(inner) => echoValue(inner)
+    case f: File     => f.getAbsolutePath()
+    case pair: Tuple2[?, ?] =>
+      f"${echoValue(pair._1)} -> ${echoValue(pair._2)}"
+    case values: Vector[?] => values.map(echoValue).mkString(", ")
+    case settings: Map[?, ?] =>
+      settings.toVector
+        .sortBy((key, _) => key.toString)
+        .map((key, value) => f"${key} -> ${echoValue(value)}")
+        .mkString(", ")
+    case p: Pattern => p.pattern()
+    case attempt: Try[?] =>
+      attempt match {
+        case Success(p: Pattern) => p.pattern()
+        case Failure(err)        => f"invalid (${err.getMessage()})"
+        case _                   => attempt.toString
+      }
+    case other => other.toString
+  }
 
   /** The settings that differ between this configuration and another.
     *

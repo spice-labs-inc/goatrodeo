@@ -4,6 +4,13 @@ import org.tomlj.TomlArray
 import org.tomlj.TomlPosition
 import org.tomlj.TomlTable
 
+import java.lang.Boolean as JBoolean
+import java.lang.Double as JDouble
+import java.lang.Long as JLong
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.util.List as JList
 import java.util.Map as JMap
 import java.util.Set as JSet
@@ -99,27 +106,27 @@ object TomlTables {
     * a TOML file, only maps handed over by a host program or a resolver, where
     * a string saying `16` came from somewhere that could not have written 16.
     */
-  private def asLong(value: Any): java.lang.Long | Null = value match {
-    case l: java.lang.Long => l
+  private def asLong(value: Any): JLong | Null = value match {
+    case l: JLong => l
     case s: String =>
-      Try(java.lang.Long.valueOf(s.trim)).toOption.getOrElse(null)
+      Try(JLong.valueOf(s.trim)).toOption.getOrElse(null)
     case _ => null
   }
 
-  private def asDouble(value: Any): java.lang.Double | Null = value match {
-    case d: java.lang.Double => d
-    case l: java.lang.Long   => java.lang.Double.valueOf(l.doubleValue())
+  private def asDouble(value: Any): JDouble | Null = value match {
+    case d: JDouble => d
+    case l: JLong   => JDouble.valueOf(l.doubleValue())
     case s: String =>
-      Try(java.lang.Double.valueOf(s.trim)).toOption.getOrElse(null)
+      Try(JDouble.valueOf(s.trim)).toOption.getOrElse(null)
     case _ => null
   }
 
-  private def asBoolean(value: Any): java.lang.Boolean | Null = value match {
-    case b: java.lang.Boolean => b
+  private def asBoolean(value: Any): JBoolean | Null = value match {
+    case b: JBoolean => b
     case s: String =>
       s.trim.toLowerCase match {
-        case "true"  => java.lang.Boolean.TRUE
-        case "false" => java.lang.Boolean.FALSE
+        case "true"  => JBoolean.TRUE
+        case "false" => JBoolean.FALSE
         case _       => null
       }
     case _ => null
@@ -155,25 +162,22 @@ object TomlTables {
           }
       }
 
-    override def getLong(dottedKey: String | Null): java.lang.Long | Null =
+    override def getLong(dottedKey: String | Null): JLong | Null =
       asLong(get(JList.of(dottedKey)))
 
-    override def getLong(path: JList[String] | Null): java.lang.Long | Null =
+    override def getLong(path: JList[String] | Null): JLong | Null =
       asLong(get(path))
 
-    override def getDouble(dottedKey: String | Null): java.lang.Double | Null =
+    override def getDouble(dottedKey: String | Null): JDouble | Null =
       asDouble(get(JList.of(dottedKey)))
 
-    override def getDouble(path: JList[String] | Null): java.lang.Double |
-      Null =
+    override def getDouble(path: JList[String] | Null): JDouble | Null =
       asDouble(get(path))
 
-    override def getBoolean(dottedKey: String | Null): java.lang.Boolean |
-      Null =
+    override def getBoolean(dottedKey: String | Null): JBoolean | Null =
       asBoolean(get(JList.of(dottedKey)))
 
-    override def getBoolean(path: JList[String] | Null): java.lang.Boolean |
-      Null =
+    override def getBoolean(path: JList[String] | Null): JBoolean | Null =
       asBoolean(get(path))
 
     override def inputPositionOf(path: JList[String] | Null): TomlPosition =
@@ -240,25 +244,25 @@ object TomlTables {
 
     override def containsStrings(): Boolean = all(_.isInstanceOf[String])
 
-    override def containsLongs(): Boolean = all(_.isInstanceOf[java.lang.Long])
+    override def containsLongs(): Boolean = all(_.isInstanceOf[JLong])
 
     override def containsDoubles(): Boolean =
-      all(_.isInstanceOf[java.lang.Double])
+      all(_.isInstanceOf[JDouble])
 
     override def containsBooleans(): Boolean =
-      all(_.isInstanceOf[java.lang.Boolean])
+      all(_.isInstanceOf[JBoolean])
 
     override def containsOffsetDateTimes(): Boolean =
-      all(_.isInstanceOf[java.time.OffsetDateTime])
+      all(_.isInstanceOf[OffsetDateTime])
 
     override def containsLocalDateTimes(): Boolean =
-      all(_.isInstanceOf[java.time.LocalDateTime])
+      all(_.isInstanceOf[LocalDateTime])
 
     override def containsLocalDates(): Boolean =
-      all(_.isInstanceOf[java.time.LocalDate])
+      all(_.isInstanceOf[LocalDate])
 
     override def containsLocalTimes(): Boolean =
-      all(_.isInstanceOf[java.time.LocalTime])
+      all(_.isInstanceOf[LocalTime])
 
     override def containsArrays(): Boolean = all(_.isInstanceOf[TomlArray])
 

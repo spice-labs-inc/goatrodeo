@@ -12,26 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+
 import java.io.File
 import java.nio.file.Files
 import scala.jdk.CollectionConverters.*
 
-/** Tests that the build emits SemanticDB files when `semanticdbEnabled :=
-  * true`.
-  *
-  * Requirement trace: build.sbt sets `semanticdbEnabled := true` and
-  * `semanticdbVersion := scalafixSemanticdb.revision`. The build must produce
-  * equivalent `.semanticdb` artifacts so that scalafix and other SemanticDB
-  * consumers can operate on this project.
-  *
-  * Theory: compiling a non-empty Scala source tree with `-Ysemanticdb` places
-  * at least one `.semanticdb` file under the SemanticDB target root, which sbt
-  * places at `target/scala-3.8.3/meta/META-INF/semanticdb` (the default
-  * `semanticdbTargetRoot`). This test asserts that root exists and is
-  * non-empty, guarding against a future regression where the compiler flag is
-  * accidentally removed.
-  */
-class SemanticDBTest extends munit.FunSuite {
+class SemanticDBTest extends GoatRodeoFunSuite {
 
   test("SemanticDB files are generated") {
     val semanticDbRoot = Some(

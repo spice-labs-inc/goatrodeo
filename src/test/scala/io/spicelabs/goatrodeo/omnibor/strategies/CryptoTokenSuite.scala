@@ -13,31 +13,31 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
-import munit.FunSuite
 
+import java.util.Base64
 import scala.collection.immutable.TreeSet
 
-/** Phase C — JWT/JWK inventory.
+/** JWT/JWK inventory.
   *
   * Verifies JWT header algorithm extraction (including the `alg:none` security
   * finding), JWK kty/crv/use/size and private-members presence, that token
   * payloads/signatures and JWK key material are never echoed, tolerant handling
   * of garbage, and an output-level no-secret property check.
   */
-class CryptoTokenSuite extends FunSuite {
+class CryptoTokenSuite extends GoatRodeoFunSuite {
 
   private val jwtAdHoc = MKC.adHoc("JWT")
   private val jwkAdHoc = MKC.adHoc("JWK")
 
   private def b64url(s: String): String =
-    java.util.Base64.getUrlEncoder.withoutPadding
+    Base64.getUrlEncoder.withoutPadding
       .encodeToString(s.getBytes("UTF-8"))
   private def b64url(bytes: Array[Byte]): String =
-    java.util.Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
+    Base64.getUrlEncoder.withoutPadding.encodeToString(bytes)
 
   private def artifact(name: String, content: String): ByteWrapper =
     ByteWrapper(content.getBytes("UTF-8"), name, None)
@@ -64,14 +64,14 @@ class CryptoTokenSuite extends FunSuite {
       )}","x":"eJw","y":"A-8"}"""
 
   test(
-    "T-C-01 JWT alg:HS256 yields JWT:alg and canonical signature algorithm"
+    "JWT alg:HS256 yields JWT:alg and canonical signature algorithm"
   ) {
     val m = meta("token.jwt", hs256)
     assertEquals(m(jwtAdHoc("alg")).head.value, "HS256")
     assertEquals(m(jwtAdHoc("signature_algorithm")).head.value, "hmac-sha-256")
   }
 
-  test("T-C-02 JWT alg:none is reported as a finding") {
+  test("JWT alg:none is reported as a finding") {
     val m = meta("token.jwt", "auth=" + noneToken)
     assert(
       m.get(jwtAdHoc("none_present")).exists(_.head.value == "true"),
@@ -80,7 +80,7 @@ class CryptoTokenSuite extends FunSuite {
     assertEquals(m(jwtAdHoc("alg")).head.value, "none")
   }
 
-  test("T-C-03 JWT token, payload and signature are never emitted") {
+  test("JWT token, payload and signature are never emitted") {
     val m = meta("token.jwt", hs256)
     val values = m.values.toVector.flatMap(_.toVector.map(_.value))
     assert(
@@ -98,7 +98,7 @@ class CryptoTokenSuite extends FunSuite {
     )
   }
 
-  test("T-C-04 public RSA JWK gives kty/use/size, never n/e") {
+  test("public RSA JWK gives kty/use/size, never n/e") {
     val m = meta("key.jwk.json", rsaJwk)
     assertEquals(m(jwkAdHoc("kty")).head.value, "RSA")
     assertEquals(m(jwkAdHoc("use")).head.value, "sig")
@@ -108,7 +108,7 @@ class CryptoTokenSuite extends FunSuite {
     assert(!values.exists(_.contains("AQAB")), "e leaked")
   }
 
-  test("T-C-05 private JWK is presence-only") {
+  test("private JWK is presence-only") {
     val m = meta("key.jwk.json", privateJwk)
     assertEquals(m(jwkAdHoc("kty")).head.value, "EC")
     assertEquals(m(jwkAdHoc("crv")).head.value, "P-256")
@@ -117,7 +117,7 @@ class CryptoTokenSuite extends FunSuite {
     assert(!values.exists(_.contains("secretdvalidator")), "private d leaked")
   }
 
-  test("T-C-06 garbage / truncated tokens are not claimed and never panic") {
+  test("garbage / truncated tokens are not claimed and never panic") {
     assert(!CryptoTokenStrategy.detects("eyJ123"), "short eyJ only")
     assert(!CryptoTokenStrategy.detects("not a jwt at all"), "plain text")
     assert(
@@ -132,7 +132,7 @@ class CryptoTokenSuite extends FunSuite {
   }
 
   test(
-    "T-C-07 property: emitted JWT/JWK values are short tags, never secrets"
+    "property: emitted JWT/JWK values are short tags, never secrets"
   ) {
     val battery = Vector(
       "token.jwt" -> hs256,

@@ -13,14 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.SshWireReader
-import munit.FunSuite
 
 /** Unit tests for the RFC 4251 SSH wire-format reader.
   *
-  * Updated for Phase 0.9: SshWireReader methods now return Option instead of
-  * throwing on short reads. Tests adapted accordingly.
+  * SshWireReader methods return Option instead of throwing on short reads.
   *
   * ## What these tests test
   *
@@ -30,7 +28,7 @@ import munit.FunSuite
   *      SSH's zero-padding convention 5. `parseFirstKeyLine` strips comments
   *      and BOMs 6. Wire reader's `string` content is faithful round-trip
   */
-class SshWireFormatTests extends FunSuite {
+class SshWireFormatTests extends GoatRodeoFunSuite {
 
   test("[INVARIANT] readUInt32 reads 4 big-endian bytes") {
     val r = new SshWireReader(Array[Byte](0x00, 0x00, 0x00, 0x05))

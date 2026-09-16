@@ -32,6 +32,7 @@ import org.json4s.*
 import org.json4s.native.JsonMethods.parse
 
 import java.nio.charset.StandardCharsets
+import java.util.Arrays
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.util.Try
@@ -239,7 +240,7 @@ object CryptoDependencyStrategy {
       val bytes = a.withStream { s =>
         val buf = new Array[Byte](MaxReadBytes)
         val n = s.read(buf, 0, MaxReadBytes)
-        if (n <= 0) Array.emptyByteArray else java.util.Arrays.copyOf(buf, n)
+        if (n <= 0) Array.emptyByteArray else Arrays.copyOf(buf, n)
       }
       new String(bytes, StandardCharsets.ISO_8859_1)
     }.getOrElse("")

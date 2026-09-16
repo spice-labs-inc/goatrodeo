@@ -18,7 +18,6 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Failure
@@ -81,14 +80,6 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  /** The artifact's last-modified time, if known — e.g. an archive entry's
-    * timestamp. None when the source has no meaningful timestamp (in-memory
-    * bytes, unknown mtime).
-    *
-    * @return
-    */
-  def lastModified: Option[Instant] = None
-
   private lazy val _mimeType: Set[String] = {
     val base = Try {
       ExtensionMimeDetector.detect(this) match {
@@ -99,13 +90,24 @@ sealed trait ArtifactWrapper {
           })
       }
     }.toOption.getOrElse(Set("application/octet-stream"))
-    Try { ArtifactWrapper.augmentMimeTypes(this, base) }.toOption
+    val base2 = mimeHint ++ base
+    Try { ArtifactWrapper.augmentMimeTypes(this, base2) }.toOption
       .getOrElse(base)
   }
 
   def isRealFile(): Boolean = false
 
+  /** The effective MIME set: the detected/augmented set UNIONED with the
+    * producer-stamped hint . The hint is authoritative (never re-checked
+    * against content) and never produced by sniffing.
+    */
   def mimeType: Set[String] = _mimeType
+
+  /** Optional authoritative MIME hint stamped by the producer that created this
+    * wrapper. None when no producer stamped one. Non-producers never set it;
+    * content sniffing never produces kind MIMEs.
+    */
+  protected def mimeHint: Set[String] = Set()
 
   protected def getTikaInputStream(): TikaInputStream
 
@@ -409,13 +411,14 @@ object ArtifactWrapper {
       data: InputStream,
       tempDir: Option[File],
       tempPath: Path,
-      lastModified: Option[Instant] = None
-  ): ArtifactWrapper = {
+      mimeHint: Set[String] = Set()
+  ): Try[ArtifactWrapper] = Try {
     val name = sanitizeName(fixPath(nominalPath))
     val forceTempFile = requireTempFile(name)
 
     // a defined temp dir implies a RAM disk... copy everything but the smallest items
     if (
+      size != -1 && // if the size is unknown, create a temp file... we don't know the size
       !forceTempFile && size <= (if (tempDir.isDefined) (64L * 1024L)
                                  else maxInMemorySize)
     ) {
@@ -423,11 +426,20 @@ object ArtifactWrapper {
       Helpers.copy(data, bos)
       val bytes = bos.toByteArray()
       if (size != bytes.length) {
-        throw Exception(
-          f"Failed to create wrapper for ${name} expecting ${size} bytes, but got ${bytes.length}"
+        // A corrupt or lying entry declared a different size than what the
+        // stream actually yielded. The wrapper carries the bytes that
+        // arrived; failing the whole container over a size lie is worse
+        // than wrapping the truth.
+        logger.warn(
+          f"Wrapper for ${name} expected ${size} bytes, but got ${bytes.length}; wrapping actual content"
         )
       }
-      ByteWrapper(bytes, name, tempDir = tempDir, lastModified = lastModified)
+      ByteWrapper(
+        bytes,
+        name,
+        tempDir = tempDir,
+        mimeHint = mimeHint
+      )
     } else {
       // Preserve the original extension so MIME-type augmenters and disk-format
       // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.
@@ -443,7 +455,7 @@ object ArtifactWrapper {
         tempFile,
         name,
         tempDir = tempDir,
-        lastModified = lastModified
+        mimeHint = mimeHint
       )
     }
   }
@@ -520,7 +532,7 @@ final case class FileWrapper(
     thePath: String,
     tempDir: Option[File],
     finishedFunc: File => Unit = f => (),
-    override val lastModified: Option[Instant] = None
+    protected override val mimeHint: Set[String] = Set()
 ) extends ArtifactWrapper {
 
   // constructor
@@ -594,7 +606,7 @@ final case class ByteWrapper(
     bytes: Array[Byte],
     fileName: String,
     tempDir: Option[File],
-    override val lastModified: Option[Instant] = None
+    protected override val mimeHint: Set[String] = Set()
 ) extends ArtifactWrapper {
 
   override protected def getTikaInputStream(): TikaInputStream = {

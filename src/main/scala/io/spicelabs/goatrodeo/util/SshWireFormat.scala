@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import scala.util.Try
 
 /** RFC 4251 / SSH wire-format reader. Out-of-bounds reads return None instead
@@ -162,7 +163,7 @@ object SshWireReader {
           val padded =
             if (b64.length % 4 == 0) b64
             else b64 + "=" * (4 - (b64.length % 4))
-          val wire = java.util.Base64.getDecoder.decode(padded)
+          val wire = Base64.getDecoder.decode(padded)
           val comment =
             if (parts.length >= 3 && parts(2).nonEmpty) Some(parts(2)) else None
           (parts(0), wire, comment)

@@ -1,25 +1,11 @@
-/* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
-/** Phase 0 (0.11) — ItemMetaData.merge handles empty fileNames gracefully.
+/** ItemMetaData.merge handles empty fileNames gracefully.
   *
   * ## What this tests
   *
@@ -37,8 +23,8 @@ import scala.collection.immutable.TreeSet
   *
   * ## Requirement trace
   *
-  * Phase 0 item 0.11: ItemMetaData.merge handles empty fileNames on left side,
-  * right side, or both without exception.
+  * Requirement: ItemMetaData.merge handles empty fileNames on left side, right
+  * side, or both without exception.
   *
   * ## LLM-friendly summary
   *
@@ -49,7 +35,7 @@ import scala.collection.immutable.TreeSet
   * | both non-empty | TreeSet("a")   | TreeSet("b")    | merged with both filenames |
   * | both empty     | TreeSet()      | TreeSet()       | merged OK, fileNames empty |
   */
-class StructMergeSuite extends FunSuite {
+class StructMergeSuite extends GoatRodeoFunSuite {
 
   test("ItemMetaData - merge handles empty fileNames on left side") {
 
@@ -57,7 +43,7 @@ class StructMergeSuite extends FunSuite {
       * non-empty fileNames (right). Why: Empty fileNames on the left should not
       * cause headOption to produce unexpected results or crash. The merge
       * should produce a result containing the right side's filenames.
-      * Requirement: Phase 0 §0.11 — merge tolerates empty left fileNames.
+      * Requirement: merge tolerates empty left fileNames.
       */
     val left = ItemMetaData(
       fileNames = TreeSet(),
@@ -89,8 +75,8 @@ class StructMergeSuite extends FunSuite {
     /** What: Merges an ItemMetaData with non-empty fileNames (left) into one
       * with empty fileNames (right). Why: Empty fileNames on the right should
       * not cause headOption to produce unexpected results. The merge result
-      * should contain the left side's filenames. Requirement: Phase 0 §0.11 —
-      * merge tolerates empty right fileNames.
+      * should contain the left side's filenames. Requirement: — merge tolerates
+      * empty right fileNames.
       */
     val left = ItemMetaData(
       fileNames = TreeSet("foo.txt"),
@@ -121,8 +107,8 @@ class StructMergeSuite extends FunSuite {
 
     /** What: Merges two ItemMetaData instances both with non-empty fileNames.
       * Why: When both sides have a single filename and they differ, the merge
-      * should preserve both filenames. Requirement: Phase 0 §0.11 — merge
-      * correctly handles both non-empty.
+      * should preserve both filenames. Requirement: merge correctly handles
+      * both non-empty.
       */
     val left = ItemMetaData(
       fileNames = TreeSet("foo.txt"),
@@ -165,8 +151,8 @@ class StructMergeSuite extends FunSuite {
 
     /** What: Merges two ItemMetaData instances both with empty fileNames. Why:
       * Both sides empty should produce empty fileNames in the result without
-      * any exception from headOption/getOrElse logic. Requirement: Phase 0
-      * §0.11 — merge tolerates both sides empty.
+      * any exception from headOption/getOrElse logic. Requirement: merge
+      * tolerates both sides empty.
       */
     val left = ItemMetaData(
       fileNames = TreeSet(),

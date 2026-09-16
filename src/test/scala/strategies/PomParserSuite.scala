@@ -1,14 +1,12 @@
-/* Phase 2 Tests: PomParser
-   PomParser tests §2.1–2.5
+/* PomParser tests
  */
 
 package io.spicelabs.goatrodeo.util
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
-import munit.FunSuite
+class PomParserSuite extends GoatRodeoFunSuite {
 
-class PomParserSuite extends FunSuite {
-
-  // 2.1 PomParser basics
+  // PomParser basics
   test("PomParser - parses simple POM") {
     val pom = """<project>
       <groupId>com.example</groupId>
@@ -24,6 +22,23 @@ class PomParserSuite extends FunSuite {
 
   test("PomParser - returns None on invalid XML") {
     assert(PomParser.parse("not xml").isEmpty)
+  }
+
+  test("PomParser - hostile XML never escapes as an exception") {
+    // The db.parse call sits inside the enclosing Try; a SAX fatal error,
+    // an entity-laden DOCTYPE, or binary junk must surface as None (or Some),
+    // never as a thrown exception to the caller. Pins the no-escape contract
+    // around the docBuilder.parse call site.
+    import scala.util.Try
+    val inputs = Vector(
+      "<project><modelVersion></project>",
+      "<?xml version=\"1.0\"?><!DOCTYPE project [<!ENTITY xxe \"boom\">]><project xmlns=\"http://maven.apache.org/POM/4.0.0\"><modelVersion>&xxe;</modelVersion></project>",
+      "\u0000\u0001\u0002"
+    )
+    for (input <- inputs) {
+      val attempt = Try(PomParser.parse(input))
+      assert(attempt.isSuccess, s"parse must not throw for: ${input.take(40)}")
+    }
   }
 
   test("PomParser - handles missing fields gracefully") {

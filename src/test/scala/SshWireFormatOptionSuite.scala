@@ -2,12 +2,11 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.nio.charset.StandardCharsets
 
-/** Phase 0.9 — SshWireReader methods return Option instead of throwing.
+/** SshWireReader methods return Option instead of throwing.
   *
   * REQUIREMENT: No exceptions for flow control. Short reads or buffer overflows
   * on untrusted SSH wire data return None instead of throwing
@@ -23,7 +22,7 @@ import java.nio.charset.StandardCharsets
   * On successful reads, positions advance. On failed reads (None return),
   * positions must NOT advance (reader stays in consistent state).
   */
-class SshWireFormatOptionSuite extends FunSuite {
+class SshWireFormatOptionSuite extends GoatRodeoFunSuite {
 
   private def sshUint32(v: Long): Array[Byte] = Array(
     ((v >> 24) & 0xff).toByte,

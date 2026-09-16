@@ -2,30 +2,41 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.coordinates.Purl
+import io.spicelabs.goatrodeo.omnibor.Item
+import io.spicelabs.goatrodeo.omnibor.PairOf
+import io.spicelabs.goatrodeo.omnibor.SingleMarker
+import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.ScalaCheckSuite
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.scalacheck.Gen
 import org.scalacheck.Prop
 import org.scalacheck.Prop.forAll
 
 import java.io.File as JFile
 import java.math.BigInteger
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.Security
 import java.security.cert.X509Certificate
+import java.security.spec.ECGenParameterSpec
 import java.util.Calendar
 import java.util.Date
+import java.util.regex.Pattern
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.io.Source
+import scala.util.Try
 
-/** Phase 8 — generative X.509 roundtrip property tests.
+/** generative X.509 roundtrip property tests.
   *
   * Per `certificates-strategy/phases-8-9-tests-docs.md`:
   *
@@ -44,16 +55,15 @@ import scala.collection.immutable.TreeSet
   * without testing anything useful). Each property either roundtrips a hash,
   * asserts a structural invariant on the pURL, or guards an absence (no leak).
   */
-class CertificatesPropertySuite extends ScalaCheckSuite {
+class CertificatesPropertySuite extends GoatRodeoScalaCheckSuite {
 
   // The heavier properties take ~15s each on an idle machine; leave headroom
   // for the contention introduced by running test classes in parallel.
-  override val munitTimeout = scala.concurrent.duration.Duration(5, "minutes")
 
   // Register BC if not already (idempotent — also done by Certificates).
   if (Security.getProvider("BC") == null) {
     Security.addProvider(
-      new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      new BouncyCastleProvider()
     )
   }
 
@@ -87,7 +97,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     val expectedAlg = "ec"
     def keyPair(): KeyPair = {
       val kpg = KeyPairGenerator.getInstance("EC", "BC")
-      kpg.initialize(new java.security.spec.ECGenParameterSpec(jcaCurve))
+      kpg.initialize(new ECGenParameterSpec(jcaCurve))
       kpg.generateKeyPair()
     }
     val signatureAlg = "SHA256withECDSA"
@@ -322,7 +332,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       val (_, cert) = buildSelfSignedCert(c)
       val (_, purls) = driveThroughStrategy(cert)
       purls.forall { purl =>
-        scala.util.Try(io.spicelabs.coordinates.Purl.parse(purl)).isSuccess
+        Try(Purl.parse(purl)).isSuccess
       }
     }
   }
@@ -383,13 +393,13 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
 
   // ===== Property 12: no private material in metadata (hard rule) ========
 
-  // A5 in v2 review: this property previously relied on
+  // This property previously relied on
   // `assertNoLeak` raising — duplicating the leak suite's work.
   // Strengthened: do the regex sweep IN-TEST against the emitted
   // metadata values, independent of the strategy's own leak guard.
   // If a refactor accidentally rendered `assertNoLeak` no-op, this
   // property would still catch a real leak.
-  private val appendixCRegexes: Seq[java.util.regex.Pattern] = Seq(
+  private val appendixCRegexes: Seq[Pattern] = Seq(
     "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
     "-----BEGIN ENCRYPTED PRIVATE KEY-----",
     "-----BEGIN PGP PRIVATE KEY BLOCK-----",
@@ -398,7 +408,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     "MIIEpAIBAAKCAQEA",
     "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
     "openssh-key-v1"
-  ).map(java.util.regex.Pattern.compile)
+  ).map(Pattern.compile)
 
   property(
     "[PROP] no emitted metadata value matches any Appendix-C pattern (independent in-test sweep)"
@@ -417,15 +427,15 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
       val (md, _) = state.getMetadata(
         artifact,
         stubItem(),
-        io.spicelabs.goatrodeo.omnibor.SingleMarker()
+        SingleMarker()
       )
       // INDEPENDENT sweep: don't rely on strategy's assertNoLeak.
       // For each emitted metadata value, check against the regex list.
       md.forall { case (_, values) =>
         values.forall { v =>
           val text = v match {
-            case io.spicelabs.goatrodeo.omnibor.StringOf(s)   => s
-            case io.spicelabs.goatrodeo.omnibor.PairOf(_, s2) => s2
+            case StringOf(s)   => s
+            case PairOf(_, s2) => s2
           }
           appendixCRegexes.forall(p => !p.matcher(text).find())
         }
@@ -445,7 +455,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
   }
 
   // ===== Corpus-driven properties for SSH cert + CRL =====================
-  //
+
   // These are listed as properties but they aren't reasonably
   // runtime-generative (CRLs need an issuing key + revocation list;
   // SSH certs need a CA. Building either from scratch in test setup
@@ -454,11 +464,11 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
   // CoverageSuite ensures has the right shape.
 
   private val sshCertSidecars: Vector[String] = {
-    val root = java.nio.file.Paths.get("test_data/certificates/ssh")
-    if (!java.nio.file.Files.exists(root)) Vector.empty
+    val root = Paths.get("test_data/certificates/ssh")
+    if (!Files.exists(root)) Vector.empty
     else {
       import scala.jdk.CollectionConverters.*
-      java.nio.file.Files
+      Files
         .walk(root)
         .iterator()
         .asScala
@@ -467,13 +477,12 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
         // substring `cert-sha256` appears in the sidecar's pURL value
         // for cert fixtures (and never for plain-pubkey fixtures).
         .filter(p =>
-          scala.util
-            .Try(
-              scala.io.Source
-                .fromFile(p.toFile, "UTF-8")
-                .mkString
-                .contains("cert-sha256")
-            )
+          Try(
+            Source
+              .fromFile(p.toFile, "UTF-8")
+              .mkString
+              .contains("cert-sha256")
+          )
             .getOrElse(false)
         )
         .map(_.toString.stripSuffix(".expected.json"))
@@ -482,11 +491,11 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
   }
 
   private val crlSidecars: Vector[String] = {
-    val root = java.nio.file.Paths.get("test_data/certificates/crls")
-    if (!java.nio.file.Files.exists(root)) Vector.empty
+    val root = Paths.get("test_data/certificates/crls")
+    if (!Files.exists(root)) Vector.empty
     else {
       import scala.jdk.CollectionConverters.*
-      java.nio.file.Files
+      Files
         .walk(root)
         .iterator()
         .asScala
@@ -510,7 +519,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
-            io.spicelabs.goatrodeo.omnibor.SingleMarker()
+            SingleMarker()
           )
           val purls = purlSet.canonicalStrings
           val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
@@ -535,7 +544,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
-            io.spicelabs.goatrodeo.omnibor.SingleMarker()
+            SingleMarker()
           )
           val purls = purlSet.canonicalStrings
           val certPurls = purls.filter(_.contains("ssh/cert-sha256"))
@@ -554,7 +563,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
-            io.spicelabs.goatrodeo.omnibor.SingleMarker()
+            SingleMarker()
           )
           val purls = purlSet.canonicalStrings
           purls.forall(p => p.contains("sig-alg="))
@@ -576,7 +585,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
           val (purlSet, _) = state.getPurls(
             w,
             stubItem(),
-            io.spicelabs.goatrodeo.omnibor.SingleMarker()
+            SingleMarker()
           )
           val purls = purlSet.canonicalStrings
           purls.exists(p => p.contains(expectedHex))
@@ -585,8 +594,8 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
     }
   }
 
-  // ===== Stratified per-algorithm-case tests (A1 in v2 review) ===========
-  //
+  // ===== Stratified per-algorithm-case tests =============================
+
   // The `forAll` properties above cover the 8 algorithm cases via
   // random sampling. With 50 runs / 8 cases, every case is
   // statistically exercised — but a particular run could miss e.g.
@@ -678,7 +687,7 @@ class CertificatesPropertySuite extends ScalaCheckSuite {
 
   // ===== Helper ==========================================================
 
-  private def stubItem(): io.spicelabs.goatrodeo.omnibor.Item = {
+  private def stubItem(): Item = {
     import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData}
     Item(
       identifier = "gitoid:blob:sha256:phase8-property-stub",

@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
+import org.slf4j.Logger.ROOT_LOGGER_NAME
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.atomic.AtomicReference
@@ -35,6 +36,18 @@ import java.util.concurrent.atomic.AtomicReference
 object LogCapture {
 
   private val lock = new Object()
+
+  /** Run `body` while no capture is active, so assertions about the ambient
+    * logger levels are not racing another suite's capture window (which raises
+    * the root logger to ALL). Holds the same lock that serialises captures, so
+    * "no capture in progress" holds for the whole body, and first waits out the
+    * SLF4J binding race — a substitute logger answers every level query with
+    * "enabled" and would fail these assertions spuriously.
+    */
+  def quiescent[T](body: => T): T = lock.synchronized {
+    loggerContext()
+    body
+  }
 
   /** A logback appender that captures events into a persistent `Vector` inside
     * an `AtomicReference`. Appends are atomic functional updates, so the event
@@ -72,23 +85,42 @@ object LogCapture {
     )
   }
 
-  def apply[T](body: () => T): (T, Vector[ILoggingEvent]) = lock.synchronized {
+  def apply[T](body: () => T): (T, Vector[ILoggingEvent]) =
+    capture(body, raiseRootLevel = true)
+
+  /** Same capture as [[apply]], but the root logger level is left untouched.
+    *
+    * Use when the assertions only need INFO (or whatever the ambient level
+    * provides). Raising the root to ALL is what leaks concurrently-executing
+    * suites' DEBUG output into the console: the munit runner executes test
+    * classes in parallel in one JVM, so a long raise window in one suite
+    * exposes every `logger.debug` emitted by the others for its duration.
+    */
+  def applyWithoutRaise[T](
+      body: () => T
+  ): (T, Vector[ILoggingEvent]) =
+    capture(body, raiseRootLevel = false)
+
+  private def capture[T](
+      body: () => T,
+      raiseRootLevel: Boolean
+  ): (T, Vector[ILoggingEvent]) = lock.synchronized {
     LoggerFactory.getLogger(getClass)
     val ctx = loggerContext()
-    val root = ctx.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
+    val root = ctx.getLogger(ROOT_LOGGER_NAME)
     val appender = new VectorCaptureAppender()
     appender.setContext(ctx)
     appender.start()
     root.addAppender(appender)
     val priorLevel = root.getLevel
-    root.setLevel(Level.ALL)
+    if (raiseRootLevel) root.setLevel(Level.toLevel("ALL"))
     val thread = Thread.currentThread().getName
     try {
       val result = body()
       val mine = appender.captured().filter(_.getThreadName == thread)
       (result, mine)
     } finally {
-      root.setLevel(priorLevel)
+      if (raiseRootLevel) root.setLevel(priorLevel)
       root.detachAppender(appender)
       appender.stop()
     }

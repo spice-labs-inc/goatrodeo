@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWrapper
@@ -21,7 +22,35 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
 
-class ArtifactWrapperTestSuite extends munit.FunSuite {
+class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
+
+  // ==================== newWrapper Tests ====================
+
+  test(
+    "newWrapper - size mismatch between declaration and content does not throw"
+  ) {
+    // A corrupt/lying zip entry can declare a size that differs from what the
+    // stream actually yields. The wrapper must carry the actual bytes and
+    // never throw: a thrown size check inside the entry loop loses the whole
+    // containing artifact.
+    val tempDir = Files.createTempDirectory("aw-mismatch").toFile()
+    val wrapper = ArtifactWrapper
+      .newWrapper(
+        "lying-1.0.bin",
+        1024L,
+        ByteArrayInputStream("only ten".getBytes("UTF-8")),
+        None,
+        tempDir.toPath
+      )
+      .get
+    val actual =
+      wrapper.asInstanceOf[ByteWrapper].bytes
+    assertEquals(
+      new String(actual, "UTF-8"),
+      "only ten",
+      "the wrapper must carry the bytes that actually arrived"
+    )
+  }
 
   // ==================== FileWrapper Tests ====================
 
@@ -156,13 +185,15 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "small content".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper(
-        "test.txt",
-        data.length,
-        input,
-        None,
-        tempDir
-      )
+      val wrapper = ArtifactWrapper
+        .newWrapper(
+          "test.txt",
+          data.length,
+          input,
+          None,
+          tempDir
+        )
+        .get
       assert(wrapper.isInstanceOf[ByteWrapper])
       assertEquals(wrapper.size(), data.length.toLong)
     } finally {
@@ -178,7 +209,9 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
       val data = new Array[Byte](largeSize.toInt)
       val input = new ByteArrayInputStream(data)
       val wrapper =
-        ArtifactWrapper.newWrapper("large.bin", largeSize, input, None, tempDir)
+        ArtifactWrapper
+          .newWrapper("large.bin", largeSize, input, None, tempDir)
+          .get
       assert(wrapper.isInstanceOf[FileWrapper])
       assertEquals(wrapper.size(), largeSize)
     } finally {
@@ -191,13 +224,15 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "test".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper(
-        "./path/file.txt",
-        data.length,
-        input,
-        None,
-        tempDir
-      )
+      val wrapper = ArtifactWrapper
+        .newWrapper(
+          "./path/file.txt",
+          data.length,
+          input,
+          None,
+          tempDir
+        )
+        .get
       assertEquals(wrapper.path(), "path/file.txt")
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -213,13 +248,15 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "static archive member".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper(
-        "obj/libpng.o\u0000\u0000\u0000\u0000",
-        data.length,
-        input,
-        None,
-        tempDir
-      )
+      val wrapper = ArtifactWrapper
+        .newWrapper(
+          "obj/libpng.o\u0000\u0000\u0000\u0000",
+          data.length,
+          input,
+          None,
+          tempDir
+        )
+        .get
       assert(wrapper.isInstanceOf[ByteWrapper])
       assert(!wrapper.path().contains('\u0000'))
       assertEquals(wrapper.path(), "obj/libpng.o")
@@ -233,13 +270,15 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "test".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper(
-        "/path/file.txt",
-        data.length,
-        input,
-        None,
-        tempDir
-      )
+      val wrapper = ArtifactWrapper
+        .newWrapper(
+          "/path/file.txt",
+          data.length,
+          input,
+          None,
+          tempDir
+        )
+        .get
       assertEquals(wrapper.path(), "path/file.txt")
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -251,13 +290,15 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val data = "test".getBytes("UTF-8")
       val input = new ByteArrayInputStream(data)
-      val wrapper = ArtifactWrapper.newWrapper(
-        "../path/file.txt",
-        data.length,
-        input,
-        None,
-        tempDir
-      )
+      val wrapper = ArtifactWrapper
+        .newWrapper(
+          "../path/file.txt",
+          data.length,
+          input,
+          None,
+          tempDir
+        )
+        .get
       assertEquals(wrapper.path(), "path/file.txt")
     } finally {
       Helpers.deleteDirectory(tempDir)
@@ -421,7 +462,7 @@ class ArtifactWrapperTestSuite extends munit.FunSuite {
     try {
       val input = new ByteArrayInputStream(Array[Byte]())
       val wrapper =
-        ArtifactWrapper.newWrapper("empty.txt", 0, input, None, tempDir)
+        ArtifactWrapper.newWrapper("empty.txt", 0, input, None, tempDir).get
       assertEquals(wrapper.size(), 0L)
     } finally {
       Helpers.deleteDirectory(tempDir)

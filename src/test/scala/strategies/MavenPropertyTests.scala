@@ -4,23 +4,24 @@
  * invariants that must hold for ALL inputs.
  *
  * Requirement traceability:
- *   - R1: PomParser interpolation is correct and terminates (acyclic/cyclic)
- *   - R2: groupId/artifactId/version filename extraction handles arbitrary Maven-style names
- *   - R3: Date parsing accepts all supported formats and rejects garbage
- *   - R4: resolveGroupIdArtifactIdVersion priority chain is deterministic and correct
+ *   - PomParser interpolation is correct and terminates (acyclic/cyclic)
+ *   - groupId/artifactId/version filename extraction handles arbitrary Maven-style names
+ *   - Date parsing accepts all supported formats and rejects garbage
+ *   - resolveGroupIdArtifactIdVersion priority chain is deterministic and correct
  */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PomParser
-import munit.ScalaCheckSuite
 import org.json4s.JsonDSL.*
+import org.json4s.native.JsonMethods
 import org.json4s.native.JsonMethods.compact
 import org.json4s.native.JsonMethods.render
 import org.scalacheck.Gen
@@ -36,8 +37,9 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.util.Try
 
-class MavenPropertyTests extends ScalaCheckSuite {
+class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Generators
@@ -174,8 +176,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Cross-Cutting Property: filename parsing terminates
-  // (plan §Property-Based)
-  //
+
   // Theory: for every generated filename, extractIdentityFromFilename either
   // returns Some(valid identity) when a version pattern is present, or returns
   // None (no version pattern).  Crucially it must NEVER throw.
@@ -194,7 +195,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
     "extractIdentityFromFilename terminates for all inputs (isDefined or None, never crashes)"
   ) {
     forAll(genFilename) { filename =>
-      val result = scala.util.Try(
+      val result = Try(
         MavenState().resolveGroupIdArtifactIdVersionFromFilename(filename)
       )
       // Must not crash
@@ -343,8 +344,8 @@ class MavenPropertyTests extends ScalaCheckSuite {
   // ------------------------------------------------------------------
 
   // ------------------------------------------------------------------
-  // Cross-Cutting Property: date parsing robustness (plan §Property-Based)
-  //
+  // Cross-Cutting Property: date parsing robustness
+
   // Theory: for every generated date string, either parseDateString returns
   // Some(Date) (the string matches a supported format) or returns None
   // (unparseable).  Crucially it must NEVER throw.
@@ -368,7 +369,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
   ) {
     forAll(genDateStr) { s =>
       val state = MavenState()
-      val result = scala.util.Try(state.parseDateString(s))
+      val result = Try(state.parseDateString(s))
       // Must not crash
       result.isSuccess &&
       // Result must be an Option (Some or None)
@@ -383,7 +384,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
   property("PomParser.parse never crashes on arbitrary strings") {
     forAll(Gen.asciiStr) { s =>
       // Must not throw; returns Option
-      scala.util.Try(PomParser.parse(s)).isSuccess
+      Try(PomParser.parse(s)).isSuccess
     }
   }
 
@@ -425,8 +426,8 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // ------------------------------------------------------------------
-  // Cross-Cutting Property: groupId/artifactId/version resolution terminates (plan §Property-Based)
-  //
+  // Cross-Cutting Property: groupId/artifactId/version resolution terminates
+
   // Theory: for every generated POM XML, either PomParser.parse returns
   // Some (the POM has structure from which a groupId/artifactId/version could be extracted) or
   // returns None (no valid groupId/artifactId/version source).  Crucially it must NEVER throw.
@@ -459,7 +460,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
     "PomParser.parse terminates for all inputs (isDefined or None, never throws)"
   ) {
     forAll(genPomXml) { xml =>
-      val result = scala.util.Try(PomParser.parse(xml))
+      val result = Try(PomParser.parse(xml))
       // Must not crash
       result.isSuccess &&
       // If it succeeds it must be an Option (Some or None), never a thrown exception
@@ -469,8 +470,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Cross-Cutting Property: property resolution terminates
-  // (plan §Property-Based)
-  //
+
   // Theory: for every generated property map and property name,
   // PomParser.resolveProperty either returns Some(value) when the key exists
   // and its value is fully resolvable, or returns None (name missing, circular
@@ -515,7 +515,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
     "PomParser.resolveProperty terminates for all inputs (isDefined or None, never crashes)"
   ) {
     forAll(genProperties, genPropName) { (props, name) =>
-      val result = scala.util.Try(PomParser.resolveProperty(name, props))
+      val result = Try(PomParser.resolveProperty(name, props))
       // Must not crash
       result.isSuccess &&
       // Result must be an Option (Some or None)
@@ -536,8 +536,8 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // ------------------------------------------------------------------
-  // Cross-Cutting Property: dependency JSON round-trip (plan §Property-Based)
-  //
+  // Cross-Cutting Property: dependency JSON round-trip
+
   // Theory: for every generated dependency list, formatting to JSON never
   // crashes (formatDeps.isDefined in spirit — compact(render) always
   // succeeds for our structured data) and re-parsing yields the original
@@ -570,7 +570,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
       // Parse JSON back
       import org.json4s.JsonAST._
       val parsed =
-        org.json4s.native.JsonMethods.parse(json).asInstanceOf[JArray]
+        JsonMethods.parse(json).asInstanceOf[JArray]
       val back = parsed.arr.map {
         case JObject(fields) =>
           val fieldMap = fields.toMap
@@ -595,8 +595,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Cross-Cutting Property: Gradle lockfile parsing never crashes
-  // (plan §Property-Based)
-  //
+
   // Theory: for every generated Gradle lockfile content, parsing terminates
   // without exception — it either produces dependencies or returns empty.
   // ------------------------------------------------------------------
@@ -633,8 +632,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Cross-Cutting Property: release file parsing never crashes
-  // (plan §Property-Based)
-  //
+
   // Theory: for every generated release-file-like content, parsing
   // terminates without exception.
   // ------------------------------------------------------------------
@@ -672,8 +670,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
 
   // ------------------------------------------------------------------
   // Cross-Cutting Property: leak filtering is idempotent
-  // (plan §Property-Based)
-  //
+
   // Theory: filterLeaks(filterLeaks(m)) == filterLeaks(m) for all
   // metadata maps m. Once leaks are removed, a second pass removes
   // nothing new.
@@ -730,13 +727,13 @@ class MavenPropertyTests extends ScalaCheckSuite {
   // ------------------------------------------------------------------
   // Properties: Field-Level Merge
   // ------------------------------------------------------------------
-  //
+
   // These properties verify the core invariants of the field-level merge
   // algorithm in resolveGroupIdArtifactIdVersion. The key distinction from source-level priority
   // is that fields are resolved INDEPENDENTLY: each field picks its value
   // from the highest-priority source that provides it, regardless of what
   // other sources provide for other fields.
-  //
+
   // Per-field priority:
   //   groupId:    external POM > pom.properties > embedded pom.xml > manifest > filename
   //   artifactId: external POM > pom.properties > embedded pom.xml > filename > manifest
@@ -1087,7 +1084,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
         "implementation-title" -> TreeSet(StringOrPair(s1)),
         "implementation-version" -> TreeSet(StringOrPair(s3))
       )
-      val result = scala.util.Try {
+      val result = Try {
         state.resolveGroupIdArtifactIdVersion(
           ByteWrapper(Array.emptyByteArray, s"$s2-$s3.jar", None),
           None,
@@ -1178,7 +1175,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
   } yield (g, a, v)
 
   private def createTestItem(id: String): Item =
-    Item(id, scala.collection.immutable.TreeSet.empty, None, None)
+    Item(id, TreeSet.empty, None, None)
 
   private def writeJarEntries(
       jarFile: File,
@@ -1197,13 +1194,13 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // Test 34: classifier always correct regardless of standalone or bundled
-  //
+
   // What this tests: For any sources JAR with a random groupId/artifactId/version
   // in pom.properties, whether standalone or bundled: primary pURL has
   // ?packaging=sources with correct coordinates. Secondary pURLs have NO
   // classifier.
-  //
-  // Requirement: Phase 1 — classifier is always correct for sources marker.
+
+  // Requirement: classifier is always correct for sources marker.
   // Theory: beginProcessing(Sources) sets currentMarker, applyAccumulatedAugmentation
   // uses currentMarker to determine classifier.
   property(
@@ -1250,11 +1247,11 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // Test 35: Sources accumulator does not contaminate JAR accumulator
-  //
+
   // What this tests: After Sources' applyAug, then JAR's beginProcessing:
   // the JAR's accumulator is fresh (empty manifest, empty embeddedGroupIdArtifactIdVersions, etc.).
   // Also, Sources' accumulator is cleared while JAR's is populated.
-  //
+
   // Requirement: Three separate accumulators — no cross-contamination.
   // Theory: Each marker has its own accumulator field. beginProcessing(JAR)
   // only sets jarAccumulated, not sourcesAccumulated.
@@ -1354,10 +1351,10 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // Test 36: classifier reset between markers
-  //
+
   // What this tests: After each marker's applyAug, that marker's accumulator
   // is cleared. The next marker starts with a fresh accumulator.
-  //
+
   // Requirement: Each accumulator is independently cleared after consumption.
   // Theory: applyAccumulatedAugmentation calls clearAccumulator for the
   // current marker.
@@ -1436,11 +1433,11 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // Test 37: applyAccumulatedAugmentation never throws for Sources/JavaDocs
-  //
+
   // What this tests: For any combination of accumulated state (random manifest,
   // random embedded groupId/artifactId/version tuples, random POMs): no exception. Either emits pURL or
   // returns gracefully.
-  //
+
   // Requirement: Robustness — applyAccumulatedAugmentation is crash-proof.
   // Theory: All resolution paths use Option/Try, no raw exceptions.
   property("applyAccumulatedAugmentation never throws for Sources") {
@@ -1486,12 +1483,12 @@ class MavenPropertyTests extends ScalaCheckSuite {
   }
 
   // Test 38: Sources uses external POM as highest priority
-  //
+
   // What this tests: Sources pom.properties groupId/artifactId/version (g, a, v), external POM groupId/artifactId/version
   // (g2, a2, v2) where different. After Sources' applyAug: emitted pURL has
   // namespace=g2, name=a2, version=v2 (from external POM, NOT pom.properties).
-  //
-  // Requirement: Companion POM is highest priority for canonical pURL (REQ-3).
+
+  // Requirement: Companion POM is highest priority for canonical pURL .
   // This applies to ALL markers including Sources.
   // Theory: resolveGroupIdArtifactIdVersion takes externalPom as highest
   // priority, so parsedPom (from beginProcessing(POM)) wins over
@@ -1520,7 +1517,7 @@ class MavenPropertyTests extends ScalaCheckSuite {
                |  <version>$pomV</version>
                |</project>""".stripMargin
             val pomFile = new File(tempDir, s"$pomA-$pomV.pom")
-            java.nio.file.Files
+            Files
               .write(pomFile.toPath, pomContent.getBytes("UTF-8"))
 
             val srcWrapper =

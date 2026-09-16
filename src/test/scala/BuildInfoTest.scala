@@ -18,10 +18,12 @@ limitations under the License. */
   * scalaVersion, sbtVersion, commit`. Runtime code (version banners, ADG
   * output) reads these fields, so each must be present and accurate.
   *
-  * Theory: if the generated object exposes every key and the commit SHA
-  * matches the current git HEAD, the build wired BuildInfo correctly.
+  * Theory: if the generated object exposes every key and the commit SHA matches
+  * the current git HEAD, the build wired BuildInfo correctly.
   */
-class BuildInfoTest extends munit.FunSuite {
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+
+class BuildInfoTest extends GoatRodeoFunSuite {
 
   test("BuildInfo.name matches the sbt project name") {
     assertEquals(hellogoat.BuildInfo.name, "goatrodeo")

@@ -3,27 +3,27 @@
 ## How to Run the Tests
 
 ```bash
-sbt 'testOnly *Phase5MetadataParitySourcesJavadocSuite'
+sbt 'testOnly *SourcesJavadocMetadataParitySuite'
 ```
 
 Expected runtime: ~2 minutes.
 
 ## How to Interpret Results
 
-All 53 tests should pass. Each test is named:
+Each corpus test is named:
 
 ```
-Test 5.X: <jar-filename> — <description> (N entries)
+<jar-filename> — <description> (N entries)
 ```
 
-- **Test 5.1**: Sources JARs discoverable in corpus (count > 100)
-- **Test 5.2**: Javadoc JARs discoverable in corpus (count >= 1)
-- **Test 5.3**: Sources JAR pURLs match pom.properties (superset, all have `?packaging=sources`, count <= expected + 2)
-- **Test 5.4**: Javadoc JAR pURLs match pom.properties (all have `?classifier=javadoc`)
-- **Test 5.5**: Sources JAR with companion POM — canonical pURL present with `?packaging=sources`
-- **Test 5.6**: Canonical pURL in metadata (`CanonicalPurl` key, starts with `pkg:maven/`, has `?packaging=sources`)
-- **Test 5.7**: Standalone sources JAR (no companion POM/main JAR) — emits pURLs with `?packaging=sources`
-- **Test 5.8**: pURL count >= pom.properties count (Goat Rodeo finds at least as many pURLs as pom.properties entries)
+- **`Discover sources JARs in test corpus`**: sources JARs discoverable in corpus (count > 100)
+- **`Discover javadoc JARs in test corpus`**: javadoc JARs discoverable in corpus (count >= 1)
+- **`<jar> — pURLs match pom.properties (N entries)`**: sources JAR pURLs match pom.properties (superset, all have `?packaging=sources`, count <= expected + 2)
+- **`<jar> — pURLs match pom.properties (N entries)`**: javadoc JAR pURLs match pom.properties (all have `?classifier=javadoc`)
+- **`<jar> — canonical pURL from companion POM`**: sources JAR with companion POM — canonical pURL present with `?packaging=sources`
+- **`<jar> — canonical pURL in metadata`**: canonical pURL in metadata (`CanonicalPurl` key, starts with `pkg:maven/`, has `?packaging=sources`)
+- **`<jar> — standalone sources JAR emits pURLs`**: standalone sources JAR (no companion POM/main JAR) — emits pURLs with `?packaging=sources`
+- **`<jar> — pURL count >= pom.properties count (N entries)`**: pURL count >= pom.properties count (Goat Rodeo finds at least as many pURLs as pom.properties entries)
 
 ## Known Differences from the Reference Scanner
 
@@ -34,16 +34,16 @@ Test 5.X: <jar-filename> — <description> (N entries)
 
 2. **Javadoc JAR with 0 pom.properties**: The one javadoc JAR in the corpus
    (`wps-demo-1.3.0-javadoc.jar`) has 0 `pom.properties` entries. Goat Rodeo
-   still emits pURLs (from companion POM, manifest, or filename). Test 5.4
-   verifies all emitted pURLs have `?classifier=javadoc` without requiring a
-   minimum count.
+   still emits pURLs (from companion POM, manifest, or filename). The
+   javadoc tests verify all emitted pURLs have `?classifier=javadoc` without
+   requiring a minimum count.
 
-3. **Sampling**: Tests 5.3-5.8 sample from the 3051 sources JARs in the
+3. **Sampling**: The per-JAR tests sample from the 3051 sources JARs in the
    corpus to keep test runtime ~2 minutes. Sampling is deterministic (sorted
    by path, every Nth file). Full corpus coverage is feasible but would
    take ~60 minutes.
 
-## How Expected pURLs Are Derived (HS-4 Compliance)
+## How Expected pURLs Are Derived
 
 Expected pURLs are extracted at test time — NOT pre-computed:
 
@@ -67,15 +67,15 @@ The `companionPom` function strips `-sources.jar`, `-javadoc.jar`,
 
 | Claim | Test |
 |-------|------|
-| Sources JARs exist in corpus (>100) | Test 5.1 |
-| Javadoc JARs exist in corpus (>=1) | Test 5.2 |
-| Sources JAR pURLs match pom.properties (superset) | Test 5.3 (per JAR) |
-| All sources JAR pURLs have `?packaging=sources` | Test 5.3, Test 5.7 |
-| Javadoc JAR pURLs match pom.properties | Test 5.4 |
-| All javadoc JAR pURLs have `?classifier=javadoc` | Test 5.4 |
-| Sources JAR with companion POM has canonical pURL | Test 5.5 (per JAR) |
-| Canonical pURL has `?packaging=sources` | Test 5.5, Test 5.6 |
-| Canonical pURL in metadata (`CanonicalPurl` key) | Test 5.6 (per JAR) |
-| Standalone sources JAR emits pURLs | Test 5.7 (per JAR) |
-| pURL count >= pom.properties count | Test 5.8 (per JAR) |
-| pURL count not inflated (<= expected + 2) | Test 5.3 (per JAR) |
+| Sources JARs exist in corpus (>100) | `Discover sources JARs in test corpus` |
+| Javadoc JARs exist in corpus (>=1) | `Discover javadoc JARs in test corpus` |
+| Sources JAR pURLs match pom.properties (superset) | `<jar> — pURLs match pom.properties (N entries)` (per JAR) |
+| All sources JAR pURLs have `?packaging=sources` | pURLs-match tests and the standalone-sources test |
+| Javadoc JAR pURLs match pom.properties | `<jar> — pURLs match pom.properties (N entries)` (per JAR) |
+| All javadoc JAR pURLs have `?classifier=javadoc` | pURLs-match tests |
+| Sources JAR with companion POM has canonical pURL | `<jar> — canonical pURL from companion POM` (per JAR) |
+| Canonical pURL has `?packaging=sources` | companion-POM and metadata tests |
+| Canonical pURL in metadata (`CanonicalPurl` key) | `<jar> — canonical pURL in metadata` (per JAR) |
+| Standalone sources JAR emits pURLs | `<jar> — standalone sources JAR emits pURLs` (per JAR) |
+| pURL count >= pom.properties count | `<jar> — pURL count >= pom.properties count (N entries)` (per JAR) |
+| pURL count not inflated (<= expected + 2) | pURLs-match tests (per JAR) |

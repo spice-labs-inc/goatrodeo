@@ -13,13 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.FileWrapper
-import munit.FunSuite
 
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util.Base64
 
 /** Hand-crafted security-key (sk-*) wire-format vectors.
@@ -50,7 +50,7 @@ import java.util.Base64
   * string("sk-ecdsa-sha2-nistp256@openssh.com") string("nistp256") string(Q) //
   * SEC1 uncompressed point string(application)
   */
-class SshSecurityKeyVectorTests extends FunSuite {
+class SshSecurityKeyVectorTests extends GoatRodeoFunSuite {
 
   private def writeSshString(
       out: ByteArrayOutputStream,
@@ -76,14 +76,14 @@ class SshSecurityKeyVectorTests extends FunSuite {
     val b64 = Base64.getEncoder.encodeToString(wire)
     val tmp = File.createTempFile("sk-vector", ".pub")
     tmp.deleteOnExit()
-    java.nio.file.Files.write(
+    Files.write(
       tmp.toPath,
       s"$algo $b64 $comment\n".getBytes(StandardCharsets.UTF_8)
     )
     tmp
   }
 
-  test("parseSshPubkey: sk-ssh-ed25519@openssh.com vector parses (G4)") {
+  test("parseSshPubkey: sk-ssh-ed25519@openssh.com vector parses") {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ssh-ed25519@openssh.com")
     writeSshString(out, Array.fill[Byte](32)(0x42)) // dummy 32-byte pk
@@ -100,7 +100,7 @@ class SshSecurityKeyVectorTests extends FunSuite {
     assertEquals(pk.get.algName, "sk-ssh-ed25519@openssh.com")
   }
 
-  test("purlForSshPubkey: sk-ed25519 emits sk=true qualifier (G4)") {
+  test("purlForSshPubkey: sk-ed25519 emits sk=true qualifier") {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ssh-ed25519@openssh.com")
     writeSshString(out, Array.fill[Byte](32)(0x42))
@@ -119,7 +119,7 @@ class SshSecurityKeyVectorTests extends FunSuite {
     assert(purl.contains("alg=ed25519"), s"expected alg=ed25519, got $purl")
   }
 
-  test("sshPubkeyMetadata: sk-ed25519 emits SshIsSecurityKey=true (G4)") {
+  test("sshPubkeyMetadata: sk-ed25519 emits SshIsSecurityKey=true") {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ssh-ed25519@openssh.com")
     writeSshString(out, Array.fill[Byte](32)(0x42))
@@ -140,7 +140,7 @@ class SshSecurityKeyVectorTests extends FunSuite {
   }
 
   test(
-    "parseSshPubkey: sk-ecdsa-sha2-nistp256@openssh.com vector parses (G4)"
+    "parseSshPubkey: sk-ecdsa-sha2-nistp256@openssh.com vector parses "
   ) {
     val out = new ByteArrayOutputStream()
     writeSshString(out, "sk-ecdsa-sha2-nistp256@openssh.com")

@@ -13,13 +13,16 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.CryptoContentDetector
-import munit.FunSuite
+import io.spicelabs.goatrodeo.util.FileWrapper
 
+import java.io.File
+import java.nio.file.Files
+import java.util.Comparator
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -31,7 +34,7 @@ import scala.collection.immutable.TreeSet
   * Hard rule under test: key file contents and key VALUES are never read or
   * emitted — only presence, paths, declared algorithms, and backends.
   */
-class DbEncryptionSuite extends FunSuite {
+class DbEncryptionSuite extends GoatRodeoFunSuite {
 
   private def metadata(
       name: String,
@@ -192,16 +195,16 @@ class DbEncryptionSuite extends FunSuite {
     assert(ServiceCryptoStrategy.detectsSqlcipher("sqlcipher_export('enc.db')"))
     assert(!ServiceCryptoStrategy.detectsSqlcipher("PRAGMA foreign_keys=ON"))
 
-    val dir = java.nio.file.Files.createTempDirectory("dbenc").toFile()
+    val dir = Files.createTempDirectory("dbenc").toFile()
     try {
-      val file = new java.io.File(dir, "db.go")
-      java.nio.file.Files.writeString(
+      val file = new File(dir, "db.go")
+      Files.writeString(
         file.toPath(),
         """db, _ := sql.Open("sqlite3", "app.db")
           |db.Exec("PRAGMA key = 's3cr3t-passphrase'")
           |""".stripMargin
       )
-      val wrapper = io.spicelabs.goatrodeo.util.FileWrapper(
+      val wrapper = FileWrapper(
         file,
         file.getName(),
         None
@@ -217,10 +220,10 @@ class DbEncryptionSuite extends FunSuite {
         "sqlcipher key value must never be emitted"
       )
     } finally {
-      java.nio.file.Files
+      Files
         .walk(dir.toPath())
-        .sorted(java.util.Comparator.reverseOrder())
-        .forEach(p => java.nio.file.Files.deleteIfExists(p))
+        .sorted(Comparator.reverseOrder())
+        .forEach(p => Files.deleteIfExists(p))
       ()
     }
   }

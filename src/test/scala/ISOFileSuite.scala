@@ -1,30 +1,22 @@
-/* Copyright 2024-2026 David Pollak, Spice Labs, Inc. & Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.strategies.GenericFile
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 // For more information on writing tests, see
 // https://scalameta.org/munit/docs/getting-started.html
-class ISOFileSuite extends munit.FunSuite {
+class ISOFileSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.
@@ -76,4 +68,38 @@ class ISOFileSuite extends munit.FunSuite {
     assert(cnt > 1200, f"expected more than 1,200, got ${cnt}")
   }
 
+  test("withinArchiveStream - counts a container whose walk fails") {
+    // The batch-drain failure summary needs to know how many containers were
+    // lost wholesale. This pins the counting contract at the walk boundary:
+    // a container whose processing function throws is reported as None AND
+    // increments the run's failure counter by exactly one.
+    val dir = Files.createTempDirectory("gr-container-failure").toFile
+    try {
+      val zip = new File(dir, "boom.zip")
+      val out = new ZipOutputStream(new FileOutputStream(zip))
+      try {
+        out.putNextEntry(new ZipEntry("hello.txt"))
+        out.write("hello".getBytes("UTF-8"))
+        out.closeEntry()
+      } finally {
+        out.close()
+      }
+      val failedContainers = new AtomicInteger(0)
+      val result = FileWalker
+        .withinArchiveStream(
+          FileWrapper(zip, zip.getName(), None),
+          failedContainers
+        ) { _ =>
+          throw new RuntimeException("the walk failed")
+        }
+      assertEquals(result, None)
+      assertEquals(failedContainers.get(), 1)
+    } finally {
+      def deleteRecursively(f: File): Unit = {
+        Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
+        val _ = f.delete()
+      }
+      deleteRecursively(dir)
+    }
+  }
 }

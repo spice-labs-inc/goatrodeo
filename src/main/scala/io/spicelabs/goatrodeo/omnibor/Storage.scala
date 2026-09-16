@@ -23,6 +23,7 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.util.HashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.immutable.TreeSet
@@ -221,8 +222,8 @@ class MemStorage(val targetDir: Option[File])
   private var thePurls: AtomicReference[TreeSet[String]] = AtomicReference(
     TreeSet()
   )
-  private val locks: java.util.HashMap[String, AtomicInteger] =
-    java.util.HashMap()
+  private val locks: HashMap[String, AtomicInteger] =
+    HashMap()
   def keys(): Set[String] = {
 
     db.get().keySet

@@ -4,6 +4,7 @@ import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.TagInfo
 import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
@@ -13,12 +14,11 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-class ADGTests extends munit.FunSuite {
+class ADGTests extends GoatRodeoFunSuite {
 
   // Builds an ADG over the whole ~10 GB adg_tests corpus; munit's 30-second
   // default is nowhere near enough, and it is looser still when this runs
   // alongside other test classes.
-  override val munitTimeout = scala.concurrent.duration.Duration(1, "hour")
 
   /** The default configuration for these tests; individual calls override it
     * with an explicit `(using ...)` where they need different settings.

@@ -13,15 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.util
-
-import munit.ScalaCheckSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import org.scalacheck.Gen
 import org.scalacheck.Prop
 import org.scalacheck.Prop.forAll
 
 import java.nio.charset.StandardCharsets
 
-/** Phase 0 — Unit tests for `OpenSSLConfigDetector`.
+/** Unit tests for `OpenSSLConfigDetector`.
   *
   * These tests verify that the augmenter:
   *   - detects OpenSSL configs with section headers and security keywords,
@@ -30,7 +29,7 @@ import java.nio.charset.StandardCharsets
   *   - reads no more than the configured prefix,
   *   - is purely additive.
   */
-class OpenSSLConfigDetectorSuite extends ScalaCheckSuite {
+class OpenSSLConfigDetectorSuite extends GoatRodeoScalaCheckSuite {
 
   private val expectedMime = OpenSSLConfigDetector.OpenSSLConfigMimeType
 

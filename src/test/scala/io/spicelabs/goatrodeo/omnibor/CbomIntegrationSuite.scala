@@ -15,14 +15,16 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
-import munit.FunSuite
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import org.json4s.*
+import org.json4s.native.JsonMethods
 
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.Comparator
 
-/** T4.2 — End-to-end integration test for CycloneDX CBOM emission.
+/** End-to-end integration test for CycloneDX CBOM emission.
   *
   * Builds an ADG from a directory containing an X.509 certificate, an OpenSSL
   * configuration file, a Java `java.security` file, and a non-crypto file. With
@@ -30,7 +32,7 @@ import java.nio.file.Files
   * certificate, OpenSSL, and Java security components, and do not represent the
   * non-crypto file as cryptographic material.
   */
-class CbomIntegrationSuite extends FunSuite {
+class CbomIntegrationSuite extends GoatRodeoFunSuite {
 
   private def text(jv: JValue, path: String*): String = {
     path.foldLeft(jv: JValue)(_ \ _) match {
@@ -62,7 +64,7 @@ class CbomIntegrationSuite extends FunSuite {
     if (dir.exists()) {
       Files
         .walk(dir.toPath)
-        .sorted(java.util.Comparator.reverseOrder())
+        .sorted(Comparator.reverseOrder())
         .forEach(p => Files.deleteIfExists(p))
       ()
     }
@@ -82,7 +84,7 @@ class CbomIntegrationSuite extends FunSuite {
   }
 
   test(
-    "T4.2 mixed directory produces CBOMs with certificate, OpenSSL, and Java security components"
+    "mixed directory produces CBOMs with certificate, OpenSSL, and Java security components"
   ) {
     val inputDir = Files.createTempDirectory("cbom-int-input").toFile()
     val outputDir = Files.createTempDirectory("cbom-int-output").toFile()
@@ -121,7 +123,7 @@ class CbomIntegrationSuite extends FunSuite {
       )
 
       val allTypes = cbomFiles.flatMap { file =>
-        val root = org.json4s.native.JsonMethods.parse(
+        val root = JsonMethods.parse(
           Files.readString(file.toPath())
         )
         assert(
@@ -147,7 +149,7 @@ class CbomIntegrationSuite extends FunSuite {
 
       val allNames = cbomFiles
         .flatMap { file =>
-          val root = org.json4s.native.JsonMethods.parse(
+          val root = JsonMethods.parse(
             Files.readString(file.toPath())
           )
           (root \ "components") match {
@@ -167,13 +169,13 @@ class CbomIntegrationSuite extends FunSuite {
     }
   }
 
-  // T4.3 — end-to-end via GoatRodeoBuilder with tamper-evident logging: the
+  // end-to-end via GoatRodeoBuilder with tamper-evident logging: the
   // run writes a hash-chained log and a run-level checksum, and every CBOM
   // carries the run's correlation ID. THEORY: the builder routes through
   // Howdy.run, so withTamperEvidentLog must produce the tamper-evident
   // artifacts and correlate the CBOMs to the run.
   test(
-    "T4.3 GoatRodeoBuilder tamper-evident run produces log, checksum, correlation"
+    "GoatRodeoBuilder tamper-evident run produces log, checksum, correlation"
   ) {
     val inputDir = Files.createTempDirectory("tel-int-input").toFile()
     val outputDir = Files.createTempDirectory("tel-int-output").toFile()
@@ -202,14 +204,14 @@ class CbomIntegrationSuite extends FunSuite {
         outputDir.listFiles(f => f.getName.endsWith("_checksum.json"))
       assertEquals(checksums.length, 1, "exactly one checksum file")
       val checksum =
-        org.json4s.native.JsonMethods
+        JsonMethods
           .parse(Files.readString(checksums(0).toPath()))
       val corrId = text(checksum, "correlation_id")
       assert(corrId.nonEmpty, "checksum should carry a correlation ID")
       val cboms = outputDir.listFiles(f => f.getName.startsWith("cbom_"))
       assert(cboms != null && cboms.nonEmpty, "should emit CBOMs")
       val cbom =
-        org.json4s.native.JsonMethods.parse(Files.readString(cboms(0).toPath()))
+        JsonMethods.parse(Files.readString(cboms(0).toPath()))
       val topProps = (cbom \ "properties") match {
         case JArray(ps) =>
           ps.collect { case o: JObject =>

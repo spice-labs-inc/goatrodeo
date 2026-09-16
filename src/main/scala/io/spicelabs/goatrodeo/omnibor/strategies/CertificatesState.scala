@@ -29,6 +29,9 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
+import org.bouncycastle.asn1.ASN1Integer
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.ASN1Primitive
 
 import java.security.KeyStore
 import java.security.cert.X509CRL
@@ -344,8 +347,8 @@ class CertificatesState(
     tm
   }
 
-  /** Metadata for an unencrypted PGP secret key ring; reuses Phase 6 PGP
-    * metadata plus envelope markers.
+  /** Metadata for an unencrypted PGP secret key ring; reuses the PGP metadata
+    * structure plus envelope markers.
     */
   private[strategies] def privateKeyPgpMetadata(
       artifact: ArtifactWrapper,
@@ -606,7 +609,7 @@ class CertificatesState(
     )
     // PQC and composite certs append the alg suffix so the inventory makes
     // PQC presence obvious; classical algs stay bare to match the
-    // historical sidecar contract from Phase 0b's `cert_sidecar.py`.
+    // historical sidecar contract from the legacy `cert_sidecar.py`.
     val pqcAlgs = Set("ml-dsa", "slh-dsa", "falcon", "composite")
     val descSuffix = if (pqcAlgs.contains(alg)) s" ($alg)" else ""
     perCert +? Some(MKC.NAME -> TreeSet(StringOrPair(cnOrDn(subject)))) +?
@@ -800,12 +803,12 @@ class CertificatesState(
     val ext = crl.getExtensionValue("2.5.29.20")
     if (ext == null) None
     else {
-      val asn1 = org.bouncycastle.asn1.ASN1Primitive.fromByteArray(ext)
-      val octetStr = asn1.asInstanceOf[org.bouncycastle.asn1.ASN1OctetString]
+      val asn1 = ASN1Primitive.fromByteArray(ext)
+      val octetStr = asn1.asInstanceOf[ASN1OctetString]
       val inner =
-        org.bouncycastle.asn1.ASN1Primitive.fromByteArray(octetStr.getOctets)
+        ASN1Primitive.fromByteArray(octetStr.getOctets)
       Some(
-        inner.asInstanceOf[org.bouncycastle.asn1.ASN1Integer].getValue.toString
+        inner.asInstanceOf[ASN1Integer].getValue.toString
       )
     }
   }.toOption.flatten

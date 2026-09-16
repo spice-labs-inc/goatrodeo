@@ -13,13 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
-
+import io.bullet.borer.Dom
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
 
-/** Phase 7 Integration Tests: Per-Package Tagging with Real Test Data
+/** Per-Package Tagging with Real Test Data
   *
   * These tests verify that the per-package tagging feature works correctly with
   * actual test corpus files:
@@ -34,18 +35,17 @@ import java.io.File
   *   - Tag JSON structure follows the specification
   *
   * Requirement Traceability:
-  *   - R1: --package-tags CLI option generates tags
-  *   - R2: --package-tags-short-name generates short names
-  *   - R3: Tag JSON has correct structure (tag, version, date)
-  *   - R4: Maven strategy extracts groupId/artifactId/version and build date
-  *   - R5: Baharat strategy extracts name/version from .deb
-  *   - R6: Docker strategy extracts repository:tag and created date
+  *   - --package-tags CLI option generates tags
+  *   - --package-tags-short-name generates short names
+  *   - Tag JSON has correct structure (tag, version, date)
+  *   - Maven strategy extracts groupId/artifactId/version and build date
+  *   - Baharat strategy extracts name/version from .deb
+  *   - Docker strategy extracts repository:tag and created date
   */
-class PackageTagIntegrationSuite extends munit.FunSuite {
+class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
 
   // Walks multi-hundred-MB docker tarballs, which takes well over munit's
   // 30-second default — more so when other test classes run concurrently.
-  override val munitTimeout = scala.concurrent.duration.Duration(30, "minutes")
 
   // Helper to check if test files exist
   def checkTestFile(path: String): Boolean = new File(path).exists()
@@ -72,7 +72,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   /** Helper to extract tag content from item as Map[String, Dom.Element] */
   def extractTagContent(
       item: Item
-  ): Option[Map[String, io.bullet.borer.Dom.Element]] = {
+  ): Option[Map[String, Dom.Element]] = {
     item.body.flatMap {
       case tagData: ItemTagData =>
         import io.bullet.borer.Dom
@@ -90,27 +90,27 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
 
   /** Helper to extract a string field from tag content */
   def stringField(
-      content: Map[String, io.bullet.borer.Dom.Element],
+      content: Map[String, Dom.Element],
       key: String
   ): Option[String] =
-    content.get(key).collect { case io.bullet.borer.Dom.StringElem(value) =>
+    content.get(key).collect { case Dom.StringElem(value) =>
       value
     }
 
   /** Helper to check if a boolean field is true */
   def isBooleanTrue(
-      content: Map[String, io.bullet.borer.Dom.Element],
+      content: Map[String, Dom.Element],
       key: String
   ): Boolean =
     content.get(key) match {
-      case Some(io.bullet.borer.Dom.BooleanElem(value)) => value
-      case _                                            => false
+      case Some(Dom.BooleanElem(value)) => value
+      case _                            => false
     }
 
   // ==================== Maven JAR Tests ====================
 
   test("Maven JARs - package tags created for pqc_jars") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true, packageTagsShortName = false)
     val source = new File("test_data/pqc_jars")
@@ -149,7 +149,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Maven JARs - short names use artifactId only") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true, packageTagsShortName = true)
     val source = new File("test_data/pqc_jars")
@@ -172,7 +172,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Maven JARs - tag edges point to correct artifacts") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true)
     val source = new File("test_data/pqc_jars")
@@ -200,7 +200,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Linux Package Tests (.deb) ====================
 
   test("Debian packages - tags created with name and version") {
-    assume(
+    assert(
       checkTestFile("test_data/libasound2_1.1.3-5ubuntu0.6_amd64.deb"),
       "Debian test data exists"
     )
@@ -229,7 +229,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Debian with metadata - extracts build date") {
-    assume(
+    assert(
       checkTestFile("test_data/debwithmetadata.deb"),
       "Debian with metadata test data exists"
     )
@@ -259,7 +259,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Linux Package Tests (.rpm) ====================
 
   test("RPM packages - tags created with name and version") {
-    assume(
+    assert(
       checkTestFile("test_data/busybox-1.37.0-160099.8.2.aarch64.rpm"),
       "RPM test data exists"
     )
@@ -287,7 +287,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   // ==================== Docker Tests ====================
 
   test("Docker images - package tags created with repository, tag, and date") {
-    assume(
+    assert(
       DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/bigtent_2025_03_22_docker.tar"
       ),
@@ -324,7 +324,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Docker complex image - multiple tags created") {
-    assume(
+    assert(
       DockerTestFixtures.checkTestFile(
         "test_data/download/docker_tests/grinder_bt_pg_docker.tar"
       ),
@@ -357,7 +357,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
       )
     ).filter { case (path, _, _) => checkTestFile(path) }
 
-    assume(testCases.nonEmpty, "At least one test file exists")
+    assert(testCases.nonEmpty, "At least one test file exists")
 
     val config = Configuration(packageTags = true)
 
@@ -401,7 +401,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Tags index - contains package tags when package-tags enabled") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = true)
     val source = new File("test_data/pqc_jars")
@@ -420,7 +420,7 @@ class PackageTagIntegrationSuite extends munit.FunSuite {
   }
 
   test("Tags index - no package tag edges when package-tags disabled") {
-    assume(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
+    assert(checkTestFile("test_data/pqc_jars"), "pqc_jars test data exists")
 
     val config = Configuration(packageTags = false)
     val source = new File("test_data/pqc_jars")

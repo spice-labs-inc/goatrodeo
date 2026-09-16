@@ -16,6 +16,7 @@ package io.spicelabs.goatrodeo.util
 
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
+import io.bullet.borer.Decoder
 import io.spicelabs.coordinates.Coordinates
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -48,9 +49,11 @@ import java.util.Date
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import java.util.jar.Manifest
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.SetHasAsScala
+import scala.util.Failure
 import scala.util.Try
 
 /** Type alias for Git Object Identifiers (GitOIDs). A GitOID is a
@@ -80,7 +83,7 @@ object Helpers {
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
     val manifestVec = Try {
-      java.util.jar.Manifest.apply(bis)
+      Manifest.apply(bis)
     }.toOption.toVector
 
     val mapping = for {
@@ -276,27 +279,8 @@ object Helpers {
   private class GoatVisitor extends FileVisitor[Path] {
     // Steve says: why the switch to Files.walkFileTree?
     // Turns out that this runs between 10 and 30% faster than Files.find.
-    // I also tested using the parallel version of Files.find and some code to
-    // simplify the original code - each improved performance a little bit, but this
-    // code goes WAY faster.
-    //
-    // This is a good thing.
-    // Caveat - the visitor is not thread-safe, but it looks that that doesn't matter as
-    // walkFileTree isn't multi-threaded. If this turns out to be an issue in the future,
-    // do the vector append in synchronized context. The goal of this code is to run a walk
-    // as expediently as possible and if don't need to lock and unlock on each file that's a
-    // win. The java source that I looked at here https://github.com/JetBrains/jdk8u_jdk/blob/master/src/share/classes/java/nio/file/FileTreeWalker.java
-    // is decidedly single-threaded, so I'm not concerned.
-    //
-    // Note for future Steve (or others) - it would make sense to start with the above code and refactor
-    // it to either be an async sequence or process that runs on a thread and fires an event on each file
-    // found and a listener would receive the event and drop the resulting file into a queue that another
-    // thread is actively processing. There are several benefits to doing this, not the least of which is
-    // that since we wouldn't be accumulating the entire set of files that we're walking before processing
-    // them we significantly ease the memory pressure and if the files being walked and the output information
-    // live on different volumes then the parallelism makes a great deal of logical sense as we can saturate
-    // (at least) two different IO channels at the same time.
-
+    // The visitor is not thread-safe, but that doesn't matter as walkFileTree
+    // is single-threaded.
     var result = Vector[File]()
     private val count: AtomicLong = AtomicLong()
 
@@ -330,17 +314,17 @@ object Helpers {
     }
   }
 
-  /** Given a file root and a filter function, return a channel that contains
-    * the files found in the folder and subfolders that match the filter.
+  /** Given a file root, find the eligible files under it (and subfolders).
+    *
+    * Single-threaded `walkFileTree` with a visitor: regular files only,
+    * dot-names skipped, dot-directories descended, symlinks neither followed
+    * nor emitted, errors inside the tree skipped.
     *
     * @param root
-    *   the root directory to search
-    * @param ok
-    *   the filter function
+    *   the root directory (or file) to enumerate
     * @return
-    *   the found files
+    *   the found files, in the filesystem's readdir order
     */
-
   def findFiles(
       root: File
   ): Vector[File] = {
@@ -408,11 +392,11 @@ object Helpers {
     *   the 16 bytes of the MD5 hash
     */
   def computeMD5(str: String): Array[Byte] =
-    computeMD5(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+    computeMD5(new ByteArrayInputStream(str.getBytes("UTF-8")))
 
   /** Compute MD5 of a File. */
   def computeMD5(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeMD5(fis) }
     finally { fis.close() }
   }
@@ -436,7 +420,7 @@ object Helpers {
 
   /** Compute SHA-1 hash of a String. */
   def computeSHA1(str: String): Array[Byte] =
-    computeSHA1(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+    computeSHA1(new ByteArrayInputStream(str.getBytes("UTF-8")))
 
   /** Compute SHA-1 hash of an InputStream.
     */
@@ -456,7 +440,7 @@ object Helpers {
 
   /** Compute SHA-1 hash of a File. */
   def computeSHA1(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeSHA1(fis) }
     finally { fis.close() }
   }
@@ -487,7 +471,7 @@ object Helpers {
   }
 
   def computeSHA256(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeSHA256(fis) }
     finally { fis.close() }
   }
@@ -512,12 +496,12 @@ object Helpers {
 
   /** Compute the SHA-512 hash of a String. */
   def computeSHA512(str: String): Array[Byte] = {
-    computeSHA512(new java.io.ByteArrayInputStream(str.getBytes("UTF-8")))
+    computeSHA512(new ByteArrayInputStream(str.getBytes("UTF-8")))
   }
 
   /** Compute SHA-512 hash of a File. */
   def computeSHA512(file: File): Array[Byte] = {
-    val fis = new java.io.FileInputStream(file)
+    val fis = new FileInputStream(file)
     try { computeSHA512(fis) }
     finally { fis.close() }
   }
@@ -882,8 +866,6 @@ object Helpers {
       suffix: String = ".temp"
   ): File = {
 
-    // Same NUL problem as an artifact name, reached by a different route:
-    // the suffix is often derived from one. See ArtifactWrapper.sanitizeName.
     val retFile = Files
       .createTempFile(
         tempDir,
@@ -929,21 +911,25 @@ object Helpers {
 
   def readLenAndCBOR[A](
       fc: FileChannel
-  )(implicit decoder: io.bullet.borer.Decoder[A]): A = {
+  )(implicit decoder: Decoder[A]): Try[A] = {
     val len = Helpers.readInt(fc)
     readCBOR(fc, len)
   }
 
   def readCBOR[A](fc: FileChannel, len: Int)(implicit
-      decoder: io.bullet.borer.Decoder[A]
-  ): A = {
-
-    val dest = ByteBuffer.allocate(len)
-    val bytesRead = fc.read(dest)
-    if (bytesRead != len) {
-      throw Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
+      decoder: Decoder[A]
+  ): Try[A] = {
+    Try(ByteBuffer.allocate(len)).flatMap { dest =>
+      Try(fc.read(dest)).flatMap { bytesRead =>
+        if (bytesRead != len) {
+          Failure(
+            Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
+          )
+        } else {
+          Try(Cbor.decode(dest).to[A].value)
+        }
+      }
     }
-    Cbor.decode(dest).to[A].value
   }
 
   /** Slurp the contents of a File

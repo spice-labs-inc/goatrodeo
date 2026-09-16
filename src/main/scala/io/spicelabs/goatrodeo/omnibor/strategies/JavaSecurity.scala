@@ -26,6 +26,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Set as MutableSet
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -421,8 +423,8 @@ object JavaSecurityToProcess {
       dependencies: Map[String, Set[String]]
   ): Vector[ArtifactWrapper] = {
     val pathToArtifact = files.map(a => a.path() -> a).toMap
-    val visited = scala.collection.mutable.Set[String]()
-    val result = scala.collection.mutable.ListBuffer[String]()
+    val visited = MutableSet[String]()
+    val result = ListBuffer[String]()
 
     def visit(path: String, stack: Set[String]): Unit = {
       if (stack.contains(path)) {

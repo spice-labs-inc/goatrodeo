@@ -2,15 +2,14 @@
    Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
 import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.Helpers
-import munit.FunSuite
 
 import java.io.File
 import java.io.FileOutputStream
@@ -21,27 +20,27 @@ import scala.collection.immutable.TreeSet
 
 // Tests that Sources and JavaDocs JAR markers get the same metadata
 // accumulation and groupId/artifactId/version resolution as the JAR marker.
-//
+
 // What this tests:
 // That beginProcessing(Sources) and beginProcessing(JavaDocs) set up
 // the accumulator (jarAccumulated) and classifier, that accumulateInfo
 // collects metadata from children of sources/javadoc JARs, that
 // applyAccumulatedAugmentation emits pURLs with the correct classifier,
 // and that standalone sources/javadoc JARs are claimed by computeMavenFiles.
-//
+
 // Why this matters:
 // Previously, Sources/JavaDocs markers were no-ops — they had no independent
 // groupId/artifactId/version resolution. They relied entirely on the POM
 // marker's shared state. Sources JARs containing META-INF/maven/*/pom.properties
 // had their metadata completely ignored. Standalone sources/javadoc JARs
 // (no companion main JAR) fell through to GenericFile and emitted 0 pURLs.
-//
+
 // LLM Summary: This suite verifies that sources and javadoc JARs
 // are treated the same as regular JARs for pURL generation. Each marker
 // gets its own accumulator lifecycle, resolves groupId/artifactId/version
 // from its own metadata, and emits pURLs with the correct classifier
 // (?packaging=sources or ?classifier=javadoc).
-class SourcesJavadocSuite extends FunSuite {
+class SourcesJavadocSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
     Item(id, TreeSet.empty, None, None)
@@ -499,7 +498,7 @@ class SourcesJavadocSuite extends FunSuite {
         primaryPurls.nonEmpty,
         "Primary pURL should have packaging=sources"
       )
-      // Secondary should ALSO have packaging=sources (REQ-1)
+      // Secondary should ALSO have packaging=sources
       val secondaryPurls =
         purls.filter(p => p.contains("org.other") || p.contains("dep"))
       assert(
@@ -508,7 +507,7 @@ class SourcesJavadocSuite extends FunSuite {
       )
       assert(
         secondaryPurls.exists(_.contains("packaging=sources")),
-        "Secondary pURLs from sources JAR should have packaging=sources (REQ-1)"
+        "Secondary pURLs from sources JAR should have packaging=sources "
       )
     } finally {
       Helpers.deleteDirectory(tempDir.toPath)
@@ -886,7 +885,7 @@ class SourcesJavadocSuite extends FunSuite {
         primaryPurls.exists(_.contains("packaging=sources")),
         "Primary pURL should have sources classifier"
       )
-      // Secondary should be org.other:dep:2.0 (with sources classifier per REQ-1)
+      // Secondary should be org.other:dep:2.0 (with the sources classifier)
       val secondaryPurls =
         purls.filter(p => p.contains("org.other") && p.contains("dep"))
       assert(
@@ -895,7 +894,7 @@ class SourcesJavadocSuite extends FunSuite {
       )
       assert(
         secondaryPurls.forall(_.contains("packaging=sources")),
-        "Secondary pURL from sources JAR should have sources classifier (REQ-1)"
+        "Secondary pURL from sources JAR should have sources classifier "
       )
     } finally {
       Helpers.deleteDirectory(tempDir.toPath)
@@ -1000,13 +999,13 @@ class SourcesJavadocSuite extends FunSuite {
   // ==================== Tests 20-23: Sequential processing / state isolation ====================
 
   // Test 20: POM → Sources → JAR — each marker uses own metadata
-  //
+
   // What this tests: That processing Sources and JAR markers sequentially
   // on the same MavenState does not cause cross-contamination. Sources
   // should emit a pURL with ?packaging=sources, JAR should emit a pURL
   // with no classifier. Both should use their own pom.properties.
-  //
-  // Requirement: Phase 1 — independent accumulation per marker.
+
+  // Requirement: independent accumulation per marker.
   // Theory: applyAccumulatedAugmentation resets jarAccumulated and
   // classifier, so the next marker starts fresh.
   test("POM → Sources → JAR: each marker uses own metadata") {
@@ -1093,12 +1092,12 @@ class SourcesJavadocSuite extends FunSuite {
   }
 
   // Test 21: Sources groupId/artifactId/version differs from JAR groupId/artifactId/version — no cross-contamination
-  //
+
   // What this tests: That when Sources has different pom.properties groupId/artifactId/version
   // than JAR, each marker uses its own groupId/artifactId/version. Sources pURL should use
   // com.sources:lib-src:2.0, JAR pURL should use com.example:lib:1.0.
-  //
-  // Requirement: Phase 1 — resolveGroupIdArtifactIdVersion reads from accumulator, not shared state.
+
+  // Requirement: resolveGroupIdArtifactIdVersion reads from accumulator, not shared state.
   // Theory: Each marker's jarAccumulated is reset between markers, so
   // resolveGroupIdArtifactIdVersion only sees the current marker's pom.properties.
   test(
@@ -1189,12 +1188,12 @@ class SourcesJavadocSuite extends FunSuite {
   }
 
   // Test 22: Sources + Javadoc both bundled — correct classifiers
-  //
+
   // What this tests: That when both Sources and JavaDocs are processed,
   // each gets the correct classifier: Sources → ?packaging=sources,
   // JavaDocs → ?classifier=javadoc, JAR → no classifier.
-  //
-  // Requirement: Phase 1 — each marker sets its own classifier.
+
+  // Requirement: each marker sets its own classifier.
   // Theory: beginProcessing sets classifier, applyAug uses it, then resets.
   test("Sources + Javadoc both bundled: correct classifiers") {
     val tempDir = Files.createTempDirectory("maven-src-javadoc").toFile
@@ -1299,12 +1298,12 @@ class SourcesJavadocSuite extends FunSuite {
   }
 
   // Test 23: Sources + Javadoc with different groupId/artifactId/version tuples — each uses own
-  //
+
   // What this tests: That when Sources has groupId/artifactId/version (com.src:lib-src:2.0)
   // and Javadoc has groupId/artifactId/version (com.doc:lib-doc:3.0), each marker uses its
   // own coordinates from its own pom.properties.
-  //
-  // Requirement: Phase 1 — resolveGroupIdArtifactIdVersion reads from current accumulator.
+
+  // Requirement: resolveGroupIdArtifactIdVersion reads from current accumulator.
   // Theory: Each marker's accumulator is fresh (reset between markers).
   test(
     "Sources + Javadoc with different groupId/artifactId/version tuples: each uses own"
@@ -1388,11 +1387,11 @@ class SourcesJavadocSuite extends FunSuite {
   // ==================== Test 28: Robustness ====================
 
   // Test 28: Sources JAR with corrupted pom.properties does not crash
-  //
+
   // What this tests: That pom.properties with empty values, binary garbage,
   // and Windows line endings does not cause an exception. The system should
   // gracefully fall back to manifest/filename.
-  //
+
   // Requirement: Boundary condition — robustness.
   // Theory: PomPropertiesParser handles malformed input gracefully (returns
   // empty Option rather than throwing).
@@ -1449,11 +1448,11 @@ class SourcesJavadocSuite extends FunSuite {
   // ==================== Test 32: wps_war_test integration ====================
 
   // Test 32: wps_war_test bundle — sources and javadoc each emit pURL
-  //
+
   // What this tests: That a real-world WAR bundle with sources and javadoc
   // JARs produces pURLs for each. Sources and javadoc have no pom.properties
   // so they should fall back to POM groupId/artifactId/version or filename.
-  //
+
   // Requirement: Integration test — end-to-end on real test data.
   // Theory: The wps_war_test directory contains wps-demo-1.3.0.war,
   // wps-demo-1.3.0-sources.jar, wps-demo-1.3.0-javadoc.jar, and
@@ -1523,11 +1522,11 @@ class SourcesJavadocSuite extends FunSuite {
   // ==================== Test 33: abris sources JAR from corpus ====================
 
   // Test 33: standalone sources JAR from corpus: abris-0.0.1-sources.jar
-  //
+
   // What this tests: That a real standalone sources JAR from the test
   // corpus produces the correct pURL with classifier. The abris sources
   // JAR contains pom.properties with za.co.absa:abris:0.0.1.
-  //
+
   // Requirement: Integration test — end-to-end on real corpus artifact.
   // Theory: beginProcessing(Sources) sets up sourcesAccumulated,
   // accumulateInfo collects pom.properties, applyAccumulatedAugmentation

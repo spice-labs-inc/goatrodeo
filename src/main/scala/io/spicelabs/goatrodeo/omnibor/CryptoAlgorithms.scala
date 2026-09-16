@@ -18,13 +18,12 @@ package io.spicelabs.goatrodeo.omnibor
   *
   * Single source of truth for algorithm vocabulary, primitive classification,
   * and `parameterSetIdentifier` extraction, consumed by the CBOM emitter and
-  * cross-checked against every discovery strategy's emissions (see
-  * `CryptoAlgorithmsSuite.R-T-01`).
+  * cross-checked against every discovery strategy's emissions.
   *
   * Classification is substring-based (for composite names like
   * `sha256withrsa`); therefore every added classification name must be
   * distinctive enough that it cannot appear inside a canonical name of a
-  * different primitive (pinned by `CryptoAlgorithmsSuite.R-T-06`).
+  * different primitive.
   */
 object CryptoAlgorithms {
 
@@ -178,10 +177,10 @@ object CryptoAlgorithms {
   }
 
   /** The closed vocabulary of canonical names the discovery strategies and
-    * resolvers may emit. Producer tables are cross-checked against this set by
-    * `CryptoAlgorithmsSuite.R-T-01`; `CipherSuiteResolver` outputs (dashed SHA
-    * spellings, cipher modes) and PGP/shadow values are curated here rather
-    * than imported to keep the registry a leaf module.
+    * resolvers may emit. Producer tables are cross-checked against this set;
+    * `CipherSuiteResolver` outputs (dashed SHA spellings, cipher modes) and
+    * PGP/shadow values are curated here rather than imported to keep the
+    * registry a leaf module.
     */
   val canonicalVocabulary: Set[String] =
     hashNames ++ blockCipherNames ++ streamCipherNames ++ kdfNames ++

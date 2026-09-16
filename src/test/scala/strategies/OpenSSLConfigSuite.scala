@@ -1,27 +1,30 @@
 /* Copyright 2026 David Pollak, Spice Labs, Inc. & Contributors. Apache 2.0. */
 
 package io.spicelabs.goatrodeo.omnibor.strategies
-
+import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.ParentScope
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.ToProcess
+import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
+import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.OpenSSLConfigDetector
 import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
-import munit.FunSuite
 
+import java.io.ByteArrayOutputStream
+import java.io.File
 import scala.collection.immutable.TreeSet
 
-/** Phase 1 — Tests for the OpenSSL config capture strategy.
+/** Tests for the OpenSSL config capture strategy.
   *
   * These tests verify MIME-based claiming, bundling, dependency ordering,
   * metadata emission, cross-file reference tracking, and coexistence with other
   * strategies.
   */
-class OpenSSLConfigSuite extends FunSuite {
+class OpenSSLConfigSuite extends GoatRodeoFunSuite {
 
   /** The default configuration for these tests; calls needing different
     * settings pass an explicit `(using ...)`.
@@ -43,7 +46,7 @@ class OpenSSLConfigSuite extends FunSuite {
       |MinProtocol = TLSv1.2
       |""".stripMargin
 
-  // ==================== T1.1 MIME-based claim ====================
+  // ==================== MIME-based claim ====================
 
   test("strategy claims OpenSSL configs by MIME type") {
     val openssl = configArtifact("openssl.cnf", basicConfig)
@@ -81,7 +84,7 @@ class OpenSSLConfigSuite extends FunSuite {
     assert(strategies.forall(!_.isInstanceOf[OpenSSLConfigToProcess]))
   }
 
-  // ==================== T1.2 Bundle grouping ====================
+  // ==================== Bundle grouping ====================
 
   test("multiple OpenSSL files at a layer are bundled into one ToProcess") {
     val a = configArtifact("a.cnf", basicConfig)
@@ -101,7 +104,7 @@ class OpenSSLConfigSuite extends FunSuite {
     assertEquals(openSslStrategies.head.files.size, 3)
   }
 
-  // ==================== T1.3 Dependency ordering ====================
+  // ==================== Dependency ordering ====================
 
   test("files are ordered with dependencies first") {
     val a = configArtifact("a.cnf", basicConfig)
@@ -146,7 +149,7 @@ class OpenSSLConfigSuite extends FunSuite {
     assertEquals(elements.map(_._1.path()), Vector("a.cnf", "b.cnf", "c.cnf"))
   }
 
-  // ==================== T1.4 / T1.5 Metadata ====================
+  // ==================== Metadata ====================
 
   test("metadata contains parsed security values") {
     val artifact = configArtifact("openssl.cnf", basicConfig)
@@ -189,7 +192,7 @@ class OpenSSLConfigSuite extends FunSuite {
     assert(data.sections.contains("system_default_sect"))
   }
 
-  // ==================== T1.6 Cross-file references ====================
+  // ==================== Cross-file references ====================
 
   test("cross-file references include container and file GitOIDs") {
     val a = configArtifact("a.cnf", basicConfig)
@@ -236,7 +239,7 @@ class OpenSSLConfigSuite extends FunSuite {
     assertEquals(encoded, s"$containerGitOID:$aGitOID")
   }
 
-  // ==================== T1.10 No false metadata ====================
+  // ==================== No false metadata ====================
 
   test("non-OpenSSL files do not receive openssl.cnf metadata") {
     val text = ByteWrapper("hello".getBytes("UTF-8"), "readme.txt", None)
@@ -251,7 +254,7 @@ class OpenSSLConfigSuite extends FunSuite {
     assert(!extra.keys.exists(_.startsWith("openssl.cnf")))
   }
 
-  // ==================== T1.11 Cycles ====================
+  // ==================== Cycles ====================
 
   test("self-reference cycle does not cause infinite processing") {
     val a = configArtifact(
@@ -327,7 +330,7 @@ class OpenSSLConfigSuite extends FunSuite {
     )
   }
 
-  // ==================== T1.14 Strategy coexistence ====================
+  // ==================== Strategy coexistence ====================
 
   test("OpenSSL config inside nested archive is discovered") {
     import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -338,7 +341,7 @@ class OpenSSLConfigSuite extends FunSuite {
     val cnfBytes = basicConfig.getBytes("UTF-8")
 
     // Build TAR containing the config.
-    val tarBaos = new java.io.ByteArrayOutputStream()
+    val tarBaos = new ByteArrayOutputStream()
     val tarOut = new TarArchiveOutputStream(tarBaos)
     val tarEntry = new TarArchiveEntry("etc/ssl/openssl.cnf")
     tarEntry.setSize(cnfBytes.length)
@@ -348,7 +351,7 @@ class OpenSSLConfigSuite extends FunSuite {
     tarOut.close()
 
     // Build ZIP containing the TAR.
-    val zipBaos = new java.io.ByteArrayOutputStream()
+    val zipBaos = new ByteArrayOutputStream()
     val zipOut = new ZipArchiveOutputStream(zipBaos)
     val zipEntry = new ZipArchiveEntry("nested.tar")
     zipEntry.setSize(tarBaos.size())
@@ -380,12 +383,12 @@ class OpenSSLConfigSuite extends FunSuite {
   }
 
   test("strategy does not steal PEM certificates") {
-    val certFile = new java.io.File(
+    val certFile = new File(
       "test_data/certificates/x509/synthetic/rsa-2048-selfsigned.pem"
     )
     assert(certFile.exists(), "test certificate fixture must exist")
     val cert =
-      io.spicelabs.goatrodeo.util.FileWrapper(certFile, "cert.pem", None)
+      FileWrapper(certFile, "cert.pem", None)
     val cnf = configArtifact("openssl.cnf", basicConfig)
 
     assert(cert.mimeType.contains("application/x-pem-file"))
@@ -404,7 +407,7 @@ class OpenSSLConfigSuite extends FunSuite {
 
   // ==================== Phase A — cipher-suite decomposition ====================
 
-  test("Phase A metadata contains resolved algorithms and per-suite entries") {
+  test("metadata contains resolved algorithms and per-suite entries") {
     val text =
       """[ssl_default]
         |CipherString = ECDHE-RSA-AES128-GCM-SHA256:!aNULL
@@ -454,7 +457,7 @@ class OpenSSLConfigSuite extends FunSuite {
     )
   }
 
-  test("Phase A decomposition metadata is deterministic across calls") {
+  test("decomposition metadata is deterministic across calls") {
     val text =
       """[ssl_default]
         |CipherString = DEFAULT@SECLEVEL=2
@@ -480,8 +483,8 @@ class OpenSSLConfigSuite extends FunSuite {
 
 /** Helper for creating minimal Items in tests. */
 object ItemTestHelper {
-  def testItem(id: String): io.spicelabs.goatrodeo.omnibor.Item = {
-    io.spicelabs.goatrodeo.omnibor.Item(
+  def testItem(id: String): Item = {
+    Item(
       id,
       TreeSet.empty,
       None,
