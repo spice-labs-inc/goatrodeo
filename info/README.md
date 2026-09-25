@@ -99,6 +99,18 @@ Standard metadata fields attached to processed artifacts:
 - Dependencies format (JSON structure)
 - Cross-ecosystem consistency guidelines
 
+### [iOS app bundle (.ipa) integration](ipa_integration.md)
+How Goat Rodeo processes iOS `.ipa` archives and unpacked `.app` trees:
+- Identification, claim, and parent-scope accumulation
+- `ipa:*` metadata keys and the provisional `pkg:apple/ios` pURL
+- Provisioning CMS signing-certs (Certificates shape)
+- ATS-on-binary-plists via the shared plist parser
+
+### [Plist Parsing](plist_parsing.md)
+The shared binary (`bplist00`) + XML property-list parser:
+- JValue normalization, bounds (16 MiB / object count / depth), never throws
+- XML XXE hardening; encoder (test-only) for fixtures and round-trips
+
 ### [CBOM Emission from an ADG](cbom_enhancements.md)
 Conventions for generating CycloneDX CBOMs from an Artifact Dependency Graph
 (so other ADG-based CBOM generators can match the output):
@@ -251,6 +263,8 @@ How Goat Rodeo manages system resources:
 | [goat_rodeo_operation.md](goat_rodeo_operation.md) | CLI usage and performance tuning |
 | [hidden_reapers.md](hidden_reapers.md) | Finding hidden vulnerabilities |
 | [metadata_tags.md](metadata_tags.md) | Standard metadata field definitions |
+| [ipa_integration.md](ipa_integration.md) | iOS .ipa strategy — identity, provisioning certs, pURL |
+| [plist_parsing.md](plist_parsing.md) | Binary + XML property-list parser (bounded, never throws) |
 | [mime_types.md](mime_types.md) | MIME type detection and handling |
 | [mime_precompute_adaptive.md](mime_precompute_adaptive.md) | Adaptive MIME precompute pass |
 | [docker_oci_parity.md](docker_oci_parity.md) | OCI image parity in the Docker strategy |

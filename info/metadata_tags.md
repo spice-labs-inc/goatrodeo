@@ -77,7 +77,16 @@ Standard tags are defined in MetadataKeyConstants
 | JavaVersionDate | jvm:JavaVersionDate | `JAVA_VERSION_DATE` from `release` file | String `YYYY-MM-DD` |
 | IsJDK | jvm:IsJDK | `true` if JDK, `false` if JRE | String `"true"` or `"false"` |
 | CanonicalPurl | CanonicalPurl | The canonical pURL for the artifact, resolved via field-level merge of pom.properties, pom.xml, MANIFEST.MF, and filename | String, pURL format `pkg:maven/groupId/artifactId@version` |
-
+| BundleIdentifier | ipa:BundleIdentifier | iOS bundle id from `Info.plist` `CFBundleIdentifier` | String, e.g. `infosecadventures.allsafe` |
+| BundleShortVersion | ipa:BundleShortVersion | iOS marketing version from `CFBundleShortVersionString` | String |
+| BundleVersion | ipa:BundleVersion | iOS build version from `CFBundleVersion` | String |
+| BundleName | ipa:BundleName | iOS app name from `CFBundleName` | String |
+| MinimumOS | ipa:MinimumOS | iOS minimum OS from `MinimumOSVersion` | String |
+| TeamIdentifier | ipa:TeamIdentifier | iOS signing team id from the provisioning payload | String |
+| AppIDName | ipa:AppIDName | iOS app id name from the provisioning payload | String |
+| ProvisioningExpiration | ipa:ProvisioningExpiration | iOS provisioning expiration from `ExpirationDate` | ISO-8601 String |
+| Entitlements | ipa:Entitlements | iOS entitlements from the provisioning payload | Compact JSON |
+| ProvisionedDeviceCount | ipa:ProvisionedDeviceCount | Count of `ProvisionedDevices` | String integer |
 **Verified by:**
 - `MavenPomInterpolationSuite` — `MavenState getMetadata includes POM name as NAME key`, `getMetadata includes POM description as DESCRIPTION key`, `getMetadata includes POM URL as URL key`, `getMetadata includes organization as PUBLISHER key`, `getMetadata includes SCM URL as adHoc key`.
 - `MavenPomInterpolationSuite` — `Bundle-License from JAR manifest appears in metadata`.
@@ -90,6 +99,7 @@ Standard tags are defined in MetadataKeyConstants
 - `MavenCoordinateResolutionSuite` — `field-merge: filename artifactId beats manifest Implementation-Title`, `field-merge: swap verification`, `field-merge: manifest provides groupId/version when no artifactId headers`, `security: version masking — manifest version with pom.properties identity`.
 - `JvmDistributionSuite` — `JvmState - parses release file with all fields`, `JvmState - generates pURL for JDK`, `corpus adoptium-jdk21 produces pURL and metadata`.
 - `GradleLockfileSuite` — `GradleLockfile - parses modern lockfile format`, `GradleLockfile - generates pURLs for each dependency`, `GradleLockfile - preserves configuration list in metadata`.
+- `IpaStrategySuite` — `Ipa-2.2` (bundle identity lands on the container), `Ipa-2.7` (cert chain in the `Certificates:` shape), `Ipa-2.a` (provisional `pkg:apple/ios` pURL), `Ipa-2.b` (real corpus end-to-end). `ipa:` metadata carries values only — no private keys or raw blobs (`Ipa-2.8`).
 
 # Dependencies
 

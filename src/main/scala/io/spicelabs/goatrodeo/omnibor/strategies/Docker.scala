@@ -214,11 +214,14 @@ object DockerMetadataExtractor {
     value.map(v => key -> TreeSet(StringOrPair(v)))
   }
 
-  /** Normalize known OCI / label-schema label keys into Goat Rodeo metadata
-    * keys.
+  /** Normalize known OCI / label-schema / Flatpak label keys into Goat
+    * Rodeo metadata keys.
     *
     * OCI keys take precedence over label-schema keys. If both are present, the
-    * OCI value wins.
+    * OCI value wins. Flatpak keys (org.flatpak.*) are independent: a Flatpak
+    * pulled from an OCI registry arrives as a plain OCI layout whose config
+    * labels carry the flatpak identity, and those keys normalize to
+    * well-named docker:Flatpak* metadata.
     */
   private def normalizeLabels(
       labels: Map[String, String]
@@ -304,6 +307,25 @@ object DockerMetadataExtractor {
       "org.label-schema.build-date",
       "BuildDate"
     )
+
+    // Flatpak OCI labels. A Flatpak exported to an OCI registry (via
+    // flatpak build-export/build-bundle with an OCI destination) carries its
+    // identity in these config labels; when such an image is pulled as a
+    // plain OCI layout, normalizing the labels is what tags the flatpak in
+    // the ADG. The key set mirrors flatpak's own OCI exporter
+    // (`flatpak_oci_add_labels_for_commit` / `flatpak_oci_export_labels` in
+    // flatpak's common/flatpak-json-oci.c): the ref identifies the app
+    // (e.g. app/org.gnome.Clocks/x86_64/stable), commit/parent-commit pin
+    // the OSTree state, and the remaining fields describe the build. There
+    // is intentionally no fallback pair: no other label family aliases the
+    // flatpak keys.
+    addOCI("org.flatpak.ref", "FlatpakRef")
+    addOCI("org.flatpak.commit", "FlatpakCommit")
+    addOCI("org.flatpak.parent-commit", "FlatpakParentCommit")
+    addOCI("org.flatpak.timestamp", "FlatpakTimestamp")
+    addOCI("org.flatpak.subject", "FlatpakSubject")
+    addOCI("org.flatpak.installed-size", "FlatpakInstalledSize")
+    addOCI("org.flatpak.download-size", "FlatpakDownloadSize")
 
     (metadata, used)
   }
