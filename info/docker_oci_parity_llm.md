@@ -41,6 +41,14 @@ addition to docker-save tars. No new strategy.
   byName/byUUID.
 - `DockerMetadataExtractor`: `SchemaVersion` accepts JInt/JLong (wild
   manifests have `"schemaVersion": 2` as an integer).
+- Label normalization (`DockerMetadataExtractor.normalizeLabels`): the
+  well-known `org.opencontainers.image.*` / `org.label-schema.*` keys map to
+  `docker:*` metadata; **`org.flatpak.*` keys** (ref, commit,
+  parent-commit, timestamp, subject, installed-size, download-size — the set
+  flatpak's own OCI exporter writes) map to well-named `docker:Flatpak*`
+  keys so a registry-pulled Flatpak arriving as a plain OCI layout is
+  tagged; every other label is preserved verbatim as `docker:Label:<key>`
+  (claim `C17`, test `DockerSuite.FP-01`).
 
 ## Fixtures (build.sbt `ociPins` + `orasImage`)
 

@@ -381,6 +381,38 @@ Test / testOptions += Tests.Setup(() => {
       }
     }
 
+    // The iOS .ipa corpus (owner decision 2026-09-25: real corpus first,
+    // size-gated at 6 MB; this item is 4.11 MB). Fetched from the upstream
+    // GitHub release (allsafe-ios v1.0) because it is not hosted on
+    // public-test-data; digest-pinned by the IpaCorpus helper so drift is
+    // caught at test time, cached once present, and skipped when the
+    // network is unavailable (the corpus tests assume the fixture).
+    val ipaCorpus = file("./test_data/download/ipa_tests/allsafe-ios.ipa")
+    ipaCorpus.getParentFile().mkdirs()
+    if (!ipaCorpus.exists()) {
+      log.info("Downloading allsafe-ios.ipa (iOS .ipa corpus)")
+      val ipaUrl =
+        "https://github.com/t0thkr1s/allsafe-ios/releases/download/v1.0/allsafe-ios.ipa"
+      var loopCnt = 0
+      var keepOn = true
+      while (keepOn) {
+        val cmdResult =
+          s"curl -fSL --retry 2 -o ${ipaCorpus.getAbsolutePath} ${ipaUrl}".!(log)
+        if (cmdResult == 0) {
+          keepOn = false
+        } else {
+          loopCnt += 1
+          ipaCorpus.delete()
+          if (loopCnt >= 3) {
+            log.warn(
+              "Failed to download allsafe-ios.ipa; the .ipa corpus tests will be skipped"
+            )
+            keepOn = false
+          }
+        }
+      }
+    }
+
   } catch {
     case e: Exception =>
       val err = s"Exception fetching test files: ${e.getMessage}"

@@ -20,6 +20,14 @@ At present there are two post-processing operations that refine MIME types:
 |----------|---------|
 | `text/plain` | `application/json` (when content is valid JSON) |
 | `application/x-msdownload; format=pe32` | `application/x-msdownload; format=pe32-dotnet` (for .NET assemblies) |
+| `application/x-itunes-ipa` (Tika) | `application/zip` (`.ipa` files whose 4-byte magic is a ZIP local-file header `PK\x03\x04` or the empty-ZIP EOCD `PK\x05\x06`) |
+
+**Verified by:** `IpaDetectionSuite.Ipa-0.1` (real ZIP `.ipa` massaged and
+walked; `Payload/…/Info.plist` children appear), `Ipa-0.2` (non-zip `.ipa`
+NOT massaged), `Ipa-0.6` (empty-zip `.ipa` accepted), `Ipa-0.5` (property:
+massage decision equals magic ∧ extension predicate). The massage keys on
+magic, never on the detected MIME, so Android APKs and plain ZIPs (shared
+magic, different extension) are unaffected — `Ipa-0.3`, `Ipa-0.7`.
 
 ### Producer-stamped MIME hints (spec §5)
 

@@ -93,12 +93,33 @@ All metadata keys Goat Rodeo can emit, by source strategy. Keys are sorted by so
 |---|---|---|
 | gradle:DependencyCount | Number of locked dependencies | String integer |
 
+## iOS Strategy (`ipa:*`)
+
+| Key | Meaning | Format |
+|---|---|---|
+| ipa:BundleIdentifier | `CFBundleIdentifier` from `Info.plist` | String |
+| ipa:BundleShortVersion | `CFBundleShortVersionString` | String |
+| ipa:BundleVersion | `CFBundleVersion` | String |
+| ipa:BundleName | `CFBundleName` | String |
+| ipa:MinimumOS | `MinimumOSVersion` | String |
+| ipa:TeamIdentifier | provisioning payload `TeamIdentifier` | String |
+| ipa:AppIDName | provisioning payload `AppIDName` | String |
+| ipa:ProvisioningExpiration | provisioning `ExpirationDate` | ISO-8601 String |
+| ipa:Entitlements | provisioning `Entitlements` | compact JSON |
+| ipa:ProvisionedDeviceCount | `ProvisionedDevices` length | String integer |
+
+Signing certs from `embedded.mobileprovision` land as child Items with the
+`Certificates:` metadata shape (`Certificates:SubjectDN`, `Certificates:CertSha256`, …)
+— verified by `IpaStrategySuite.Ipa-2.7` and `Ipa-2.b`. `ipa:` values
+carry no private keys or raw binary blobs (`Ipa-2.8`).
+
 ## Verification Sources
 
 - `MavenPomInterpolationSuite`, `MavenDependencyLicenseSuite`, `MavenJarStructureSuite`, `MavenModuleInfoSuite`, `MavenJarStructureCorpusSuite`
 - `JvmDistributionSuite`
 - `GradleLockfileSuite`
 - `MavenPropertyTests`
+- `IpaStrategySuite`
 
 ## Dependency JSON Shape
 

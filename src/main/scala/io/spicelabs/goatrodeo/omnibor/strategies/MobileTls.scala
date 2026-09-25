@@ -27,7 +27,10 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
+import io.spicelabs.goatrodeo.util.BinaryPlistParser
 import io.spicelabs.goatrodeo.util.GitOID
+import org.json4s.{JBool, JObject, JValue}
+import org.json4s.MonadicJValue.jvalueToMonadic
 
 import java.nio.charset.StandardCharsets
 import java.util.Arrays
@@ -91,6 +94,37 @@ object MobileTlsStrategy {
       }
       new String(bytes, StandardCharsets.ISO_8859_1)
     }.getOrElse("")
+  }
+
+  /** Read up to [[MaxReadBytes]] bytes of the artifact's content, draining
+    * the stream (a single `read` may return a partial chunk on real file
+    * streams; plist parsing needs the complete bytes).
+    *
+    * When the content exceeds the cap, returns an EMPTY array: a truncated
+    * blob must never be parsed as a plist (truncation can coincidentally
+    * align into a parseable-but-wrong structure — see Mtl-3.7).
+    */
+  private[strategies] def contentBytes(a: ArtifactWrapper): Array[Byte] = {
+    Try {
+      a.withStream { s =>
+        val out = new java.io.ByteArrayOutputStream()
+        val chunk = new Array[Byte](64 * 1024)
+        var total = 0
+        var overflow = false
+        var n = s.read(chunk)
+        while (n >= 0) {
+          if (total + n > MaxReadBytes) {
+            overflow = true
+            n = -1
+          } else {
+            out.write(chunk, 0, n)
+            total += n
+            n = s.read(chunk)
+          }
+        }
+        if (overflow) Array.emptyByteArray else out.toByteArray
+      }
+    }.getOrElse(Array.emptyByteArray)
   }
 }
 
@@ -198,6 +232,36 @@ class MobileTlsState(artifact: ArtifactWrapper)
     }
   }
 
+  /** ATS metadata from a parsed plist JValue (binary or XML — both parse
+    * through BinaryPlistParser to the same JValue shape).
+    */
+  private def parseAtsFromJValue(
+      jv: JValue
+  ): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
+    val ats = jv \ "NSAppTransportSecurity"
+    ats match {
+      case JObject(_) =>
+        var tm = TreeMap[String, TreeSet[StringOrPair]](
+          mtAdHoc("FileType") -> TreeSet(StringOrPair("apple-ats"))
+        )
+        if ((ats \ "NSAllowsArbitraryLoads") == JBool(true))
+          tm = tm + (mtAdHoc("ats_arbitrary_loads") -> TreeSet(
+            StringOrPair("true")
+          ))
+        if ((ats \ "NSExceptionDomains") match {
+            case JObject(_) => true
+            case _          => false
+          })
+          tm = tm + (mtAdHoc("ats_exceptions") -> TreeSet(StringOrPair("true")))
+        if ((ats \ "NSAllowsLocalNetworking") == JBool(true))
+          tm = tm + (mtAdHoc("ats_local_networking") -> TreeSet(
+            StringOrPair("true")
+          ))
+        Some(tm)
+      case _ => None
+    }
+  }
+
   private def parseInfoPlist(
       text: String
   ): Option[TreeMap[String, TreeSet[StringOrPair]]] = {
@@ -240,14 +304,36 @@ class MobileTlsState(artifact: ArtifactWrapper)
   ): TreeMap[String, TreeSet[StringOrPair]] = {
     val path = artifact.path()
     val kind = MobileTlsStrategy.detectTlsPolicyArtifact(path)
-    val text = Try(MobileTlsStrategy.contentOf(artifact)).getOrElse("")
     kind match {
+      case Some("apple-ats") =>
+        // Binary plists (bplist00, the real-device form) cannot be read as
+        // text; parse through the shared plist facade first, with the
+        // XML/text path as fallback (behavior-preserving for XML).
+        val bytes = Try(MobileTlsStrategy.contentBytes(artifact)).getOrElse(
+          Array.emptyByteArray
+        )
+        BinaryPlistParser.parse(bytes) match {
+          case Some(jv) =>
+            parseAtsFromJValue(jv).getOrElse(TreeMap.empty)
+          // The binary parse failed. Fall back to the text/XML path ONLY
+          // when the full content was readable (bytes non-empty): an
+          // oversized blob (contentBytes returned empty on overflow) must
+          // never be interpreted as text — the truncated object table of a
+          // binary plist contains ASCII key strings like
+          // "NSAppTransportSecurity", which would false-positive (Mtl-3.7).
+          case None if bytes.nonEmpty =>
+            val text = Try(MobileTlsStrategy.contentOf(artifact)).getOrElse("")
+            parseInfoPlist(text).getOrElse(TreeMap.empty)
+          case None => TreeMap.empty
+        }
       case Some("android-network-security-config") =>
+        val text = Try(MobileTlsStrategy.contentOf(artifact)).getOrElse("")
         parseNetworkSecurity(text).getOrElse(TreeMap.empty)
       case Some("android-manifest") =>
+        val text = Try(MobileTlsStrategy.contentOf(artifact)).getOrElse("")
         parseManifest(text).getOrElse(TreeMap.empty)
-      case Some("apple-ats") => parseInfoPlist(text).getOrElse(TreeMap.empty)
       case Some("jvm-crypto-policy") =>
+        val text = Try(MobileTlsStrategy.contentOf(artifact)).getOrElse("")
         parseCryptoPolicy(text).getOrElse(TreeMap.empty)
       case _ => TreeMap.empty
     }

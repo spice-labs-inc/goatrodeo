@@ -86,6 +86,7 @@ canonical location).
 | C14 | No claim without `oci-layout`; missing blobs claim nothing | `O-06`, `O-07` |
 | C15 | docker-save wins when both formats present | `O-08` |
 | C16 | Empty manifests, non-JSON index, garbage ref.name, oversized index, excessive nesting, hostile layer digests handled | `O-09`…`O-14` |
+| C17 | `org.flatpak.*` config labels on a plain OCI layout (how a registry-pulled Flatpak arrives) normalize into well-named `docker:Flatpak*` keys; unlisted labels keep the verbatim `docker:Label:*` fallback without duplication | `DockerSuite.FP-01` |
 
 ## Related
 

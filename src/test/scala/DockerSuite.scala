@@ -6,6 +6,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerMarkers
+import io.spicelabs.goatrodeo.omnibor.strategies.DockerMetadataExtractor
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerState
 import io.spicelabs.goatrodeo.omnibor.strategies.DockerToProcess
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
@@ -960,6 +961,66 @@ class DockerSuite extends GoatRodeoFunSuite {
     assertEquals(
       toProcess.head.asInstanceOf[DockerToProcess].config.head.layers,
       Nil
+    )
+  }
+
+  // FP-01 — org.flatpak.* labels in an OCI image config (how a registry-
+  // pulled Flatpak arrives as a plain OCI layout) normalize into well-named
+  // Goat Rodeo metadata keys instead of only the verbatim docker:Label:
+  // fallback.
+  //
+  // '''What it tests:''' `DockerMetadataExtractor.extractMetadata` maps the
+  // canonical Flatpak OCI label set (org.flatpak.ref/commit/parent-commit/
+  // timestamp/subject/installed-size/download-size, as written by flatpak's
+  // own OCI exporter) to well-named `docker:Flatpak*` keys, marks them as
+  // consumed (no duplicate under `docker:Label:org.flatpak.*`), and leaves
+  // any other label on the verbatim path (`docker:Label:<name>`).
+  //
+  // '''Why:''' a Flatpak exported to an OCI registry and pulled as an OCI
+  // layout carries its identity in these config labels; normalizing them is
+  // what "tags" the flatpak in the ADG metadata.
+  test("FP-01 flatpak OCI labels are normalized into metadata keys") {
+    val configJson = parse(
+      """{"architecture":"x86_64","os":"linux","config":{"Labels":{
+        |"org.flatpak.ref":"app/org.gnome.Clocks/x86_64/stable",
+        |"org.flatpak.commit":"0123456789abcdef",
+        |"org.flatpak.parent-commit":"fedcba9876543210",
+        |"org.flatpak.timestamp":"1735689600",
+        |"org.flatpak.subject":"Update clocks to 46.1",
+        |"org.flatpak.installed-size":"884736",
+        |"org.flatpak.download-size":"4096",
+        |"com.example.custom":"keep-me-verbatim"
+        |}}}""".stripMargin
+    )
+    val metadata =
+      DockerMetadataExtractor.extractMetadata(configJson, parse("{}"))
+
+    def dockerKey(key: String): Option[String] =
+      metadata
+        .get(s"docker:$key")
+        .flatMap(_.headOption)
+        .map(_.value)
+
+    assertEquals(
+      dockerKey("FlatpakRef"),
+      Some("app/org.gnome.Clocks/x86_64/stable")
+    )
+    assertEquals(dockerKey("FlatpakCommit"), Some("0123456789abcdef"))
+    assertEquals(dockerKey("FlatpakParentCommit"), Some("fedcba9876543210"))
+    assertEquals(dockerKey("FlatpakTimestamp"), Some("1735689600"))
+    assertEquals(dockerKey("FlatpakSubject"), Some("Update clocks to 46.1"))
+    assertEquals(dockerKey("FlatpakInstalledSize"), Some("884736"))
+    assertEquals(dockerKey("FlatpakDownloadSize"), Some("4096"))
+
+    // The normalized flatpak labels are marked used: they must NOT also
+    // appear on the verbatim docker:Label: path.
+    assert(metadata.get("docker:Label:org.flatpak.ref").isEmpty)
+    assert(metadata.get("docker:Label:org.flatpak.commit").isEmpty)
+
+    // Unlisted labels keep the verbatim fallback.
+    assertEquals(
+      dockerKey("Label:com.example.custom"),
+      Some("keep-me-verbatim")
     )
   }
 }
