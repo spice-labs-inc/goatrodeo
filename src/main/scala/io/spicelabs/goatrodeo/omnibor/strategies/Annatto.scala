@@ -1,5 +1,6 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
+import com.typesafe.scalalogging.Logger
 import io.spicelabs.annatto.Ecosystem
 import io.spicelabs.annatto.EcosystemRouter
 import io.spicelabs.annatto.LanguagePackage
@@ -26,6 +27,8 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 object AnnattoStrategy {
@@ -84,6 +87,8 @@ class Annatto(artifact: ArtifactWrapper, pkg: LanguagePackage)
 
 class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
     extends ProcessingState[SingleMarker, AnnattoState] {
+  private val logger = Logger(getClass())
+
   override def beginProcessing(
       artifact: ArtifactWrapper,
       item: Item,
@@ -102,15 +107,23 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
   ): (PurlSet, AnnattoState) = {
     // annatto returns a com.github.packageurl.PackageURL; convert to
     // io.spicelabs.coordinates.Purl via string round-trip.
-    // Wrap in Try — a malformed pURL should not abort processing.
+    // Wrap in Try — a malformed pURL should not abort processing, but log it
+    // so that a whole ecosystem losing its identifiers is visible.
     pkg
       .toPurl()
       .toScala
-      .flatMap(p =>
-        Try {
-          Purl.parse(p.canonicalize())
-        }.toOption
-      )
+      .flatMap { p =>
+        val purlString = p.canonicalize()
+        Try(Purl.parse(purlString)) match {
+          case Success(purl) => Some(purl)
+          case Failure(e) =>
+            val path = artifact.path()
+            logger.warn(
+              f"Discarding purl '${purlString}' for ${path}: rejected by coordinates: ${e.getMessage()}"
+            )
+            None
+        }
+      }
       .map(p => PurlSet.single(p))
       .getOrElse(PurlSet.empty) -> this
   }
