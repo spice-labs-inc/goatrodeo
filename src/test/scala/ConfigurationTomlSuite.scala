@@ -210,8 +210,6 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     // The exemptions are written out, with the reason, so that adding a field
     // means making the choice rather than inheriting it by silence.
     val exempt: Map[String, String] = Map(
-      "cutoff" ->
-        "an entitlement, not a preference: --cutoff only, and alwaysRejected refuses it by name",
       "configFile" -> "how the run was started, not a setting anybody wrote",
       "runtime" -> "the ambient process state, not a setting",
       "logging" ->
@@ -240,21 +238,6 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     assert(
       stale.isEmpty,
       s"exempt names no such field: ${stale.mkString(", ")}"
-    )
-  }
-
-  test("a key refused by name is a key the schema knows about") {
-    // The point of alwaysRejected is to say "you spelled this correctly and it
-    // is deliberately unavailable" rather than "unknown key". That only works
-    // while the key is also in knownKeys -- otherwise the unknown-key check
-    // fires first and reports it as a typo. Today only `cutoff` is involved,
-    // and it was put in both sets by hand.
-    val notKnown = ConfigurationToml.rejectedKeys.filterNot(
-      ConfigurationToml.accepts
-    )
-    assert(
-      notKnown.isEmpty,
-      s"${notKnown.mkString(", ")} would be reported as a typo rather than refused by name"
     )
   }
 
