@@ -148,12 +148,6 @@ object ConfigurationToml {
     */
   def mappedFields: Set[String] = keyForField.keySet
 
-  /** Keys a config file may name but not set, so that they are refused by name
-    * rather than reported as a typo. Exposed so a test can hold the two lists
-    * against each other.
-    */
-  def rejectedKeys: Set[String] = alwaysRejected.keySet
-
   /** Whether the `[analysis]` table accepts this key. */
   def accepts(key: String): Boolean = knownKeys.contains(key)
 

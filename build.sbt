@@ -250,19 +250,19 @@ lazy val root = project
     libraryDependencies += "org.tomlj" % "tomlj" % "1.1.1",
     // The naming, layering and precedence rules every Spice component shares.
     libraryDependencies += "io.spicelabs" % "spice-config" % "1.0.0",
-    // Still required at the boundary: the annatto/baharat readers hand back
+    // Still required at the boundary: the baharat readers hand back
     // com.github.packageurl.PackageURL, which we convert to coordinates.Purl.
     libraryDependencies += "com.github.package-url" % "packageurl-java" % "1.5.0",
     // Spice Labs readers — current Maven Central releases (spec §1).
     libraryDependencies += "io.spicelabs" %% "cilantro" % "0.4.0",
     // Canonical content identifiers (hashes + git blob ids) — the single source of
-    // truth shared across Spice Labs tooling (spec §1 pins 1.2.1). Plain Java jar:
-    libraryDependencies += "io.spicelabs" % "coordinates" % "1.2.1",
+    // truth shared across Spice Labs tooling (spec §1 pins 1.3.1). Plain Java jar:
+    libraryDependencies += "io.spicelabs" % "coordinates" % "1.3.1",
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
     // Spice Labs "readers" — current Maven Central releases (spec §1).
     libraryDependencies += "io.spicelabs" % "baharat" % "0.2.1",
-    libraryDependencies += "io.spicelabs" % "annatto" % "0.3.0",
+    libraryDependencies += "io.spicelabs" % "annatto" % "0.4.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.5.0",
     // Direct pins (spec §1):
     libraryDependencies += "org.eclipse.jgit" % "org.eclipse.jgit" % "7.3.0.202506031305-r",
