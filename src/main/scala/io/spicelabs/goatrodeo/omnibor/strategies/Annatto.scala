@@ -1,11 +1,9 @@
 package io.spicelabs.goatrodeo.omnibor.strategies
 
-import com.typesafe.scalalogging.Logger
 import io.spicelabs.annatto.Ecosystem
 import io.spicelabs.annatto.EcosystemRouter
 import io.spicelabs.annatto.LanguagePackage
 import io.spicelabs.annatto.LanguagePackageReader
-import io.spicelabs.coordinates.Purl
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
 import io.spicelabs.goatrodeo.omnibor.PackageTagInfo
@@ -27,8 +25,6 @@ import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
-import scala.util.Failure
-import scala.util.Success
 import scala.util.Try
 
 object AnnattoStrategy {
@@ -87,7 +83,6 @@ class Annatto(artifact: ArtifactWrapper, pkg: LanguagePackage)
 
 class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
     extends ProcessingState[SingleMarker, AnnattoState] {
-  private val logger = Logger(getClass())
 
   override def beginProcessing(
       artifact: ArtifactWrapper,
@@ -105,25 +100,11 @@ class AnnattoState(artifact: ArtifactWrapper, pkg: LanguagePackage)
       item: Item,
       marker: SingleMarker
   ): (PurlSet, AnnattoState) = {
-    // annatto returns a com.github.packageurl.PackageURL; convert to
-    // io.spicelabs.coordinates.Purl via string round-trip.
-    // Wrap in Try — a malformed pURL should not abort processing, but log it
-    // so that a whole ecosystem losing its identifiers is visible.
+    // annatto builds a coordinates Purl itself, and logs the packages whose
+    // metadata does not make a valid one; those come back empty.
     pkg
       .toPurl()
       .toScala
-      .flatMap { p =>
-        val purlString = p.canonicalize()
-        Try(Purl.parse(purlString)) match {
-          case Success(purl) => Some(purl)
-          case Failure(e) =>
-            val path = artifact.path()
-            logger.warn(
-              f"Discarding purl '${purlString}' for ${path}: rejected by coordinates: ${e.getMessage()}"
-            )
-            None
-        }
-      }
       .map(p => PurlSet.single(p))
       .getOrElse(PurlSet.empty) -> this
   }
