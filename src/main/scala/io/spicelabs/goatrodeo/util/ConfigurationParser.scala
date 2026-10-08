@@ -9,6 +9,7 @@ import scopt.OParserBuilder
 
 import java.io.File
 import java.io.FileFilter
+import java.time.Instant
 import java.util.regex.Pattern
 import scala.io.Source
 import scala.util.Try
@@ -24,6 +25,20 @@ import scala.util.Using
   */
 object ConfigurationParser {
   private val logger = Logger(getClass())
+
+  /** Parse an cutoff cutoff from its textual form: epoch milliseconds, an
+    * ISO-8601 instant, or a flexible date string.
+    */
+  def parseCutoff(raw: String): Option[Instant] =
+    Option(raw).map(_.trim).filter(_.nonEmpty).flatMap { raw =>
+      val fromMillis =
+        if (raw.forall(_.isDigit))
+          Try(Instant.ofEpochMilli(raw.toLong)).toOption
+        else None
+      fromMillis
+        .orElse(Try(Instant.parse(raw)).toOption)
+        .orElse(DateParser.parse(raw).toOption.map(_.toInstant()))
+    }
 
   /** The scopt parser builder instance. */
   lazy val builder: OParserBuilder[Configuration] =
@@ -175,6 +190,26 @@ object ConfigurationParser {
           "Tag all top level artifacts (files) with the current date and the text of the tag"
         )
         .action((x, c) => c.copy(tag = Some(x))),
+      opt[String]("cutoff")
+        .text(
+          "Refuse to analyze internal files modified after this date/time (e.g. 2026-01-01); dependents are dropped too"
+        )
+        .action((x, c) =>
+          parseCutoff(x) match {
+            case Some(instant) => c.copy(cutoff = Some(instant))
+            case None          =>
+              // Stop, rather than log and carry on with `c` unchanged. A cutoff that fails to
+              // parse would otherwise leave `cutoff = None`, and the run would analyse
+              // everything -- a restriction failing open, which is the one direction it must
+              // not fail in. Nothing types this flag by hand: allspice and spice both set the
+              // cutoff through withCutoff(Instant) from the Spice Pass, so a malformed value
+              // here means the tool that built the command line is wrong, and saying so
+              // loudly is more use than scopt's usage text.
+              logger.error(f"Invalid --cutoff value: ${x}")
+              Helpers.exitWrapper(1)
+              c
+          }
+        ),
       opt[File]("ingested")
         .text(
           "Append all the ingested files to this file on successful completion"

@@ -95,6 +95,8 @@ object FileWalker {
               .flatMap(v => {
                 val name = v.getName()
                 val size = v.getSize()
+                val modified =
+                  Option(v.getLastModifiedTime()).map(_.toInstant())
 
                 ArtifactWrapper
                   .newWrapper(
@@ -102,7 +104,8 @@ object FileWalker {
                     size,
                     zipFile.getInputStream(v),
                     in.tempDir,
-                    tempDir
+                    tempDir,
+                    lastModified = modified
                   )
                   .toOption
               })
@@ -618,13 +621,16 @@ object FileWalker {
 
           val size = ae.getSize()
 
+          val modified = Option(ae.getLastModifiedDate()).map(_.toInstant())
+
           ArtifactWrapper
             .newWrapper(
               artifactName,
               size,
               input,
               tempPath,
-              tempDir
+              tempDir,
+              lastModified = modified
             )
             .toOption
         })

@@ -123,6 +123,28 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
 
   // ==================== nesting ====================
 
+  test("cutoff is refused in Goat Rodeo's own config file too") {
+    // An entitlement, not a preference: --cutoff is the only way to ask for one when
+    // standalone, so that the embedded rule has no second spelling to be forgotten by.
+    val error = read("""cutoff = "2026-01-01"""").left
+      .getOrElse(fail("expected an error"))
+    assert(error.contains("cutoff"), error)
+    assert(error.contains("not settable here"), error)
+  }
+
+  test("cutoff is refused in a table nested inside another program's config") {
+    // Embedded, the cutoff is the Spice Pass's `x-cutoff`: it constrains what the
+    // platform will accept, so a config file must not be able to widen it.
+    val result = ConfigurationToml.nestedFromToml(
+      parse("""cutoff = "2026-01-01""""),
+      Configuration(),
+      "registry.analysis"
+    )
+    val error = result.left.getOrElse(fail("expected an error"))
+    assert(error.contains("Spice Pass"), error)
+    assert(error.contains("registry.analysis"), error)
+  }
+
   test("errors name the table the user wrote, not an internal component") {
     val error = ConfigurationToml
       .nestedFromToml(
@@ -210,6 +232,8 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     // The exemptions are written out, with the reason, so that adding a field
     // means making the choice rather than inheriting it by silence.
     val exempt: Map[String, String] = Map(
+      "cutoff" ->
+        "an entitlement, not a preference: --cutoff only, and alwaysRejected refuses it by name",
       "configFile" -> "how the run was started, not a setting anybody wrote",
       "runtime" -> "the ambient process state, not a setting",
       "logging" ->
@@ -238,6 +262,21 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     assert(
       stale.isEmpty,
       s"exempt names no such field: ${stale.mkString(", ")}"
+    )
+  }
+
+  test("a key refused by name is a key the schema knows about") {
+    // The point of alwaysRejected is to say "you spelled this correctly and it
+    // is deliberately unavailable" rather than "unknown key". That only works
+    // while the key is also in knownKeys -- otherwise the unknown-key check
+    // fires first and reports it as a typo. Today only `cutoff` is involved,
+    // and it was put in both sets by hand.
+    val notKnown = ConfigurationToml.rejectedKeys.filterNot(
+      ConfigurationToml.accepts
+    )
+    assert(
+      notKnown.isEmpty,
+      s"${notKnown.mkString(", ")} would be reported as a typo rather than refused by name"
     )
   }
 
@@ -673,6 +712,20 @@ class ConfigurationTomlSuite extends GoatRodeoFunSuite {
     val applied = builderConfig(builder)
     assertEquals(applied.threads, 11)
     assertEquals(applied.maxRecords, 4242)
+  }
+
+  test("the builder refuses a cutoff from an embedding program's config file") {
+    val result = GoatRodeo
+      .builder()
+      .withConfiguration(
+        TomlTables.toPlainMap(parse("cutoff = \"2026-01-01\"")),
+        "survey.inventory.analysis"
+      )
+    assert(result.isLeft, s"a cutoff must produce Left, got $result")
+    assert(
+      result.swap.toOption.get.contains("Spice Pass"),
+      result.swap.toOption.get
+    )
   }
 
   test("the builder rejects an unknown key rather than ignoring it") {

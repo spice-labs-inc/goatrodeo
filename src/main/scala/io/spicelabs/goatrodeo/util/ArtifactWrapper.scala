@@ -18,6 +18,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.Failure
@@ -79,6 +80,14 @@ sealed trait ArtifactWrapper {
     * @return
     */
   def size(): Long
+
+  /** The artifact's last-modified time, if known — e.g. an archive entry's
+    * timestamp. None when the source has no meaningful timestamp (in-memory
+    * bytes, unknown mtime).
+    *
+    * @return
+    */
+  def lastModified: Option[Instant] = None
 
   private lazy val _mimeType: Set[String] = {
     val base = Try {
@@ -460,7 +469,8 @@ object ArtifactWrapper {
       data: InputStream,
       tempDir: Option[File],
       tempPath: Path,
-      mimeHint: Set[String] = Set()
+      mimeHint: Set[String] = Set(),
+      lastModified: Option[Instant] = None
   ): Try[ArtifactWrapper] = Try {
     val name = sanitizeName(fixPath(nominalPath))
     val forceTempFile = requireTempFile(name)
@@ -487,7 +497,8 @@ object ArtifactWrapper {
         bytes,
         name,
         tempDir = tempDir,
-        mimeHint = mimeHint
+        mimeHint = mimeHint,
+        lastModified = lastModified
       )
     } else {
       // Preserve the original extension so MIME-type augmenters and disk-format
@@ -504,7 +515,8 @@ object ArtifactWrapper {
         tempFile,
         name,
         tempDir = tempDir,
-        mimeHint = mimeHint
+        mimeHint = mimeHint,
+        lastModified = lastModified
       )
     }
   }
@@ -581,7 +593,8 @@ final case class FileWrapper(
     thePath: String,
     tempDir: Option[File],
     finishedFunc: File => Unit = f => (),
-    protected override val mimeHint: Set[String] = Set()
+    protected override val mimeHint: Set[String] = Set(),
+    override val lastModified: Option[Instant] = None
 ) extends ArtifactWrapper {
 
   // constructor
@@ -655,7 +668,8 @@ final case class ByteWrapper(
     bytes: Array[Byte],
     fileName: String,
     tempDir: Option[File],
-    protected override val mimeHint: Set[String] = Set()
+    protected override val mimeHint: Set[String] = Set(),
+    override val lastModified: Option[Instant] = None
 ) extends ArtifactWrapper {
 
   override protected def getTikaInputStream(): TikaInputStream = {
