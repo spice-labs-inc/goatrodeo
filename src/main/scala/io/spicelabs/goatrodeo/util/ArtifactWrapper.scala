@@ -357,25 +357,24 @@ object ArtifactWrapper {
     }
   }
 
-  /** Does the file look like an iOS `.ipa`? An `.ipa` is a ZIP archive
-    * whose name ends in `.ipa` (Tika reports it as
-    * `application/x-itunes-ipa`); the massage normalizes it to
-    * `application/zip` so the FileWalker ZIP branch walks the container and
-    * its `Payload/<App>.app/` bundle.
+  /** Does the file look like an iOS `.ipa`? An `.ipa` is a ZIP archive whose
+    * name ends in `.ipa` (Tika reports it as `application/x-itunes-ipa`); the
+    * massage normalizes it to `application/zip` so the FileWalker ZIP branch
+    * walks the container and its `Payload/<App>.app/` bundle.
     *
     * The sniff is exactly the nupkg pattern: extension plus the 4-byte ZIP
-    * magic — a local-file header (`PK\x03\x04`) or an empty-archive EOCD
-    * record (`PK\x05\x06`). It keys on magic, never on Tika's outcome, so
-    * Android APKs and plain ZIPs are unaffected (they share the magic but
-    * not the extension, and the extension gate keeps this branch off them).
+    * magic — a local-file header (`PK\x03\x04`) or an empty-archive EOCD record
+    * (`PK\x05\x06`). It keys on magic, never on Tika's outcome, so Android APKs
+    * and plain ZIPs are unaffected (they share the magic but not the extension,
+    * and the extension gate keeps this branch off them).
     *
     * @param fileName
     *   the logical file name
     * @param rawData
     *   the Tika input stream (rewound before the sniff)
     * @return
-    *   Some(true) when the file is an .ipa ZIP, Some(false) otherwise,
-    *   None when the sniff itself fails
+    *   Some(true) when the file is an .ipa ZIP, Some(false) otherwise, None
+    *   when the sniff itself fails
     */
   private def isIpa(
       fileName: String,

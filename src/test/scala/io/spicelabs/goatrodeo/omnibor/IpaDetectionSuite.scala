@@ -15,9 +15,9 @@ import org.scalacheck.Properties
   *
   * Requirement (§2.1 of the plan): an `.ipa` with ZIP magic is massaged to
   * `application/zip` in `ArtifactWrapper.massageMimeType` (mirroring the
-  * `isNupkg` pattern) so the FileWalker ZIP branch walks it; the massage
-  * keys on extension+magic only, never on MIME, so Android APKs and plain
-  * ZIPs are unaffected.
+  * `isNupkg` pattern) so the FileWalker ZIP branch walks it; the massage keys
+  * on extension+magic only, never on MIME, so Android APKs and plain ZIPs are
+  * unaffected.
   *
   * LLM note: Ipa-xx = test id. Corpus tests require the fetched
   * `allsafe-ios.ipa` (see `IpaCorpus` and build.sbt Tests.Setup).
@@ -25,8 +25,8 @@ import org.scalacheck.Properties
 class IpaDetectionSuite extends GoatRodeoFunSuite {
 
   /** The byte-level predicate the .ipa massage must implement: extension is
-    * `.ipa` AND the first four bytes are a ZIP local-file header
-    * (PK\\x03\\x04) or an empty-ZIP EOCD header (PK\\x05\\x06).
+    * `.ipa` AND the first four bytes are a ZIP local-file header (PK\\x03\\x04)
+    * or an empty-ZIP EOCD header (PK\\x05\\x06).
     */
   private def isIpaPredicate(bytes: Array[Byte], name: String): Boolean =
     name.toLowerCase.endsWith(".ipa") &&
@@ -187,8 +187,7 @@ class IpaDetectionSuite extends GoatRodeoFunSuite {
 
 /** Property-based companion for the Ipa-0.5 decision predicate.
   */
-object IpaMassageProperties
-    extends Properties("ipa-massage-decision") {
+object IpaMassageProperties extends Properties("ipa-massage-decision") {
   property("massage = zip-magic AND .ipa extension") = Prop.forAll(
     Gen.listOfN(8, Gen.chooseNum[Int](0, 255))
   ) { prefix =>

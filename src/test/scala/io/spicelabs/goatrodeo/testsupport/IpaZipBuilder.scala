@@ -6,17 +6,16 @@ import java.util.zip.{ZipEntry, ZipOutputStream}
 /** Builds in-memory ZIP archives shaped like an iOS `.ipa` for tests.
   *
   * An `.ipa` is a ZIP with a `Payload/<App>.app/` bundle inside; the builder
-  * produces exactly that shape from caller-supplied member names and bytes,
-  * so hostile/edge contents are easy to construct without committing binary
-  * blobs.
+  * produces exactly that shape from caller-supplied member names and bytes, so
+  * hostile/edge contents are easy to construct without committing binary blobs.
   */
 object IpaZipBuilder {
 
   /** Create a ZIP archive with the given entries.
     *
     * @param entries
-    *   (path, bytes) pairs; directory entries are auto-created as needed by
-    *   the caller (pass explicit empty entries for them if relevant)
+    *   (path, bytes) pairs; directory entries are auto-created as needed by the
+    *   caller (pass explicit empty entries for them if relevant)
     * @return
     *   the ZIP bytes
     */
@@ -33,8 +32,8 @@ object IpaZipBuilder {
     bos.toByteArray
   }
 
-  /** Build a minimal but structurally real `.ipa`: `Payload/Min.app/` with
-    * an `Info.plist` and an `embedded.mobileprovision`.
+  /** Build a minimal but structurally real `.ipa`: `Payload/Min.app/` with an
+    * `Info.plist` and an `embedded.mobileprovision`.
     *
     * @param infoPlistBytes
     *   the Info.plist bytes (binary or XML)

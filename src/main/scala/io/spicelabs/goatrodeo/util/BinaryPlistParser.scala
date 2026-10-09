@@ -9,43 +9,43 @@ import javax.xml.parsers.DocumentBuilderFactory
 import scala.collection.mutable
 import scala.util.Try
 
-/** Parses Apple property-list files into `org.json4s.JValue`, supporting
-  * both the **binary** plist format (`bplist00`) and **XML** plists.
+/** Parses Apple property-list files into `org.json4s.JValue`, supporting both
+  * the **binary** plist format (`bplist00`) and **XML** plists.
   *
-  * This is the parsing foundation for iOS `.ipa` support: an iOS app
-  * bundle's `Info.plist` (and the payload inside
-  * `embedded.mobileprovision`) is frequently a binary plist, and the
-  * existing MobileTls ATS capture reads raw bytes and regexes them — it
-  * cannot read binary plists. Both formats normalize to the same JValue
-  * shape so consumers (MobileTls, the Ipa strategy) write one code path.
+  * This is the parsing foundation for iOS `.ipa` support: an iOS app bundle's
+  * `Info.plist` (and the payload inside `embedded.mobileprovision`) is
+  * frequently a binary plist, and the existing MobileTls ATS capture reads raw
+  * bytes and regexes them — it cannot read binary plists. Both formats
+  * normalize to the same JValue shape so consumers (MobileTls, the Ipa
+  * strategy) write one code path.
   *
   * ==Bounded and never throws==
   *
   * The parser is hostile-input safe in the style of [[PomParser]]:
   *
-  *   - a blob read cap (16 MiB, mirroring `DockerToProcess.MaxOciJsonBytes`)
-  *     is enforced by the caller or the facade before parsing;
+  *   - a blob read cap (16 MiB, mirroring `DockerToProcess.MaxOciJsonBytes`) is
+  *     enforced by the caller or the facade before parsing;
   *   - the trailer's object count, offset-table claims, per-object length
-  *     fields (including the `0xf`-escaped forms) and the depth are all
-  *     checked **before allocation**, so attacker-controlled counts cannot
-  *     drive memory amplification;
+  *     fields (including the `0xf`-escaped forms) and the depth are all checked
+  *     **before allocation**, so attacker-controlled counts cannot drive memory
+  *     amplification;
   *   - refs outside the object table and offsets outside the buffer are
   *     rejected; cyclic object graphs are rejected via a resolved-set;
-  *   - any malformed input yields `None` — a failed parse is a value, never
-  *     an exception out of the strategy.
+  *   - any malformed input yields `None` — a failed parse is a value, never an
+  *     exception out of the strategy.
   *
   * ==XML path==
   *
-  * The XML path reuses the hardened `DocumentBuilderFactory` configuration
-  * from [[PomParser]] (doctype disallowed, external entities off, no
-  * external DTD, no XInclude), with a DOCTYPE-stripping retry so benign
-  * plist DOCTYPEs parse. A hostile DOCTYPE with entity expansion stays
-  * inert (verified by `BinaryPlistParserSuite.Bplist-1.c`).
+  * The XML path reuses the hardened `DocumentBuilderFactory` configuration from
+  * [[PomParser]] (doctype disallowed, external entities off, no external DTD,
+  * no XInclude), with a DOCTYPE-stripping retry so benign plist DOCTYPEs parse.
+  * A hostile DOCTYPE with entity expansion stays inert (verified by
+  * `BinaryPlistParserSuite.Bplist-1.c`).
   */
 object BinaryPlistParser {
 
-  /** Hard read cap for a property-list blob (16 MiB, mirroring the OCI
-    * metadata cap). The facade refuses to parse larger inputs.
+  /** Hard read cap for a property-list blob (16 MiB, mirroring the OCI metadata
+    * cap). The facade refuses to parse larger inputs.
     */
   val MaxPlistBytes: Int = 16 * 1024 * 1024
 
@@ -59,9 +59,9 @@ object BinaryPlistParser {
 
   private val bplistHeader = "bplist00"
 
-  /** A hardened DocumentBuilderFactory for the XML path (identical settings
-    * to PomParser's secureDbf: doctype off, external entities off, no
-    * external DTD, no XInclude).
+  /** A hardened DocumentBuilderFactory for the XML path (identical settings to
+    * PomParser's secureDbf: doctype off, external entities off, no external
+    * DTD, no XInclude).
     */
   private def secureDbf: DocumentBuilderFactory = {
     val f = DocumentBuilderFactory.newInstance()
@@ -83,16 +83,18 @@ object BinaryPlistParser {
   /** Parse a plist from bytes: binary (`bplist00` magic) or XML.
     *
     * @param bytes
-    *   the plist bytes (bounded: callers should enforce
-    *   [[MaxPlistBytes]]; the facade also refuses larger inputs)
+    *   the plist bytes (bounded: callers should enforce [[MaxPlistBytes]]; the
+    *   facade also refuses larger inputs)
     * @return
-    *   the parsed JValue, or None when the input is not a plist or is
-    *   malformed — never an exception
+    *   the parsed JValue, or None when the input is not a plist or is malformed
+    *   — never an exception
     */
   def parse(bytes: Array[Byte]): Option[JValue] = {
     if (bytes == null || bytes.length == 0) return None
     if (bytes.length > MaxPlistBytes) return None
-    if (bytes.length >= 8 && startsWith(bytes, bplistHeader.getBytes("US-ASCII")))
+    if (
+      bytes.length >= 8 && startsWith(bytes, bplistHeader.getBytes("US-ASCII"))
+    )
       parseBinary(bytes)
     else parseXml(bytes)
   }
@@ -112,8 +114,8 @@ object BinaryPlistParser {
 
   /** Parse a binary plist.
     *
-    * Layout: 8-byte header ("bplist00"), the object stream, then the
-    * 32-byte trailer at the *end* of the buffer:
+    * Layout: 8-byte header ("bplist00"), the object stream, then the 32-byte
+    * trailer at the *end* of the buffer:
     *
     * {{{
     *   bytes[length-32 .. length-27]  unused (6 bytes, zero)
@@ -164,8 +166,8 @@ object BinaryPlistParser {
       .map(_._1)
   }
 
-  /** Read a big-endian unsigned integer of `size` bytes as a Long.
-    * Returns -1 when out of range or size > 8.
+  /** Read a big-endian unsigned integer of `size` bytes as a Long. Returns -1
+    * when out of range or size > 8.
     */
   private def readBE(bytes: Array[Byte], at: Int, size: Int): Long = {
     if (size < 1 || size > 8) return -1
@@ -179,12 +181,12 @@ object BinaryPlistParser {
     v
   }
 
-  /** Resolve one object from the object table by index, with cycle
-    * protection: an object currently being resolved (a cycle) is rejected.
+  /** Resolve one object from the object table by index, with cycle protection:
+    * an object currently being resolved (a cycle) is rejected.
     *
     * @return
-    *   (JValue, objectCount consumed in this subtree) — the count is unused
-    *   by the parser but kept for future budget accounting.
+    *   (JValue, objectCount consumed in this subtree) — the count is unused by
+    *   the parser but kept for future budget accounting.
     */
   private def resolveObject(
       bytes: Array[Byte],
@@ -218,7 +220,7 @@ object BinaryPlistParser {
             val size = 1 << info
             readBE(bytes, objOffset.toInt + 1, size) match {
               case v if v < 0 => None
-              case unsigned =>
+              case unsigned   =>
                 // bplist ints are two's complement: if the sign bit is set,
                 // the value is negative.
                 val signBit = 1L << (size * 8 - 1)
@@ -235,7 +237,9 @@ object BinaryPlistParser {
               if (bits < 0) None
               else
                 Some(
-                  JDouble(java.lang.Float.intBitsToFloat(bits.toInt).toDouble) -> 1
+                  JDouble(
+                    java.lang.Float.intBitsToFloat(bits.toInt).toDouble
+                  ) -> 1
                 )
             case 3 =>
               val bits = readBE(bytes, objOffset.toInt + 1, 8)
@@ -243,7 +247,8 @@ object BinaryPlistParser {
               else Some(JDouble(java.lang.Double.longBitsToDouble(bits)) -> 1)
             case _ => None
           }
-        case 0x3 if info == 3 => // date: 8-byte BE double, seconds since 2001-01-01
+        case 0x3
+            if info == 3 => // date: 8-byte BE double, seconds since 2001-01-01
           val bits = readBE(bytes, objOffset.toInt + 1, 8)
           if (bits < 0) None
           else {
@@ -289,10 +294,11 @@ object BinaryPlistParser {
         case 0x8 => // UID: info+1 bytes
           val len = info + 1
           if (len < 1 || len > 8) None
-          else readBE(bytes, objOffset.toInt + 1, len) match {
-            case v if v < 0 => None
-            case v          => Some(JInt(BigInt(v)) -> 1)
-          }
+          else
+            readBE(bytes, objOffset.toInt + 1, len) match {
+              case v if v < 0 => None
+              case v          => Some(JInt(BigInt(v)) -> 1)
+            }
         case 0xa | 0xc => // array or set
           val (count, refsPos) = lengthAndPos(bytes, objOffset, info)
           if (count < 0 || count > MaxObjectCount) None
@@ -302,7 +308,14 @@ object BinaryPlistParser {
             var i = 0
             while (i < count) {
               val ref = readBE(bytes, refsPos + i * refSize, refSize)
-              resolveObject(bytes, offsets, refSize, ref.toInt, resolved, depth + 1) match {
+              resolveObject(
+                bytes,
+                offsets,
+                refSize,
+                ref.toInt,
+                resolved,
+                depth + 1
+              ) match {
                 case Some((jv, _)) => values = values :+ jv
                 case None          => return None
               }
@@ -319,11 +332,26 @@ object BinaryPlistParser {
             var i = 0
             while (i < count) {
               val keyRef = readBE(bytes, refsPos + i * refSize, refSize)
-              val keyObj = resolveObject(bytes, offsets, refSize, keyRef.toInt, resolved, depth + 1)
+              val keyObj = resolveObject(
+                bytes,
+                offsets,
+                refSize,
+                keyRef.toInt,
+                resolved,
+                depth + 1
+              )
               keyObj match {
                 case Some((JString(key), _)) =>
-                  val valRef = readBE(bytes, refsPos + (count + i) * refSize, refSize)
-                  resolveObject(bytes, offsets, refSize, valRef.toInt, resolved, depth + 1) match {
+                  val valRef =
+                    readBE(bytes, refsPos + (count + i) * refSize, refSize)
+                  resolveObject(
+                    bytes,
+                    offsets,
+                    refSize,
+                    valRef.toInt,
+                    resolved,
+                    depth + 1
+                  ) match {
                     case Some((jv, _)) => fields(key) = jv
                     case None          => return None
                   }
@@ -342,8 +370,8 @@ object BinaryPlistParser {
 
   /** Compute the length and the position after the length field for
     * data/string/array/set/dict markers. When `info < 0xf`, the length is
-    * exactly `info`; when `info == 0xf`, the length is the following
-    * integer object (marker 0x1n + n bytes, big-endian).
+    * exactly `info`; when `info == 0xf`, the length is the following integer
+    * object (marker 0x1n + n bytes, big-endian).
     *
     * @return
     *   (length, position after the length encoding), or (-1, pos) when
@@ -398,14 +426,14 @@ object BinaryPlistParser {
     */
   private def xmlValue(elem: Element): Option[JValue] = {
     elem.getTagName match {
-      case "string"  => Some(JString(elem.getTextContent))
+      case "string" => Some(JString(elem.getTextContent))
       case "integer" =>
         Try(JInt(BigInt(elem.getTextContent.trim))).toOption
-      case "real"    => Try(JDouble(elem.getTextContent.trim.toDouble)).toOption
-      case "true"    => Some(JBool(true))
-      case "false"   => Some(JBool(false))
-      case "date"    => Some(JString(elem.getTextContent.trim))
-      case "data"    => Some(JString(elem.getTextContent.trim))
+      case "real"  => Try(JDouble(elem.getTextContent.trim.toDouble)).toOption
+      case "true"  => Some(JBool(true))
+      case "false" => Some(JBool(false))
+      case "date"  => Some(JString(elem.getTextContent.trim))
+      case "data"  => Some(JString(elem.getTextContent.trim))
       case "array" =>
         Some(JArray(children(elem).flatMap(xmlValue)))
       case "dict" =>
@@ -439,9 +467,9 @@ object BinaryPlistParser {
     }
   }
 
-  /** Strip the DOCTYPE declaration (mirrors PomParser's strip routine):
-    * finds "<!DOCTYPE" and removes through the matching ">" handling
-    * internal subsets and quoted strings.
+  /** Strip the DOCTYPE declaration (mirrors PomParser's strip routine): finds
+    * "<!DOCTYPE" and removes through the matching ">" handling internal subsets
+    * and quoted strings.
     */
   private def stripDoctype(xml: String): String = {
     val start = xml.toUpperCase.indexOf("<!DOCTYPE")

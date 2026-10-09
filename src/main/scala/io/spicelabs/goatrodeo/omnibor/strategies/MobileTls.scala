@@ -96,13 +96,13 @@ object MobileTlsStrategy {
     }.getOrElse("")
   }
 
-  /** Read up to [[MaxReadBytes]] bytes of the artifact's content, draining
-    * the stream (a single `read` may return a partial chunk on real file
-    * streams; plist parsing needs the complete bytes).
+  /** Read up to [[MaxReadBytes]] bytes of the artifact's content, draining the
+    * stream (a single `read` may return a partial chunk on real file streams;
+    * plist parsing needs the complete bytes).
     *
-    * When the content exceeds the cap, returns an EMPTY array: a truncated
-    * blob must never be parsed as a plist (truncation can coincidentally
-    * align into a parseable-but-wrong structure — see Mtl-3.7).
+    * When the content exceeds the cap, returns an EMPTY array: a truncated blob
+    * must never be parsed as a plist (truncation can coincidentally align into
+    * a parseable-but-wrong structure — see Mtl-3.7).
     */
   private[strategies] def contentBytes(a: ArtifactWrapper): Array[Byte] = {
     Try {
@@ -248,10 +248,12 @@ class MobileTlsState(artifact: ArtifactWrapper)
           tm = tm + (mtAdHoc("ats_arbitrary_loads") -> TreeSet(
             StringOrPair("true")
           ))
-        if ((ats \ "NSExceptionDomains") match {
+        if (
+          (ats \ "NSExceptionDomains") match {
             case JObject(_) => true
             case _          => false
-          })
+          }
+        )
           tm = tm + (mtAdHoc("ats_exceptions") -> TreeSet(StringOrPair("true")))
         if ((ats \ "NSAllowsLocalNetworking") == JBool(true))
           tm = tm + (mtAdHoc("ats_local_networking") -> TreeSet(
