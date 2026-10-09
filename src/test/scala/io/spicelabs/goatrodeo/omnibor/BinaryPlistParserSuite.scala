@@ -11,8 +11,9 @@ import org.scalacheck.{Gen, Prop, Properties}
   *
   * Requirement (§2.2 of the plan): the parser is bounded (16 MiB blob cap,
   * object-count cap, depth cap, allocation-time bound checks), never throws
-  * (malformed input is `None`), normalizes binary and XML plists to the same
-  * JValue shape, and mirrors PomParser's XXE hardening on the XML path.
+  * (malformed input is `None`), normalizes binary and XML plists to the
+  * same JValue shape, and mirrors PomParser's XXE hardening on the XML
+  * path.
   *
   * LLM note: Bplist-xx = test id.
   */
@@ -40,10 +41,7 @@ class BinaryPlistParserSuite extends GoatRodeoFunSuite {
     assertEquals(jv \ "enabled", JBool(true))
     assertEquals(jv \ "disabled", JBool(false))
     assertEquals(jv \ "missing", JNull)
-    assertEquals(
-      jv \ "tags",
-      JArray(List(JString("a"), JString("b"), JString("c")))
-    )
+    assertEquals(jv \ "tags", JArray(List(JString("a"), JString("b"), JString("c"))))
     assertEquals(jv \ "weight", JDouble(1.5))
   }
 
@@ -137,17 +135,8 @@ class BinaryPlistParserSuite extends GoatRodeoFunSuite {
     // buffer holds: marker 0x4f, then 0x10 0x08 (8-byte int length), then
     // 0x7f..x7 (a huge length), then EOF.
     val bomb = Array[Byte](
-      0x4f.toByte,
-      0x10,
-      0x08,
-      0x7f,
-      0x7f,
-      0x7f,
-      0x7f,
-      0x7f,
-      0x7f,
-      0x7f,
-      0x7f
+      0x4f.toByte, 0x10, 0x08,
+      0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f
     )
     // needs a valid trailer; wrap minimal: bplist00 + object + trailer
     val withTrailer = mkMinimal(bomb)
@@ -257,12 +246,10 @@ class BinaryPlistParserSuite extends GoatRodeoFunSuite {
           Gen.const(JBool(false): JValue),
           Gen.const(JNull: JValue),
           Gen.listOfN(3, genValue(depth + 1)).map(l => JArray(l): JValue),
-          Gen
-            .mapOfN(
-              3,
-              Gen.zip(genString, genValue(depth + 1))
-            )
-            .map(m => JObject(m.toList): JValue)
+          Gen.mapOfN(
+            3,
+            Gen.zip(genString, genValue(depth + 1))
+          ).map(m => JObject(m.toList): JValue)
         )
     val prop = Prop.forAll(genValue(0)) { v =>
       val encoded = BplistEncoder.encode(v)
@@ -313,8 +300,8 @@ class BinaryPlistParserSuite extends GoatRodeoFunSuite {
             s != "root:" && !s.contains(":0:0:"),
           "XXE payload must not expand to file content"
         )
-      // The entity reference may be preserved literally or dropped,
-      // but must not be resolved.
+        // The entity reference may be preserved literally or dropped,
+        // but must not be resolved.
       case Some(other) => fail(s"unexpected parse of XXE payload: $other")
     }
   }
@@ -322,7 +309,8 @@ class BinaryPlistParserSuite extends GoatRodeoFunSuite {
 
 /** ScalaCheck companion for the Bplist-1.9 round-trip property.
   */
-object BplistRoundTripProperties extends Properties("bplist-roundtrip") {
+object BplistRoundTripProperties
+    extends Properties("bplist-roundtrip") {
   property("encode/parse round-trip") = {
     val genString = Gen.oneOf(
       Gen.alphaNumStr,
@@ -340,8 +328,7 @@ object BplistRoundTripProperties extends Properties("bplist-roundtrip") {
           Gen.const(JBool(false): JValue),
           Gen.const(JNull: JValue),
           Gen.listOfN(3, genValue(depth + 1)).map(JArray(_): JValue),
-          Gen
-            .mapOfN(3, Gen.zip(genString, genValue(depth + 1)))
+          Gen.mapOfN(3, Gen.zip(genString, genValue(depth + 1)))
             .map(m => JObject(m.toList): JValue)
         )
     Prop.forAll(genValue(0)) { v =>

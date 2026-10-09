@@ -20,15 +20,16 @@ import scala.util.Try
 
 /** Strategy for iOS app bundles (`.ipa` and unpacked `.app` trees).
   *
-  * An `.ipa` is a ZIP containing `Payload/<App>.app/` with a Mach-O executable,
-  * `Info.plist` (often binary bplist00), and `embedded.mobileprovision` (a
-  * CMS/PKCS#7 SignedData whose payload is a plist of entitlements and whose
-  * certificate chain is the signing chain).
+  * An `.ipa` is a ZIP containing `Payload/<App>.app/` with a Mach-O
+  * executable, `Info.plist` (often binary bplist00), and
+  * `embedded.mobileprovision` (a CMS/PKCS#7 SignedData whose payload is a
+  * plist of entitlements and whose certificate chain is the signing
+  * chain).
   *
   * This strategy:
   *
-  *   - claims `.ipa` containers (path ends `.ipa`, MIME is zip) and, when the
-  *     bundle appears unpacked, the bare bundle members
+  *   - claims `.ipa` containers (path ends `.ipa`, MIME is zip) and, when
+  *     the bundle appears unpacked, the bare bundle members
   *     (`Payload/**/*.app/Info.plist`, `embedded.mobileprovision`);
   *   - parses `Info.plist` (binary or XML) for bundle identity
   *     (CFBundleIdentifier, CFBundleShortVersionString, CFBundleVersion,
@@ -42,11 +43,12 @@ import scala.util.Try
   *     ProvisionedDevices count);
   *   - accumulates the parsed metadata onto the container Item via the
   *     Dotnet/Maven parent-scope pattern: `accumulateInfo` harvests direct
-  *     children during child processing, and `applyAccumulatedAugmentation`
-  *     performs the single `store.write` merge after the children are done.
+  *     children during child processing, and
+  *     `applyAccumulatedAugmentation` performs the single `store.write`
+  *     merge after the children are done.
   *
-  * Selection uses only path/MIME/size (the selection boundary); all content
-  * reads happen in processing.
+  * Selection uses only path/MIME/size (the selection boundary); all
+  * content reads happen in processing.
   */
 object IpaStrategy {
 
@@ -58,8 +60,8 @@ object IpaStrategy {
   /** MIME of a zip container (the massage turns .ipa into this). */
   private[strategies] val zipMime = "application/zip"
 
-  /** Maximum number of certificates accepted from a mobileprovision CMS chain
-    * (chain-bomb DoS guard).
+  /** Maximum number of certificates accepted from a mobileprovision CMS
+    * chain (chain-bomb DoS guard).
     */
   val MaxCertChain: Int = 32
 
@@ -68,30 +70,35 @@ object IpaStrategy {
 
   /** Claim the .ipa containers and bare bundle members.
     *
-    * Selection uses only path/MIME/size. The `.ipa` container must be a zip
-    * (the ArtifactWrapper massage normalizes it). The bare bundle members are
-    * claimed only when they appear inside a `Payload/**/*.app/` path and are
-    * NOT inside a claimed .ipa (containers take precedence).
+    * Selection uses only path/MIME/size. The `.ipa` container must be a
+    * zip (the ArtifactWrapper massage normalizes it). The bare bundle
+    * members are claimed only when they appear inside a
+    * `Payload/**/*.app/` path and are NOT inside a claimed .ipa (containers
+    * take precedence).
     */
   def computeIpaFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     // 1. Claim .ipa containers.
-    val ipaContainers: Vector[ArtifactWrapper] = byUUID.values.filter { a =>
-      a.path().toLowerCase.endsWith(".ipa") &&
-      a.mimeType.contains(zipMime)
-    }.toVector
+    val ipaContainers: Vector[ArtifactWrapper] = byUUID.values
+      .filter { a =>
+        a.path().toLowerCase.endsWith(".ipa") &&
+        a.mimeType.contains(zipMime)
+      }
+      .toVector
 
     val claimedUuids = ipaContainers.map(_.uuid).toSet
 
     // 2. Claim bare bundle members (unpacked .app trees).
     // Only when they are NOT under a claimed .ipa container (the container
     // absorbs its own children during processing).
-    val bareMembers: Vector[ArtifactWrapper] = byUUID.values.filter { a =>
-      !claimedUuids.contains(a.uuid) &&
-      isBundleMemberPath(a.path())
-    }.toVector
+    val bareMembers: Vector[ArtifactWrapper] = byUUID.values
+      .filter { a =>
+        !claimedUuids.contains(a.uuid) &&
+        isBundleMemberPath(a.path())
+      }
+      .toVector
 
     val allUuids = claimedUuids ++ bareMembers.map(_.uuid).toSet
 
@@ -144,11 +151,12 @@ final class IpaMarkers extends ProcessingMarker
 
 /** Processing state for the Ipa strategy.
   *
-  * The accumulated metadata (bundle identity + provisioning) is harvested from
-  * direct children via [[accumulate]] during child processing and merged onto
-  * the container Item in [[applyAccumulatedAugmentation]] after all children
-  * are done (Dotnet/Maven pattern). One mutable accumulator, written by the
-  * single thread processing the container item.
+  * The accumulated metadata (bundle identity + provisioning) is harvested
+  * from direct children via [[accumulate]] during child processing and
+  * merged onto the container Item in
+  * [[applyAccumulatedAugmentation]] after all children are done
+  * (Dotnet/Maven pattern). One mutable accumulator, written by the single
+  * thread processing the container item.
   */
 final case class IpaState(
     var bundleIdentifier: Option[String] = None,
@@ -180,10 +188,10 @@ final case class IpaState(
     this
   }
 
-  /** Identity metadata is surfaced via the accumulation; no per-item purls here
-    * (pURLs are emitted in [[applyAccumulatedAugmentation]] once the bundle
-    * identity is known, matching the Docker pattern where getPurls returns
-    * empty and finalAugmentation emits).
+  /** Identity metadata is surfaced via the accumulation; no per-item purls
+    * here (pURLs are emitted in [[applyAccumulatedAugmentation]] once the
+    * bundle identity is known, matching the Docker pattern where getPurls
+    * returns empty and finalAugmentation emits).
     */
   override def getPurls(
       artifact: ArtifactWrapper,
@@ -218,8 +226,8 @@ final case class IpaState(
   }
 
   /** Generate per-package tag info. Only when the bundle identity has been
-    * accumulated (a real `.ipa` container); bare members with no identity yield
-    * None.
+    * accumulated (a real `.ipa` container); bare members with no identity
+    * yield None.
     */
   override def maybePackageTag(marker: IpaMarkers): Option[PackageTagInfo] =
     (bundleIdentifier, bundleShortVersion) match {
@@ -236,12 +244,13 @@ final case class IpaState(
 
   /** Generate the parent scope for the container's children.
     *
-    * Overrides accumulateInfo so that every DIRECT child (which includes the
-    * `Info.plist` and `embedded.mobileprovision` entries) is offered to
-    * IpaState to harvest metadata — the Dotnet analog. The scope accepts only
-    * children whose `parentId` equals its own item: `ParentScope.passToParent`
-    * also offers every child to the grandparent scope, and without this guard a
-    * nested bundle's children would be accumulated onto the outer item.
+    * Overrides accumulateInfo so that every DIRECT child (which includes
+    * the `Info.plist` and `embedded.mobileprovision` entries) is offered to
+    * IpaState to harvest metadata — the Dotnet analog. The scope accepts
+    * only children whose `parentId` equals its own item:
+    * `ParentScope.passToParent` also offers every child to the grandparent
+    * scope, and without this guard a nested bundle's children would be
+    * accumulated onto the outer item.
     */
   override def generateParentScope(
       artifact: ArtifactWrapper,
@@ -273,14 +282,14 @@ final case class IpaState(
     }
 
   /** Harvest a direct child's content into the accumulation (called via the
-    * container's ParentScope for direct children only — the parentId guard in
-    * the scope prevents nested bundles from clobbering).
+    * container's ParentScope for direct children only — the parentId guard
+    * in the scope prevents nested bundles from clobbering).
     *
     * Children that contribute:
     *   - `<...>.app/Info.plist` → bundle identity;
-    *   - `<...>.app/embedded.mobileprovision` → CMS parse for certs and the
-    *     provisioning plist (TeamIdentifier, AppIDName, ExpirationDate,
-    *     entitlements, ProvisionedDevices).
+    *   - `<...>.app/embedded.mobileprovision` → CMS parse for certs and
+    *     the provisioning plist (TeamIdentifier, AppIDName,
+    *     ExpirationDate, entitlements, ProvisionedDevices).
     */
   private[strategies] def accumulate(artifact: ArtifactWrapper): Unit = {
     val path = artifact.path()
@@ -302,9 +311,7 @@ final case class IpaState(
         bundleName = stringAt(jv, "CFBundleName")
         minimumOS = stringAt(jv, "MinimumOSVersion")
       }
-    } else if (
-      isAppBundleMember && lower.endsWith("embedded.mobileprovision")
-    ) {
+    } else if (isAppBundleMember && lower.endsWith("embedded.mobileprovision")) {
       val bytes = readBounded(artifact)
       parseMobileProvision(bytes)
     }
@@ -335,11 +342,11 @@ final case class IpaState(
     }.getOrElse(Array.emptyByteArray)
   }
 
-  /** Parse a mobileprovision blob: CMS SignedData → certs (bounded) and the
-    * payload plist (entitlements, team, app id, expiration, devices).
+  /** Parse a mobileprovision blob: CMS SignedData → certs (bounded) and
+    * the payload plist (entitlements, team, app id, expiration, devices).
     *
-    * Failure is a value: any parse problem leaves the accumulators empty and
-    * never throws.
+    * Failure is a value: any parse problem leaves the accumulators empty
+    * and never throws.
     */
   private def parseMobileProvision(bytes: Array[Byte]): Unit = {
     if (bytes.isEmpty) return
@@ -348,7 +355,8 @@ final case class IpaState(
       // Certificate chain, bounded (chain-bomb guard). The chain lives in
       // the CMS SignerInfos; getCertificates() returns the cert store.
       val holders: Vector[X509CertificateHolder] =
-        Option(cms.getCertificates()).toVector
+        Option(cms.getCertificates())
+          .toVector
           .flatMap(_.getMatches(null).asScala)
           .collect { case h: X509CertificateHolder => h }
           .take(IpaStrategy.MaxCertChain)
@@ -389,8 +397,8 @@ final case class IpaState(
   }
 
   /** Apply the accumulated metadata onto the container Item via a single
-    * store.write (Dotnet pattern). Also emits the signing certs as certificate
-    * Items with the Certificates metadata shape (one code path:
+    * store.write (Dotnet pattern). Also emits the signing certs as
+    * certificate Items with the Certificates metadata shape (one code path:
     * `Certificates.perCertMetadata`) and the provisional pURL.
     */
   def applyAccumulatedAugmentation(
@@ -409,12 +417,16 @@ final case class IpaState(
         bundleVersion.map(v =>
           ipaAdHoc("BundleVersion") -> TreeSet(StringOrPair(v))
         ),
-        bundleName.map(v => ipaAdHoc("BundleName") -> TreeSet(StringOrPair(v))),
+        bundleName.map(v =>
+          ipaAdHoc("BundleName") -> TreeSet(StringOrPair(v))
+        ),
         minimumOS.map(v => ipaAdHoc("MinimumOS") -> TreeSet(StringOrPair(v))),
         teamIdentifier.map(v =>
           ipaAdHoc("TeamIdentifier") -> TreeSet(StringOrPair(v))
         ),
-        appIDName.map(v => ipaAdHoc("AppIDName") -> TreeSet(StringOrPair(v))),
+        appIDName.map(v =>
+          ipaAdHoc("AppIDName") -> TreeSet(StringOrPair(v))
+        ),
         provisioningExpiration.map(v =>
           ipaAdHoc("ProvisioningExpiration") -> TreeSet(StringOrPair(v))
         ),
@@ -461,8 +473,9 @@ final case class IpaState(
     this
   }
 
-  /** Emit each signing certificate as a certificate Item with the Certificates
-    * metadata shape; each cert is a child (contains) of the .ipa item.
+  /** Emit each signing certificate as a certificate Item with the
+    * Certificates metadata shape; each cert is a child (contains) of the
+    * .ipa item.
     */
   private def emitCertificates(item: Item, store: Storage): Unit = {
     certificates.foreach { cert =>
@@ -474,10 +487,7 @@ final case class IpaState(
         )
         val id = s"gitoid:blob:sha256:$certGitoid"
         val certMeta =
-          Certificates.perCertMetadata(
-            MetadataKeyConstants.adHoc("Certificates"),
-            cert
-          )
+          Certificates.perCertMetadata(MetadataKeyConstants.adHoc("Certificates"), cert)
         val certItem = Item(
           id,
           TreeSet(EdgeType.contains -> item.identifier),
@@ -504,51 +514,49 @@ final case class IpaState(
     }
   }
 
-  /** Emit the provisional pURL `pkg:apple/ios/<bundle-id>@<version>` when the
-    * bundle id is known (owner decision 2026-09-25; provisional until purl-spec
-    * ratifies an app-store type; arch qualifier omitted for now).
+  /** Emit the provisional pURL `pkg:apple/ios/<bundle-id>@<version>` when
+    * the bundle id is known (owner decision 2026-09-25; provisional until
+    * purl-spec ratifies an app-store type; arch qualifier omitted for now).
     */
   private def emitPurl(item: Item, store: Storage): Unit = {
-    bundleIdentifier
-      .flatMap { rawId =>
-        PURLComponentSanitizer.sanitizeGenericIdentifier(rawId).flatMap { id =>
-          val version = bundleShortVersion.flatMap(
-            PURLComponentSanitizer.sanitizeGenericVersion
-          )
-          Try {
-            PURLHelpers
-              .purl(
-                `type` = "apple",
-                name = id,
-                namespace = Some("ios"),
-                version = version
-              )
-              .toCanonical()
-          }.toOption
-        }
-      }
-      .foreach { purl =>
-        store.addPurl(purl)
-        // canonical pURL metadata on the item (Docker pattern)
-        store.write(
-          item.identifier,
-          {
-            case Some(existing) =>
-              Some(
-                existing.enhanceWithMetadata(
-                  extra = TreeMap(
-                    MetadataKeyConstants.CANONICAL_PURL ->
-                      TreeSet(StringOrPair(purl))
-                  ),
-                  filenames = Vector.empty,
-                  mimeTypes = Vector.empty
-                )
-              )
-            case None => Some(item)
-          },
-          _ => "ipa canonical purl"
+    bundleIdentifier.flatMap { rawId =>
+      PURLComponentSanitizer.sanitizeGenericIdentifier(rawId).flatMap { id =>
+        val version = bundleShortVersion.flatMap(
+          PURLComponentSanitizer.sanitizeGenericVersion
         )
+        Try {
+          PURLHelpers
+            .purl(
+              `type` = "apple",
+              name = id,
+              namespace = Some("ios"),
+              version = version
+            )
+            .toCanonical()
+        }.toOption
       }
+    }.foreach { purl =>
+      store.addPurl(purl)
+      // canonical pURL metadata on the item (Docker pattern)
+      store.write(
+        item.identifier,
+        {
+          case Some(existing) =>
+            Some(
+              existing.enhanceWithMetadata(
+                extra = TreeMap(
+                  MetadataKeyConstants.CANONICAL_PURL ->
+                    TreeSet(StringOrPair(purl))
+                ),
+                filenames = Vector.empty,
+                mimeTypes = Vector.empty
+              )
+            )
+          case None => Some(item)
+        },
+        _ => "ipa canonical purl"
+      )
+    }
   }
 
   private def stringAt(jv: JValue, key: String): Option[String] =

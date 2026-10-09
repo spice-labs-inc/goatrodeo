@@ -8,18 +8,18 @@ import scala.collection.mutable
 /** Encodes `org.json4s.JValue` structures into the Apple **binary plist**
   * format (`bplist00`), for test fixtures and golden blobs.
   *
-  * The encoder covers the grammar the parser supports: null, booleans, integers
-  * (1/2/4/8-byte), doubles, ASCII strings (8-bit safe), UTF-16 strings
-  * (non-ASCII), data (as base64 strings), arrays, sets, and dictionaries. Dates
-  * are not encoded (the parser maps them to ISO strings; date tests use
-  * hand-built golden blobs).
+  * The encoder covers the grammar the parser supports: null, booleans,
+  * integers (1/2/4/8-byte), doubles, ASCII strings (8-bit safe), UTF-16
+  * strings (non-ASCII), data (as base64 strings), arrays, sets, and
+  * dictionaries. Dates are not encoded (the parser maps them to ISO
+  * strings; date tests use hand-built golden blobs).
   *
   * ==Determinism==
   * Object-table order is first-encounter, refs and offsets use fixed sizes
-  * (refSize = 2, offsetSize = 4), so encoding the same JValue twice produces
-  * identical bytes — required by the round-trip property tests and golden
-  * comparisons. Fixture corpora are small (well under 65535 objects and 4 GiB),
-  * so the fixed sizing is always sufficient.
+  * (refSize = 2, offsetSize = 4), so encoding the same JValue twice
+  * produces identical bytes — required by the round-trip property tests
+  * and golden comparisons. Fixture corpora are small (well under 65535
+  * objects and 4 GiB), so the fixed sizing is always sufficient.
   */
 object BplistEncoder {
 
@@ -81,8 +81,8 @@ object BplistEncoder {
 
   /** Append an object's encoded bytes to the table; returns its index.
     * Containers are appended AFTER their children (children first), so the
-    * offset table is computed over the final order — order does not matter to
-    * the parser (the offsets point at each object's bytes).
+    * offset table is computed over the final order — order does not matter
+    * to the parser (the offsets point at each object's bytes).
     */
   private def addObject(
       value: JValue,
