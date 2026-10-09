@@ -125,7 +125,8 @@ jobs:
 
       - name: Set project version from tag
         run: |
-          mvn -B --file maven/pom.xml \
+          cd maven
+          ./mvnw -B \
               clean versions:set -DnewVersion="${{ needs.publish-jars.outputs.version }}" -DgenerateBackupPoms=false
 
       - name: Create target dir
@@ -172,10 +173,15 @@ jobs:
             {print}
           ' "$FAKE_POM" > "${FAKE_POM}.tmp" && mv "${FAKE_POM}.tmp" "$FAKE_POM"
 
+      # Maven comes from the wrapper (maven/.mvn/wrapper), pinned to 3.9.15, not from the runner
+      # image. Maven 3.10 (ubuntu-24.04 since 2026-10-04) writes local-repository bookkeeping
+      # (maven-metadata-local.xml, _remote.repositories) into central-publishing's staging
+      # directory, the plugin bundles it, and Central rejects the deployment: "Bundle has
+      # content that does NOT have a .pom file". spice-probe lost three versions to it.
       - name: Publish to Maven Central
         run: |
           cd maven
-          mvn --batch-mode deploy \
+          ./mvnw --batch-mode deploy \
             -Dcentral.autoPublish=${{ needs.publish-jars.outputs.auto-publish }}
         env:
           GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}
