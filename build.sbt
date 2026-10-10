@@ -262,7 +262,7 @@ lazy val root = project
 
     // Spice Labs "readers" — current Maven Central releases (spec §1).
     libraryDependencies += "io.spicelabs" % "baharat" % "0.2.1",
-    libraryDependencies += "io.spicelabs" % "annatto" % "0.4.0",
+    libraryDependencies += "io.spicelabs" % "annatto" % "0.5.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.5.0",
     // Direct pins (spec §1):
     libraryDependencies += "org.eclipse.jgit" % "org.eclipse.jgit" % "7.8.0.202609011348-r",

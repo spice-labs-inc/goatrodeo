@@ -14,13 +14,14 @@ It is simpler in the short term to let a default Tika installation do the heavy 
 
 ## Post-Processing Refinements
 
-At present there are two post-processing operations that refine MIME types:
+At present there are four post-processing operations that refine MIME types:
 
 | Original | Refined |
 |----------|---------|
 | `text/plain` | `application/json` (when content is valid JSON) |
 | `application/x-msdownload; format=pe32` | `application/x-msdownload; format=pe32-dotnet` (for .NET assemblies) |
 | `application/x-itunes-ipa` (Tika) | `application/zip` (`.ipa` files whose 4-byte magic is a ZIP local-file header `PK\x03\x04` or the empty-ZIP EOCD `PK\x05\x06`) |
+| `text/plain` | `text/x-lua` (`.rockspec` files, so Annatto reads LuaRocks rockspecs) |
 
 **Verified by:** `IpaDetectionSuite.Ipa-0.1` (real ZIP `.ipa` massaged and
 walked; `Payload/…/Info.plist` children appear), `Ipa-0.2` (non-zip `.ipa`

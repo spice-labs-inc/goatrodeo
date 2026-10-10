@@ -349,6 +349,9 @@ object ArtifactWrapper {
       } else false
     }.toOption match {
       case Some(true) => "application/json"
+      // Tika has no glob for LuaRocks rockspecs, so they arrive as text/plain;
+      // Annatto only accepts them as text/x-lua
+      case _ if isRockspec(fileName, detected) => "text/x-lua"
       case _ if isNupkg(fileName, detected.toString(), rawData) == Some(true) =>
         "application/zip"
       case _ if isIpa(fileName, rawData) == Some(true) =>
@@ -356,6 +359,17 @@ object ArtifactWrapper {
       case _ => detected.toString()
     }
   }
+
+  /** Is the file a LuaRocks `.rockspec` that Tika detected as plain text?
+    *
+    * @param fileName
+    *   the logical file name
+    * @param detected
+    *   the MIME type Tika detected
+    */
+  private def isRockspec(fileName: String, detected: MediaType): Boolean =
+    detected == MediaType.TEXT_PLAIN &&
+      fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".rockspec")
 
   /** Does the file look like an iOS `.ipa`? An `.ipa` is a ZIP archive
     * whose name ends in `.ipa` (Tika reports it as
