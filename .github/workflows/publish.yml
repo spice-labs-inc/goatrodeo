@@ -84,7 +84,6 @@ jobs:
           spice_pass: "${{ secrets.SPICE_PASS }}"
           input: "${{ github.workspace }}"
           subject: "${{ github.event.repository.name }}"
-          cli_image_tag: "1.6.3"
 
   publish-to-central:
     name: Re-publish Goatrodeo to Maven Central
@@ -257,7 +256,6 @@ jobs:
           spice_pass: "${{ secrets.SPICE_PASS }}"
           input: "${{ github.workspace }}"
           subject: "${{ github.event.repository.name }}"
-          cli_image_tag: "1.6.3"
 
   # Its own job rather than a step inside publish-jars: failing there would block
   # publish-to-central and docker-image, and the point is for the Central
