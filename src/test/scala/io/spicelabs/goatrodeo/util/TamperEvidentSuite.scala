@@ -34,6 +34,8 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.util.Comparator
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
@@ -289,7 +291,7 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   ) {
     val dir = tempDir()
     try
-      TamperEvidentLog.sync.synchronized {
+      TamperEvidentLog.exclusively {
         val chainHex =
           "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         TamperEvidentLog.start(
@@ -334,7 +336,7 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   test("T-08 .grc info omits log_chain_head when tamper-evidence is off") {
     val dir = tempDir()
     try
-      TamperEvidentLog.sync.synchronized {
+      TamperEvidentLog.exclusively {
         TamperEvidentLog.start(
           "99999999-8888-7777-6666-555555555555",
           () => None
@@ -364,7 +366,7 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   test("T-09 checksum file shape") {
     val dir = tempDir()
     try
-      TamperEvidentLog.sync.synchronized {
+      TamperEvidentLog.exclusively {
         TamperEvidentLog.start(
           "abcd1234-0000-0000-0000-000000000000",
           () =>
@@ -412,7 +414,7 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   // THEORY: cleanup must always run at the end of a run so a tamper-evident
   // appender never leaks into subsequent work in the same JVM.
   test("T-10 reset invokes the run cleanup callback") {
-    TamperEvidentLog.sync.synchronized {
+    TamperEvidentLog.exclusively {
       val called = new AtomicBoolean(false)
       TamperEvidentLog.start("corr-id", () => None, () => called.set(true))
       TamperEvidentLog.addGrc("a.grc", "beef")
@@ -420,6 +422,42 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
       assert(called.get())
       assertEquals(TamperEvidentLog.correlationId, "")
       assertEquals(TamperEvidentLog.grcs, Vector())
+    }
+  }
+
+  // T-11 — waiting for the run lock must not pin virtual-thread carriers.
+  // Allspice starts one run per artifact on virtual threads. With a monitor here,
+  // on JDK 21 to 23 the holder (blocked inside it) and every waiter (blocked
+  // entering it) each pinned a carrier; with as many runs as carriers, the
+  // holder's own virtual threads (the MIME pass) could never be scheduled and the
+  // runs deadlocked. THEORY: with more waiters than carriers, an unrelated virtual
+  // thread still runs while the lock is held.
+  test(
+    "T-11 waiting for the run lock leaves carriers for other virtual threads"
+  ) {
+    val held = new CountDownLatch(1)
+    val release = new CountDownLatch(1)
+    val probeRan = new CountDownLatch(1)
+    val holder = Thread.ofVirtual().start { () =>
+      TamperEvidentLog.exclusively {
+        held.countDown()
+        release.await()
+      }
+    }
+    assert(held.await(10, TimeUnit.SECONDS), "the holder never took the lock")
+    val waiters = (1 to Runtime.getRuntime.availableProcessors * 2).map { _ =>
+      Thread.ofVirtual().start(() => TamperEvidentLog.exclusively(()))
+    }
+    try {
+      Thread.sleep(200) // let every waiter reach the lock
+      Thread.ofVirtual().start(() => probeRan.countDown())
+      assert(
+        probeRan.await(10, TimeUnit.SECONDS),
+        "a virtual thread could not run while others waited for the run lock"
+      )
+    } finally {
+      release.countDown()
+      (holder +: waiters).foreach(_.join(10000))
     }
   }
 }
