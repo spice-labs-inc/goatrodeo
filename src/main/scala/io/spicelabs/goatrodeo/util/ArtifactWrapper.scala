@@ -195,6 +195,13 @@ object ArtifactWrapper {
 
   /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
+
+  /** The largest item kept in memory when items should mostly go to disk: with
+    * a RAM-disk `tempDir`, and for the files of a disk image (see
+    * `FileWalker.asSaffronFilesystem`).
+    */
+  val smallInMemorySize: Long = 64L * 1024
+
   private val tika = new TikaConfig()
   // avoid the WARN Contention waiting for a SAXParser. Consider increasing the XMLReaderUtils.POOL_SIZE warning
   XMLReaderUtils.setPoolSize(200)
@@ -464,6 +471,9 @@ object ArtifactWrapper {
     *   the InputStream of the data
     * @param tempPath
     *   the temporary directory to put a file in
+    * @param inMemoryLimit
+    *   the largest item kept in memory rather than written to `tempPath`; by
+    *   default 64KiB with a `tempDir` and [[maxInMemorySize]] without
     *
     * @return
     *   the built item
@@ -474,16 +484,19 @@ object ArtifactWrapper {
       data: InputStream,
       tempDir: Option[File],
       tempPath: Path,
-      mimeHint: Set[String] = Set()
+      mimeHint: Set[String] = Set(),
+      inMemoryLimit: Option[Long] = None
   ): Try[ArtifactWrapper] = Try {
     val name = sanitizeName(fixPath(nominalPath))
     val forceTempFile = requireTempFile(name)
 
     // a defined temp dir implies a RAM disk... copy everything but the smallest items
+    val limit = inMemoryLimit.getOrElse(
+      if (tempDir.isDefined) smallInMemorySize else maxInMemorySize
+    )
     if (
       size != -1 && // if the size is unknown, create a temp file... we don't know the size
-      !forceTempFile && size <= (if (tempDir.isDefined) (64L * 1024L)
-                                 else maxInMemorySize)
+      !forceTempFile && size <= limit
     ) {
       val bos = ByteArrayOutputStream()
       Helpers.copy(data, bos)

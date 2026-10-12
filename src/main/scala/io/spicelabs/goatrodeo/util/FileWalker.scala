@@ -485,13 +485,18 @@ object FileWalker {
                 .flatMap(fileSystemEntry => {
                   fileSystemEntry match {
                     case regular: RegularFile =>
+                      // Every file of the image is wrapped before any is
+                      // processed, so keep only the small ones in memory: at
+                      // the 32MiB default a Linux root filesystem (5GiB of
+                      // such files in linuxmint-21) exhausts the heap.
                       ArtifactWrapper
                         .newWrapper(
                           regular.path(),
                           regular.size(),
                           regular.openStream(),
                           None,
-                          tempPath
+                          tempPath,
+                          inMemoryLimit = Some(ArtifactWrapper.smallInMemorySize)
                         )
                         .toOption
 
