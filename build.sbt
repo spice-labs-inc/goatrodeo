@@ -329,55 +329,69 @@ Test / testOptions += Tests.Setup(() => {
   log.info("Downloading and caching test data…")
 
   try {
-    val toDownload: Seq[(String, String, Option[String])] = Vector(
-      ("docker_tests", "bigtent_2025_03_22_docker.tar", None),
-      ("docker_tests", "grinder_bt_pg_docker.tar", None),
-      ("iso_tests", "iso_of_archives.iso", None),
-      ("iso_tests", "simple.iso", None),
-      ("", "sample-tomcat-6.war", None),
-      ("", "EnterpriseHelloWorld.ear", None),
-      ("", "azure-cosmos-spark_3-3_2-12-4.18.1.jar", None),
-      ("apk_tests", "bitbar-sample-app.apk", None),
-      ("gem_tests", "java-properties-0.3.0.gem", None),
-      ("deb_tests", "hello_2.10-3_arm64.deb", None),
-      (
-        "adg_tests",
-        "repo_ea.tgz",
-        Some(
-          "tar -xzvf test_data/download/adg_tests/repo_ea.tgz -C test_data/download/adg_tests/"
-        )
-      )
+    // (directory, item, archive to extract into the directory once downloaded)
+    val toDownload: Seq[(String, String, Boolean)] = Vector(
+      ("docker_tests", "bigtent_2025_03_22_docker.tar", false),
+      ("docker_tests", "grinder_bt_pg_docker.tar", false),
+      ("iso_tests", "iso_of_archives.iso", false),
+      ("iso_tests", "simple.iso", false),
+      ("", "sample-tomcat-6.war", false),
+      ("", "EnterpriseHelloWorld.ear", false),
+      ("", "azure-cosmos-spark_3-3_2-12-4.18.1.jar", false),
+      ("apk_tests", "bitbar-sample-app.apk", false),
+      ("gem_tests", "java-properties-0.3.0.gem", false),
+      ("deb_tests", "hello_2.10-3_arm64.deb", false),
+      ("adg_tests", "repo_ea.tgz", true)
     )
 
     for {
-      (dir, item, cmd) <- toDownload
+      (dir, item, extract) <- toDownload
     } {
       val f = file(f"./test_data/download/${dir}/${item}")
       f.getParentFile().mkdirs()
       if (!f.exists()) {
         log.info(f"Downloading ${item}")
+        // Download beside the target and rename once complete: large items
+        // (repo_ea.tgz is 5GB) drop mid-transfer, and a truncated file at the
+        // target would be taken as cached. Each attempt resumes (-C -) from
+        // what the last one left, and curl fails on a short transfer.
+        val part = file(f.getPath + ".part")
         var loopCnt = 0
         var keepOn = true
 
         while (keepOn) {
-          val cmdResult =
-            url(f"https://public-test-data.spice-labs.dev/${item}") #> f ! log
+          val cmdResult = Seq(
+            "curl", "-fsSL", "-C", "-", "--retry", "5", "--connect-timeout", "30",
+            "-o", part.getPath, f"https://public-test-data.spice-labs.dev/${item}"
+          ) ! log
 
           if (cmdResult == 0) {
             keepOn = false
           } else {
             loopCnt += 1
             if (loopCnt >= 10) {
+              part.delete()
               throw new Exception(
                 f"Failed to download ${item} after ${loopCnt} tries. Aborting"
               )
             }
+            log.info(f"Resuming ${item} (attempt ${loopCnt + 1})")
           }
         }
-        cmd match {
-          case None      =>
-          case Some(cmd) => cmd ! log
+        IO.move(part, f)
+      }
+      // Extracted once per download; the stamp marks a complete extraction,
+      // so one that failed part-way is redone rather than left half-done.
+      val stamp = file(f.getPath + ".extracted")
+      if (extract && !stamp.exists()) {
+        log.info(f"Extracting ${item}")
+        if ((Seq("tar", "-xzf", f.getPath, "-C", f.getParent) ! log) != 0) {
+          f.delete()
+          throw new Exception(
+            f"Failed to extract ${item}; removed it so the next run downloads it again"
+          )
         }
+        IO.touch(stamp)
       }
     }
 
