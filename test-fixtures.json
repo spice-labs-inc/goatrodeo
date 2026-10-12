@@ -98,7 +98,7 @@
   ],
   "downloads": [
     {
-      "url": "https://public-test-data.spice-labs.dev/adg_tests/repo_ea.tgz",
+      "url": "https://public-test-data.spice-labs.dev/repo_ea.tgz",
       "dest": "test_data/download/adg_tests/repo_ea.tgz",
       "tier": 2,
       "extract": {
