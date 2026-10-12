@@ -39,6 +39,7 @@ import java.nio.charset.Charset
 import java.nio.file.Files
 import java.util.Map as JMap
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.static
 import scala.jdk.CollectionConverters.*
@@ -48,6 +49,14 @@ import scala.util.Try
 
 /** Marker class for the main entry point. */
 class Howdy
+
+/** Thrown by [[Howdy.run]] (and so [[GoatRodeoBuilder.run]]) when the build
+  * died part-way — out of memory, a full temp filesystem, an illegal state —
+  * so its output is missing or incomplete. Without it a caller could not tell
+  * such a run from a successful one.
+  */
+final class GoatRodeoRunFailed(message: String)
+    extends RuntimeException(message)
 
 /** The main entry point for the Goat Rodeo CLI application.
   *
@@ -87,7 +96,12 @@ object Howdy {
         // through GoatRodeoBuilder, the host owns logging and chose its levels
         // deliberately, so nothing on that path touches them.
         applyLogging(config)
-        run(using config)
+        try run(using config)
+        catch {
+          case e: GoatRodeoRunFailed =>
+            logger.error(e.getMessage())
+            Helpers.exitWrapper(1)
+        }
       case _ => Helpers.bailFail()
     }
   }
@@ -281,6 +295,7 @@ object Howdy {
         )
 
     val failedContainers = new AtomicInteger(0)
+    val succeeded = new AtomicBoolean(true)
     Builder.buildDB(
       dest = dest,
       tag = (config.tag, config.tagJson) match {
@@ -292,7 +307,7 @@ object Howdy {
       ignorePathSet = ignorePathSet,
       excludeFileRegex = excludePatterns,
       finishedFile = onFileFinish,
-      done = onRunFinish,
+      done = good => { succeeded.set(good); onRunFinish(good) },
       preWriteDB = preWriteDB,
       failedContainers = failedContainers
     )
@@ -307,6 +322,15 @@ object Howdy {
         f"${containerFailures}%,d container(s) failed to process; their contents are missing from this run's outputs"
       )
 
+    failUnless(succeeded.get())
+  }
+
+  /** Throw [[GoatRodeoRunFailed]] unless the build completed. */
+  private[goatrodeo] def failUnless(succeeded: Boolean): Unit = {
+    if (!succeeded)
+      throw GoatRodeoRunFailed(
+        "The build did not complete (see the errors above); its output is missing or incomplete"
+      )
   }
 
   /** Initialize and start the component system.
