@@ -20,6 +20,7 @@ import org.json4s.native.JsonMethods.*
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.ReentrantLock
 
 /** Run-scoped holder for the tamper-evident logging state.
   *
@@ -43,11 +44,28 @@ object TamperEvidentLog {
   private val cleanupRef: AtomicReference[() => Unit] =
     new AtomicReference(() => ())
 
-  /** Lock serializing run-state mutations against [[start]]/[[reset]]. Held by
-    * tests that exercise the global holder so a concurrent run's [[reset]]
-    * cannot clear the state under them while they are mid-assertion.
+  /** Lock serializing run-state mutations against [[start]]/[[reset]]. A run
+    * holds it from start to reset; tests that exercise the global holder hold
+    * it so a concurrent run's [[reset]] cannot clear the state under them while
+    * they are mid-assertion.
+    *
+    * A `ReentrantLock` rather than a monitor, because runs are often started on
+    * virtual threads (Allspice runs one per artifact). On JDK 21 to 23 a
+    * virtual thread blocked entering a monitor, or sleeping while it holds one,
+    * pins its carrier; enough concurrent runs pin every carrier, and the run
+    * holding the lock then waits forever for virtual threads of its own that
+    * cannot be scheduled. Waiting on, or sleeping under, a `ReentrantLock`
+    * releases the carrier. It must be reentrant: a run holds it while [[start]]
+    * and [[reset]] take it again.
     */
-  val sync = new Object()
+  private val lock = new ReentrantLock()
+
+  /** Run `body` while holding the run-state lock. */
+  def exclusively[T](body: => T): T = {
+    lock.lock()
+    try body
+    finally lock.unlock()
+  }
 
   /** Initialize the run state. Call once at the start of a Goat Rodeo run.
     *
@@ -63,7 +81,7 @@ object TamperEvidentLog {
       correlationId: String,
       headProvider: () => Option[String],
       cleanup: () => Unit = () => ()
-  ): Unit = sync.synchronized {
+  ): Unit = exclusively {
     corrId = correlationId
     headRef.set(headProvider)
     grcRef.set(Vector())
@@ -75,7 +93,7 @@ object TamperEvidentLog {
     * not leak into subsequent work in the same JVM (e.g. other test suites or a
     * library consumer running multiple builds).
     */
-  def reset(): Unit = sync.synchronized {
+  def reset(): Unit = exclusively {
     val c = cleanupRef.getAndSet(() => ())
     try c()
     catch {
