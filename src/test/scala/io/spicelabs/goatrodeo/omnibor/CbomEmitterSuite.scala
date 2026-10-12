@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationParser
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.everit.json.schema.Schema
 import org.everit.json.schema.ValidationException
 import org.everit.json.schema.loader.SchemaClient
@@ -1527,24 +1528,30 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       Files.copy(certSource.toPath(), certDest.toPath())
 
       var finished = false
-      Builder.buildDB(
-        dest = outputDir,
-        tag = None,
-        fileListers = Vector((inputDir, () => Helpers.findFiles(inputDir))),
-        ignorePathSet = Set(),
-        excludeFileRegex = Vector(),
-        finishedFile = _ => (),
-        done = b => { finished = b; () },
-        preWriteDB = Vector()
-      )(using
-        Configuration(
-          threads = 1,
-          blockList = None,
-          maxRecords = 10000,
-          tempDir = None,
-          fsFilePaths = false
+      // buildDB writes a tamper-evident checksum (.json) into its output when a
+      // run's correlation id is set, and that id is process-wide: hold the run
+      // lock, as Howdy.run does, so a run in a suite executing in parallel
+      // cannot leave its checksum here.
+      TamperEvidentLog.exclusively {
+        Builder.buildDB(
+          dest = outputDir,
+          tag = None,
+          fileListers = Vector((inputDir, () => Helpers.findFiles(inputDir))),
+          ignorePathSet = Set(),
+          excludeFileRegex = Vector(),
+          finishedFile = _ => (),
+          done = b => { finished = b; () },
+          preWriteDB = Vector()
+        )(using
+          Configuration(
+            threads = 1,
+            blockList = None,
+            maxRecords = 10000,
+            tempDir = None,
+            fsFilePaths = false
+          )
         )
-      )
+      }
       assert(finished)
 
       val jsonFiles =
