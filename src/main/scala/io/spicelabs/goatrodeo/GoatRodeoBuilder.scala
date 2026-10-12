@@ -489,6 +489,10 @@ class GoatRodeoBuilder {
   }
 
   /** Execute the Goat Rodeo build with the current configuration.
+    *
+    * @throws GoatRodeoRunFailed
+    *   if the build died part-way (e.g. out of memory), so its output is
+    *   missing or incomplete
     */
   def run(): Unit = {
 
