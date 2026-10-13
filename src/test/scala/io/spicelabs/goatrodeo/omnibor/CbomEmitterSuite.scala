@@ -1532,7 +1532,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       // run's correlation id is set, and that id is process-wide: hold the run
       // lock, as Howdy.run does, so a run in a suite executing in parallel
       // cannot leave its checksum here.
-      TamperEvidentLog.exclusively {
+      TamperEvidentLog.sync.synchronized {
         Builder.buildDB(
           dest = outputDir,
           tag = None,
