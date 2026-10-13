@@ -145,7 +145,7 @@ object Howdy {
     // chain-head state) is process-global, and no other run or test may mutate
     // it while this run's CBOMs and checksum are being written. Concurrent
     // runs are serialized, which is fine — Goat Rodeo is one run per JVM.
-    TamperEvidentLog.exclusively {
+    TamperEvidentLog.sync.synchronized {
       setupTamperEvidentLogging
       try {
         runImpl
