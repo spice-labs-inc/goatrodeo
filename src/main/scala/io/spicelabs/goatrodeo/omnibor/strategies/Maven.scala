@@ -334,17 +334,16 @@ case class MavenState(
     val embArtifactId = embeddedPom.flatMap(_.artifactId).filter(_.nonEmpty)
     val embVersion = embeddedPom.flatMap(_.version).filter(_.nonEmpty)
 
+    // Manifest contributes individual fields without a gate — even when
+    // it has no artifactId headers, its groupId (Implementation-Vendor-Id)
+    // and version (Implementation-Version) are still valid.
+    val (manGroupId, manArtifactId, manVersion) =
+      resolveGroupIdArtifactIdVersionFromManifest(manifest)
+
     val (fileGroupId, fileArtifactId, fileVersion) =
       extractIdentityFromFilename(artifact.filenameWithNoPath).getOrElse(
         (None, None, None)
       )
-
-    // Manifest contributes individual fields without a gate — even when
-    // it has no artifactId headers, its groupId (Implementation-Vendor-Id)
-    // and version (Implementation-Version) are still valid. The filename's
-    // artifactId tells it how to read dotted names like Bundle-SymbolicName.
-    val (manGroupId, manArtifactId, manVersion) =
-      resolveGroupIdArtifactIdVersionFromManifest(manifest, fileArtifactId)
 
     // Per-field priority:
     // groupId:    external POM > pom.properties > embedded pom.xml > manifest > filename
@@ -387,50 +386,25 @@ case class MavenState(
     (finalGroupId, sanitizedArtifactId, sanitizedVersion)
   }
 
-  /** Derive a groupId from a dotted manifest header value.
+  /** Derive a groupId from a package-path-style manifest header value.
     *
-    * Many JAR manifests store Java package paths or module names in headers
-    * like Bundle-SymbolicName, Automatic-Module-Name, Extension-Name, etc.
-    * These are often `groupId.artifactId` (e.g.
-    * `io.projectreactor.netty.reactor-netty-core`), but just as often the name
-    * is the groupId itself (e.g. `org.objenesis` for `objenesis`, or
-    * `io.perfmark` for `perfmark-api`). The filename's artifactId tells the two
-    * apart:
-    *   - the name ends with `.artifactId` and at least two segments come before
-    *     it → those segments
-    *   - the last segment is the artifactId, the artifactId without `-`, or the
-    *     artifactId's first `-` token → the whole name
-    *   - otherwise → all segments except the last
+    * Many JAR manifests store Java package paths in headers like
+    * Bundle-SymbolicName, Extension-Name, Implementation-Title, etc. These
+    * often follow the convention `groupId.artifactId` (e.g.
+    * `org.apache.commons.lang`), so the groupId can be derived by taking all
+    * segments except the last.
     *
     * Handles:
     *   - `org.apache.commons.codec.*` → `org.apache.commons` (strip `.*`)
     *   - `org.apache.commons.lang` → `org.apache.commons`
-    *   - `org.objenesis` with artifactId `objenesis` → `org.objenesis`
     *   - `collections-generic` → `None` (no dots, can't derive groupId)
     *   - `.*` → `None` (only wildcard, nothing useful)
     */
-  private def groupIdFromName(
-      value: String,
-      artifactId: Option[String]
-  ): Option[String] = {
-    val cleaned = value.split(";")(0).trim.stripSuffix(".*").trim
+  private def groupIdFromPackagePath(value: String): Option[String] = {
+    val cleaned = value.stripSuffix(".*").trim
     val parts = cleaned.split("\\.")
     if (parts.length > 1) {
-      // `<groupId>.<artifactId>`, unless that would leave a one-segment
-      // groupId: maven-bundle-plugin names the bundle after the groupId alone
-      // when the artifactId equals its last segment, so
-      // `org.objenesis:objenesis` has the symbolic name `org.objenesis`, not
-      // a groupId of `org`.
-      val withoutArtifactId = artifactId
-        .filter(a => cleaned.endsWith("." + a))
-        .map(a => cleaned.stripSuffix("." + a))
-        .filter(_.contains('.'))
-      val nameIsGroup = artifactId.exists { a =>
-        Set(a, a.replace("-", ""), a.split('-').head).contains(parts.last)
-      }
-      val groupId = withoutArtifactId.getOrElse {
-        if (nameIsGroup) cleaned else parts.init.mkString(".")
-      }
+      val groupId = parts.init.mkString(".")
       if (groupId.nonEmpty) Some(groupId) else None
     } else None
   }
@@ -444,22 +418,18 @@ case class MavenState(
     * with only Implementation-Vendor-Id and Implementation-Version).
     *
     * groupId is resolved from multiple manifest headers in priority order:
-    *   1. Implementation-Vendor-Id (most specific, Maven-native) 2. Spring's
-    *      own jars, looked up in `KnownMavenGroups` 3. Bundle-SymbolicName
-    *      (OSGi, see `groupIdFromName`) 4. Automatic-Module-Name (Java module)
-    *      5. Extension-Name (Java extension) 6. Implementation-Title (if it
-    *      looks like a package path) 7. Package (Java package)
-    *
-    * version prefers Implementation-Version over Bundle-Version, because OSGi
-    * versions add qualifiers and padding (`1.0.27.RELEASE` for `1.0.27`,
-    * `3.2.0` for `3.2`) that the Maven version doesn't have.
+    *   1. Implementation-Vendor-Id (most specific, Maven-native) 2.
+    *      Bundle-SymbolicName (OSGi, derive parent path) 3.
+    *      Automatic-Module-Name (Java module, derive parent path) 4.
+    *      Extension-Name (Java extension, derive parent path) 5.
+    *      Implementation-Title (if it looks like a package path) 6. Package
+    *      (Java package, derive parent path)
     *
     * All empty-string values are filtered to None so they don't block the
     * orElse chain.
     */
   private def resolveGroupIdArtifactIdVersionFromManifest(
-      manifest: TreeMap[String, TreeSet[StringOrPair]],
-      fileArtifactId: Option[String]
+      manifest: TreeMap[String, TreeSet[StringOrPair]]
   ): (Option[String], Option[String], Option[String]) = {
     // Helper: read a manifest header value, filtering empty strings.
     // Java's Manifest parser stores "Key: " (trailing space, no value) as "",
@@ -497,36 +467,25 @@ case class MavenState(
       .orElse(bundleNameOpt)
       .orElse(extNameOpt)
 
-    // Spring's jars have no Implementation-Vendor-Id, and their module names
-    // (`spring.boot`, `spring.beans`) don't contain the groupId. Only trust
-    // the Spring lookup when the manifest itself says the jar is Spring's.
-    val springGroupIdOpt = fileArtifactId
-      .filter { a =>
-        autoModuleOpt.exists(_.startsWith("spring.")) ||
-        (a.startsWith("spring-") && implTitleOpt.contains(a))
-      }
-      .flatMap(KnownMavenGroups.springGroupId)
-
     // groupId priority chain within manifest:
     //   1. Implementation-Vendor-Id (direct, Maven-native)
-    //   2. Spring lookup (see above)
-    //   3. Bundle-SymbolicName (see groupIdFromName)
-    //   4. Automatic-Module-Name
-    //   5. Extension-Name (strip .* wildcard)
-    //   6. Implementation-Title (if it has dots)
-    //   7. Package (strip .* wildcard)
-    def fromName(value: Option[String]): Option[String] =
-      value.flatMap(groupIdFromName(_, fileArtifactId))
-
+    //   2. Bundle-SymbolicName (derive parent path, e.g. org.apache.commons.lang → org.apache.commons)
+    //   3. Automatic-Module-Name (derive parent path)
+    //   4. Extension-Name (derive parent path, strip .* wildcard)
+    //   5. Implementation-Title (derive parent path if it has dots)
+    //   6. Package (derive parent path, strip .* wildcard)
     val groupIdOpt = implVendorOpt
-      .orElse(springGroupIdOpt)
-      .orElse(fromName(bundleSymOpt))
-      .orElse(fromName(autoModuleOpt))
-      .orElse(fromName(extNameOpt))
-      .orElse(fromName(implTitleOpt))
-      .orElse(fromName(packageOpt))
+      .orElse {
+        bundleSymOpt
+          .map(_.split(";")(0).trim)
+          .flatMap(groupIdFromPackagePath)
+      }
+      .orElse(autoModuleOpt.flatMap(groupIdFromPackagePath))
+      .orElse(extNameOpt.flatMap(groupIdFromPackagePath))
+      .orElse(implTitleOpt.flatMap(groupIdFromPackagePath))
+      .orElse(packageOpt.flatMap(groupIdFromPackagePath))
 
-    val versionOpt = implVerOpt.orElse(bundleVerOpt).orElse(specVerOpt)
+    val versionOpt = bundleVerOpt.orElse(implVerOpt).orElse(specVerOpt)
 
     (
       groupIdOpt.flatMap(PURLComponentSanitizer.sanitizeMavenGroupId),
