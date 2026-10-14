@@ -261,7 +261,7 @@ lazy val root = project
     libraryDependencies += "com.github.dwickern" %% "scala-nameof" % "5.0.0" % "provided",
 
     // Spice Labs "readers" — current Maven Central releases (spec §1).
-    libraryDependencies += "io.spicelabs" % "baharat" % "0.2.1",
+    libraryDependencies += "io.spicelabs" % "baharat" % "0.2.2",
     libraryDependencies += "io.spicelabs" % "annatto" % "0.5.0",
     libraryDependencies += "io.spicelabs" % "saffron" % "0.6.0",
     // Direct pins (spec §1):
