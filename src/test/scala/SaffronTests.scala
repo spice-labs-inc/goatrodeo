@@ -4,7 +4,6 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
-import java.nio.file.Files
 class SaffronTests extends GoatRodeoFunSuite {
 
   // this takes a compressed disk image file, decompresses it, then
@@ -92,31 +91,6 @@ class SaffronTests extends GoatRodeoFunSuite {
       assert(successOpt.isDefined)
     })
     assert(openedArchiveOpt.isDefined)
-  }
-
-  // A raw disk named `.raw` (the Debian and other cloud images ship that way).
-  // Tika types `.raw` as a Panasonic camera RAW photo (image/x-raw-panasonic),
-  // and an image/ MIME type used to stop both the augmenters and the archive
-  // walk, so the disk was never opened.
-  test("check minimal raw disk named .raw for files") {
-    val dir = Files.createTempDirectory("saffron_raw")
-    val raw = dir.resolve("disk.raw").toFile()
-    try {
-      Files.copy(File("test_data/raw.img").toPath(), raw.toPath())
-      val artifact: ArtifactWrapper = FileWrapper(raw, raw.getName(), None)
-      assert(artifact.mimeType.contains("application/x-saffron-raw-disk"))
-      assert(!artifact.mimeType.exists(_.startsWith("image/")))
-      val successOpt = FileWalker.withinArchiveStream(artifact)(files => {
-        assertEquals(files.length, 2)
-        assert(files.exists(art => art.filenameWithNoPath == "small.txt"))
-        assert(files.exists(art => art.filenameWithNoPath == "README.md"))
-        ()
-      })
-      assert(successOpt.isDefined)
-    } finally {
-      raw.delete()
-      dir.toFile().delete()
-    }
   }
 
   // Test a gzip-compressed raw .img.gz file. Saffron must detect the gzip

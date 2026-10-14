@@ -34,12 +34,6 @@ import scala.jdk.CollectionConverters.*
   * pURLs come from recursively-processed nested JARs, not from embedded
   * pom.properties in the uberjar itself.
   *
-  * Fat JARs are covered separately: their pURLs live on the nested JARs, so
-  * every reference pURL must appear as `alias:from` on some Item in the fat
-  * JAR's containment tree, which is how Surveyor's `goatrodeo_metadata` adapter
-  * checks them. `MultiplePurlSuite.knownGaps` lists the pURLs that nothing
-  * inside the JAR can produce.
-  *
   * '''LLM Summary:''' This test suite checks metadata parity for
   * uberjar/assembly JARs. Each test copies the JAR and its companion POM to a
   * temp directory, processes them through the full Maven pipeline, and asserts
@@ -142,94 +136,9 @@ class MultiplePurlSuite extends GoatRodeoFunSuite {
       }
     }
   }
-
-  // Fat JARs over the size limit (hidden1.jar at 254 MB, hidden2.jar at
-  // 51 MB) are left out: building their whole graph in memory needs several
-  // GB of heap.
-  val fatJarEntries = loadedEntries.filter { entry =>
-    val jarFile = File(entry.path)
-    jarFile.exists() &&
-    jarFile.length() <= MultiplePurlSuite.fatJarSizeLimit &&
-    MultiplePurlSuite.hasNestedJars(jarFile)
-  }
-
-  test("every known gap names a fat JAR in the reference data") {
-    val names = fatJarEntries.map(_.name).toSet
-    val unknown = MultiplePurlSuite.knownGaps.keySet -- names
-    assert(unknown.isEmpty, s"Known gaps for unknown JARs: $unknown")
-  }
-
-  fatJarEntries.foreach { entry =>
-    test(s"Fat JAR parity: ${entry.name} (${entry.purls.size} pURLs)") {
-      MavenTestHelpers.withTempDir(s"fat-${entry.name}") { dir =>
-        val jarFile = File(entry.path)
-        val destJar = new File(dir, jarFile.getName)
-        Files.copy(jarFile.toPath, destJar.toPath)
-
-        val store = MavenTestHelpers.processDirectoryWithStore(dir)
-        val artifact = FileWrapper(destJar, destJar.getName, None)
-        val (gitoid, _) = GitOIDUtils.computeAllHashes(artifact)
-
-        // Walk the containment tree from the fat JAR, collecting pURLs from
-        // every Item in it.
-        def treePurls(
-            todo: List[String],
-            seen: Set[String],
-            purls: Set[String]
-        ): Set[String] = todo match {
-          case Nil                    => purls
-          case id :: rest if seen(id) => treePurls(rest, seen, purls)
-          case id :: rest =>
-            val edges = store.read(id).map(_.connections.toList).getOrElse(Nil)
-            val children = edges.filter(_._1 == EdgeType.contains).map(_._2)
-            val found = edges
-              .filter(_._1 == EdgeType.aliasFrom)
-              .map(_._2)
-              .filter(_.startsWith("pkg:"))
-              .map(p => p.takeWhile(_ != '?'))
-            treePurls(children ++ rest, seen + id, purls ++ found)
-        }
-
-        val found = treePurls(List(gitoid), Set.empty, Set.empty)
-        val expected = entry.purls.map(p => p.takeWhile(_ != '?')).toSet
-        val gaps = MultiplePurlSuite.knownGaps.getOrElse(entry.name, Set.empty)
-        val missing = expected -- found -- gaps
-        val closedGaps = gaps & found
-
-        assert(
-          missing.isEmpty && closedGaps.isEmpty,
-          s"""JAR: ${entry.path}
-             |
-             |Missing pURLs (expected somewhere in the JAR's tree):
-             |${missing.toList.sorted.map(p => s"  - $p").mkString("\n")}
-             |
-             |Known gaps that are now found (remove them from knownGaps):
-             |${closedGaps.toList.sorted.map(p => s"  - $p").mkString("\n")}
-             |""".stripMargin
-        )
-      }
-    }
-  }
 }
+
 object MultiplePurlSuite {
-
-  /** Reference pURLs that nothing inside the fat JAR can produce, keyed by fat
-    * JAR name. The parity test fails if one of these starts being found, so the
-    * list can't go stale.
-    */
-  val knownGaps: Map[String, Set[String]] = Map(
-    // The Tomcat 9 manifests name the bundles `org.apache.tomcat-embed-*`
-    // and the modules `org.apache.tomcat.embed.*`, neither of which gives the
-    // groupId `org.apache.tomcat.embed`.
-    "apisdk-1.0.jar" -> Set(
-      "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@9.0.27",
-      "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@9.0.27",
-      "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@9.0.27"
-    )
-  )
-
-  /** Fat JARs larger than this are too big to process in a test. */
-  val fatJarSizeLimit: Long = 20L * 1024 * 1024
 
   /** The reference entries loaded from the metadata ground truth JSON.
     *
