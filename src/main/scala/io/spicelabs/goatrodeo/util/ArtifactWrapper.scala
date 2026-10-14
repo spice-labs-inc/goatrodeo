@@ -273,9 +273,7 @@ object ArtifactWrapper {
     *
     * Deliberately excludes text-prefixed and `application/octet-stream` types:
     * SaffronDetector intentionally re-checks those (e.g. a `.vhd` that Tika
-    * misdetects as `text/x-vhdl`). Camera RAW types (`image/x-raw-*`) are
-    * excluded too: Tika assigns them by extension alone, and a raw disk image
-    * named `.raw` comes back as `image/x-raw-panasonic`.
+    * misdetects as `text/x-vhdl`).
     */
   private lazy val terminalBinaryMimeTypes: Set[String] =
     Helpers.javaClassMimeTypes ++ Set(
@@ -285,9 +283,8 @@ object ArtifactWrapper {
 
   private def augmentationCannotApply(mimes: Set[String]): Boolean =
     mimes.exists(m =>
-      (m.startsWith("image/") && !m.startsWith("image/x-raw-")) ||
-        m.startsWith("audio/") || m.startsWith("video/") ||
-        terminalBinaryMimeTypes.contains(m)
+      m.startsWith("image/") || m.startsWith("audio/") ||
+        m.startsWith("video/") || terminalBinaryMimeTypes.contains(m)
     )
 
   /** Augment the mime type with other mime types. Each registered augmenter
