@@ -87,12 +87,8 @@ object SaffronDetector {
     // This is still fairly heavy-handed, but if it turns out to do too much, the filter could
     // be narrowed to one that specifically filters out "text/x-vhdl" when myMimes contains
     // application/vhd". This happens in ONE specific case when tika misidentifies a .vhd file as
-    // "text/x-vhdl". Likewise a raw disk named `.raw` comes back from tika as a camera RAW photo
-    // ("image/x-raw-panasonic"), and FileWalker never opens anything with an image/ type.
+    // "text/x-vhdl"
     if myMimes.isEmpty then currentMimes
-    else
-      currentMimes.filterNot(m =>
-        m.startsWith("text/") || m.startsWith("image/x-raw-")
-      ) ++ myMimes
+    else currentMimes.filterNot(_.startsWith("text/")) ++ myMimes
   }
 }
