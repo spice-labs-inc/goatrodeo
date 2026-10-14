@@ -69,18 +69,18 @@ import java.util.UUID
   *
   * ==LLM summary==
   *
-  * | Test | Asserts |
-  * |---|---|
-  * | O-1 | single-batch layout: `.grc`, `.grd`, `.gri`, `history.jsonl`, `purls.txt` all in the output directory |
-  * | O-2 | `.grd`/`.gri`/`.grc` names follow the implemented rule, computed independently of `Helpers` |
-  * | O-3 | every name in a `.grc` resolves in its directory and hashes to the recorded SHA-256 |
-  * | O-4 | `purls.txt` holds exactly the run's purls |
-  * | O-5 | `history.jsonl` records version, commit, operation, date, cluster name |
-  * | O-6 | the JSON dump and the `.grd` files hold the same items |
-  * | O-7 | the run's item count meets a measured floor and the purls are reachable |
-  * | O-8 | a crossed batch boundary writes every batch's artifacts and loses nothing |
-  * | O-9 | the JSON dump carries no private-key material (with a sentinel proving the sweep fires) |
-  * | O-10 | no temporary file survives in any batch directory |
+  * | Test | Asserts                                                                                               |
+  * |:-----|:------------------------------------------------------------------------------------------------------|
+  * | O-1  | single-batch layout: `.grc`, `.grd`, `.gri`, `history.jsonl`, `purls.txt` all in the output directory |
+  * | O-2  | `.grd`/`.gri`/`.grc` names follow the implemented rule, computed independently of `Helpers`           |
+  * | O-3  | every name in a `.grc` resolves in its directory and hashes to the recorded SHA-256                   |
+  * | O-4  | `purls.txt` holds exactly the run's purls                                                             |
+  * | O-5  | `history.jsonl` records version, commit, operation, date, cluster name                                |
+  * | O-6  | the JSON dump and the `.grd` files hold the same items                                                |
+  * | O-7  | the run's item count meets a measured floor and the purls are reachable                               |
+  * | O-8  | a crossed batch boundary writes every batch's artifacts and loses nothing                             |
+  * | O-9  | the JSON dump carries no private-key material (with a sentinel proving the sweep fires)               |
+  * | O-10 | no temporary file survives in any batch directory                                                     |
   *
   * Shared helper: [[RunOutputs]].
   */
@@ -88,7 +88,8 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
 
   /** The three package fixtures. Each is small, committed, and not a `*.jar` or
     * `*.tar`, so the suite does not depend on the LFS pull; each has a purl
-    * asserted elsewhere in the tree, so this suite does not invent ground truth.
+    * asserted elsewhere in the tree, so this suite does not invent ground
+    * truth.
     */
   private val fixtures: Vector[(String, String)] = Vector(
     "debwithmetadata.deb" -> "pkg:deb/debian/not-a-real-package@1.2.3",
@@ -96,10 +97,11 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
     "cpufreqctl-8-1-x86_64.pkg.tar.zst" -> "pkg:alpm/arch/cpufreqctl@8-1?arch=x86_64"
   )
 
-  /** A PKCS#8 private key, surveyed only by O-9. It is deliberately part of that
-    * run so the leak sweep has something that would leak if the filter failed.
-    * It is kept out of the shared run so O-4's exact purl equality stays over the
-    * three known package purls (the key yields an SPKI purl of its own).
+  /** A PKCS#8 private key, surveyed only by O-9. It is deliberately part of
+    * that run so the leak sweep has something that would leak if the filter
+    * failed. It is kept out of the shared run so O-4's exact purl equality
+    * stays over the three known package purls (the key yields an SPKI purl of
+    * its own).
     */
   private val privateKeyFixture =
     "test_data/certificates/private-keys/synthetic/pkcs8-ed25519-unencrypted.pem"
@@ -119,9 +121,10 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
   /** Build a run over the fixture set.
     *
     * Tamper-evident logging is enabled so that every `.grc` carries a
-    * `correlation_id` (GraphManager adds it only when a log is configured), which
-    * is what `info/README.md` documents and what O-3 asserts. The checksum file
-    * lands outside the output directory, so it cannot disturb O-1 or O-10.
+    * `correlation_id` (GraphManager adds it only when a log is configured),
+    * which is what `info/README.md` documents and what O-3 asserts. The
+    * checksum file lands outside the output directory, so it cannot disturb O-1
+    * or O-10.
     *
     * @param maxRecords
     *   the batch size; a value below the item count forces a batch boundary
@@ -268,7 +271,9 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
       val info = env.info
 
       assert(
-        info.get("correlation_id").exists(s => scala.util.Try(UUID.fromString(s)).isSuccess),
+        info
+          .get("correlation_id")
+          .exists(s => scala.util.Try(UUID.fromString(s)).isSuccess),
         s"${grc.getName}: correlation_id must be a UUID, got ${info.get("correlation_id")}"
       )
 
@@ -414,14 +419,17 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
     val text = new String(Files.readAllBytes(dumps.head.toPath), "UTF-8")
     val parsed = parse(text) match {
       case JArray(arr) => arr
-      case other       => fail(s"the dump must be a JSON array, got ${other.getClass}")
+      case other =>
+        fail(s"the dump must be a JSON array, got ${other.getClass}")
     }
     assert(parsed.nonEmpty, "the dump must hold items")
     assert(
-      parsed.forall(e => ((e \ "identifier") match {
-        case JString(s) => s.nonEmpty
-        case _          => false
-      })),
+      parsed.forall(e =>
+        ((e \ "identifier") match {
+          case JString(s) => s.nonEmpty
+          case _          => false
+        })
+      ),
       "every dumped item must have a non-empty identifier"
     )
 
@@ -476,7 +484,8 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
       val batches = multi.batches
       assert(
         batches.exists(_ != multi.output),
-        s"expected the run to write a batch directory besides ${multi.output.getName}, found ${batches.map(_.getName)}"
+        s"expected the run to write a batch directory besides ${multi.output.getName}, found ${batches
+            .map(_.getName)}"
       )
 
       batches.foreach { dir =>
@@ -499,7 +508,10 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
       }
 
       val singleIds = run.grdIdentifiers
-      val multiIds = multi.batches.flatMap(d => RunOutputs.readItemsFromGrd(d)).map(_.identifier).toSet
+      val multiIds = multi.batches
+        .flatMap(d => RunOutputs.readItemsFromGrd(d))
+        .map(_.identifier)
+        .toSet
       assert(
         singleIds.subsetOf(multiIds),
         s"the batch boundary lost ${singleIds.diff(multiIds).size} items, e.g. ${singleIds.diff(multiIds).take(3)}"
@@ -582,7 +594,9 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
         val leftovers = Option(dir.listFiles())
           .getOrElse(Array.empty[File])
           .filter(f =>
-            RunOutputs.temporaryNamePrefixes.exists(p => f.getName.startsWith(p))
+            RunOutputs.temporaryNamePrefixes.exists(p =>
+              f.getName.startsWith(p)
+            )
           )
         assert(
           leftovers.isEmpty,
@@ -599,15 +613,19 @@ class RunOutputContractSuite extends GoatRodeoFunSuite {
           Vector("grd", "gri").flatMap { field =>
             (sha \ field) match {
               case JArray(arr) =>
-                arr.collect { case JString(s) => s }.map(s =>
-                  RunOutputs.expectedHashName(hexToBytes(s))
-                )
+                arr
+                  .collect { case JString(s) => s }
+                  .map(s => RunOutputs.expectedHashName(hexToBytes(s)))
               case _ => Vector.empty
             }
           }.toSet
         val present: Set[String] =
-          (RunOutputs.filesWithSuffix(dir, ".grd").map(_.getName.stripSuffix(".grd")) ++
-            RunOutputs.filesWithSuffix(dir, ".gri").map(_.getName.stripSuffix(".gri"))).toSet
+          (RunOutputs
+            .filesWithSuffix(dir, ".grd")
+            .map(_.getName.stripSuffix(".grd")) ++
+            RunOutputs
+              .filesWithSuffix(dir, ".gri")
+              .map(_.getName.stripSuffix(".gri"))).toSet
         assertEquals(
           present,
           recorded,

@@ -29,11 +29,10 @@ metadata under the `CanonicalPurl` key.
 
 1. **Companion POM (external)** — the sibling `.pom` file paired with
    the JAR by `computeMavenFiles`. This is the authoritative published
-   Maven metadata. See ADR 0012.
+   Maven metadata.
 2. **Embedded `pom.properties`** — `META-INF/maven/.../pom.properties`
    inside the JAR. When multiple exist (fat/uber JARs), only the one
    whose artifactId best matches the filename is selected via `matchScore`.
-   See ADR 0014.
 3. **Embedded POM** — `META-INF/maven/.../pom.xml` inside the JAR,
    selected by the same `matchScore` logic.
 4. **MANIFEST.MF** (for groupId and version) / **Filename** (for artifactId) —
@@ -53,6 +52,69 @@ priority for each individual field.
 **Verified by:** `MavenPropertyTests` — "resolveGroupIdArtifactIdVersion:
 falls through each layer deterministically" and "external POM always wins
 when complete".
+
+### When only the manifest is left
+
+Spring Boot's own JARs ship without `pom.properties`, so a Spring Boot
+application's dependencies are where the manifest path does most of its work.
+Two rules govern it.
+
+**groupId.** A manifest header such as `Bundle-SymbolicName`,
+`Automatic-Module-Name` or `Implementation-Title` names the artifact in one of
+two conventions, and the manifest alone cannot always tell which:
+`<group>.<artifactId>` (the group is everything before the last segment) or the
+group itself (`org.hamcrest` is the group of `hamcrest`). The artifactId from
+the file name separates them, so the rules are applied in this order:
+
+1. the value ends with `.<artifactId>` and at least two segments remain → those
+   segments are the group (`com.example.foo` + `foo` → `com.example`);
+2. otherwise, the last segment equals the artifactId, the artifactId without its
+   hyphens, or the artifactId's first hyphen-separated token → the whole value is
+   the group (`org.hamcrest` + `hamcrest` → `org.hamcrest`; `io.perfmark` +
+   `perfmark-api` → `io.perfmark`; `org.reactivestreams` + `reactive-streams` →
+   `org.reactivestreams`);
+3. otherwise → the parent (`com.example.mybundle` → `com.example`).
+
+Rule 1 must precede rule 2, or the second rule would claim `com.example.foo` is
+the group of `com.example.foo` with artifactId `foo`, breaking a shape that
+already worked.
+
+`Implementation-Vendor-Id` outranks all of this. When no source yields a groupId
+at all, the artifactId is used as the groupId, so that a purl exists rather than
+none — which is why a JAR whose manifest has only an undotted
+`Implementation-Title` becomes `pkg:maven/<artifactId>/<artifactId>@<version>`.
+
+**Verified by:** `ManifestPurlDerivationSuite.A-1` through `A-9`.
+
+**version.** `Implementation-Version` outranks `Bundle-Version`, which outranks
+`Specification-Version`. A `Bundle-Version` is an OSGi version and may carry
+qualifiers and padding the Maven release does not, so a purl built from it
+matches no artifact in a repository: `3.2.0` for a `3.2` JAR,
+`1.0.27.RELEASE` for `1.0.27`.
+
+**Verified by:** `ManifestPurlDerivationSuite.B-1` through `B-4`.
+
+### What the manifest cannot tell you, and why that is accepted
+
+A `spring-*` JAR names neither its group nor a `<group>.<artifactId>` pair.
+`spring-boot-2.7.14.jar` carries `Implementation-Title: Spring Boot`,
+`Automatic-Module-Name: spring.boot` and `Implementation-Version: 2.7.14`, and
+nothing in the file states `org.springframework.boot`. No rule that reads only
+the artifact can recover it, so these JARs are emitted under the group the
+module name implies — `spring`, or `spring.security` for
+`spring-security-crypto`.
+
+**An emitted pURL is a best effort.** Goat Rodeo emits the coordinates the
+artifact's own evidence supports, and does not withhold a purl because the
+evidence is incomplete. A purl whose groupId is inferred from the manifest is
+worth more than none: it resolves for the many artifacts whose module name does
+carry the group, and when it is wrong the wrongness is visible in the output
+rather than hidden. Nothing here consults an external package index; the
+artifact is the only evidence used.
+
+**Verified by:** `ManifestPurlDerivationSuite.C-1`, which pins the emitted
+groupId for the three Spring shapes as the accepted outcome rather than as a
+defect awaiting repair.
 
 ## Secondary pURLs
 
@@ -117,6 +179,7 @@ Goat Rodeo's pURLs are a superset of the reference scanner's pURLs:
 | Suite | What |
 |-------|------|
 | MavenCoordinateResolutionSuite | groupId/artifactId/version chain, filename parsing |
+| ManifestPurlDerivationSuite | groupId and version rules when only the manifest is left |
 | MavenPropertyTests | Property tests for interpolation, priority, parsing |
 | CanonicalPurlPrioritySuite | Canonical pURL priority chain |
 | PurlMatchingSuite | matchScore algorithm |

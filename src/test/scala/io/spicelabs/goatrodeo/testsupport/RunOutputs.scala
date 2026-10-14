@@ -40,11 +40,12 @@ import scala.util.Try
   *
   * ==Why the naming helpers compute the rule themselves==
   *
-  * A test that asserts `name == Helpers.toHex(Helpers.byteArrayToLong63Bits(sha256(file)))`
-  * is a tautology: the expectation is the production expression, so a change to
-  * `Helpers` moves both sides and the test still passes. [[expectedHashName]]
-  * therefore performs the bit arithmetic itself, so the test fails if the
-  * masking changes.
+  * A test that asserts `name ==
+  * Helpers.toHex(Helpers.byteArrayToLong63Bits(sha256(file)))` is a tautology:
+  * the expectation is the production expression, so a change to `Helpers` moves
+  * both sides and the test still passes. [[expectedHashName]] therefore
+  * performs the bit arithmetic itself, so the test fails if the masking
+  * changes.
   *
   * ==Why batch directories are discovered rather than named==
   *
@@ -280,8 +281,8 @@ object RunOutputs {
   }
 
   /** A run's output directory and its JSON dump directory, plus a cleanup that
-    * removes both, every batch directory beside them, and any extra file the run
-    * was configured to write (e.g. the tamper-evident checksum).
+    * removes both, every batch directory beside them, and any extra file the
+    * run was configured to write (e.g. the tamper-evident checksum).
     *
     * @param output
     *   the output directory
@@ -315,7 +316,9 @@ object RunOutputs {
     def purls: Set[String] =
       batches
         .flatMap(d => filesWithSuffix(d, "purls.txt"))
-        .flatMap(f => Files.readAllLines(f.toPath).toArray(new Array[String](0)))
+        .flatMap(f =>
+          Files.readAllLines(f.toPath).toArray(new Array[String](0))
+        )
         .map(_.trim)
         .filter(_.nonEmpty)
         .toSet

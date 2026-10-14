@@ -90,7 +90,6 @@ canonical location).
 
 ## Related
 
-- `docs/adrs/adr_2026_08_24_oci_docker_parity.md`
 - `src/main/scala/io/spicelabs/goatrodeo/omnibor/strategies/Docker.scala`
 - `src/test/scala/io/spicelabs/goatrodeo/omnibor/OciDockerParitySuite.scala`
 - `src/test/scala/DockerSuite.scala` (O-xx tests)

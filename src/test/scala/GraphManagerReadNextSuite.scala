@@ -252,7 +252,7 @@ class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
   }
 }
 
-/** GRD EOF semantics. See ADR 0005.
+/** GRD EOF semantics.
   *
   * WHAT: pins that ANY negative entry length is treated as end-of-file (not
   * just −1), and that a positive length exceeding the remaining bytes is

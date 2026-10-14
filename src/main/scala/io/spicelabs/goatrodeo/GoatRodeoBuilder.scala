@@ -500,8 +500,7 @@ class GoatRodeoBuilder {
       val tel = TamperEvidentLog(java.util.UUID.randomUUID().toString(), dest)
       tel.start(() => None)
       tel
-    }
-    )
+    })
 
     // println("Tamper evident log "+tamperLogging)
     Howdy.run(tamperLogging)(using config)

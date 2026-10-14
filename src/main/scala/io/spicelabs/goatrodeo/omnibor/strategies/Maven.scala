@@ -334,16 +334,19 @@ case class MavenState(
     val embArtifactId = embeddedPom.flatMap(_.artifactId).filter(_.nonEmpty)
     val embVersion = embeddedPom.flatMap(_.version).filter(_.nonEmpty)
 
-    // Manifest contributes individual fields without a gate — even when
-    // it has no artifactId headers, its groupId (Implementation-Vendor-Id)
-    // and version (Implementation-Version) are still valid.
-    val (manGroupId, manArtifactId, manVersion) =
-      resolveGroupIdArtifactIdVersionFromManifest(manifest)
-
+    // The file name's identity is needed before the manifest is resolved: the
+    // manifest's groupId rules use the file's artifactId to tell a group from a
+    // `<group>.<artifactId>` pair (see `groupIdFromName`).
     val (fileGroupId, fileArtifactId, fileVersion) =
       extractIdentityFromFilename(artifact.filenameWithNoPath).getOrElse(
         (None, None, None)
       )
+
+    // Manifest contributes individual fields without a gate — even when
+    // it has no artifactId headers, its groupId (Implementation-Vendor-Id)
+    // and version (Implementation-Version) are still valid.
+    val (manGroupId, manArtifactId, manVersion) =
+      resolveGroupIdArtifactIdVersionFromManifest(manifest, fileArtifactId)
 
     // Per-field priority:
     // groupId:    external POM > pom.properties > embedded pom.xml > manifest > filename
@@ -390,23 +393,81 @@ case class MavenState(
     *
     * Many JAR manifests store Java package paths in headers like
     * Bundle-SymbolicName, Extension-Name, Implementation-Title, etc. These
-    * often follow the convention `groupId.artifactId` (e.g.
-    * `org.apache.commons.lang`), so the groupId can be derived by taking all
-    * segments except the last.
+    * values name the artifact in one of two conventions, and the manifest alone
+    * cannot always tell which:
+    *
+    *   - `<group>.<artifactId>` — the group is everything before the last
+    *     segment (`com.example.foo` for artifactId `foo`);
+    *   - the group itself — a module name or OSGi symbolic name is often the
+    *     group with no artifact segment (`org.hamcrest` for artifactId
+    *     `hamcrest`, `io.perfmark` for `perfmark-api`).
+    *
+    * The artifactId from the file name is what separates them, so it is a
+    * parameter. The rules are applied in this order, and the order is load
+    * bearing:
+    *
+    *   1. the value ends with `.<artifactId>` and at least two segments remain
+    *      → those remaining segments are the group (`com.example.foo` →
+    *      `com.example`); 2. otherwise, the last segment equals the artifactId,
+    *      the artifactId with its hyphens removed, or the artifactId's first
+    *      hyphen-separated token → the whole value is the group
+    *      (`org.hamcrest`, `org.reactivestreams`, `io.perfmark`); 3. otherwise
+    *      → the parent, which is the historical behaviour.
+    *
+    * Rule 1 must precede rule 2. Rule 2 alone would take `com.example.foo` with
+    * artifactId `foo` for the group `com.example.foo`, breaking the shape that
+    * already worked; `ManifestPurlDerivationSuite.A-5` pins that ordering.
     *
     * Handles:
     *   - `org.apache.commons.codec.*` → `org.apache.commons` (strip `.*`)
-    *   - `org.apache.commons.lang` → `org.apache.commons`
+    *   - `org.apache.commons.lang` → `org.apache.commons` (rule 1)
+    *   - `org.hamcrest` + `hamcrest` → `org.hamcrest` (rule 2)
+    *   - `io.perfmark` + `perfmark-api` → `io.perfmark` (rule 2, first token)
     *   - `collections-generic` → `None` (no dots, can't derive groupId)
     *   - `.*` → `None` (only wildcard, nothing useful)
+    *
+    * @param value
+    *   the manifest header value
+    * @param artifactId
+    *   the artifactId from the file name, when the file name yields one
+    * @return
+    *   the derived groupId, or None when the value cannot yield one
     */
-  private def groupIdFromPackagePath(value: String): Option[String] = {
+  private def groupIdFromName(
+      value: String,
+      artifactId: Option[String]
+  ): Option[String] = {
     val cleaned = value.stripSuffix(".*").trim
     val parts = cleaned.split("\\.")
-    if (parts.length > 1) {
-      val groupId = parts.init.mkString(".")
-      if (groupId.nonEmpty) Some(groupId) else None
-    } else None
+    if (parts.length <= 1) None
+    else {
+      val artifact = artifactId.map(_.trim).filter(_.nonEmpty)
+
+      // rule 1: the value is `<group>.<artifactId>`, and a group remains
+      val bySuffix = artifact.flatMap { a =>
+        if (cleaned.endsWith("." + a) && parts.length - 1 >= 2) {
+          val groupId = parts.init.mkString(".")
+          if (groupId.nonEmpty) Some(groupId) else None
+        } else None
+      }
+
+      // rule 2: the value is the group, and its last segment is the artifact
+      val byLastSegment = artifact.flatMap { a =>
+        val last = parts.last
+        val firstToken = a.split("-").headOption.getOrElse(a)
+        if (last == a || last == a.replace("-", "") || last == firstToken)
+          Some(cleaned)
+        else None
+      }
+
+      // rule 3: the parent, the historical behaviour
+      val byParent = {
+        val groupId = parts.init.mkString(".")
+        if (groupId.nonEmpty) Some(groupId) else None
+      }
+
+      bySuffix.orElse(byLastSegment).orElse(byParent)
+    }
   }
 
   /** Extract individual groupId, artifactId, and version from MANIFEST headers.
@@ -419,17 +480,29 @@ case class MavenState(
     *
     * groupId is resolved from multiple manifest headers in priority order:
     *   1. Implementation-Vendor-Id (most specific, Maven-native) 2.
-    *      Bundle-SymbolicName (OSGi, derive parent path) 3.
-    *      Automatic-Module-Name (Java module, derive parent path) 4.
-    *      Extension-Name (Java extension, derive parent path) 5.
-    *      Implementation-Title (if it looks like a package path) 6. Package
-    *      (Java package, derive parent path)
+    *      Bundle-SymbolicName (OSGi) 3. Automatic-Module-Name (Java module) 4.
+    *      Extension-Name (Java extension) 5. Implementation-Title (if it looks
+    *      like a package path) 6. Package (Java package). Headers 2-6 go
+    *      through [[groupIdFromName]], which uses the file name's artifactId to
+    *      tell a group from a `<group>.<artifactId>` pair.
+    *
+    * version prefers Implementation-Version over Bundle-Version, because a
+    * Bundle-Version is an OSGi version and may carry qualifiers and padding the
+    * Maven version does not (`1.0.27.RELEASE` for `1.0.27`, `3.2.0` for `3.2`).
+    * A purl carrying the OSGi spelling matches no artifact in a repository.
     *
     * All empty-string values are filtered to None so they don't block the
     * orElse chain.
+    *
+    * @param manifest
+    *   the manifest headers, lower-cased keys
+    * @param fileArtifactId
+    *   the artifactId the file name yields, when it yields one; used only to
+    *   disambiguate a dotted name
     */
   private def resolveGroupIdArtifactIdVersionFromManifest(
-      manifest: TreeMap[String, TreeSet[StringOrPair]]
+      manifest: TreeMap[String, TreeSet[StringOrPair]],
+      fileArtifactId: Option[String]
   ): (Option[String], Option[String], Option[String]) = {
     // Helper: read a manifest header value, filtering empty strings.
     // Java's Manifest parser stores "Key: " (trailing space, no value) as "",
@@ -469,23 +542,26 @@ case class MavenState(
 
     // groupId priority chain within manifest:
     //   1. Implementation-Vendor-Id (direct, Maven-native)
-    //   2. Bundle-SymbolicName (derive parent path, e.g. org.apache.commons.lang → org.apache.commons)
-    //   3. Automatic-Module-Name (derive parent path)
-    //   4. Extension-Name (derive parent path, strip .* wildcard)
-    //   5. Implementation-Title (derive parent path if it has dots)
-    //   6. Package (derive parent path, strip .* wildcard)
-    val groupIdOpt = implVendorOpt
-      .orElse {
-        bundleSymOpt
-          .map(_.split(";")(0).trim)
-          .flatMap(groupIdFromPackagePath)
-      }
-      .orElse(autoModuleOpt.flatMap(groupIdFromPackagePath))
-      .orElse(extNameOpt.flatMap(groupIdFromPackagePath))
-      .orElse(implTitleOpt.flatMap(groupIdFromPackagePath))
-      .orElse(packageOpt.flatMap(groupIdFromPackagePath))
+    //   2. Bundle-SymbolicName (OSGi, e.g. org.apache.commons.lang → org.apache.commons,
+    //      io.projectreactor.netty.reactor-netty-core → io.projectreactor.netty,
+    //      org.hamcrest → org.hamcrest)
+    //   3. Automatic-Module-Name (Java module)
+    //   4. Extension-Name (strip .* wildcard)
+    //   5. Implementation-Title (only if it has dots)
+    //   6. Package (strip .* wildcard)
+    def fromName(value: Option[String]): Option[String] =
+      value.flatMap(groupIdFromName(_, fileArtifactId))
 
-    val versionOpt = bundleVerOpt.orElse(implVerOpt).orElse(specVerOpt)
+    val groupIdOpt = implVendorOpt
+      .orElse(fromName(bundleSymOpt.map(_.split(";")(0).trim)))
+      .orElse(fromName(autoModuleOpt))
+      .orElse(fromName(extNameOpt))
+      .orElse(fromName(implTitleOpt))
+      .orElse(fromName(packageOpt))
+
+    // Implementation-Version first: a Bundle-Version is an OSGi version and may
+    // carry a qualifier the Maven version does not, so it is the weaker source.
+    val versionOpt = implVerOpt.orElse(bundleVerOpt).orElse(specVerOpt)
 
     (
       groupIdOpt.flatMap(PURLComponentSanitizer.sanitizeMavenGroupId),

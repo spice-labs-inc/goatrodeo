@@ -29,15 +29,15 @@ import java.nio.file.Files
   *
   * For each `maxRecords` in a small set, a run over the same fixtures must
   * produce batch directories whose union is the whole graph: every purl the
-  * single-batch run produced must appear in the union, and every batch directory
-  * must be self-describing (it holds its own `.grc`, `.grd`, `.gri`,
+  * single-batch run produced must appear in the union, and every batch
+  * directory must be self-describing (it holds its own `.grc`, `.grd`, `.gri`,
   * `purls.txt` and `history.jsonl`).
   *
   * ==Why a property and not another example test==
   *
   * `RunOutputContractSuite.O-8` pins one batch size (`maxRecords = 1`) as a
-  * worked example. The failure mode this guards is not one specific size but any
-  * size at which the writer relocates output: a change that mishandled the
+  * worked example. The failure mode this guards is not one specific size but
+  * any size at which the writer relocates output: a change that mishandled the
   * second batch, or the boundary between an overlapped batch and its successor,
   * could pass at one size and fail at another. Enumerating the sizes is cheap
   * (each run is a second) and covers the boundaries rather than one point on
@@ -52,10 +52,10 @@ import java.nio.file.Files
   *
   * ==LLM summary==
   *
-  * | Property | Asserts |
-  * |---|---|
-  * | P-1 | for `maxRecords` in {1,2,3,5}: the union of purls equals the single-batch purl set |
-  * | P-1 | and every batch directory holds `.grc`, `.grd`, `.gri`, `purls.txt`, `history.jsonl` |
+  * | Property | Asserts                                                                              |
+  * |:---------|:-------------------------------------------------------------------------------------|
+  * | P-1      | for `maxRecords` in {1,2,3,5}: the union of purls equals the single-batch purl set   |
+  * | P-1      | and every batch directory holds `.grc`, `.grd`, `.gri`, `purls.txt`, `history.jsonl` |
   *
   * Shared helper: [[RunOutputs]].
   */
@@ -105,8 +105,8 @@ class RunOutputContractPropertySuite extends GoatRodeoScalaCheckSuite {
 
   /** The property, instantiated at one batch size: every batch directory is
     * self-describing, the union of purls across them is the whole graph, and no
-    * temporary file survives. Wrapped in [[Prop.secure]] so an assertion failure
-    * is reported as a property failure with its message intact.
+    * temporary file survives. Wrapped in [[Prop.secure]] so an assertion
+    * failure is reported as a property failure with its message intact.
     *
     * @param maxRecords
     *   the batch size to exercise
@@ -158,7 +158,9 @@ class RunOutputContractPropertySuite extends GoatRodeoScalaCheckSuite {
         val leftovers = Option(dir.listFiles())
           .getOrElse(Array.empty[File])
           .filter(f =>
-            RunOutputs.temporaryNamePrefixes.exists(p => f.getName.startsWith(p))
+            RunOutputs.temporaryNamePrefixes.exists(p =>
+              f.getName.startsWith(p)
+            )
           )
         assert(
           leftovers.isEmpty,
@@ -169,7 +171,9 @@ class RunOutputContractPropertySuite extends GoatRodeoScalaCheckSuite {
     Prop.proved
   }
 
-  test("P-1 every batch size yields self-describing batches whose union is whole") {
+  test(
+    "P-1 every batch size yields self-describing batches whose union is whole"
+  ) {
     Prop.all(batchSizes.map(wholeGraphAcrossBatches)*)
   }
 }

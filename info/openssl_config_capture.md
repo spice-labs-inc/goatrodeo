@@ -105,4 +105,3 @@ The parser never throws. Malformed files, binary data, and invalid UTF-8 result 
 - Implementation: `src/main/scala/io/spicelabs/goatrodeo/omnibor/strategies/OpenSSLConfig.scala`
 - Parser: `src/main/scala/io/spicelabs/goatrodeo/util/OpenSSLConfigParser.scala`
 - Registration: `src/main/scala/io/spicelabs/goatrodeo/omnibor/ToProcess.scala`
-- ADR: `docs/adr/0002-openssl-config-strategy.md`

@@ -88,7 +88,6 @@ case class TamperEvidentLog(correlationId: String, dest: File) {
     * correlation ID, the final log chain head, and every `.grc` cluster written
     * this run (name + full 256-bit SHA-256) across all batch directories. This
     * is the out-of-band anchor a verifier checks.
-
     *
     * @return
     *   the written file
@@ -103,6 +102,6 @@ case class TamperEvidentLog(correlationId: String, dest: File) {
       )
     )
     Files.writeString(dest.toPath(), doc)
-    dest 
+    dest
   }
 }

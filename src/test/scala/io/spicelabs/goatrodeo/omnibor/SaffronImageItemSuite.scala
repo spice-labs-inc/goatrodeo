@@ -14,16 +14,12 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+import ch.qos.logback.classic.Level
 import io.spicelabs.goatrodeo.GoatRodeoBuilder
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.testsupport.LogCapture
 import io.spicelabs.goatrodeo.testsupport.RunOutputs
 import io.spicelabs.goatrodeo.testsupport.RunOutputs.Run
-import io.spicelabs.goatrodeo.util.ArtifactWrapper
-import io.spicelabs.goatrodeo.util.FileWalker
-import io.spicelabs.goatrodeo.util.FileWrapper
-
-import ch.qos.logback.classic.Level
 
 import java.io.File
 import java.nio.file.Files
@@ -47,8 +43,8 @@ import java.nio.file.Files
   * So a change that dropped a filesystem, flattened the paths, or populated
   * items from empty placeholders would pass every existing test.
   * `IoTGoatCbomSuite` is the one existing end-to-end image test; it checks five
-  * crypto-relevant paths through the CBOM on one image, which is a precedent for
-  * this harness rather than a substitute for this coverage.
+  * crypto-relevant paths through the CBOM on one image, which is a precedent
+  * for this harness rather than a substitute for this coverage.
   *
   * ==Theory of the path==
   *
@@ -60,12 +56,13 @@ import java.nio.file.Files
   *
   * ==LLM summary==
   *
-  * | Test | Asserts |
-  * |---|---|
-  * | S-1 | `raw.img`'s files become items with their in-filesystem paths, measured sizes and MIME types |
-  * | S-2 | `alpine-minimal.squashfs` contributes at least 40 file items (58 measured) including `bin/busybox` and `etc/os-release` |
-  * | S-3 | `fsFilePaths` does not change in-container names |
-  * | S-4 | a recognised disk with no mountable filesystem is surveyed as one opaque artifact, logs no error, and yields no file items |
+  * | Test | Asserts                                                                                                                    |
+  * |:-----|:---------------------------------------------------------------------------------------------------------------------------|
+  * | S-1  | `raw.img`'s files become items with their in-filesystem paths, measured sizes and MIME types                               |
+  * | S-2  | `alpine-minimal.squashfs` contributes at least 40 file items (58 measured) including `bin/busybox` and `etc/os-release`    |
+  * | S-3  | `fsFilePaths` does not change in-container names                                                                           |
+  * | S-4  | a recognised disk with no mountable filesystem is surveyed as one opaque artifact, logs no error, and yields no file items |
+  * | S-5  | a raw disk named `.raw` is recognised as a Saffron disk and its files become items                                         |
   */
 class SaffronImageItemSuite extends GoatRodeoFunSuite {
 
@@ -88,13 +85,17 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
     *   an optional subdirectory of the input to place the fixture in, so that
     *   the fixture's path relative to the build root differs from its basename
     *   and `fsFilePaths` therefore has an observable effect
+    * @param rename
+    *   an optional name to give the fixture in the input directory, so a test
+    *   can exercise what the extension does to MIME detection
     * @return
     *   the run's directories, to be cleaned up by the caller
     */
   private def build(
       fixture: String,
       fsFilePaths: Boolean = false,
-      subdirectory: Option[String] = None
+      subdirectory: Option[String] = None,
+      rename: Option[String] = None
   ): Run = {
     val input = Files.createTempDirectory("img-in").toFile()
     val output = Files.createTempDirectory("img-out").toFile()
@@ -104,8 +105,8 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
       case Some(sub) =>
         val dir = new File(input, sub)
         dir.mkdirs()
-        new File(dir, fixture)
-      case None => new File(input, fixture)
+        new File(dir, rename.getOrElse(fixture))
+      case None => new File(input, rename.getOrElse(fixture))
     }
     Files.copy(f.toPath, destination.toPath)
     new GoatRodeoBuilder()
@@ -133,7 +134,8 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
       .flatMap(d => RunOutputs.readItemsFromGrd(d))
       .flatMap(i =>
         i.bodyAsItemMetaData.toVector.flatMap(md =>
-          md.fileNames.toVector.map(name => (name, md.fileSize, md.mimeType.toSet))
+          md.fileNames.toVector
+            .map(name => (name, md.fileSize, md.mimeType.toSet))
         )
       )
 
@@ -155,7 +157,8 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
         assertEquals(
           matches.length,
           1,
-          s"expected exactly one item named $path, found ${matches.map(_._1)} among ${named.map(_._1).sorted}"
+          s"expected exactly one item named $path, found ${matches
+              .map(_._1)} among ${named.map(_._1).sorted}"
         )
         val (_, gotSize, gotMimes) = matches.head
         assertEquals(
@@ -326,6 +329,56 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
         errors.isEmpty,
         s"a disk with no filesystem must not log an error, got: ${errors.take(5)}"
       )
+    } finally run.cleanup()
+  }
+  // S-5 — a raw disk named `.raw` is recognised and walked.
+  // THEORY: Tika types a `.raw` file as a Panasonic camera RAW photo
+  // (`image/x-raw-panasonic`), by extension alone. An `image/` type is terminal
+  // for MIME augmentation and `FileWalker.notArchive` rejects anything under
+  // `image/`, so the disk is never even offered to Saffron: a Debian cloud image
+  // shipped as `.raw` is surveyed as one opaque file. The extension must not
+  // decide the format — the bytes must — so the detector has to be allowed to
+  // re-check a camera RAW type and, when Saffron recognises the file, to drop
+  // it. `S-4` covers the recognised-but-unmountable case; this covers the case
+  // where there is a filesystem to walk, and is the one whose loss would be
+  // silent, because the run would still succeed.
+  //
+  // The fixture is `raw.img` renamed to `disk.raw`, so the bytes are identical
+  // to `S-1`'s and the only variable is the extension.
+  test("S-5 a raw disk named .raw is recognised and its files become items") {
+    val run = build("raw.img", rename = Some("disk.raw"))
+    try {
+      val named = namedItems(run)
+
+      val diskItem = named.filter(_._1 == "disk.raw")
+      assertEquals(
+        diskItem.length,
+        1,
+        s"expected one item for the disk itself, got ${named.map(_._1).sorted}"
+      )
+      assert(
+        diskItem.head._3.contains("application/x-saffron-raw-disk"),
+        s"the .raw disk must carry the Saffron raw-disk MIME, got ${diskItem.head._3.toVector.sorted}"
+      )
+      assert(
+        !diskItem.head._3.exists(_.startsWith("image/")),
+        s"the camera-RAW misreading must be dropped, got ${diskItem.head._3.toVector.sorted}"
+      )
+
+      // and the filesystem inside it was walked, not skipped
+      rawImageFiles.foreach { case (path, size, _) =>
+        val matches = named.filter(_._1 == path)
+        assertEquals(
+          matches.length,
+          1,
+          s"expected exactly one item named $path, got ${named.map(_._1).sorted}"
+        )
+        assertEquals(
+          matches.head._2,
+          size,
+          s"$path: the item's size must be the file's size inside the image"
+        )
+      }
     } finally run.cleanup()
   }
 }

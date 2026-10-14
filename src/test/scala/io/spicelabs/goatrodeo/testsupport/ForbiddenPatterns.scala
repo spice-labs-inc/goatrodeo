@@ -18,17 +18,18 @@ import java.util.regex.Pattern
 
 /** The Appendix C forbidden private-key patterns.
   *
-  * Two suites sweep for private-key material: `CertificatesLeakSuite` sweeps the
-  * `Item`s the certificate strategy emits, and `RunOutputContractSuite` sweeps
-  * the serialised JSON dump a run leaves on disk. A leak is only meaningful if
-  * both agree on what a leak looks like, so the list lives here once. Duplicating
-  * it would let the two suites drift, and a pattern added to only one of them
-  * would leave a gap that neither suite reports.
+  * Two suites sweep for private-key material: `CertificatesLeakSuite` sweeps
+  * the `Item`s the certificate strategy emits, and `RunOutputContractSuite`
+  * sweeps the serialised JSON dump a run leaves on disk. A leak is only
+  * meaningful if both agree on what a leak looks like, so the list lives here
+  * once. Duplicating it would let the two suites drift, and a pattern added to
+  * only one of them would leave a gap that neither suite reports.
   *
   * The patterns match the header, footer and body forms of the key formats Goat
-  * Rodeo encounters: PEM (RSA/EC/DSA/OpenSSH/PGP/encrypted), PGP armour, and the
-  * fixed base64 prefixes that PKCS#8 and PKCS#1 bodies share regardless of the
-  * surrounding text. `openssh-key-v1` is the binary OpenSSH private-key magic.
+  * Rodeo encounters: PEM (RSA/EC/DSA/OpenSSH/PGP/encrypted), PGP armour, and
+  * the fixed base64 prefixes that PKCS#8 and PKCS#1 bodies share regardless of
+  * the surrounding text. `openssh-key-v1` is the binary OpenSSH private-key
+  * magic.
   */
 object ForbiddenPatterns {
 

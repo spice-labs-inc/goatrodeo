@@ -15,7 +15,6 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.util
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
-import io.bullet.borer.Cbor
 import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import io.spicelabs.goatrodeo.omnibor.CbomEmitter
 import io.spicelabs.goatrodeo.omnibor.GraphManager
@@ -31,8 +30,6 @@ import org.json4s.JString
 import org.json4s.native.JsonMethods.*
 
 import java.io.File
-import java.io.FileInputStream
-import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.util.Comparator
 import scala.collection.immutable.TreeMap
@@ -277,7 +274,10 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
 
       val chainHex =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      val tel = TamperEvidentLog("11111111-2222-3333-4444-555555555555", File(dir, "run.log"))
+      val tel = TamperEvidentLog(
+        "11111111-2222-3333-4444-555555555555",
+        File(dir, "run.log")
+      )
       tel.start(() => Some(chainHex))
       val items = Vector(
         makeItem(
@@ -317,7 +317,10 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
     val dir = tempDir()
     try {
 
-      val tel = TamperEvidentLog("99999999-8888-7777-6666-555555555555", File(dir, "run.log"))
+      val tel = TamperEvidentLog(
+        "99999999-8888-7777-6666-555555555555",
+        File(dir, "run.log")
+      )
 
       tel.start(() => None)
       val items = Vector(
@@ -347,7 +350,10 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   test("T-09 checksum file shape") {
     val dir = tempDir()
     try {
-      val tel = TamperEvidentLog("abcd1234-0000-0000-0000-000000000000", File(dir, "run.log"))
+      val tel = TamperEvidentLog(
+        "abcd1234-0000-0000-0000-000000000000",
+        File(dir, "run.log")
+      )
       tel.start(() =>
         Some(
           "feedface00000000000000000000000000000000000000000000000000000000"
@@ -358,7 +364,6 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
         "beefcafe0000000000000000000000000000000000000000000000000000000000"
       )
       val file = tel.writeChecksum(
-        
       )
 
       val json = parse(Files.readString(file.toPath()))

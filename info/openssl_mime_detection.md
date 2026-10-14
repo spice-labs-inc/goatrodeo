@@ -83,6 +83,5 @@ A missed OpenSSL config is safe: it falls through to `GenericFile` and is not cl
 
 ## Related
 
-- ADR: [`docs/adr/0001-openssl-config-mime-augmenter.md`](../docs/adr/0001-openssl-config-mime-augmenter.md)
 - Implementation: [`src/main/scala/io/spicelabs/goatrodeo/util/OpenSSLConfigDetector.scala`](../src/main/scala/io/spicelabs/goatrodeo/util/OpenSSLConfigDetector.scala)
 - Registration: [`src/main/scala/io/spicelabs/goatrodeo/util/ArtifactWrapper.scala`](../src/main/scala/io/spicelabs/goatrodeo/util/ArtifactWrapper.scala) line 260
