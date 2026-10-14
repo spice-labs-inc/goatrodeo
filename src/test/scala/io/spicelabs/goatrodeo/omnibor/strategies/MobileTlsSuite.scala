@@ -132,7 +132,6 @@ class MobileTlsSuite extends GoatRodeoFunSuite {
 
   import io.spicelabs.goatrodeo.testsupport.BplistEncoder
   import org.json4s.*
-  import org.json4s.JsonDSL.*
 
   private def binaryPlistMeta(
       name: String,
@@ -242,7 +241,9 @@ class MobileTlsSuite extends GoatRodeoFunSuite {
     assert(tp.nonEmpty, "binary Info.plist must be claimed by MobileTls")
     ToProcess.buildGraphForToProcess(tp, store)
 
-    val atsLoads = store.keys().toVector
+    val atsLoads = store
+      .keys()
+      .toVector
       .flatMap(k => store.read(k))
       .flatMap(_.bodyAsItemMetaData)
       .flatMap(_.extra.get(mt("ats_arbitrary_loads")))

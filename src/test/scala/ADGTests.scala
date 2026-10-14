@@ -103,6 +103,7 @@ class ADGTests extends GoatRodeoFunSuite {
               Helpers.findFiles(source).filter(!_.getName().endsWith(".tgz"))
           )
         ),
+        tamperEvidentLog = None,
         ignorePathSet = Set(),
         excludeFileRegex = Vector(),
         finishedFile = f => {

@@ -20,7 +20,6 @@ import org.json4s.native.JsonMethods.*
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.locks.ReentrantLock
 
 /** Run-scoped holder for the tamper-evident logging state.
   *
@@ -34,9 +33,8 @@ import java.util.concurrent.locks.ReentrantLock
   * and read from many worker threads (each batch writes its own `.grc`), which
   * is not practical to thread through the deep call chain.
   */
-object TamperEvidentLog {
+case class TamperEvidentLog(correlationId: String, dest: File) {
 
-  @volatile private var corrId: String = ""
   private val headRef: AtomicReference[() => Option[String]] =
     new AtomicReference(() => None)
   private val grcRef: AtomicReference[Vector[(String, String)]] =
@@ -44,33 +42,8 @@ object TamperEvidentLog {
   private val cleanupRef: AtomicReference[() => Unit] =
     new AtomicReference(() => ())
 
-  /** Lock serializing run-state mutations against [[start]]/[[reset]]. A run
-    * holds it from start to reset; tests that exercise the global holder hold
-    * it so a concurrent run's [[reset]] cannot clear the state under them while
-    * they are mid-assertion.
-    *
-    * A `ReentrantLock` rather than a monitor, because runs are often started on
-    * virtual threads (Allspice runs one per artifact). On JDK 21 to 23 a
-    * virtual thread blocked entering a monitor, or sleeping while it holds one,
-    * pins its carrier; enough concurrent runs pin every carrier, and the run
-    * holding the lock then waits forever for virtual threads of its own that
-    * cannot be scheduled. Waiting on, or sleeping under, a `ReentrantLock`
-    * releases the carrier. It must be reentrant: a run holds it while [[start]]
-    * and [[reset]] take it again.
-    */
-  private val lock = new ReentrantLock()
-
-  /** Run `body` while holding the run-state lock. */
-  def exclusively[T](body: => T): T = {
-    lock.lock()
-    try body
-    finally lock.unlock()
-  }
-
-  /** Initialize the run state. Call once at the start of a Goat Rodeo run.
-    *
-    * @param correlationId
-    *   the run's correlation ID
+  /** Initialize the run state. Call once at the start of a Goat Rodeo run. the
+    * run's correlation ID
     * @param headProvider
     *   supplies the current log-chain head (None when disabled)
     * @param cleanup
@@ -78,11 +51,9 @@ object TamperEvidentLog {
     *   appender); invoked by [[reset]]
     */
   def start(
-      correlationId: String,
       headProvider: () => Option[String],
       cleanup: () => Unit = () => ()
-  ): Unit = exclusively {
-    corrId = correlationId
+  ): Unit = {
     headRef.set(headProvider)
     grcRef.set(Vector())
     cleanupRef.set(cleanup)
@@ -93,19 +64,15 @@ object TamperEvidentLog {
     * not leak into subsequent work in the same JVM (e.g. other test suites or a
     * library consumer running multiple builds).
     */
-  def reset(): Unit = exclusively {
+  def reset(): Unit = {
     val c = cleanupRef.getAndSet(() => ())
     try c()
     catch {
       case _: Throwable => // never let cleanup failure break the run
     }
-    corrId = ""
     headRef.set(() => None)
     grcRef.set(Vector())
   }
-
-  /** The run's correlation ID (empty string if not started). */
-  def correlationId: String = corrId
 
   /** The current log-chain head, if tamper-evident logging is active. */
   def currentChainHead: Option[String] = headRef.get()()
@@ -121,25 +88,21 @@ object TamperEvidentLog {
     * correlation ID, the final log chain head, and every `.grc` cluster written
     * this run (name + full 256-bit SHA-256) across all batch directories. This
     * is the out-of-band anchor a verifier checks.
+
     *
-    * @param dest
-    *   the base output directory
-    * @param corrId
-    *   the run correlation ID
     * @return
     *   the written file
     */
-  def writeChecksum(dest: File, corrId: String): File = {
+  def writeChecksum(): File = {
     val grcsJson = grcs.map { case (n, s) => ("name" -> n) ~ ("sha256" -> s) }
     val doc = compact(
       render(
-        ("correlation_id" -> corrId) ~
+        ("correlation_id" -> correlationId) ~
           ("final_chain_head" -> currentChainHead.getOrElse("")) ~
           ("grcs" -> grcsJson)
       )
     )
-    val file = new File(dest, f"goat_rodeo_${corrId}_checksum.json")
-    Files.writeString(file.toPath(), doc)
-    file
+    Files.writeString(dest.toPath(), doc)
+    dest 
   }
 }

@@ -19,10 +19,10 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
   *
   * ## LLM-friendly summary
   *
-  * | Test             | Input | Expected                  |
-  * |:-----------------|:------|:--------------------------|
-  * | build completed  | true  | returns normally          |
-  * | build died       | false | throws GoatRodeoRunFailed |
+  * | Test            | Input | Expected                  |
+  * |:----------------|:------|:--------------------------|
+  * | build completed | true  | returns normally          |
+  * | build died      | false | throws GoatRodeoRunFailed |
   */
 class RunFailureSuite extends GoatRodeoFunSuite {
 

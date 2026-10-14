@@ -272,7 +272,9 @@ Cryptographic material lives in `ItemMetaData.extra`, whose keys use a
 - On disk: `--dump-json <dir>` writes `items_<timestamp>.json`, a JSON array of
   all Items (`Storage.emitAllItemsToDir`); `--dump-roots <dir>` writes
   `roots_<timestamp>.json`, the identifiers of all roots. Both are a faithful
-  serialization of the same Items.
+  serialization of the same Items. A run split into batches writes **one dump per
+  batch**, and the union of the dumps is the whole graph — see
+  [Run Outputs](run_outputs.md); verified by `RunOutputContractSuite.O-6`.
 
 ### Algorithm (reproduce exactly)
 

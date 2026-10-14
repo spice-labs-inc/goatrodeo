@@ -50,6 +50,15 @@ How to run and interpret regular JAR metadata parity tests:
 - Maven Central-verified coordinates
 - "Better than the reference scanner" verification, companion POM priority, count checks
 
+### [Run Outputs](run_outputs.md)
+What a survey writes, and what you may rely on:
+- The output set: `.grd`, `.gri`, `.grc`, `purls.txt`, `history.jsonl`, `items_*.json`
+- Naming rules, and why the first hex character is always `0`-`7`
+- Batches: why a large run writes several directories, and why `purls.txt` is per batch
+- Cleanup guarantees, and how disk images appear as items
+
+---
+
 ### [Append-Only Graph Database](append_only_graph.md)
 Technical deep-dive into the graph database design:
 - Graph structure and relationships
@@ -123,7 +132,9 @@ Design for making ADG outputs auditable against the Goat Rodeo run that produced
 them:
 - Hash-chained run logs (`--tamper-evident-log`)
 - Correlation ID tying a run, its `.grc` files, and the final checksum
+  (verified by `RunOutputContractSuite.O-3`)
 - Full SHA-256 of `.grd`/`.gri` recorded inside each `.grc`
+  (verified by `RunOutputContractSuite.O-3`)
 - CBOM filename = escaped file name + last 16 of the gitoid
 - Standalone Python verifier and a red-to-green test plan
 
@@ -270,6 +281,7 @@ How Goat Rodeo manages system resources:
 | [docker_oci_parity.md](docker_oci_parity.md) | OCI image parity in the Docker strategy |
 | [dotnet_integration.md](dotnet_integration.md) | Cilantro 0.4.0 .NET assembly/PDB container integration |
 | [resource_handling.md](resource_handling.md) | Temp files, streams, and resource cleanup |
+| [run_outputs.md](run_outputs.md) | What a survey writes: the output set, naming, batches, cleanup |
 | [tamper_evident_logging.md](tamper_evident_logging.md) | Tamper-evident run logs and ADG auditability |
 
 ---

@@ -2,8 +2,8 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
-import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.MemStorage
+import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
@@ -13,20 +13,16 @@ import io.spicelabs.goatrodeo.testsupport.IpaZipBuilder
 import io.spicelabs.goatrodeo.util.ByteWrapper
 import io.spicelabs.goatrodeo.util.Configuration
 import org.json4s.*
-import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.parseOpt
-
-import scala.collection.immutable.TreeMap
-import scala.collection.immutable.TreeSet
 
 /** Ipa strategy tests.
   *
-  * Requirement (§2.3/§2.4 of the plan): the strategy claims `.ipa`
-  * containers and bare bundle members, accumulates `Info.plist` +
+  * Requirement (§2.3/§2.4 of the plan): the strategy claims `.ipa` containers
+  * and bare bundle members, accumulates `Info.plist` +
   * `embedded.mobileprovision` metadata onto the container item via the
-  * parent-scope pattern, captures the provisioning CMS certs as
-  * certificate Items in the Certificates metadata shape, and emits the
-  * provisional `pkg:apple/ios` pURL.
+  * parent-scope pattern, captures the provisioning CMS certs as certificate
+  * Items in the Certificates metadata shape, and emits the provisional
+  * `pkg:apple/ios` pURL.
   *
   * LLM note: Ipa-xx = test id. Corpus tests require the fetched
   * `allsafe-ios.ipa` (see `IpaCorpus`).
@@ -42,7 +38,8 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
       wrappers: io.spicelabs.goatrodeo.util.ArtifactWrapper*
   ): (Vector[ToProcess], ToProcess.ByUUID, ToProcess.ByName) = {
     val byUuid = wrappers.map(w => w.uuid -> w).toMap
-    val byName = wrappers.groupBy(_.path()).map { case (k, v) => k -> v.toVector }
+    val byName =
+      wrappers.groupBy(_.path()).map { case (k, v) => k -> v.toVector }
     val (tp, u, n, _) = IpaStrategy.computeIpaFiles(byUuid, byName)
     (tp, u, n)
   }
@@ -106,7 +103,9 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     // Find the container item: the item whose identifier is the wrapper's
     // processed GitOID ending with the ipa item having BundleIdentifier.
     val ipaItems = store.keys().toVector.flatMap { k =>
-      store.read(k).toVector
+      store
+        .read(k)
+        .toVector
         .filter(i =>
           i.bodyAsItemMetaData
             .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
@@ -154,10 +153,14 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     val (tp, _, _) = claim(wrapper)
     ToProcess.buildGraphForToProcess(tp, store)
 
-    val item = store.keys().toVector.flatMap(k => store.read(k)).find(i =>
-      i.bodyAsItemMetaData
-        .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
-    )
+    val item = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .find(i =>
+        i.bodyAsItemMetaData
+          .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
+      )
     assert(item.isDefined)
     assertEquals(
       metaOf(store, item.get, ipaAdHoc("BundleIdentifier")),
@@ -210,7 +213,9 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
       "a bare Info.plist must emit ipa metadata"
     )
     assertEquals(
-      withMeta.flatMap(i => metaOf(store, i, ipaAdHoc("BundleIdentifier"))).headOption,
+      withMeta
+        .flatMap(i => metaOf(store, i, ipaAdHoc("BundleIdentifier")))
+        .headOption,
       Some("org.example.Bare")
     )
   }
@@ -230,10 +235,14 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     ToProcess.buildGraphForToProcess(tp, store)
 
     // No ipa item should throw; the run completes.
-    val item = store.keys().toVector.flatMap(k => store.read(k)).find(i =>
-      i.bodyAsItemMetaData
-        .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
-    )
+    val item = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .find(i =>
+        i.bodyAsItemMetaData
+          .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
+      )
     assert(item.isDefined, "the ipa item still exists")
     assertEquals(
       metaOf(store, item.get, ipaAdHoc("TeamIdentifier")),
@@ -241,11 +250,17 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
       "no team id from a garbage mobileprovision"
     )
     // No cert items were emitted
-    val certItems = store.keys().toVector.filter(k =>
-      store.read(k).exists(i => i.bodyAsItemMetaData.exists(
-        m => m.extra.contains(certAdHoc("SubjectDN"))
-      ))
-    )
+    val certItems = store
+      .keys()
+      .toVector
+      .filter(k =>
+        store
+          .read(k)
+          .exists(i =>
+            i.bodyAsItemMetaData
+              .exists(m => m.extra.contains(certAdHoc("SubjectDN")))
+          )
+      )
     assert(certItems.isEmpty, "no certs from a garbage mobileprovision")
   }
 
@@ -278,11 +293,15 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     val (tp, _, _) = claim(wrapper)
     ToProcess.buildGraphForToProcess(tp, store)
 
-    val certItems = store.keys().toVector.flatMap(k => store.read(k)).filter(
-      i => i.bodyAsItemMetaData.exists(m =>
+    val certItems = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .filter(i =>
+        i.bodyAsItemMetaData.exists(m =>
           m.extra.contains(certAdHoc("SubjectDN"))
+        )
       )
-    )
     assert(
       certItems.nonEmpty,
       "the provisioning cert chain must surface as certificate Items"
@@ -298,10 +317,14 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
       "certificate item carries CertSha256"
     )
     // Team metadata also landed from the provisioning plist payload.
-    val ipaItem = store.keys().toVector.flatMap(k => store.read(k)).find(i =>
-      i.bodyAsItemMetaData
-        .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
-    )
+    val ipaItem = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .find(i =>
+        i.bodyAsItemMetaData
+          .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
+      )
     assert(ipaItem.isDefined)
     assertEquals(
       metaOf(store, ipaItem.get, ipaAdHoc("TeamIdentifier")),
@@ -333,10 +356,14 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     val (tp, _, _) = claim(wrapper)
     ToProcess.buildGraphForToProcess(tp, store)
 
-    val ipaItem = store.keys().toVector.flatMap(k => store.read(k)).find(i =>
-      i.bodyAsItemMetaData
-        .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
-    )
+    val ipaItem = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .find(i =>
+        i.bodyAsItemMetaData
+          .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
+      )
     assert(ipaItem.isDefined)
     val extra = ipaItem.get.body.get.asInstanceOf[ItemMetaData].extra
     extra.foreach { case (k, v) =>
@@ -369,9 +396,15 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
 
     // The container item still exists (as a processed zip child structure)
     // but no ipa:* metadata keys.
-    val ipaKeyed = store.keys().toVector.flatMap(k => store.read(k)).filter(
-      i => i.bodyAsItemMetaData.exists(m => m.extra.keys.exists(_.startsWith("ipa:")))
-    )
+    val ipaKeyed = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .filter(i =>
+        i.bodyAsItemMetaData.exists(m =>
+          m.extra.keys.exists(_.startsWith("ipa:"))
+        )
+      )
     assert(ipaKeyed.isEmpty, "no ipa:* metadata without a plist")
   }
 
@@ -413,10 +446,14 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     assert(tp.nonEmpty, "corpus .ipa must be claimed")
     ToProcess.buildGraphForToProcess(tp, store)
 
-    val ipaItem = store.keys().toVector.flatMap(k => store.read(k)).find(i =>
-      i.bodyAsItemMetaData
-        .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
-    )
+    val ipaItem = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .find(i =>
+        i.bodyAsItemMetaData
+          .exists(m => m.extra.contains(ipaAdHoc("BundleIdentifier")))
+      )
     assert(ipaItem.isDefined, "corpus .ipa item must carry metadata")
     assertEquals(
       metaOf(store, ipaItem.get, ipaAdHoc("BundleIdentifier")),
@@ -427,11 +464,15 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
       Some("1.0")
     )
     // Certs from the real provisioning profile.
-    val certItems = store.keys().toVector.flatMap(k => store.read(k)).filter(
-      i => i.bodyAsItemMetaData.exists(m =>
+    val certItems = store
+      .keys()
+      .toVector
+      .flatMap(k => store.read(k))
+      .filter(i =>
+        i.bodyAsItemMetaData.exists(m =>
           m.extra.contains(certAdHoc("SubjectDN"))
+        )
       )
-    )
     assert(
       certItems.nonEmpty,
       "the real provisioning profile must surface signing certs"
@@ -439,7 +480,9 @@ class IpaStrategySuite extends GoatRodeoFunSuite {
     // Provisional pURL.
     val purls = store.purls().toVector
     assert(
-      purls.exists(p => p.startsWith("pkg:apple/ios/infosecadventures.allsafe")),
+      purls.exists(p =>
+        p.startsWith("pkg:apple/ios/infosecadventures.allsafe")
+      ),
       s"corpus pURL must be emitted, got: $purls"
     )
   }
@@ -459,7 +502,7 @@ object MobileProvisionFixture {
   import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
   import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder
   import java.math.BigInteger
-  import java.security.{KeyPair, KeyPairGenerator, SecureRandom}
+  import java.security.{KeyPair, KeyPairGenerator}
   import java.util.Date
 
   /** Build a self-signed cert + private key, then a CMS SignedData whose
@@ -487,9 +530,11 @@ object MobileProvisionFixture {
       name,
       kp.getPublic
     )
-    val signer = new JcaContentSignerBuilder("SHA256withRSA").build(kp.getPrivate)
+    val signer =
+      new JcaContentSignerBuilder("SHA256withRSA").build(kp.getPrivate)
     val holder = builder.build(signer)
-    val cert = new JcaX509CertificateConverter().setProvider("BC")
+    val cert = new JcaX509CertificateConverter()
+      .setProvider("BC")
       .getCertificate(holder)
 
     // The provisioning plist payload.

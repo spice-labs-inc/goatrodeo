@@ -160,7 +160,8 @@ class GraphManagerOpenSuite extends GoatRodeoFunSuite {
       val item = createTestItem(
         "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111"
       )
-      val (_, _) = GraphManager.writeEntries(tempDir, Vector(item).iterator)
+      val (_, _) =
+        GraphManager.writeEntries(tempDir, Vector(item).iterator, None)
 
       val grdFiles = tempDir.listFiles().filter(_.getName.endsWith(".grd"))
       assert(grdFiles.nonEmpty, "writeEntries should produce a .grd file")

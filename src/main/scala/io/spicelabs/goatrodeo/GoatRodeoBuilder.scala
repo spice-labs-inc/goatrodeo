@@ -20,6 +20,7 @@ import io.bullet.borer.Json
 import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.ConfigurationToml
 import io.spicelabs.goatrodeo.util.DateParser
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import io.spicelabs.goatrodeo.util.TomlTables
 import io.spicelabs.goatrodeo.util.VectorOfStrings
 
@@ -495,8 +496,15 @@ class GoatRodeoBuilder {
     *   missing or incomplete
     */
   def run(): Unit = {
+    val tamperLogging = config.tamperEvidentLog.map(dest => {
+      val tel = TamperEvidentLog(java.util.UUID.randomUUID().toString(), dest)
+      tel.start(() => None)
+      tel
+    }
+    )
 
-    Howdy.run(using config)
+    // println("Tamper evident log "+tamperLogging)
+    Howdy.run(tamperLogging)(using config)
   }
 }
 

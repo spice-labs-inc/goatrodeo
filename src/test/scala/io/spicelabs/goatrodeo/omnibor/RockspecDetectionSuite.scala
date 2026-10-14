@@ -40,7 +40,9 @@ class RockspecDetectionSuite extends GoatRodeoFunSuite {
     val mimes = mimesFor(rockspec, "fun-0.1.3-1.rockspec")
     assert(mimes.contains("text/x-lua"), s"got $mimes")
     assert(
-      mimes.intersect(EcosystemRouter.supportedMimeTypes().asScala.toSet).nonEmpty,
+      mimes
+        .intersect(EcosystemRouter.supportedMimeTypes().asScala.toSet)
+        .nonEmpty,
       s"$mimes must include a MIME type Annatto supports"
     )
   }

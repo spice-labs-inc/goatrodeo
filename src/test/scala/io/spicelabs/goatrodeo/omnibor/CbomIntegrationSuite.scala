@@ -197,11 +197,11 @@ class CbomIntegrationSuite extends GoatRodeoFunSuite {
         Files.readAllLines(logFile.toPath()).toArray(new Array[String](0))
       assert(logLines.nonEmpty, "tamper-evident log should not be empty")
       assert(
-        logLines.exists(_.contains("Correlation ID:")),
+        logLines.exists(_.contains("\"correlation_id\":")),
         "log should contain the correlation ID as the first line"
       )
       val checksums =
-        outputDir.listFiles(f => f.getName.endsWith("_checksum.json"))
+        outputDir.listFiles(f => f.getName.endsWith("run.log"))
       assertEquals(checksums.length, 1, "exactly one checksum file")
       val checksum =
         JsonMethods

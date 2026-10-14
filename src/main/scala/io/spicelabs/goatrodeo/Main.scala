@@ -51,9 +51,9 @@ import scala.util.Try
 class Howdy
 
 /** Thrown by [[Howdy.run]] (and so [[GoatRodeoBuilder.run]]) when the build
-  * died part-way — out of memory, a full temp filesystem, an illegal state —
-  * so its output is missing or incomplete. Without it a caller could not tell
-  * such a run from a successful one.
+  * died part-way — out of memory, a full temp filesystem, an illegal state — so
+  * its output is missing or incomplete. Without it a caller could not tell such
+  * a run from a successful one.
   */
 final class GoatRodeoRunFailed(message: String)
     extends RuntimeException(message)
@@ -96,7 +96,10 @@ object Howdy {
         // through GoatRodeoBuilder, the host owns logging and chose its levels
         // deliberately, so nothing on that path touches them.
         applyLogging(config)
-        try run(using config)
+        val tamperEvidentLog = config.tamperEvidentLog.map(dest =>
+          TamperEvidentLog(UUID.randomUUID().toString(), dest)
+        )
+        try run(tamperEvidentLog)(using config)
         catch {
           case e: GoatRodeoRunFailed =>
             logger.error(e.getMessage())
@@ -140,27 +143,21 @@ object Howdy {
     * as `config`.
     */
   @static
-  def run(using Configuration): Unit = {
+  def run(
+      tamperEvidentLog: Option[TamperEvidentLog]
+  )(using Configuration): Unit = {
     // Hold the tamper-evidence lock for the whole run: the correlation ID (and
     // chain-head state) is process-global, and no other run or test may mutate
     // it while this run's CBOMs and checksum are being written. Concurrent
     // runs are serialized, which is fine — Goat Rodeo is one run per JVM.
-    TamperEvidentLog.exclusively {
-      setupTamperEvidentLogging
-      try {
-        runImpl
-      } finally {
-        // The only teardown, paired with the start above: guaranteed release of
-        // run-scoped logging resources (e.g. detaching the chain appender from
-        // the root logger) even if the run throws. Nothing further down the call
-        // stack resets -- a component that did not start the log does not get to
-        // decide when it ends.
-        TamperEvidentLog.reset()
-      }
-    }
+
+    runImpl(tamperEvidentLog)
+
   }
 
-  private def runImpl(using Configuration): Unit = {
+  private def runImpl(
+      tamperEvidentLog: Option[TamperEvidentLog]
+  )(using Configuration): Unit = {
     startComponents
 
     val logger = Logger(getClass())
@@ -309,7 +306,8 @@ object Howdy {
       finishedFile = onFileFinish,
       done = good => { succeeded.set(good); onRunFinish(good) },
       preWriteDB = preWriteDB,
-      failedContainers = failedContainers
+      failedContainers = failedContainers,
+      tamperEvidentLog = tamperEvidentLog
     )
 
     // Wholesale container loss is invisible in the counts otherwise: the
@@ -357,28 +355,32 @@ object Howdy {
     * anchors every later line, `.grc`, and the final checksum file to this run.
     */
   @static
-  private def setupTamperEvidentLogging(using Configuration): Unit = {
-    val correlationId = UUID.randomUUID().toString
-    var chainHead: () => Option[String] = () => None
-    var cleanup: () => Unit = () => ()
-    config.tamperEvidentLog.foreach { file =>
-      val lc = LoggerFactory
-        .getILoggerFactory()
-        .asInstanceOf[LoggerContext]
-      val appender = new ChainAppender()
-      appender.setContext(lc)
-      appender.setFile(file)
-      appender.start()
-      val root =
-        lc.getLogger(ROOT_LOGGER_NAME)
-      root.addAppender(appender)
-      chainHead = () => Some(appender.currentChainHead())
-      cleanup = () => {
-        root.detachAppender(appender)
-        appender.stop()
+  private def setupTamperEvidentLogging(
+      tamperEvidentLog: Option[TamperEvidentLog]
+  )(using Configuration): Unit = {
+
+    tamperEvidentLog.foreach(tel => {
+      var chainHead: () => Option[String] = () => None
+      var cleanup: () => Unit = () => ()
+      config.tamperEvidentLog.foreach { file =>
+        val lc = LoggerFactory
+          .getILoggerFactory()
+          .asInstanceOf[LoggerContext]
+        val appender = new ChainAppender()
+        appender.setContext(lc)
+        appender.setFile(file)
+        appender.start()
+        val root =
+          lc.getLogger(ROOT_LOGGER_NAME)
+        root.addAppender(appender)
+        chainHead = () => Some(appender.currentChainHead())
+        cleanup = () => {
+          root.detachAppender(appender)
+          appender.stop()
+        }
       }
-    }
-    TamperEvidentLog.start(correlationId, chainHead, cleanup)
-    logger.info(f"Correlation ID: ${correlationId}")
+      tel.start(chainHead, cleanup)
+      logger.info(f"Correlation ID: ${tel.correlationId}")
+    })
   }
 }

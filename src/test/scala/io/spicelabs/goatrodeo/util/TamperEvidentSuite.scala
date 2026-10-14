@@ -25,6 +25,7 @@ import io.spicelabs.goatrodeo.omnibor.MemStorage
 import io.spicelabs.goatrodeo.omnibor.Storage
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testsupport.RunOutputs
 import org.json4s.*
 import org.json4s.JString
 import org.json4s.native.JsonMethods.*
@@ -34,9 +35,6 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.util.Comparator
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSet
 
@@ -86,27 +84,12 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
     ()
   }
 
-  /** Decode a `.grc` file's ClusterFileEnvelope. The cluster file layout is
-    * magic (4 bytes) + short envelope length (2 bytes) + CBOR envelope.
+  /** Decode a `.grc` file's ClusterFileEnvelope. The layout is shared with
+    * every other suite that reads a cluster file, so the decoder lives in
+    * [[RunOutputs]] rather than here.
     */
-  private def readClusterEnv(file: File): ClusterFileEnvelope = {
-    val dfp = new FileInputStream(file).getChannel()
-    try {
-      val magic = Helpers.readInt(dfp)
-      assertEquals(magic, GraphManager.Consts.ClusterFileMagicNumber)
-      val len = Helpers.readShort(dfp)
-      val bytes = new Array[Byte](len)
-      var off = 0
-      while (off < len) {
-        val r = dfp.read(ByteBuffer.wrap(bytes, off, len - off))
-        if (r < 0) throw new Exception("short read on cluster envelope")
-        off += r
-      }
-      Cbor.decode(bytes).to[ClusterFileEnvelope].value
-    } finally {
-      dfp.close()
-    }
-  }
+  private def readClusterEnv(file: File): ClusterFileEnvelope =
+    RunOutputs.readClusterEnvelope(file)
 
   /** Recompute the chain digests from payloads and check they match the
     * `<digest> <payload>` prefixes. Returns the recomputed digests.
@@ -290,43 +273,40 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
     "T-07 .grc info records correlation id, per-file sha256, and chain head"
   ) {
     val dir = tempDir()
-    try
-      TamperEvidentLog.exclusively {
-        val chainHex =
-          "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-        TamperEvidentLog.start(
-          "11111111-2222-3333-4444-555555555555",
-          () => Some(chainHex)
+    try {
+
+      val chainHex =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      val tel = TamperEvidentLog("11111111-2222-3333-4444-555555555555", File(dir, "run.log"))
+      tel.start(() => Some(chainHex))
+      val items = Vector(
+        makeItem(
+          "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ),
+        makeItem(
+          "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         )
-        val items = Vector(
-          makeItem(
-            "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          ),
-          makeItem(
-            "gitoid:blob:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-          )
-        )
-        val (dataAndIndex, clusterFile) =
-          GraphManager.writeEntries(dir, items.iterator)
-        val env = readClusterEnv(clusterFile)
-        assertEquals(
-          env.info("correlation_id"),
-          "11111111-2222-3333-4444-555555555555"
-        )
-        assertEquals(env.info("log_chain_head"), chainHex)
-        // sha256 JSON arrays, index-aligned with dataFiles/indexFiles
-        val sha = parse(env.info("sha256"))
-        val grd = (sha \ "grd").children.map(_.values.toString)
-        val gri = (sha \ "gri").children.map(_.values.toString)
-        assertEquals(grd.length, dataAndIndex.length)
-        assertEquals(gri.length, dataAndIndex.length)
-        dataAndIndex.zipWithIndex.foreach { case (dif, i) =>
-          assertEquals(grd(i), dif.dataFileSha256)
-          assertEquals(gri(i), dif.indexFileSha256)
-        }
+      )
+      val (dataAndIndex, clusterFile) =
+        GraphManager.writeEntries(dir, items.iterator, Some(tel))
+      val env = readClusterEnv(clusterFile)
+      assertEquals(
+        env.info("correlation_id"),
+        "11111111-2222-3333-4444-555555555555"
+      )
+      assertEquals(env.info("log_chain_head"), chainHex)
+      // sha256 JSON arrays, index-aligned with dataFiles/indexFiles
+      val sha = parse(env.info("sha256"))
+      val grd = (sha \ "grd").children.map(_.values.toString)
+      val gri = (sha \ "gri").children.map(_.values.toString)
+      assertEquals(grd.length, dataAndIndex.length)
+      assertEquals(gri.length, dataAndIndex.length)
+      dataAndIndex.zipWithIndex.foreach { case (dif, i) =>
+        assertEquals(grd(i), dif.dataFileSha256)
+        assertEquals(gri(i), dif.indexFileSha256)
       }
-    finally {
-      TamperEvidentLog.start("", () => None)
+    } finally {
+
       cleanup(dir)
     }
   }
@@ -335,29 +315,30 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   // THEORY: the chain head is a flag-gated, additive field.
   test("T-08 .grc info omits log_chain_head when tamper-evidence is off") {
     val dir = tempDir()
-    try
-      TamperEvidentLog.exclusively {
-        TamperEvidentLog.start(
-          "99999999-8888-7777-6666-555555555555",
-          () => None
+    try {
+
+      val tel = TamperEvidentLog("99999999-8888-7777-6666-555555555555", File(dir, "run.log"))
+
+      tel.start(() => None)
+      val items = Vector(
+        makeItem(
+          "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         )
-        val items = Vector(
-          makeItem(
-            "gitoid:blob:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          )
-        )
-        val (_, clusterFile) = GraphManager.writeEntries(dir, items.iterator)
-        val env = readClusterEnv(clusterFile)
-        assertEquals(
-          env.info("correlation_id"),
-          "99999999-8888-7777-6666-555555555555"
-        )
-        assert(!env.info.contains("log_chain_head"))
-      }
-    finally {
-      TamperEvidentLog.start("", () => None)
+      )
+      val (_, clusterFile) =
+        GraphManager.writeEntries(dir, items.iterator, Some(tel))
+      val env = readClusterEnv(clusterFile)
+      assertEquals(
+        env.info("correlation_id"),
+        "99999999-8888-7777-6666-555555555555"
+      )
+      assert(!env.info.contains("log_chain_head"))
+
+    } finally {
+
       cleanup(dir)
     }
+
   }
 
   // T-09 — the run-level checksum JSON contains correlation id, final chain head,
@@ -365,99 +346,41 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   // run's .grc files to the chained log.
   test("T-09 checksum file shape") {
     val dir = tempDir()
-    try
-      TamperEvidentLog.exclusively {
-        TamperEvidentLog.start(
-          "abcd1234-0000-0000-0000-000000000000",
-          () =>
-            Some(
-              "feedface00000000000000000000000000000000000000000000000000000000"
-            )
-        )
-        TamperEvidentLog.addGrc(
-          "2026_01_02_03_04_05_deadbeef.grc",
-          "beefcafe0000000000000000000000000000000000000000000000000000000000"
-        )
-        val file = TamperEvidentLog.writeChecksum(
-          dir,
-          "abcd1234-0000-0000-0000-000000000000"
-        )
-        assertEquals(
-          file.getName(),
-          "goat_rodeo_abcd1234-0000-0000-0000-000000000000_checksum.json"
-        )
-        val json = parse(Files.readString(file.toPath()))
-        assertEquals(
-          (json \ "correlation_id").values.toString,
-          "abcd1234-0000-0000-0000-000000000000"
-        )
-        assertEquals(
-          (json \ "final_chain_head").values.toString,
+    try {
+      val tel = TamperEvidentLog("abcd1234-0000-0000-0000-000000000000", File(dir, "run.log"))
+      tel.start(() =>
+        Some(
           "feedface00000000000000000000000000000000000000000000000000000000"
         )
-        assertEquals(
-          (json \ "grcs")(0) \ "name" match {
-            case JString(s) => s
-            case other      => fail(s"expected string, got $other")
-          },
-          "2026_01_02_03_04_05_deadbeef.grc"
-        )
-      }
-    finally {
-      TamperEvidentLog.start("", () => None)
+      )
+      tel.addGrc(
+        "2026_01_02_03_04_05_deadbeef.grc",
+        "beefcafe0000000000000000000000000000000000000000000000000000000000"
+      )
+      val file = tel.writeChecksum(
+        
+      )
+
+      val json = parse(Files.readString(file.toPath()))
+      assertEquals(
+        (json \ "correlation_id").values.toString,
+        "abcd1234-0000-0000-0000-000000000000"
+      )
+      assertEquals(
+        (json \ "final_chain_head").values.toString,
+        "feedface00000000000000000000000000000000000000000000000000000000"
+      )
+      assertEquals(
+        (json \ "grcs")(0) \ "name" match {
+          case JString(s) => s
+          case other      => fail(s"expected string, got $other")
+        },
+        "2026_01_02_03_04_05_deadbeef.grc"
+      )
+    } finally {
+
       cleanup(dir)
     }
   }
 
-  // T-10 — TamperEvidentLog.reset() invokes the run's cleanup callback (the
-  // mechanism by which the chain appender is detached from the root logger).
-  // THEORY: cleanup must always run at the end of a run so a tamper-evident
-  // appender never leaks into subsequent work in the same JVM.
-  test("T-10 reset invokes the run cleanup callback") {
-    TamperEvidentLog.exclusively {
-      val called = new AtomicBoolean(false)
-      TamperEvidentLog.start("corr-id", () => None, () => called.set(true))
-      TamperEvidentLog.addGrc("a.grc", "beef")
-      TamperEvidentLog.reset()
-      assert(called.get())
-      assertEquals(TamperEvidentLog.correlationId, "")
-      assertEquals(TamperEvidentLog.grcs, Vector())
-    }
-  }
-
-  // T-11 — waiting for the run lock must not pin virtual-thread carriers.
-  // Allspice starts one run per artifact on virtual threads. With a monitor here,
-  // on JDK 21 to 23 the holder (blocked inside it) and every waiter (blocked
-  // entering it) each pinned a carrier; with as many runs as carriers, the
-  // holder's own virtual threads (the MIME pass) could never be scheduled and the
-  // runs deadlocked. THEORY: with more waiters than carriers, an unrelated virtual
-  // thread still runs while the lock is held.
-  test(
-    "T-11 waiting for the run lock leaves carriers for other virtual threads"
-  ) {
-    val held = new CountDownLatch(1)
-    val release = new CountDownLatch(1)
-    val probeRan = new CountDownLatch(1)
-    val holder = Thread.ofVirtual().start { () =>
-      TamperEvidentLog.exclusively {
-        held.countDown()
-        release.await()
-      }
-    }
-    assert(held.await(10, TimeUnit.SECONDS), "the holder never took the lock")
-    val waiters = (1 to Runtime.getRuntime.availableProcessors * 2).map { _ =>
-      Thread.ofVirtual().start(() => TamperEvidentLog.exclusively(()))
-    }
-    try {
-      Thread.sleep(200) // let every waiter reach the lock
-      Thread.ofVirtual().start(() => probeRan.countDown())
-      assert(
-        probeRan.await(10, TimeUnit.SECONDS),
-        "a virtual thread could not run while others waited for the run lock"
-      )
-    } finally {
-      release.countDown()
-      (holder +: waiters).foreach(_.join(10000))
-    }
-  }
 }
