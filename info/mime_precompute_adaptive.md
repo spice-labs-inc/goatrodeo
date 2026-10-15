@@ -89,7 +89,7 @@ Each worker treats its current file as a boundary:
 
 - A worker blocked forever in a native blocking call would prevent
   resolution (documented deployment property; the plain `.par` code had the
-  same property — see the ADR).
+  same property).
 - A JVM-level fatal (OOM) propagates loudly instead of being counted.
 
 ## Claims and their tests
@@ -117,7 +117,6 @@ Each worker treats its current file as a boundary:
 
 ## Related
 
-- `info/adrs/adr_2026_08_17_adaptive_mime_workers.md`
 - `src/main/scala/io/spicelabs/goatrodeo/util/AdaptiveMimeBuilder.scala`
 - `src/main/scala/io/spicelabs/goatrodeo/util/AdaptiveParallelism.scala`
 - `info/mime_types.md` (MIME detection itself)

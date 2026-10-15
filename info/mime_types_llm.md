@@ -48,6 +48,43 @@ Verified by `MimeHintSuite.T5.1–T5.8` (hint default/union/spill/
 never-sniffed/authoritative/monotonic property) and
 `CertificatesPkcs7Suite.T6.x` (claim semantics).
 
+### Terminal MIME types and the extension-misreading exceptions
+
+`ArtifactWrapper.augmentationCannotApply` short-circuits the augmenter chain when
+Tika produced a MIME no augmenter could match: media types, plus
+`terminalBinaryMimeTypes` (JVM class mimes, `application/java-archive`,
+`application/vnd.android.package-archive`). Pure performance; safe only while "no
+augmenter could match" holds.
+
+Excluded from the short-circuit, because Tika assigns them **by extension alone**
+and the bytes contradict them:
+
+| Tika | Pipeline |
+|---|---|
+| `text/x-vhdl` for `.vhd` | text stays probed; `SaffronDetector.mimeTypeAugmenter` drops `text/*` once `readFormat` recognises a disk |
+| `image/x-raw-panasonic` for `.raw` | `image/x-raw-*` is not terminal; the same augmenter drops `image/x-raw-*` once a disk is recognised |
+
+The `image/` case is the dangerous one: `image/` is also terminal for
+`FileWalker.notArchive`, so without the exception the file never reaches Saffron
+and a `.raw` cloud image is surveyed as one opaque file **while the run still
+succeeds**. Nothing else reports it.
+
+Exact predicates:
+
+```scala
+// ArtifactWrapper.augmentationCannotApply
+(m.startsWith("image/") && !m.startsWith("image/x-raw-")) ||
+  m.startsWith("audio/") || m.startsWith("video/") ||
+  terminalBinaryMimeTypes.contains(m)
+
+// SaffronDetector.mimeTypeAugmenter, when readFormat is non-empty
+currentMimes.filterNot(m => m.startsWith("text/") || m.startsWith("image/x-raw-")) ++ myMimes
+```
+
+Tests: `SaffronImageItemSuite.S-4` (`.raw` with no filesystem: recognised, carries
+`application/x-saffron-raw-disk`, no error, no file items) and `S-5` (`.raw` with a
+filesystem: walked, files become items, no `image/` MIME survives).
+
 ## CryptoDetector augmentation (Certificates strategy)
 
 Where Tika falls short for cryptographic file types — most crypto

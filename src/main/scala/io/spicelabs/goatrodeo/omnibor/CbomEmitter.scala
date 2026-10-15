@@ -15,6 +15,7 @@ limitations under the License. */
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.*
 import org.json4s.JsonDSL.*
 import org.json4s.native.JsonMethods.*
@@ -70,10 +71,10 @@ object CbomEmitter {
       storage: Storage,
       version: String,
       outDir: File,
-      correlationId: String = ""
+      tamperEvidentLog: Option[TamperEvidentLog] = None
   ): Try[Seq[File]] = {
     val roots = findRoots(storage)
-    emit(storage, roots, version, outDir, correlationId)
+    emit(storage, roots, version, outDir, tamperEvidentLog)
   }
 
   /** Emit one CBOM file per root Item.
@@ -86,9 +87,7 @@ object CbomEmitter {
     *   CycloneDX version ("1.6" or "1.7")
     * @param outDir
     *   destination directory
-    * @param correlationId
-    *   the run's correlation ID, recorded as a top-level property (empty when
-    *   not part of a run)
+    *
     * @return
     *   the emitted files, or a failure
     */
@@ -97,7 +96,7 @@ object CbomEmitter {
       roots: Seq[Item],
       version: String,
       outDir: File,
-      correlationId: String = ""
+      tamperEvidentLog: Option[TamperEvidentLog] = None
   ): Try[Seq[File]] = {
     for {
       dir <- safeOutputDir(outDir)
@@ -105,7 +104,7 @@ object CbomEmitter {
         for {
           acc <- accTry
           (items, truncated) = collectCryptoItems(storage, root)
-          doc = buildDocument(root, items, version, truncated, correlationId)
+          doc = buildDocument(root, items, version, truncated, tamperEvidentLog)
           filename = cbomFilename(root)
           file <- atomicWrite(dir, filename, doc)
         } yield acc :+ file
@@ -217,7 +216,7 @@ object CbomEmitter {
       items: Vector[(Item, Vector[Item])],
       version: String,
       truncated: Boolean,
-      correlationId: String
+      tamperEvidentLog: Option[TamperEvidentLog]
   ): JObject = {
     if (truncated) {
       logger.warn(
@@ -282,12 +281,11 @@ object CbomEmitter {
           )
         )
       else None,
-      Option(correlationId)
-        .filter(_.nonEmpty)
+      tamperEvidentLog
         .map(corr =>
           JObject(
             "name" -> JString("goatrodeo:correlation-id"),
-            "value" -> JString(corr)
+            "value" -> JString(corr.correlationId)
           )
         )
     ).flatten

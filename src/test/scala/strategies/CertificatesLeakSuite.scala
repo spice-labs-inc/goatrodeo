@@ -10,6 +10,7 @@ import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
+import io.spicelabs.goatrodeo.testsupport.ForbiddenPatterns
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
@@ -39,16 +40,7 @@ import scala.util.Try
   */
 class CertificatesLeakSuite extends GoatRodeoFunSuite {
 
-  private val appendixCPatterns: Seq[Pattern] = Seq(
-    "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
-    "-----BEGIN ENCRYPTED PRIVATE KEY-----",
-    "-----BEGIN PGP PRIVATE KEY BLOCK-----",
-    "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END [A-Z ]*PRIVATE KEY-----",
-    "MIIEvQIBADAN",
-    "MIIEpAIBAAKCAQEA",
-    "MIIB[A-Za-z0-9+/]{8}QIB[A-Za-z0-9+/]+",
-    "openssh-key-v1"
-  ).map(Pattern.compile)
+  private val appendixCPatterns: Seq[Pattern] = ForbiddenPatterns.appendixC
 
   private def stubItem(): Item = Item(
     identifier = "gitoid:blob:sha256:phase8-leak-suite-stub",

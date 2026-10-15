@@ -77,6 +77,5 @@ Encoded as `containerGitOID:referencedFileGitOID` strings in `java.security:asso
 
 ## Related
 
-- ADR: `docs/adr/0004-java-security-strategy.md`
 - MIME detection: `info/java_security_capture.md`
 - Architecture boundary: `info/architecture_llm.md` §Strategy Selection vs. Processing Boundary

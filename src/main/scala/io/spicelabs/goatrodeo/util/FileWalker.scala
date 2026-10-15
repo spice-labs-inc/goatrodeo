@@ -496,7 +496,8 @@ object FileWalker {
                           regular.openStream(),
                           None,
                           tempPath,
-                          inMemoryLimit = Some(ArtifactWrapper.smallInMemorySize)
+                          inMemoryLimit =
+                            Some(ArtifactWrapper.smallInMemorySize)
                         )
                         .toOption
 

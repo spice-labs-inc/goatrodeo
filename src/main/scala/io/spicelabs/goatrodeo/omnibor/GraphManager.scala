@@ -232,7 +232,8 @@ object GraphManager {
     */
   def writeEntries(
       targetDirectory: File,
-      entries: Iterator[Item]
+      entries: Iterator[Item],
+      tamperEvidentLog: Option[TamperEvidentLog] = None
   ): (Seq[DataAndIndexFiles], File) = {
     var previousInChain: Long = 0L
     var biggest: Vector[(Item, Int)] = Vector()
@@ -282,9 +283,9 @@ object GraphManager {
       )
     )
     val info = TreeMap[String, String](
-      "correlation_id" -> TamperEvidentLog.correlationId,
       "sha256" -> sha256Json
-    ) ++ TamperEvidentLog.currentChainHead.map("log_chain_head" -> _)
+    ) ++ tamperEvidentLog.map(log => "correlation_id" -> log.correlationId)
+      ++ tamperEvidentLog.flatMap(_.currentChainHead.map("log_chain_head" -> _))
     val clusterEnvelope =
       ClusterFileEnvelope.build(
         indexFiles = fileSet.map(_.indexFile).toVector,
@@ -319,7 +320,7 @@ object GraphManager {
 
     tempFile.toFile().renameTo(targetFile)
     logger.info(f"Wrote ADG cluster ${grcName} sha256 ${grcSha256}")
-    TamperEvidentLog.addGrc(grcName, grcSha256)
+    tamperEvidentLog.foreach(_.addGrc(grcName, grcSha256))
     if (false) {
       for { i <- biggest } {
         logger.info(

@@ -114,5 +114,4 @@ The parser never throws. Malformed files, unreadable files, and binary data resu
 - Parser: `src/main/scala/io/spicelabs/goatrodeo/util/JavaSecurityParser.scala`
 - Detector: `src/main/scala/io/spicelabs/goatrodeo/util/JavaSecurityDetector.scala`
 - Registration: `src/main/scala/io/spicelabs/goatrodeo/omnibor/ToProcess.scala`
-- ADR: `docs/adr/0004-java-security-strategy.md`
 - Architecture boundary: `info/architecture.md` §Strategy Selection vs. Processing Boundary

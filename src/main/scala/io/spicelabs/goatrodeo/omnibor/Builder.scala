@@ -97,7 +97,8 @@ object Builder {
       finishedFile: File => Unit,
       done: Boolean => Unit,
       preWriteDB: Vector[Storage => Boolean] = Vector(),
-      failedContainers: AtomicInteger = new AtomicInteger(0)
+      failedContainers: AtomicInteger = new AtomicInteger(0),
+      tamperEvidentLog: Option[TamperEvidentLog] = None
   )(using Configuration): Unit = {
     val totalStart = Instant.now()
     // Fresh per-run dispatcher; enforces monotonic current and catches
@@ -253,7 +254,8 @@ object Builder {
         lastProgressReport = lastProgressReport,
         failedContainers = failedContainers,
         preWriteDB = preWriteDB,
-        gitItems = gitItems
+        gitItems = gitItems,
+        tamperEvidentLog = tamperEvidentLog
       )
       logger.info(
         f"Starting multi-thread consumer loop ${loopCnt}%,d at ${Duration
@@ -297,9 +299,9 @@ object Builder {
     // chained log line follows it), so its final_chain_head is the digest of
     // the last line of the log. Correlates the run id, the log, and every
     // .grc written across all batch dirs.
-    TamperEvidentLog.correlationId match {
-      case ""     => ()
-      case corrId => TamperEvidentLog.writeChecksum(dest, corrId)
+    tamperEvidentLog.foreach { tel =>
+      tel.writeChecksum()
+
     }
     // No reset here: whoever called TamperEvidentLog.start owns the teardown,
     // and that is Howdy.run, which does it in a finally so a throw cannot skip
@@ -325,7 +327,8 @@ object Builder {
       lastProgressReport: AtomicLong,
       failedContainers: AtomicInteger,
       preWriteDB: Vector[Storage => Boolean] = Vector(),
-      gitItems: Vector[GitRunItem] = Vector()
+      gitItems: Vector[GitRunItem] = Vector(),
+      tamperEvidentLog: Option[TamperEvidentLog]
   )(using Configuration): Option[BatchState] = {
 
     val liveWorkers = AtomicInteger(0)
@@ -614,7 +617,7 @@ object Builder {
                     storage,
                     config.cbomVersion,
                     cbomDir,
-                    TamperEvidentLog.correlationId
+                    tamperEvidentLog
                   ) match {
                   case Success(files) =>
                     logger.info(
@@ -632,7 +635,7 @@ object Builder {
             val ret = storage match {
               case lf: (ListFileNames & Storage)
                   if writeToStorage && !dead_?.get() =>
-                writeGoatRodeoFiles(lf)
+                writeGoatRodeoFiles(lf, tamperEvidentLog)
               case _ => logger.error("Didn't write"); None
             }
 
@@ -659,7 +662,8 @@ object Builder {
   }
 
   def writeGoatRodeoFiles(
-      store: ListFileNames & Storage
+      store: ListFileNames & Storage,
+      tamperEvidentLog: Option[TamperEvidentLog]
   ): Option[File] = {
     store.target() match {
       case Some(target) => {
@@ -709,7 +713,8 @@ object Builder {
 
         val ret = GraphManager.writeEntries(
           target,
-          finalItems.iterator
+          finalItems.iterator,
+          tamperEvidentLog
         )
 
         logger.info(

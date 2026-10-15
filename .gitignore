@@ -41,11 +41,17 @@ metals.sbt
 .idea_modules
 /.worksheet/
 
+AGENTS.md
+CLAUDE.md
 frood.db
 info_repo*.txt
 frood.txt
 /frood_dir
 /mirror
+/discussions
+/external_r*
+/plans
+/execution_state
 info_repo_*.txt
 
 build_repo_*.txt

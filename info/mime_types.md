@@ -49,6 +49,36 @@ Verified by `MimeHintSuite.T5.1–T5.8` (hint default/union/spill/
 never-sniffed/authoritative/monotonic property) and
 `CertificatesPkcs7Suite.T6.x` (claim semantics).
 
+### Terminal MIME types, and the extension misreadings they must not block
+
+`ArtifactWrapper.augmentationCannotApply` skips the whole augmenter chain when
+Tika has already produced a MIME that no augmenter could ever match — media types
+and the terminal binary types. That is a pure performance short-circuit, and it is
+safe only while "no augmenter could match" is true.
+
+Two families are **deliberately excluded** from that short-circuit because Tika
+assigns them by extension alone and the bytes contradict them:
+
+| Tika's reading | Why it is wrong | What the pipeline does |
+|---|---|---|
+| `text/x-vhdl` for a `.vhd` | Tika reads the extension as VHDL source | the text family is left probed, and `SaffronDetector` drops `text/*` once it has recognised a disk |
+| `image/x-raw-panasonic` for a `.raw` | Tika reads the extension as a Panasonic camera RAW photo | `image/x-raw-*` is not terminal, and `SaffronDetector` drops it once it has recognised a disk |
+
+The second row matters more than it looks. An `image/` type is not only terminal
+for augmentation — `FileWalker.notArchive` also rejects anything under `image/`,
+so the file is never offered to Saffron at all. Without the exception, a raw disk
+image named `.raw` — which is how Debian and other cloud images ship — is
+surveyed as a single opaque file, and the run still succeeds, so nothing else
+reports it. The bytes decide the format; the extension may not.
+
+**Verified by:** `SaffronImageItemSuite.S-4` (a `.raw` disk with no mountable
+filesystem is still recognised, carries `application/x-saffron-raw-disk`, logs no
+error, and yields no file items) and `SaffronImageItemSuite.S-5` (a `.raw` disk
+*with* a filesystem is walked, its files become items, and the camera-RAW
+misreading is absent from the disk's MIME set). `S-5` is the load-bearing one:
+if the exception is lost, the run still succeeds and only the missing items
+reveal it.
+
 ## CryptoDetector augmentation (Certificates strategy)
 
 Where Tika falls short for cryptographic file types — most crypto

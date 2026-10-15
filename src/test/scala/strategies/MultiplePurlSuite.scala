@@ -103,7 +103,7 @@ class MultiplePurlSuite extends GoatRodeoFunSuite {
         // Normalize pURLs by stripping query qualifiers (?packaging=sources,
         // ?classifier=javadoc, etc.) before comparison. Goat Rodeo emits
         // classifier qualifiers on sources/javadoc pURLs as a deliberate
-        // design decision (ADR 0009), but the reference scanner does not
+        // design decision, but the reference scanner does not
         // use qualifiers.
         def normalizePurl(p: String): String = {
           val queryIdx = p.indexOf('?')

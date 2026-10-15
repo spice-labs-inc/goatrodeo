@@ -116,6 +116,7 @@ ipa:Entitlements = {"application-identifier": "...", "get-task-allow": false}
 | IG | Binary-plist ATS flags match the XML twin; exception domains and local networking survive; absent ATS → no flags | `MobileTlsSuite.Mtl-3.1`, `Mtl-3.2`, `Mtl-3.3` |
 | IH | Invalid plist bytes → no ATS, no exception; strategy-level binary-plist ATS pipeline | `Mtl-3.4`, `Mtl-3.6` |
 | II | Oversized plist refused (never truncated-parsed as ATS) | `Mtl-3.7` |
+| IJ | `purls.txt` holds exactly the run's package URLs, one per line, so the `grep apple` query above finds the `.ipa`'s pURL | `RunOutputContractSuite.O-4` |
 
 ## Related
 

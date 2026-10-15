@@ -214,14 +214,14 @@ object DockerMetadataExtractor {
     value.map(v => key -> TreeSet(StringOrPair(v)))
   }
 
-  /** Normalize known OCI / label-schema / Flatpak label keys into Goat
-    * Rodeo metadata keys.
+  /** Normalize known OCI / label-schema / Flatpak label keys into Goat Rodeo
+    * metadata keys.
     *
     * OCI keys take precedence over label-schema keys. If both are present, the
     * OCI value wins. Flatpak keys (org.flatpak.*) are independent: a Flatpak
     * pulled from an OCI registry arrives as a plain OCI layout whose config
-    * labels carry the flatpak identity, and those keys normalize to
-    * well-named docker:Flatpak* metadata.
+    * labels carry the flatpak identity, and those keys normalize to well-named
+    * docker:Flatpak* metadata.
     */
   private def normalizeLabels(
       labels: Map[String, String]

@@ -52,6 +52,5 @@ Conservative detection prefers false negatives over false positives. Missed conf
 
 ## Related
 
-- ADR: `docs/adr/0001-openssl-config-mime-augmenter.md`
 - Implementation: `src/main/scala/io/spicelabs/goatrodeo/util/OpenSSLConfigDetector.scala`
 - Registration: `src/main/scala/io/spicelabs/goatrodeo/util/ArtifactWrapper.scala:260`

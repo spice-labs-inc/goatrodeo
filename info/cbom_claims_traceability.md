@@ -37,12 +37,6 @@ This file maps factual claims in the documentation to tests that verify them.
 | `GoatRodeoBuilder` exposes `withCbomDir(String)` and `withCbomVersion(String)`. | ``ConfigCbomFlagsSuite` `GoatRodeoBuilder withExtraArg supports CBOM keys`` |
 | `withExtraArg` supports `emitCbomDir` and `cbomVersion` keys. | ``ConfigCbomFlagsSuite` `GoatRodeoBuilder withExtraArg supports CBOM keys`` |
 
-## docs/adr
-
-| Claim | Verified By |
-|-------|-------------|
-| Required ADRs exist and contain both human and LLM sections. | `AdrExistenceSuite.T4.5` |
-
 ## info/architecture.md / info/architecture_llm.md
 
 | Claim | Verified By |
@@ -59,15 +53,10 @@ The following documents already include their own `Verified by` sections and are
 - `info/openssl_config_capture.md` / `info/openssl_config_capture_llm.md`
 - `info/java_security_capture.md` / `info/java_security_capture_llm.md`
 - `info/cbom_emitter.md` / `info/cbom_emitter_llm.md`
-- `docs/adr/0001-openssl-config-mime-augmenter.md`
-- `docs/adr/0002-openssl-config-strategy.md`
-- `docs/adr/0004-java-security-strategy.md`
-- `docs/adr/0005-cbom-output-format.md`
 
 ## Expanded Hashing Coverage (2026-08-14)
 
-Claims in `info/cbom_emitter.md` "Algorithm classification" and
-`info/adrs/adr_2026_08_14_crypto_algorithm_registry.md`:
+Claims in `info/cbom_emitter.md` "Algorithm classification":
 
 | Claim | Verified By |
 |-------|-------------|

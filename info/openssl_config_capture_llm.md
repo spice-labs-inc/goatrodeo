@@ -68,5 +68,4 @@ Encoded as `containerGitOID:referencedFileGitOID` strings in `openssl.cnf:associ
 
 ## Related
 
-- ADR: `docs/adr/0002-openssl-config-strategy.md`
 - MIME detection: `info/openssl_mime_detection_llm.md`

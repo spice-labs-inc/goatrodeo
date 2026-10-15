@@ -464,8 +464,8 @@ val item = Item.decode(bytes)
 
 The Maven strategy uses field-level merge for groupId/artifactId/version resolution, implemented in `MavenState.resolveGroupIdArtifactIdVersion()`. Instead of picking the first source that provides all three fields, each field is resolved independently from the highest-priority source that provides it:
 
-1. **External POM (companion)** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`. This is the HIGHEST priority source because it is the authoritative published Maven metadata. See ADR 0012.
-2. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId best matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata. Matching uses `matchScore`: exact match (score 3) > prefix match with separator (score 2) > reverse prefix match with separator (score 1) > no match (score 0). Among same-score matches, the longest artifactId is preferred. See ADR 0014.
+1. **External POM (companion)** — the sibling `.pom` file paired with the JAR by `computeMavenFiles`, parsed securely via `PomParser`. This is the HIGHEST priority source because it is the authoritative published Maven metadata.
+2. **Embedded `pom.properties`** — `META-INF/maven/**/pom.properties` extracted from the JAR. When multiple embedded properties files exist (common in fat/uber JARs), only the one whose artifactId best matches the filename is considered; if none match, this layer is skipped entirely to avoid picking a random dependency's metadata. Matching uses `matchScore`: exact match (score 3) > prefix match with separator (score 2) > reverse prefix match with separator (score 1) > no match (score 0). Among same-score matches, the longest artifactId is preferred.
 3. **Embedded POM** — `META-INF/maven/**/pom.xml` inside the JAR, selected by the same `matchScore` logic as pom.properties when multiple are present.
 4. **MANIFEST.MF** (for groupId and version) / **Filename** (for artifactId) — OSGi headers (`Bundle-SymbolicName` / `Bundle-Version`) and standard headers (`Implementation-Title`, `Implementation-Version`, `Implementation-Vendor-Id`). The Maven Bundle Plugin heuristic extracts the last dot segment as artifactId when `Created-By` indicates the bundle plugin. For artifactId, filename has higher priority than manifest because `Implementation-Title` is human-readable, not a Maven artifactId.
 5. **Filename heuristics** (for groupId and version) / **MANIFEST.MF** (for artifactId) — the JAR name is split on the first dash preceding a digit: `artifactId-version[.classifier].ext`. Scala binary suffixes (`_2.13`) and `SNAPSHOT` qualifiers are preserved.
@@ -475,11 +475,11 @@ Per-field priority:
 - **artifactId**: external POM > pom.properties > embedded pom.xml > filename > manifest
 - **version**: external POM > pom.properties > embedded pom.xml > manifest > filename
 
-The companion POM (external POM) is the HIGHEST priority for canonical pURL resolution because it is the authoritative published Maven metadata. pom.properties is filename-gated by `determinePrimaryGroupIdArtifactIdVersion` — it only contributes fields when its artifactId matches the JAR filename via `matchScore` (exact > prefix-with-separator > None), preventing cross-artifact mixing and pURL hijacking via short artifactIds. The key difference from source-level priority: **filename and manifest swap positions for artifactId**. This produces pURLs more likely to exist in Maven Central because the filename usually matches the Maven artifactId, while `Implementation-Title` is a human-readable display name. See ADR 0014 for the matching algorithm details.
+The companion POM (external POM) is the HIGHEST priority for canonical pURL resolution because it is the authoritative published Maven metadata. pom.properties is filename-gated by `determinePrimaryGroupIdArtifactIdVersion` — it only contributes fields when its artifactId matches the JAR filename via `matchScore` (exact > prefix-with-separator > None), preventing cross-artifact mixing and pURL hijacking via short artifactIds. The key difference from source-level priority: **filename and manifest swap positions for artifactId**. This produces pURLs more likely to exist in Maven Central because the filename usually matches the Maven artifactId, while `Implementation-Title` is a human-readable display name.
 
 `resolveGroupIdArtifactIdVersionFromManifest` returns individual fields without an artifactId gate, allowing the manifest to contribute groupId and version even when it has no artifactId headers.
 
-If no groupId is found from any source but artifactId exists, artifactId is used as both groupId and artifactId (last resort fallback). See ADR 0008 for the full decision rationale, trust model, and security concerns.
+If no groupId is found from any source but artifactId exists, artifactId is used as both groupId and artifactId (last resort fallback).
 
 ### PomParser Integration
 
@@ -511,8 +511,8 @@ Beyond the standard `MetadataKeyConstants` keys, the Maven strategy emits:
 - `PurlMatchingPropertySuite` — property tests for exact match preference and short artifactId hijacking prevention.
 - `CanonicalPurlPrioritySuite` — canonical pURL priority chain.
 - `SecondaryPurlClassifierSuite` — secondary pURL classifier fix (sources/javadoc JARs emit classifier on ALL pURLs).
-- `SourcesJavadocMetadataParitySuite` — corpus-based metadata parity for sources/javadoc JARs (real JARs at test time). See ADR 0015.
-- `RegularJarMetadataParitySuite` — Maven Central validation for regular JARs (coordinates verified against Maven Central on 2026-07-08). See ADR 0016.
+- `SourcesJavadocMetadataParitySuite` — corpus-based metadata parity for sources/javadoc JARs (real JARs at test time).
+- `RegularJarMetadataParitySuite` — Maven Central validation for regular JARs (coordinates verified against Maven Central on 2026-07-08).
 - `MultiplePurlSuite` — metadata parity for regular JARs/WARs.
 - `BestPurlSuite` — field-level merge produces Maven Central pURLs.
 - `PackageTagIntegrationSuite` — end-to-end processing of real Maven JARs from `test_data/pqc_jars`.

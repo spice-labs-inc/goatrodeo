@@ -361,8 +361,17 @@ Test / testOptions += Tests.Setup(() => {
 
         while (keepOn) {
           val cmdResult = Seq(
-            "curl", "-fsSL", "-C", "-", "--retry", "5", "--connect-timeout", "30",
-            "-o", part.getPath, f"https://public-test-data.spice-labs.dev/${item}"
+            "curl",
+            "-fsSL",
+            "-C",
+            "-",
+            "--retry",
+            "5",
+            "--connect-timeout",
+            "30",
+            "-o",
+            part.getPath,
+            f"https://public-test-data.spice-labs.dev/${item}"
           ) ! log
 
           if (cmdResult == 0) {
@@ -411,7 +420,9 @@ Test / testOptions += Tests.Setup(() => {
       var keepOn = true
       while (keepOn) {
         val cmdResult =
-          s"curl -fSL --retry 2 -o ${ipaCorpus.getAbsolutePath} ${ipaUrl}".!(log)
+          s"curl -fSL --retry 2 -o ${ipaCorpus.getAbsolutePath} ${ipaUrl}".!(
+            log
+          )
         if (cmdResult == 0) {
           keepOn = false
         } else {
