@@ -98,8 +98,6 @@ sealed trait ArtifactWrapper {
       .getOrElse(base2)
   }
 
-  def isRealFile(): Boolean = false
-
   /** The effective MIME set: the detected/augmented set UNIONED with the
     * producer-stamped hint . The hint is authoritative (never re-checked
     * against content) and never produced by sniffing.
@@ -131,13 +129,6 @@ sealed trait ArtifactWrapper {
 
   // these methods implement the RodeoArtifact interface for the API
 
-  /** Returns true if the artifact is represented by a real file, false
-    * otherwise
-    *
-    * @return
-    *   true if the artifact is a real file, false otherwise
-    */
-  def getIsRealFile(): Boolean = isRealFile()
 
   /** Returns the mime type of the artifact
     *
@@ -622,7 +613,6 @@ final case class FileWrapper(
     )
   }
 
-  override def isRealFile(): Boolean = true
   override protected def getTikaInputStream(): TikaInputStream = {
     val metadata = new Metadata()
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, thePath)

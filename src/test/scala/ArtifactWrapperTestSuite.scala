@@ -88,15 +88,6 @@ class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
     }
   }
 
-  test("FileWrapper - isRealFile returns true") {
-    val tempFile = Files.createTempFile("realfiletest", ".txt").toFile()
-    try {
-      val wrapper = FileWrapper(tempFile, tempFile.getName(), None)
-      assert(wrapper.isRealFile())
-    } finally {
-      tempFile.delete()
-    }
-  }
 
   test("FileWrapper - throws exception for non-existent file") {
     intercept[Exception] {
@@ -168,10 +159,6 @@ class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
     assertEquals(result, "test content")
   }
 
-  test("ByteWrapper - isRealFile returns false") {
-    val wrapper = ByteWrapper(Array[Byte](1, 2, 3), "test.bin", None)
-    assert(!wrapper.isRealFile())
-  }
 
   test("ByteWrapper - finished does nothing") {
     val wrapper = ByteWrapper(Array[Byte](1, 2, 3), "test.bin", None)

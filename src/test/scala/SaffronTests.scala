@@ -72,6 +72,7 @@ class SaffronTests extends GoatRodeoFunSuite {
     assert(openedArchiveOpt.isDefined)
   }
 
+
   test("check minimal vmdk for files") {
     val vmdk = File("test_data/smallvm.zip")
     testDiskImage(vmdk, 2)

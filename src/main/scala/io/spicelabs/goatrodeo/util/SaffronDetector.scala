@@ -75,10 +75,7 @@ object SaffronDetector {
       artifact: ArtifactWrapper,
       currentMimes: Set[String]
   ): Set[String] = {
-    // Avoid spilling small in-memory artifacts to a temp file just to rule out
-    // a disk image they cannot be.
-    if (!artifact.isRealFile() && artifact.size() < minInMemoryProbeSize)
-      return currentMimes
+
 
     val myMimes = readFormat(artifact)
     // why the conditional?
