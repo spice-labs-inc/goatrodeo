@@ -204,7 +204,7 @@ object Builder {
     // Don't kick off the consumer threads until at least 1 item
     // is in the work queue
     while (queue.isEmpty() && stillWorking.get()) {
-      Thread.sleep(250)
+      Thread.sleep(5)
       if (dead_?.get()) {
         logger.error("Died while waiting for any files")
         Helpers.exitWrapper(1)
@@ -276,7 +276,7 @@ object Builder {
           olderBatch = currentBatch
           currentBatch = startNextBatch()
         case _ =>
-          Thread.sleep(25)
+          Thread.sleep(5)
       }
     }
 
@@ -284,7 +284,7 @@ object Builder {
 
     // loop while we wait for the end of processing
     while (writeThreadCnt.get() > 0) {
-      Thread.sleep(250)
+      Thread.sleep(5)
     }
 
     // create the non-number-suffixed directory
