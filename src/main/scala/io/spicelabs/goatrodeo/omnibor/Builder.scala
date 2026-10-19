@@ -397,7 +397,6 @@ object Builder {
     val threads = for { threadNum <- 0 until config.threads } yield {
       val t = new Thread(
         () => {
-          liveWorkers.incrementAndGet()
           try {
 
             @tailrec
@@ -567,6 +566,12 @@ object Builder {
         },
         f"gitoid ${batchName} ${threadNum}"
       )
+      // Counted before it starts, not once it runs: buildDB starts the next
+      // batch when this count falls to its wind-down threshold (0 for fewer
+      // than 10 threads), and a worker that had not yet been scheduled
+      // looked like one that had finished, so a new batch could start
+      // straight after this one and take its items.
+      liveWorkers.incrementAndGet()
       t.start()
       t
     }
