@@ -77,56 +77,59 @@ object FileWalker {
     */
   private def asZipContainer(
       in: ArtifactWrapper,
-      tempDir: Path
+      tempDir: () => Option[Path]
   ): OptionalArchiveStream = {
-    if (zipMimeTypes.intersect(in.mimeType).nonEmpty) {
-      import scala.jdk.CollectionConverters.IteratorHasAsScala
+    if (zipMimeTypes.intersect(in.mimeType).nonEmpty) tempDir() match {
+      case None => None
+      case Some(walkDir) =>
+        import scala.jdk.CollectionConverters.IteratorHasAsScala
 
-      in.withFile { theFile =>
-        try {
-
-          val zipFile = ZipFile(theFile)
+        in.withFile { theFile =>
           try {
-            val it: Vector[ArtifactWrapper] = zipFile
-              .stream()
-              .iterator()
-              .asScala
-              .filter(v => { !v.isDirectory() })
-              .flatMap(v => {
-                val name = v.getName()
-                val size = v.getSize()
 
-                ArtifactWrapper
-                  .newWrapper(
-                    name,
-                    size,
-                    zipFile.getInputStream(v),
-                    in.tempDir,
-                    tempDir
-                  )
-                  .toOption
-              })
-              .toVector
-            Some(
-              it,
-              "Zip Container"
-            )
-          } finally {
-            zipFile.close()
+            val zipFile = ZipFile(theFile)
+            try {
+              val it: Vector[ArtifactWrapper] = zipFile
+                .stream()
+                .iterator()
+                .asScala
+                .filter(v => { !v.isDirectory() })
+                .flatMap(v => {
+                  val name = v.getName()
+                  val size = v.getSize()
+
+                  ArtifactWrapper
+                    .newWrapper(
+                      name,
+                      size,
+                      zipFile.getInputStream(v),
+                      in.tempDir,
+                      walkDir
+                    )
+                    .toOption
+                })
+                .toVector
+              Some(
+                it,
+                "Zip Container"
+              )
+            } finally {
+              zipFile.close()
+            }
+
+          } catch {
+            case e: Exception =>
+              // if creating the artifact wrappers from the thing that might be a zip file fail, it
+              // just means it's not a valid zip. This is okay.
+              logger.trace(
+                f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}",
+                e
+              )
+              None
           }
-
-        } catch {
-          case e: Exception =>
-            // if creating the artifact wrappers from the thing that might be a zip file fail, it
-            // just means it's not a valid zip. This is okay.
-            logger.trace(
-              f"Failed for ${in.path()} mime type ${in.mimeType} error ${e.getMessage()}",
-              e
-            )
-            None
         }
-      }
-    } else {
+    }
+    else {
       None
     }
   }
@@ -135,37 +138,40 @@ object FileWalker {
     */
   private def asRPMWrapper(
       in: ArtifactWrapper,
-      tempPath: Path
+      tempPath: () => Option[Path]
   ): OptionalArchiveStream = {
-    if (rpmMimeTypes.intersect(in.mimeType).nonEmpty) {
-      try {
-        in.withFile(f => {
-          Using.resource(RpmReader.streamPayload(f.toPath())) { payload =>
-            val wrappers = for {
-              entry <- payload.iterator().asScala
+    if (rpmMimeTypes.intersect(in.mimeType).nonEmpty) tempPath() match {
+      case None => None
+      case Some(walkDir) =>
+        try {
+          in.withFile(f => {
+            Using.resource(RpmReader.streamPayload(f.toPath())) { payload =>
+              val wrappers = for {
+                entry <- payload.iterator().asScala
 
-              file <- entry match {
-                case f: PayloadEntry.FileEntry => Some(f)
-                case _                         => None
-              }
-              wrapper <- ArtifactWrapper
-                .newWrapper(
-                  file.path(),
-                  file.size(),
-                  file.content(),
-                  in.tempDir,
-                  tempPath
-                )
-                .toOption
-            } yield wrapper
-            Some(wrappers.toVector -> "RPM")
-          }
-        })
-      } catch {
-        case e: Exception =>
-          None
-      }
-    } else {
+                file <- entry match {
+                  case f: PayloadEntry.FileEntry => Some(f)
+                  case _                         => None
+                }
+                wrapper <- ArtifactWrapper
+                  .newWrapper(
+                    file.path(),
+                    file.size(),
+                    file.content(),
+                    in.tempDir,
+                    walkDir
+                  )
+                  .toOption
+              } yield wrapper
+              Some(wrappers.toVector -> "RPM")
+            }
+          })
+        } catch {
+          case e: Exception =>
+            None
+        }
+    }
+    else {
       None
     }
   }
@@ -177,71 +183,72 @@ object FileWalker {
     */
   private def asISOWrapper(
       in: ArtifactWrapper,
-      tempPath: Path
+      tempPath: () => Option[Path]
   ): OptionalArchiveStream = {
-    if (isoMimeTypes.intersect(in.mimeType).nonEmpty) {
-      try {
-        val theFile = in match {
-          case fw: FileWrapper => fw.wrappedFile
-          case _ => in.withStream(Helpers.tempFileFromStream(_, true, tempPath))
-        }
-
-        val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
-
+    if (isoMimeTypes.intersect(in.mimeType).nonEmpty) tempPath() match {
+      case None => None
+      case Some(walkDir) =>
         try {
-          val files = isoFileReader.getAllFiles()
+          in.withFile { theFile =>
 
-          import scala.jdk.CollectionConverters.ListHasAsScala
-          val flatList =
-            isoFileReader.convertTreeFilesToFlatList(files).asScala.toVector
+            val isoFileReader: IsoFileReader = new IsoFileReader(theFile)
 
-          val wrappers =
-            for {
-              cycleFile <- flatList
-              wrapper <- {
+            try {
+              val files = isoFileReader.getAllFiles()
 
-                val nameWithThing = cycleFile.getFullFileName('/')
-                val name =
-                  (if (nameWithThing.endsWith(";1")) {
-                     nameWithThing.substring(0, nameWithThing.length() - 2)
+              import scala.jdk.CollectionConverters.ListHasAsScala
+              val flatList =
+                isoFileReader.convertTreeFilesToFlatList(files).asScala.toVector
 
-                   } else nameWithThing).toLowerCase()
+              val wrappers =
+                for {
+                  cycleFile <- flatList
+                  wrapper <- {
 
-                val size = cycleFile.getSize()
+                    val nameWithThing = cycleFile.getFullFileName('/')
+                    val name =
+                      (if (nameWithThing.endsWith(";1")) {
+                         nameWithThing.substring(0, nameWithThing.length() - 2)
 
-                ArtifactWrapper.newWrapper(
-                  name,
-                  size,
-                  isoFileReader.getFileStream(cycleFile),
-                  in.tempDir,
-                  tempPath
-                )
-              }.toOption
-            } yield wrapper
+                       } else nameWithThing).toLowerCase()
 
-          isoFileReader.close()
+                    val size = cycleFile.getSize()
 
-          Some(
-            wrappers,
-            "ISO Reader"
-          )
+                    ArtifactWrapper.newWrapper(
+                      name,
+                      size,
+                      isoFileReader.getFileStream(cycleFile),
+                      in.tempDir,
+                      walkDir
+                    )
+                  }.toOption
+                } yield wrapper
 
+              isoFileReader.close()
+
+              Some(
+                wrappers,
+                "ISO Reader"
+              )
+
+            } catch {
+              case e: Exception =>
+                // if creating the artfiact wrappers from the thing that might be an iso file fail, it
+                // just means it's not a valid iso. This is okay.
+                logger.trace(s"Try getAllFiles failed: ${e.getMessage}", e)
+                isoFileReader.close()
+                None
+            }
+          }
         } catch {
           case e: Exception =>
-            // if creating the artfiact wrappers from the thing that might be an iso file fail, it
-            // just means it's not a valid iso. This is okay.
-            logger.trace(s"Try getAllFiles failed: ${e.getMessage}", e)
-            isoFileReader.close()
+            // if creating the artfiact wrappers from the thing that might be a zip file fail, it
+            // just means it's not a valid zip. This is okay.
+            logger.trace(s"Whole ISO Fetch process failed… ${e.getMessage}", e)
             None
         }
-      } catch {
-        case e: Exception =>
-          // if creating the artfiact wrappers from the thing that might be a zip file fail, it
-          // just means it's not a valid zip. This is okay.
-          logger.trace(s"Whole ISO Fetch process failed… ${e.getMessage}", e)
-          None
-      }
-    } else None
+    }
+    else None
   }
 
   // partial list of saffron supported mime types
@@ -339,10 +346,7 @@ object FileWalker {
     * certificate files under `etc/ssl/certs` flow through the normal
     * certificate strategy.
     */
-  private def asApRomfs(
-      in: ArtifactWrapper,
-      tempPath: Path
-  ): OptionalArchiveStream = {
+  private def asApRomfs(in: ArtifactWrapper): OptionalArchiveStream = {
     ApRomfs.read(in).map { files =>
       val wrappers = files.flatMap { case (name, data) =>
         Some(ByteWrapper(data, name, in.tempDir))
@@ -382,7 +386,7 @@ object FileWalker {
     */
   private def asDotnetAssemblyContainer(
       in: ArtifactWrapper,
-      tempDir: Path
+      tempDir: () => Option[Path]
   ): OptionalArchiveStream = {
     val dotnetMime = DotnetDetector.DOTNET_MIME_STRING
     val isDotnetMime = in.mimeType.contains(dotnetMime)
@@ -391,39 +395,44 @@ object FileWalker {
       // Cheap probe: bounded, never throws, no withFile.
       val probeOk =
         in.withStream(s => DotnetAssemblyProbe.isDotnetAssembly(s))
+      // The temp dir is materialized only now: the artifact has passed both the
+      // MIME gate and the byte probe, so a walk really is about to happen.
       if (!probeOk) None
-      else {
-        try {
-          in.withFile(f =>
-            AssemblyWalker
-              .withinAssemblyStream(f.toPath) { entries =>
-                val wrappers = entries.flatMap { e =>
-                  e.processStream { stream =>
-                    ArtifactWrapper
-                      .newWrapper(
-                        nominalPath = e.name,
-                        size = e.length,
-                        data = stream,
-                        tempDir = in.tempDir,
-                        tempPath = tempDir,
-                        mimeHint = e.mimeHint.toSet
-                      )
-                      .toOption
+      else
+        tempDir() match {
+          case None => None
+          case Some(walkDir) =>
+            try {
+              in.withFile(f =>
+                AssemblyWalker
+                  .withinAssemblyStream(f.toPath) { entries =>
+                    val wrappers = entries.flatMap { e =>
+                      e.processStream { stream =>
+                        ArtifactWrapper
+                          .newWrapper(
+                            nominalPath = e.name,
+                            size = e.length,
+                            data = stream,
+                            tempDir = in.tempDir,
+                            tempPath = walkDir,
+                            mimeHint = e.mimeHint.toSet
+                          )
+                          .toOption
+                      }
+                    }
+                    wrappers.toVector -> "Cilantro .NET assembly"
                   }
-                }
-                wrappers.toVector -> "Cilantro .NET assembly"
-              }
-          )
-        } catch {
-          case _: Exception => None
+              )
+            } catch {
+              case _: Exception => None
+            }
         }
-      }
     }
   }
 
   private def asSaffronFilesystem(
       in: ArtifactWrapper,
-      tempPath: Path
+      tempPath: () => Option[Path]
   ): OptionalArchiveStream = {
     val mimes = in.mimeType
     val diskMime = mimes.intersect(saffronMimeTypes).nonEmpty
@@ -440,82 +449,90 @@ object FileWalker {
     if (
       (diskMime || containerMime || maskMime) &&
       (containerMime || saffronProbePasses(in))
-    ) {
-      in.withFile(f => {
-        val path = f.toPath()
-        if (isSaffronSupported(in.mimeType, path)) {
-          val mimes = in.mimeType
-          // The disk's format travels with its filesystems so the label can
-          // name it. `Saffron EXT4` says which reader produced these artifacts
-          // and a bare `Saffron` does not, and the name is only reachable from
-          // the `disk` handle, which does not outlive this block.
-          val (diskSystems, diskFormat): (Vector[FileSystem], Option[String]) =
-            if (
-              mimes.intersect(saffronMimeTypes).nonEmpty ||
-              Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
-            ) {
+    ) tempPath() match {
+      case None => None
+      case Some(walkDir) =>
+        in.withFile(f => {
+          val path = f.toPath()
+          if (isSaffronSupported(in.mimeType, path)) {
+            val mimes = in.mimeType
+            // The disk's format travels with its filesystems so the label can
+            // name it. `Saffron EXT4` says which reader produced these artifacts
+            // and a bare `Saffron` does not, and the name is only reachable from
+            // the `disk` handle, which does not outlive this block.
+            val (diskSystems, diskFormat)
+                : (Vector[FileSystem], Option[String]) =
+              if (
+                mimes.intersect(saffronMimeTypes).nonEmpty ||
+                Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
+              ) {
+                Try {
+                  val disk = DiskReader.open(path)
+                  (
+                    FileSystemMount.mountAll(disk).asScala.toVector,
+                    Option(disk.format()).map(_.name())
+                  )
+                }.getOrElse((Vector(), None))
+              } else (Vector(), None)
+            val containerSystems: Vector[FileSystem] =
+              if (
+                mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty
+              ) {
+                Try {
+                  BinaryContainerMount.mount(path).toScala.toVector
+                }.getOrElse(Vector())
+              } else Vector()
+            val systems = diskSystems ++ containerSystems
+            if (systems.isEmpty) None
+            else {
+              // Saffron's `walk`/`openStream` can throw while iterating a corrupt
+              // or truncated filesystem; treat that as "nothing to expand" rather
+              // than propagating the exception.
               Try {
-                val disk = DiskReader.open(path)
-                (
-                  FileSystemMount.mountAll(disk).asScala.toVector,
-                  Option(disk.format()).map(_.name())
-                )
-              }.getOrElse((Vector(), None))
-            } else (Vector(), None)
-          val containerSystems: Vector[FileSystem] =
-            if (mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty) {
-              Try {
-                BinaryContainerMount.mount(path).toScala.toVector
-              }.getOrElse(Vector())
-            } else Vector()
-          val systems = diskSystems ++ containerSystems
-          if (systems.isEmpty) None
-          else {
-            // Saffron's `walk`/`openStream` can throw while iterating a corrupt
-            // or truncated filesystem; treat that as "nothing to expand" rather
-            // than propagating the exception.
-            Try {
-              val files =
-                for {
-                  system <- systems
-                  file <- system.walk().iterator().asScala
-                } yield file
-              val artifacts = files
-                .filter(f => f.`type`() == EntryType.REGULAR_FILE)
-                .flatMap(fileSystemEntry => {
-                  fileSystemEntry match {
-                    case regular: RegularFile =>
-                      // Every file of the image is wrapped before any is
-                      // processed, so keep only the small ones in memory: at
-                      // the 32MiB default a Linux root filesystem (5GiB of
-                      // such files in linuxmint-21) exhausts the heap.
-                      ArtifactWrapper
-                        .newWrapper(
-                          regular.path(),
-                          regular.size(),
-                          regular.openStream(),
-                          None,
-                          tempPath,
-                          inMemoryLimit =
-                            Some(ArtifactWrapper.smallInMemorySize)
-                        )
-                        .toOption
+                val files =
+                  for {
+                    system <- systems
+                    file <- system.walk().iterator().asScala
+                  } yield file
+                val artifacts = files
+                  .filter(f => f.`type`() == EntryType.REGULAR_FILE)
+                  .flatMap(fileSystemEntry => {
+                    fileSystemEntry match {
+                      case regular: RegularFile =>
+                        // Every file of the image is wrapped before any is
+                        // processed, so keep only the small ones in memory: at
+                        // the 32MiB default a Linux root filesystem (5GiB of
+                        // such files in linuxmint-21) exhausts the heap.
+                        ArtifactWrapper
+                          .newWrapper(
+                            regular.path(),
+                            regular.size(),
+                            regular.openStream(),
+                            None,
+                            walkDir,
+                            inMemoryLimit =
+                              Some(ArtifactWrapper.smallInMemorySize)
+                          )
+                          .toOption
 
-                    case _ => None
-                  }
-                })
-                .toVector
-              // Container-only mounts keep the bare name: their format is
-              // already in the MIME type, and there is no equivalent handle to
-              // ask.
-              Some(artifacts -> diskFormat.fold("Saffron")(f => s"Saffron $f"))
-            }.getOrElse(None)
+                      case _ => None
+                    }
+                  })
+                  .toVector
+                // Container-only mounts keep the bare name: their format is
+                // already in the MIME type, and there is no equivalent handle to
+                // ask.
+                Some(
+                  artifacts -> diskFormat.fold("Saffron")(f => s"Saffron $f")
+                )
+              }.getOrElse(None)
+            }
+          } else {
+            None
           }
-        } else {
-          None
-        }
-      })
-    } else None
+        })
+    }
+    else None
   }
 
   /** Try to construct an `OptionalArchiveStream` from a portable PDB.
@@ -542,53 +559,62 @@ object FileWalker {
     */
   private def asPdbContainer(
       in: ArtifactWrapper,
-      tempDir: Path
+      tempDir: () => Option[Path]
   ): OptionalArchiveStream = {
     val pdbMime = "pe/debug; format=mpdb"
     val isPdbMime = in.mimeType.contains(pdbMime)
     if (!isPdbMime) None
-    else {
-      in.withFile { file =>
-        try {
-          val spoolDir =
-            Files.createTempDirectory(tempDir, "cilantro")
-          val result: Try[
-            Option[Option[(Vector[ArtifactWrapper], String)]]
-          ] =
-            PortablePdbFile.withPdb[Option[(Vector[ArtifactWrapper], String)]](
-              file,
-              Some(spoolDir)
-            ) { (outcome: Try[Option[PDBView]]) =>
-              outcome match {
-                case Success(Some(view)) =>
-                  val wrappers = view.sources.flatMap { src =>
-                    val name = src.name
-                    val bytes = src.processStream { stream =>
-                      val bos = new ByteArrayOutputStream()
-                      Helpers.copy(stream, bos)
-                      bos.toByteArray()
+    else
+      tempDir() match {
+        case None => None
+        case Some(walkDir) =>
+          in.withFile { file =>
+            try {
+              val spoolDir =
+                Files.createTempDirectory(walkDir, "cilantro")
+              val result: Try[
+                Option[Option[(Vector[ArtifactWrapper], String)]]
+              ] =
+                PortablePdbFile
+                  .withPdb[Option[(Vector[ArtifactWrapper], String)]](
+                    file,
+                    Some(spoolDir)
+                  ) { (outcome: Try[Option[PDBView]]) =>
+                    outcome match {
+                      case Success(Some(view)) =>
+                        val wrappers = view.sources.flatMap { src =>
+                          val name = src.name
+                          val bytes = src.processStream { stream =>
+                            val bos = new ByteArrayOutputStream()
+                            Helpers.copy(stream, bos)
+                            bos.toByteArray()
+                          }
+
+                          Some(
+                            ByteWrapper(
+                              bytes,
+                              name,
+                              in.tempDir,
+                              Set("text/plain")
+                            )
+                          )
+
+                        }
+                        Some(wrappers.toVector -> "Portable PDB")
+                      case _ =>
+                        // Not a portable PDB, or hostile: not a container.
+                        None
                     }
-
-                    Some(
-                      ByteWrapper(bytes, name, in.tempDir, Set("text/plain"))
-                    )
-
                   }
-                  Some(wrappers.toVector -> "Portable PDB")
-                case _ =>
-                  // Not a portable PDB, or hostile: not a container.
-                  None
+              result match {
+                case Success(Some(inner)) => inner
+                case _                    => None
               }
+            } catch {
+              case _: Exception => None
             }
-          result match {
-            case Success(Some(inner)) => inner
-            case _                    => None
           }
-        } catch {
-          case _: Exception => None
-        }
       }
-    }
   }
 
   /** Try to construct an `OptionalArchiveStream` using the Apache Commons "we
@@ -745,93 +771,99 @@ object FileWalker {
     * @param in
     *   the artifact wrapper to attempt to create a stream for
     * @return
-    *   if the stream is created, an iterator of fuctions to access each stream
+    *   if the stream is created, an iterator of functions to access each stream
     *   piece and a closing/cleanup function which *must* be called
     */
   private def tryToConstructArchiveStream(
       in: ArtifactWrapper,
-      tempDir: Path
+      tempDir: () => Option[Path]
   ): OptionalArchiveStream = {
     val mimeType = in.mimeType
-    if (notArchive(in)) None
-    else {
-      {
-        val ret = asZipContainer(in, tempDir)
 
-        ret
-      }.orElse(asRPMWrapper(in, tempDir))
-        .orElse(asApRomfs(in, tempDir))
-        .orElse(asDotnetAssemblyContainer(in, tempDir))
-        .orElse(asPdbContainer(in, tempDir))
-        .orElse(asSaffronFilesystem(in, tempDir))
-        .orElse(
-          asISOWrapper(in, tempDir)
-            .orElse {
-              // the inputstream to the apache stuff is either a
-              // decompressed file or the input stream from the artifact
+    val cannotBeArchive = notArchive(in)
+    {
+      if (cannotBeArchive) None else asZipContainer(in, tempDir)
+    }.orElse(asRPMWrapper(in, tempDir))
+      .orElse(asApRomfs(in))
+      .orElse(asDotnetAssemblyContainer(in, tempDir))
+      .orElse(asPdbContainer(in, tempDir))
+      .orElse(asSaffronFilesystem(in, tempDir))
+      .orElse(
+        asISOWrapper(in, tempDir)
+          .orElse {
+            if (cannotBeArchive) None
+            else
+              tempDir() match {
+                // The Apache Commons path is the only other consumer of the walk
+                // directory (it decompresses into it); without a directory there
+                // is nothing to try.
+                case None          => None
+                case Some(walkDir) =>
+                  // the inputstream to the apache stuff is either a
+                  // decompressed file or the input stream from the artifact
 
-              val withInputStreamFn
-                  : BufferedInputStream => OptionalArchiveStream =
-                theStream =>
-                  asApacheCommonsArchiveWrapper(
-                    theStream,
-                    in.path(),
-                    in.tempDir,
-                    tempDir
-                  )
+                  val withInputStreamFn
+                      : BufferedInputStream => OptionalArchiveStream =
+                    theStream =>
+                      asApacheCommonsArchiveWrapper(
+                        theStream,
+                        in.path(),
+                        in.tempDir,
+                        walkDir
+                      )
 
-              // if it's not compressed, just run with the stream
-              if (notCompressed(in.path(), in.mimeType))
-                in.withStream(s =>
-                  withInputStreamFn(new BufferedInputStream(s))
-                )
-              else {
-                // if it might be compressed, try to decompress the stream into a file
-                val maybeFile: Option[File] = Try {
-                  in.withStream { stream =>
-                    val factory = new CompressorStreamFactory()
-                    val fis = new BufferedInputStream(stream)
-
-                    val input: CompressorInputStream =
-                      factory.createCompressorInputStream(fis)
-
-                    val theFile =
-                      Files
-                        .createTempFile(tempDir, "goats", "uncompressed")
-                        .toFile()
-
-                    val fos = new FileOutputStream(theFile)
-                    Helpers.copy(input, fos)
-                    fos.close()
-                    theFile
-                  }
-                }.toOption
-
-                maybeFile match {
-                  // if we were able to decompress, then use the temp file
-                  case Some(uncompressedFile) => {
-                    try {
-                      Using.resource(
-                        new BufferedInputStream(
-                          new FileInputStream(uncompressedFile)
-                        )
-                      ) { stream =>
-                        withInputStreamFn(stream)
-                      }
-                    } finally {
-                      uncompressedFile.delete()
-                    }
-                  }
-                  case None =>
+                  // if it's not compressed, just run with the stream
+                  if (notCompressed(in.path(), in.mimeType))
                     in.withStream(s =>
                       withInputStreamFn(new BufferedInputStream(s))
                     )
-                }
+                  else {
+                    // if it might be compressed, try to decompress the stream into a file
+                    val maybeFile: Option[File] = Try {
+                      in.withStream { stream =>
+                        val factory = new CompressorStreamFactory()
+                        val fis = new BufferedInputStream(stream)
 
+                        val input: CompressorInputStream =
+                          factory.createCompressorInputStream(fis)
+
+                        val theFile =
+                          Files
+                            .createTempFile(walkDir, "goats", "uncompressed")
+                            .toFile()
+
+                        val fos = new FileOutputStream(theFile)
+                        Helpers.copy(input, fos)
+                        fos.close()
+                        theFile
+                      }
+                    }.toOption
+
+                    maybeFile match {
+                      // if we were able to decompress, then use the temp file
+                      case Some(uncompressedFile) => {
+                        try {
+                          Using.resource(
+                            new BufferedInputStream(
+                              new FileInputStream(uncompressedFile)
+                            )
+                          ) { stream =>
+                            withInputStreamFn(stream)
+                          }
+                        } finally {
+                          uncompressedFile.delete()
+                        }
+                      }
+                      case None =>
+                        in.withStream(s =>
+                          withInputStreamFn(new BufferedInputStream(s))
+                        )
+                    }
+
+                  }
               }
-            }
-        )
-    }
+          }
+      )
   }
 
   private val threadTempDir: ThreadLocal[Option[Path]] = ThreadLocal()
@@ -857,51 +889,63 @@ object FileWalker {
       artifact: ArtifactWrapper,
       failedContainers: AtomicInteger = new AtomicInteger(0)
   )(function: Vector[ArtifactWrapper] => T): Option[T] = {
-    if (notArchive(artifact)) None
-    else {
-      val tempDirOpt: Option[Path] = artifact.tempDir match {
-        case Some(p) =>
-          Try(
-            Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
-          ).toOption
-        case None =>
-          Try(Files.createTempDirectory("goatrodeo_temp_dir")).toOption
+
+    // Materialized on first demand, not eagerly: most artifacts are settled by
+    // a MIME check or a bounded probe (zip, saffron, dotnet, pdb) and never
+    // need a directory at all, so none is created for them. The first branch
+    // that needs a directory creates it; every later branch receives the same
+    // one. A failed creation is remembered so it is not retried per branch.
+    var created: Option[Path] = None
+    var attempted = false
+    val tempDir: () => Option[Path] = () => {
+      if (!attempted) {
+        attempted = true
+        created = artifact.tempDir match {
+          case Some(p) =>
+            Try(
+              Files.createTempDirectory(p.toPath(), "goatrodeo_temp_dir")
+            ).toOption
+          case None =>
+            Try(Files.createTempDirectory("goatrodeo_temp_dir")).toOption
+        }
+        // Publish the walk directory the moment it exists, not at entry: code
+        // running inside the walk (a spill from `ByteWrapper.withFile`, which
+        // goes through [[withinTempDir]]) must reuse this directory rather than
+        // create a sibling. Published here because entry-time publication is
+        // exactly what made the directory eager in the first place.
+        created.foreach(dir => threadTempDir.set(Some(dir)))
       }
-
-      tempDirOpt match {
-        case Some(tempDir) =>
-          val oldTempDir = threadTempDir.get()
-          try {
-            threadTempDir.set(Some(tempDir))
-            tryToConstructArchiveStream(artifact, tempDir) match {
-              case None => None
-              case Some(artifacts -> wrapperName) =>
-                try {
-
-                  // call the function
-                  Some(function(artifacts))
-                } catch {
-                  case e: Exception =>
-                    // Count wholesale container loss so the run's completion
-                    // can summarize it; the error itself stays logged here.
-                    failedContainers.incrementAndGet()
-                    logger.error(
-                      f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
-                          .getMessage()}",
-                      e
-                    )
-                    None
-                }
-            }
-          } finally {
-            threadTempDir.set(oldTempDir)
-            // clean up
-            Helpers.deleteDirectory(tempDir)
-          }
-
-        case None => None
-      }
+      created
     }
+
+    val oldTempDir = threadTempDir.get()
+    try {
+      tryToConstructArchiveStream(artifact, tempDir) match {
+        case None => None
+        case Some(artifacts -> wrapperName) =>
+          try {
+
+            // call the function
+            Some(function(artifacts))
+          } catch {
+            case e: Exception =>
+              // Count wholesale container loss so the run's completion
+              // can summarize it; the error itself stays logged here.
+              failedContainers.incrementAndGet()
+              logger.error(
+                f"Failed to process ${artifact.path()} -- ${artifact.mimeType} wrapper ${wrapperName} exception ${e
+                    .getMessage()}",
+                e
+              )
+              None
+          }
+      }
+    } finally {
+      threadTempDir.set(oldTempDir)
+      // clean up only what this call actually created
+      created.foreach(Helpers.deleteDirectory)
+    }
+
   }
 
   /** Execute a function within a temporary directory context.

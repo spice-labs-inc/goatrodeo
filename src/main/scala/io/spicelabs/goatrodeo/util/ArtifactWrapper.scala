@@ -129,7 +129,6 @@ sealed trait ArtifactWrapper {
 
   // these methods implement the RodeoArtifact interface for the API
 
-
   /** Returns the mime type of the artifact
     *
     * @return

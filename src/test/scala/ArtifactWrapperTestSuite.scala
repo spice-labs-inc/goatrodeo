@@ -88,7 +88,6 @@ class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
     }
   }
 
-
   test("FileWrapper - throws exception for non-existent file") {
     intercept[Exception] {
       FileWrapper(new File("/nonexistent/file.txt"), "file.txt", None)
@@ -158,7 +157,6 @@ class ArtifactWrapperTestSuite extends GoatRodeoFunSuite {
     val result = wrapper.withStream(Helpers.slurpInputToString(_))
     assertEquals(result, "test content")
   }
-
 
   test("ByteWrapper - finished does nothing") {
     val wrapper = ByteWrapper(Array[Byte](1, 2, 3), "test.bin", None)

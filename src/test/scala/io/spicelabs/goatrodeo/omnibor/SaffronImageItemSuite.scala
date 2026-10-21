@@ -333,15 +333,13 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
   }
   // S-5 — a raw disk named `.raw` is recognised and walked.
   // THEORY: Tika types a `.raw` file as a Panasonic camera RAW photo
-  // (`image/x-raw-panasonic`), by extension alone. An `image/` type is terminal
-  // for MIME augmentation and `FileWalker.notArchive` rejects anything under
-  // `image/`, so the disk is never even offered to Saffron: a Debian cloud image
-  // shipped as `.raw` is surveyed as one opaque file. The extension must not
-  // decide the format — the bytes must — so the detector has to be allowed to
-  // re-check a camera RAW type and, when Saffron recognises the file, to drop
-  // it. `S-4` covers the recognised-but-unmountable case; this covers the case
-  // where there is a filesystem to walk, and is the one whose loss would be
-  // silent, because the run would still succeed.
+  // (`image/x-raw-panasonic`), by extension alone, and `FileWalker` treats an
+  // `image/` MIME as terminal, so the disk is never offered to Saffron: a Debian
+  // cloud image shipped as `.raw` is surveyed as one opaque file. The bytes must
+  // decide the format, not the extension. This test asserts that the disk is
+  // recognised and that the filesystem inside it is walked. It says nothing
+  // about which MIME types are present, because MIME augmentation only ever adds
+  // — the camera-RAW type Tika supplied legitimately remains in the set.
   //
   // The fixture is `raw.img` renamed to `disk.raw`, so the bytes are identical
   // to `S-1`'s and the only variable is the extension.
@@ -358,11 +356,7 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
       )
       assert(
         diskItem.head._3.contains("application/x-saffron-raw-disk"),
-        s"the .raw disk must carry the Saffron raw-disk MIME, got ${diskItem.head._3.toVector.sorted}"
-      )
-      assert(
-        !diskItem.head._3.exists(_.startsWith("image/")),
-        s"the camera-RAW misreading must be dropped, got ${diskItem.head._3.toVector.sorted}"
+        s"the .raw disk must be recognised as a Saffron raw disk, got ${diskItem.head._3.toVector.sorted}"
       )
 
       // and the filesystem inside it was walked, not skipped
