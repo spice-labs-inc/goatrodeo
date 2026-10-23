@@ -339,7 +339,10 @@ object ArtifactWrapper {
   ): String = {
     // if you add more changes to this, add to the mime_types.md documentation
     Try {
-      if (detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000) {
+      if (
+        detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000 &&
+        rawData.getLength() > 0
+      ) {
         import org.json4s._
         import org.json4s.native.JsonMethods._
 

@@ -116,6 +116,23 @@ import scala.util.Using
   */
 object Certificates {
 
+  /** BouncyCastle is a hard dependency of every parser here: `CertificateFactory`
+    * and `JcaX509CertificateConverter` are both asked for the `"BC"` provider
+    * by name. It used to be registered only as a side effect of
+    * [[io.spicelabs.goatrodeo.util.CryptoDetector]] initialising, so any entry
+    * point that reached this strategy first got `NoSuchProviderException`
+    * inside a `Try` and silently reported no certificates at all. Registering it
+    * here makes the dependency explicit and order-independent; the call is
+    * idempotent.
+    */
+  private val _bcInit: Unit = Try {
+    if (java.security.Security.getProvider("BC") == null) {
+      java.security.Security.addProvider(
+        new org.bouncycastle.jce.provider.BouncyCastleProvider()
+      )
+    }
+  }.getOrElse(())
+
   /** The certificate blob MIME constants, owned by this module . Other modules
     * that stamp certificate blobs refer to these constants.
     */
@@ -341,25 +358,53 @@ object Certificates {
     * Returns None (clean skip) when the blob contains no certificates or cannot
     * be parsed; never throws.
     */
+  // ---------- whole-blob read budgets ----------------------------------
+
+  /** Upper bounds on how many bytes a whole-artifact parse may buffer.
+    *
+    * Every parser below consumes its input as one complete structure, so the
+    * read is capped and an over-budget artifact is treated as "not this shape"
+    * rather than truncated (a truncated certificate parses as a different
+    * object or fails deep inside BouncyCastle). The caps matter because the
+    * MIME test that routes an artifact here is a 4 KB sniff: a multi-gigabyte
+    * container whose first 4 KB happens to hold a PEM header is otherwise
+    * buffered whole.
+    */
+  private val MaxSingleCertBytes: Long = 1L * 1024 * 1024
+  private val MaxPkcs7Bytes: Long = 8L * 1024 * 1024
+  private val MaxSshBytes: Long = 1L * 1024 * 1024
+  private val MaxPgpBytes: Long = 8L * 1024 * 1024
+  private val MaxPemKeyBytes: Long = 1L * 1024 * 1024
+
+  /** Read the artifact and hand the bytes to `parse`, refusing to buffer more
+    * than `budget` bytes.
+    *
+    * Bounds the read *during* the read rather than checking `artifact.size()`
+    * first: a declared size can be unknown (`-1` on a stream-backed entry) or a
+    * lie. Exceptions from either the read or the parser are swallowed, matching
+    * what these parsers did before — a blob that cannot be parsed is not a
+    * claim, never a failure of the run.
+    */
+  private def parseWhole[T](
+      artifact: ArtifactWrapper,
+      budget: Long
+  )(parse: Array[Byte] => Option[T]): Option[T] =
+    Try(artifact.withStream(f => Helpers.slurpInputUpTo(f, budget))).toOption
+      .flatten
+      .flatMap(bytes => Try(parse(bytes)).toOption.flatten)
+
   private[strategies] def parsePkcs7(
       artifact: ArtifactWrapper
-  ): Option[Bundle] = {
-    Try {
-      artifact.withStream { f =>
-        val bytes = Helpers.slurpInput(f)
-        val cf = CertificateFactory.getInstance("X.509", "BC")
-        val certs =
-          cf.generateCertificates(new ByteArrayInputStream(bytes))
-            .asScala
-            .toVector
-            .collect { case c: X509Certificate =>
-              c
-            }
-        certs
-      }
-    }.toOption
-      .filter(_.nonEmpty)
-      .map(Bundle(_))
+  ): Option[Bundle] = parseWhole(artifact, MaxPkcs7Bytes) { bytes =>
+    val cf = CertificateFactory.getInstance("X.509", "BC")
+    val certs =
+      cf.generateCertificates(new ByteArrayInputStream(bytes))
+        .asScala
+        .toVector
+        .collect { case c: X509Certificate =>
+          c
+        }
+    if (certs.isEmpty) None else Some(Bundle(certs))
   }
 
   /** True if the artifact's MIME set indicates a single X.509 cert. Excludes
@@ -387,12 +432,10 @@ object Certificates {
   /** Parse a single X.509 cert (PEM or DER). */
   private[strategies] def parseSingleCert(
       artifact: ArtifactWrapper
-  ): Option[X509Certificate] = Try {
-    artifact.withStream { f =>
-      val bytes = Helpers.slurpInput(f)
+  ): Option[X509Certificate] =
+    parseWhole(artifact, MaxSingleCertBytes)(bytes =>
       tryParsePem(bytes).orElse(tryParseDer(bytes))
-    }
-  }.toOption.flatten
+    )
 
   private lazy val converter: JcaX509CertificateConverter =
     new JcaX509CertificateConverter().setProvider("BC")
@@ -565,52 +608,42 @@ object Certificates {
   /** Parse an OpenSSH plain public-key file. */
   private[strategies] def parseSshPubkey(
       artifact: ArtifactWrapper
-  ): Option[SshPubkey] = Try {
-    artifact.withStream { f =>
-      val raw = new String(
-        Helpers.slurpInput(f),
-        UTF_8
-      )
-      SshWireReader
-        .parseFirstKeyLine(raw)
-        .flatMap { case (alg, wire, comment) =>
-          val r = SshWireReader(wire)
-          r.readUtf8String().flatMap { innerAlg =>
-            if (innerAlg != alg) None
-            else if (!sshAlgMap.contains(alg)) None
-            else {
-              val rsaBits =
-                if (alg == "ssh-rsa") {
-                  r.readMpint().flatMap { _ =>
-                    r.readMpint().map(n => SshWireReader.mpintBitLength(n))
-                  }
-                } else None
-              Some(SshPubkey(wire, alg, comment, rsaBits))
-            }
+  ): Option[SshPubkey] = parseWhole(artifact, MaxSshBytes) { bytes =>
+    val raw = new String(bytes, UTF_8)
+    SshWireReader
+      .parseFirstKeyLine(raw)
+      .flatMap { case (alg, wire, comment) =>
+        val r = SshWireReader(wire)
+        r.readUtf8String().flatMap { innerAlg =>
+          if (innerAlg != alg) None
+          else if (!sshAlgMap.contains(alg)) None
+          else {
+            val rsaBits =
+              if (alg == "ssh-rsa") {
+                r.readMpint().flatMap { _ =>
+                  r.readMpint().map(n => SshWireReader.mpintBitLength(n))
+                }
+              } else None
+            Some(SshPubkey(wire, alg, comment, rsaBits))
           }
         }
-    }
-  }.toOption.flatten
+      }
+  }
 
   /** Parse an OpenSSH CA-issued certificate file. */
   private[strategies] def parseSshCert(
       artifact: ArtifactWrapper
-  ): Option[SshCert] = Try {
-    artifact.withStream { f =>
-      val raw = new String(
-        Helpers.slurpInput(f),
-        UTF_8
-      )
-      SshWireReader
-        .parseFirstKeyLine(raw)
-        .flatMap { case (certTypeName, certBytes, comment) =>
-          signedKeyAlgFromCertName(certTypeName).flatMap { signedAlg =>
-            if (!sshAlgMap.contains(signedAlg)) None
-            else parseSshCertBlob(certTypeName, signedAlg, certBytes, comment)
-          }
+  ): Option[SshCert] = parseWhole(artifact, MaxSshBytes) { bytes =>
+    val raw = new String(bytes, UTF_8)
+    SshWireReader
+      .parseFirstKeyLine(raw)
+      .flatMap { case (certTypeName, certBytes, comment) =>
+        signedKeyAlgFromCertName(certTypeName).flatMap { signedAlg =>
+          if (!sshAlgMap.contains(signedAlg)) None
+          else parseSshCertBlob(certTypeName, signedAlg, certBytes, comment)
         }
-    }
-  }.toOption.flatten
+      }
+  }
 
   /** Decode the cert wire blob. Returns None for cert-type mismatch,
     * unsupported key algorithm, or short wire data instead of throwing.
@@ -800,20 +833,14 @@ object Certificates {
   /** Parse a PGP key ring (armored or binary). */
   private[strategies] def parsePgpKeyRing(
       artifact: ArtifactWrapper
-  ): Option[PgpKeyRing] = {
-    artifact.withStream { f =>
-      Try {
-        val raw = Helpers.slurpInput(f)
-
-        val segments = splitArmoredBlocks(raw)
-        val rings = segments.foldLeft(Vector[PGPPublicKeyRing]()) {
-          case (rings, seg) => parsePgpStream(seg, rings)
-        }
-
-        if (rings.isEmpty) None
-        else Some(buildPgpKeyRing(rings.toVector))
-      }.toOption.flatten
+  ): Option[PgpKeyRing] = parseWhole(artifact, MaxPgpBytes) { raw =>
+    val segments = splitArmoredBlocks(raw)
+    val rings = segments.foldLeft(Vector[PGPPublicKeyRing]()) {
+      case (rings, seg) => parsePgpStream(seg, rings)
     }
+
+    if (rings.isEmpty) None
+    else Some(buildPgpKeyRing(rings.toVector))
   }
 
   /** Split a raw byte buffer into one segment per `BEGIN PGP …` armor block. If
@@ -898,19 +925,13 @@ object Certificates {
     */
   private[strategies] def parsePgpSecretKeyRing(
       artifact: ArtifactWrapper
-  ): Option[ClaimedContent] = {
-    artifact.withStream { f =>
-      Try {
-        val raw = Helpers.slurpInput(f)
-
-        val segments = splitArmoredBlocks(raw)
-        val rings = segments.foldLeft(Vector[PGPSecretKeyRing]()) {
-          case (rings, seg) => parsePgpSecretStream(seg, rings)
-        }
-        if (rings.isEmpty) None
-        else Some(buildPgpSecretClaim(rings))
-      }.toOption.flatten
+  ): Option[ClaimedContent] = parseWhole(artifact, MaxPgpBytes) { raw =>
+    val segments = splitArmoredBlocks(raw)
+    val rings = segments.foldLeft(Vector[PGPSecretKeyRing]()) {
+      case (rings, seg) => parsePgpSecretStream(seg, rings)
     }
+    if (rings.isEmpty) None
+    else Some(buildPgpSecretClaim(rings))
   }
 
   /** Read every PGPSecretKeyRing from a decoder stream. */
@@ -1566,17 +1587,14 @@ object Certificates {
   /** Parse a PEM-private-key MIME; disambiguates encrypted vs unencrypted. */
   private[strategies] def parsePemPrivateKey(
       artifact: ArtifactWrapper
-  ): Option[ClaimedContent] = Try {
-    artifact.withStream { f =>
-      val raw = Helpers.slurpInput(f)
-      val text = new String(raw, ISO_8859_1)
-      if (procTypeEncryptedHeaderPresent(text)) {
-        Some(legacyEncryptedPemClaim(text))
-      } else {
-        parseUnencryptedPemBytes(raw)
-      }
+  ): Option[ClaimedContent] = parseWhole(artifact, MaxPemKeyBytes) { raw =>
+    val text = new String(raw, ISO_8859_1)
+    if (procTypeEncryptedHeaderPresent(text)) {
+      Some(legacyEncryptedPemClaim(text))
+    } else {
+      parseUnencryptedPemBytes(raw)
     }
-  }.toOption.flatten
+  }
 
   private def iteratorToVec[T](parser: Iterator[T]): Vector[T] = {
     val iterator = parser
@@ -1891,13 +1909,10 @@ object Certificates {
   /** Parse an OpenSSH-private-key MIME (openssh-key-v1 envelope). */
   private[strategies] def parseOpenSshPrivateKey(
       artifact: ArtifactWrapper
-  ): Option[ClaimedContent] = Try {
-    artifact.withStream { f =>
-      val raw = Helpers.slurpInput(f)
-      val envelope = decodeOpenSshArmor(raw)
-      envelope.flatMap(parseOpenSshV1Envelope)
-    }
-  }.toOption.flatten
+  ): Option[ClaimedContent] = parseWhole(artifact, MaxPemKeyBytes) { raw =>
+    val envelope = decodeOpenSshArmor(raw)
+    envelope.flatMap(parseOpenSshV1Envelope)
+  }
 
   /** Strip PEM armor and base64-decode the inner body. */
   private def decodeOpenSshArmor(raw: Array[Byte]): Option[Array[Byte]] = {

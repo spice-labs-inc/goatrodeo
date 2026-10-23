@@ -90,20 +90,6 @@ object ServiceTlsConfigStrategy {
     )
   }
 
-  private def isTlsConfigArtifact(artifact: ArtifactWrapper): Boolean = {
-    val path = artifact.path()
-    if (!TlsConfigPathPatterns.exists(path.contains)) return false
-    Try {
-      artifact.withStream { stream =>
-        val text = new String(
-          Helpers.slurpInput(stream),
-          StandardCharsets.UTF_8
-        )
-        containsTlsConfiguration(text)
-      }
-    }.getOrElse(false)
-  }
-
   private[goatrodeo] def containsTlsConfiguration(text: String): Boolean = {
     text.linesIterator.exists { line =>
       line.trim match {

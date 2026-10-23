@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Arrays
@@ -584,21 +585,27 @@ object FileWalker {
                       case Success(Some(view)) =>
                         val wrappers = view.sources.flatMap { src =>
                           val name = src.name
-                          val bytes = src.processStream { stream =>
-                            val bos = new ByteArrayOutputStream()
-                            Helpers.copy(stream, bos)
-                            bos.toByteArray()
-                          }
-
-                          Some(
-                            ByteWrapper(
-                              bytes,
-                              name,
-                              in.tempDir,
-                              Set("text/plain")
-                            )
+                          // The size is not in Cilantro's API (`EmbeddedSourceFile`
+                          // exposes only `name` and `processStream`), so this hands
+                          // `newWrapper` an unknown size. `newWrapper` treats that as
+                          // "must be a file", which is the safe direction: the
+                          // source is written to the walk directory instead of being
+                          // buffered whole, so a pathological embedded source costs
+                          // disk rather than heap. It also keeps the in-memory vs
+                          // temp-file decision in one place instead of duplicating
+                          // it here.
+                          src.processStream(stream =>
+                            ArtifactWrapper
+                              .newWrapper(
+                                nominalPath = name,
+                                size = -1L,
+                                data = stream,
+                                tempDir = in.tempDir,
+                                tempPath = walkDir,
+                                mimeHint = Set("text/plain")
+                              )
+                              .toOption
                           )
-
                         }
                         Some(wrappers.toVector -> "Portable PDB")
                       case _ =>
