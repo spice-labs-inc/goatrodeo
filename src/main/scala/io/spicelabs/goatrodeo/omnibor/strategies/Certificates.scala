@@ -116,14 +116,14 @@ import scala.util.Using
   */
 object Certificates {
 
-  /** BouncyCastle is a hard dependency of every parser here: `CertificateFactory`
-    * and `JcaX509CertificateConverter` are both asked for the `"BC"` provider
-    * by name. It used to be registered only as a side effect of
-    * [[io.spicelabs.goatrodeo.util.CryptoDetector]] initialising, so any entry
-    * point that reached this strategy first got `NoSuchProviderException`
-    * inside a `Try` and silently reported no certificates at all. Registering it
-    * here makes the dependency explicit and order-independent; the call is
-    * idempotent.
+  /** BouncyCastle is a hard dependency of every parser here:
+    * `CertificateFactory` and `JcaX509CertificateConverter` are both asked for
+    * the `"BC"` provider by name. It used to be registered only as a side
+    * effect of [[io.spicelabs.goatrodeo.util.CryptoDetector]] initialising, so
+    * any entry point that reached this strategy first got
+    * `NoSuchProviderException` inside a `Try` and silently reported no
+    * certificates at all. Registering it here makes the dependency explicit and
+    * order-independent; the call is idempotent.
     */
   private val _bcInit: Unit = Try {
     if (java.security.Security.getProvider("BC") == null) {
@@ -389,8 +389,9 @@ object Certificates {
       artifact: ArtifactWrapper,
       budget: Long
   )(parse: Array[Byte] => Option[T]): Option[T] =
-    Try(artifact.withStream(f => Helpers.slurpInputUpTo(f, budget))).toOption
-      .flatten
+    Try(
+      artifact.withStream(f => Helpers.slurpInputUpTo(f, budget))
+    ).toOption.flatten
       .flatMap(bytes => Try(parse(bytes)).toOption.flatten)
 
   private[strategies] def parsePkcs7(

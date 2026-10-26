@@ -736,9 +736,9 @@ object Helpers {
     * `slurpInput` buffers until EOF with no upper bound, so any caller that
     * parses "the whole blob" can be handed an arbitrarily large artifact. Every
     * such caller treats the bytes as one complete structure, so a *truncated*
-    * buffer is worse than no buffer at all: a truncated certificate, key ring or
-    * POM does not fail cleanly, it either fails deep inside a parser or parses
-    * as a different object.
+    * buffer is worse than no buffer at all: a truncated certificate, key ring
+    * or POM does not fail cleanly, it either fails deep inside a parser or
+    * parses as a different object.
     *
     * This reads at most `maxBytes + 1` bytes. The extra byte is what proves the
     * stream is longer than the budget; when it arrives the answer is `None` and

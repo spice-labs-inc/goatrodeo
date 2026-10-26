@@ -6,7 +6,6 @@ import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 
 import java.nio.file.Files
 import java.security.MessageDigest
-import java.util.Arrays
 import java.util.zip.ZipFile
 import scala.util.Try
 
@@ -18,19 +17,19 @@ import scala.util.Try
   * copied whole into memory.
   *
   * WHY: the previous code buffered each source into a `ByteArrayOutputStream`
-  * with no bound. A portable PDB is attacker-supplied data — it arrives inside a
-  * compiled assembly — so one pathological embedded source could exhaust the
-  * heap and kill the run. Cilantro's `EmbeddedSourceFile` exposes only `name` and
-  * `processStream`, with no length, so `newWrapper`'s unknown-size branch (which
-  * writes a temp file) is the only way to route the decision through the one
-  * place that owns it.
+  * with no bound. A portable PDB is attacker-supplied data — it arrives inside
+  * a compiled assembly — so one pathological embedded source could exhaust the
+  * heap and kill the run. Cilantro's `EmbeddedSourceFile` exposes only `name`
+  * and `processStream`, with no length, so `newWrapper`'s unknown-size branch
+  * (which writes a temp file) is the only way to route the decision through the
+  * one place that owns it.
   *
   * THEORY: the thing worth pinning is the pair "no whole-source buffering" and
   * "content unchanged". S-1 pins the first: every yielded wrapper must be a
-  * `FileWrapper`, which cannot happen if the source was buffered in memory.
-  * S-2 pins the second by comparing each yielded wrapper's content with the
-  * bytes the PDB reader itself yields for the same file, digest by digest, so a
-  * spill that truncated or reordered bytes fails.
+  * `FileWrapper`, which cannot happen if the source was buffered in memory. S-2
+  * pins the second by comparing each yielded wrapper's content with the bytes
+  * the PDB reader itself yields for the same file, digest by digest, so a spill
+  * that truncated or reordered bytes fails.
   */
 class PdbSourceSpillSuite extends GoatRodeoFunSuite {
 
@@ -42,8 +41,9 @@ class PdbSourceSpillSuite extends GoatRodeoFunSuite {
     try {
       val e = zip.getEntry("lib/net6.0/Polly.pdb")
       val in = zip.getInputStream(e)
-      val bytes = try in.readAllBytes()
-      finally in.close()
+      val bytes =
+        try in.readAllBytes()
+        finally in.close()
       val tempDir = Files.createTempDirectory("pdb-source-suite")
       ArtifactWrapper
         .newWrapper(
@@ -83,7 +83,10 @@ class PdbSourceSpillSuite extends GoatRodeoFunSuite {
           s.mimeType.contains("text/plain"),
           s"${s.path()} must carry the text/plain hint, got ${s.mimeType}"
         )
-        assert(s.size() > 0, s"${s.path()} must have content while the walk is open")
+        assert(
+          s.size() > 0,
+          s"${s.path()} must have content while the walk is open"
+        )
       }
       found.length
     }
@@ -97,13 +100,14 @@ class PdbSourceSpillSuite extends GoatRodeoFunSuite {
 
     val direct: Set[String] = pdb.withFile { f =>
       val acc = scala.collection.mutable.Set.empty[String]
-      PortablePdbFile.withPdb[Unit](f, None) { (outcome: Try[Option[PDBView]]) =>
-        outcome.foreach(_.foreach { view =>
-          view.sources.foreach { src =>
-            acc += digest(src.processStream(_.readAllBytes()))
-          }
-        })
-        ()
+      PortablePdbFile.withPdb[Unit](f, None) {
+        (outcome: Try[Option[PDBView]]) =>
+          outcome.foreach(_.foreach { view =>
+            view.sources.foreach { src =>
+              acc += digest(src.processStream(_.readAllBytes()))
+            }
+          })
+          ()
       }
       acc.toSet
     }
@@ -124,7 +128,9 @@ class PdbSourceSpillSuite extends GoatRodeoFunSuite {
   test("S-3 distinct sources do not share one buffer") {
     val pdb = pdbWrapper()
     val contents = FileWalker.withinArchiveStream(artifact = pdb) { found =>
-      found.map(s => s.path() -> digest(s.withStream(_.readAllBytes()))).toVector
+      found
+        .map(s => s.path() -> digest(s.withStream(_.readAllBytes())))
+        .toVector
     }
     assert(contents.isDefined)
     val byPath = contents.get

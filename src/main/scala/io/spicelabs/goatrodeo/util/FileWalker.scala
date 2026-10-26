@@ -17,15 +17,14 @@ import io.spicelabs.saffron.fs.FileSystemMount
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.compressors.CompressorInputStream
 import org.apache.commons.compress.compressors.CompressorStreamFactory
 
 import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Arrays
@@ -655,7 +654,18 @@ object FileWalker {
         .flatMap(ae => {
           val artifactName = ae.getName()
 
-          val size = ae.getSize()
+          // A GNU sparse member's `getSize()` is the *stored* (compacted) size —
+          // the bytes the archive holds — while the archive stream expands the
+          // holes and yields the logical file. `getRealSize()` is the number of
+          // bytes that will actually arrive. Measuring by the stored size made a
+          // multi-megabyte sparse member look like a few kilobytes: it stayed in
+          // memory, defeating the in-memory limit, and `newWrapper` logged a
+          // size mismatch for every sparse member in the corpus. For ordinary
+          // members `getRealSize()` returns `getSize()`, so nothing else moves.
+          val size = ae match {
+            case tar: TarArchiveEntry => tar.getRealSize
+            case other                => other.getSize()
+          }
 
           ArtifactWrapper
             .newWrapper(
