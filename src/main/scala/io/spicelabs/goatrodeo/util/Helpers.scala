@@ -76,11 +76,49 @@ type GitOID = String
 object Helpers {
   private val logger: Logger = Logger(getClass())
 
+  /** Silence the JDK's own manifest warnings.
+    *
+    * `java.util.jar.Attributes.read` logs `Duplicate name in Manifest: <name>`
+    * through the platform logger named `java.util.jar`, once per duplicated
+    * attribute per manifest. Duplicate attributes are common in real jars —
+    * `Manifest-Version`, `Created-By`, `Automatic-Module-Name`,
+    * `Build-Jdk-Spec` — and every consumer we know of tolerates them by taking
+    * the last value, which is exactly what `Manifest` itself does. A single
+    * Maven-shaped run produced tens of thousands of those lines, and at that
+    * volume they are the largest source of log noise in the run.
+    *
+    * The level is set once, for that one logger. Nothing else is muted, and the
+    * parsing behaviour is unchanged: the attributes still arrive, duplicates
+    * included, resolved by the same last-value-wins rule.
+    */
+  /** A strong reference to the JDK's `java.util.jar` logger, and the reason it
+    * is held: `LogManager` keeps loggers in a weakly-referenced map, so a level
+    * set on an instance that nobody else references is lost when that instance
+    * is collected — a later `getLogger` hands back a fresh one with a null
+    * level and the warnings come back. Holding the reference for the life of
+    * the object keeps the level where it was set.
+    */
+  private val jdkJarLogger: java.util.logging.Logger =
+    java.util.logging.Logger.getLogger("java.util.jar")
+
+  private def silenceJdkManifestWarnings(): Unit =
+    Try(jdkJarLogger.setLevel(java.util.logging.Level.OFF)).toOption
+
+  /** Re-apply the level if anything reset it. A field read and a comparison
+    * when the level is already OFF, which is the normal case.
+    */
+  private def ensureManifestWarningsSilenced(): Unit =
+    if (jdkJarLogger.getLevel != java.util.logging.Level.OFF)
+      silenceJdkManifestWarnings()
+
+  silenceJdkManifestWarnings()
+
   /** Take a JAR manifest and turn it into metadata stuff
     */
   def treeInfoFromManifest(
       manifestString: String
   ): TreeMap[String, TreeSet[StringOrPair]] = {
+    ensureManifestWarningsSilenced()
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
     val manifestVec = Try {
       Manifest.apply(bis)
