@@ -17,9 +17,14 @@ class MimeHintSurvivesAugmenterFailureSuite extends GoatRodeoFunSuite {
     // The rule keys on a unique hint so this augmenter never fires for any
     // other artifact in the test run.
     val hint = "application/x-goatrodeo-test-hint-" + UUID.randomUUID()
-    ArtifactWrapper.addMimeTypeAugmenter(_.contains(hint)) { (_, _) =>
-      throw new RuntimeException("augmenter failure")
-    }
+    ArtifactWrapper.addMimeTypeAugmenter(
+      MimeAugmenter(
+        id = "failing-test-augmenter",
+        rule = (mimes: Set[String], _: String) => mimes.contains(hint),
+        budget = ProbeBudget(),
+        fn = (_, _, _, _) => throw new RuntimeException("augmenter failure")
+      )
+    )
     val wrapper =
       ByteWrapper("hello".getBytes("UTF-8"), "x.bin", None, Set(hint))
     assert(

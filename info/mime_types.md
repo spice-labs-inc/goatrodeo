@@ -49,35 +49,48 @@ Verified by `MimeHintSuite.T5.1–T5.8` (hint default/union/spill/
 never-sniffed/authoritative/monotonic property) and
 `CertificatesPkcs7Suite.T6.x` (claim semantics).
 
-### Terminal MIME types, and the extension misreadings they must not block
+### Per-augmenter short-circuits, and why there is no global MIME gate
 
-`ArtifactWrapper.augmentationCannotApply` skips the whole augmenter chain when
-Tika has already produced a MIME that no augmenter could ever match — media types
-and the terminal binary types. That is a pure performance short-circuit, and it is
-safe only while "no augmenter could match" is true.
+There is no such thing as a "terminal" MIME type. A MIME type is an additive claim
+about what an artifact *is*: a JAR is also a ZIP, also a container that will be
+walked, and its stored bytes may also carry a certificate or a PEM block. One
+claim therefore cannot mean "nothing further can be found here", so no shared gate
+is allowed to decide that for every augmenter at once.
 
-Two families are **deliberately excluded** from that short-circuit because Tika
-assigns them by extension alone and the bytes contradict them:
+Each augmenter instead carries its own block-shaped `rule` (see
+`ArtifactWrapper.addMimeTypeAugmenter`), and `augmentMimeTypes` consults nothing
+else. An augmenter whose own rule finds the MIME set impossible is skipped — no
+probe, no evidence, no MIME of its own — and every other augmenter keeps running.
+`ArtifactWrapper.noneOf` is the combinator the rules share; it carries no policy
+of its own. A blocked name that ends in a slash plus an asterisk is a family
+wildcard (`"text/*"` blocks `text/plain` and `text/x-vhdl`); any other name matches
+exactly, so `"application/java-vm"` blocks that one MIME and nothing more.
 
-| Tika's reading | Why it is wrong | What the pipeline does |
-|---|---|---|
-| `text/x-vhdl` for a `.vhd` | Tika reads the extension as VHDL source | the text family is left probed, and `SaffronDetector` drops `text/*` once it has recognised a disk |
-| `image/x-raw-panasonic` for a `.raw` | Tika reads the extension as a Panasonic camera RAW photo | `image/x-raw-*` is not terminal, and `SaffronDetector` drops it once it has recognised a disk |
+| Situation | What happens |
+|---|---|
+| an augmenter's own work is impossible for this MIME set | that augmenter is skipped; the others still probe |
+| a media or archive MIME describes the artifact | only the augmenters whose rules refuse that family skip it |
+| several augmenters recognise the same artifact | every claim is added; none suppresses another |
 
-The second row matters more than it looks. An `image/` type is not only terminal
-for augmentation — `FileWalker.notArchive` also rejects anything under `image/`,
-so the file is never offered to Saffron at all. Without the exception, a raw disk
-image named `.raw` — which is how Debian and other cloud images ship — is
-surveyed as a single opaque file, and the run still succeeds, so nothing else
-reports it. The bytes decide the format; the extension may not.
+Each family block is that augmenter's own reasoning. `SaffronDetector`'s rule
+blocks only class files, deliberately: Tika assigns `.vhd` and `.raw` by
+extension (`text/x-vhdl`, `image/x-raw-panasonic`), so leaving the text and image
+families probed is what lets a cloud disk image be recognised at all.
+`SaffronDetector` then *adds* `application/x-saffron-raw-disk` — augmentation is
+additive, nothing is removed — and that MIME is a member of
+`FileWalker.saffronMimeTypes`, which is what gets the filesystem inside the disk
+walked. The wrong claim from Tika stays in the set; the bytes decide.
 
-**Verified by:** `SaffronImageItemSuite.S-4` (a `.raw` disk with no mountable
-filesystem is still recognised, carries `application/x-saffron-raw-disk`, logs no
-error, and yields no file items) and `SaffronImageItemSuite.S-5` (a `.raw` disk
-*with* a filesystem is walked, its files become items, and the camera-RAW
-misreading is absent from the disk's MIME set). `S-5` is the load-bearing one:
-if the exception is lost, the run still succeeds and only the missing items
-reveal it.
+**Verified by:** `AugmenterLocalShortCircuitSuite.LR-1` (no MIME family is blocked
+by every augmenter except class files, which each augmenter rejects in its own
+rule), `LR-2` (a JAR holding a stored PEM and a `java.security` line is skipped by
+`JavaSecurityDetector` and still probed by `CryptoContentDetector`, which finds
+the PEM), `LR-3` (the same payload in a plain settings file fires both),
+`LR-4` (one artifact carries several augmenters' claims at once),
+`MimeAugmenterRuleSuite.R-1` (each rule blocks its declared families only, with
+`"text/*"` and `"image/*"` matching as prefixes), and `SaffronImageItemSuite.S-5` (a
+`.raw` disk with a filesystem is walked, so an extension misreading cannot hide
+it).
 
 ## CryptoDetector augmentation (Certificates strategy)
 
@@ -88,12 +101,12 @@ augmenter (registered after Saffron in
 `ArtifactWrapper.augmenters`) inspects the first 4 KB of each
 artifact and ADDS specific MIME types based on content signatures.
 
-**Pure-addition design:** unlike `SaffronDetector`, which strips
-`text/*` MIMEs when it finds a binary signature, `CryptoDetector` is
-purely additive — it never removes a Tika-detected MIME, only adds
-its own. Rationale: PEM-encoded artifacts legitimately are BOTH
-`text/plain` (Tika) AND `application/x-pem-file` (CryptoDetector);
-downstream filtering chooses what to act on.
+**Pure-addition design:** every augmenter is purely additive, `SaffronDetector`
+included — none of them removes a Tika-detected MIME; they only add their own.
+`SaffronDetector` adds `application/x-saffron-raw-disk` rather than deleting the
+`text/x-vhdl` or `image/x-raw-*` misreading. Rationale: PEM-encoded artifacts
+legitimately are BOTH `text/plain` (Tika) AND `application/x-pem-file`
+(`CryptoDetector`); downstream filtering chooses what to act on.
 
 **Verified by:**
 [`CertificatesStubTests::[INVARIANT] CryptoDetector.mimeTypeAugmenter never strips MIME types beginning with text/`](../src/test/scala/strategies/CertificatesStubTests.scala)
@@ -102,18 +115,19 @@ downstream filtering chooses what to act on.
 
 ### Per-augmenter applicability rules
 
-Every registered augmenter carries its own block-shaped MIME rule
-(`addMimeTypeAugmenter(rule)(fn)` in `ArtifactWrapper`; `noneOf` helper), so a
-new augmenter is added without touching any global skip logic. Rules only
-block MIMEs that provably cannot match — unknown or degenerate MIMEs (inner
-package fragments, future ecosystems) are always probed, so a wrong rule can
-only cost performance, never a false negative.
+Every registered augmenter is one `MimeAugmenter(id, rule, budget, fn)` value
+registered with `ArtifactWrapper.addMimeTypeAugmenter`, and its `rule` is the only
+statement about which MIME sets it is willing to look at. Rules only block MIMEs
+that provably cannot match — unknown or degenerate MIMEs (inner package
+fragments, future ecosystems) are always probed, so a wrong rule can only cost
+performance, never a false negative. `noneOf` is the shared combinator, with no
+policy of its own.
 
 | Augmenter | Blocked MIMEs |
 |-----------|---------------|
 | `CryptoDetector` | `application/java-vm` |
 | `CryptoContentDetector` | `application/java-vm` |
-| `OpenSSLConfigDetector` | media (`image/`·`audio/`·`video/`), class mimes, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` |
+| `OpenSSLConfigDetector` | media families (`image/*`·`audio/*`·`video/*`), class mimes, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` |
 | `JavaSecurityDetector` | same as OpenSSLConfigDetector |
 | `JavaArchiveDetector` | `text/*`, `application/xml`, `application/java-vm` |
 | `DotnetDetector` | `text/*`, `application/xml`, `application/java-vm` |

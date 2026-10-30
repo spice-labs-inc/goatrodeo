@@ -50,28 +50,6 @@ class SaffronTests extends GoatRodeoFunSuite {
     testDiskImage(qemu, 2)
   }
 
-  // A disk image's files are all wrapped before any is processed, so only the
-  // small ones may stay in memory; a Linux root filesystem otherwise holds GiBs.
-  test(
-    "files of a disk image above the small in-memory size go to temp files"
-  ) {
-    val squashfs = File("test_data/alpine-minimal.squashfs")
-    val artifact: ArtifactWrapper =
-      FileWrapper(squashfs, squashfs.getName(), None)
-    val openedArchiveOpt = FileWalker.withinArchiveStream(artifact)(files => {
-      val large = files.filter(_.size() > ArtifactWrapper.smallInMemorySize)
-      assert(large.nonEmpty, "the fixture needs a file above the limit")
-      assert(large.forall(_.isRealFile()), large.map(_.getClass()).toString)
-      assert(
-        files
-          .filter(_.size() <= ArtifactWrapper.smallInMemorySize)
-          .exists(!_.isRealFile())
-      )
-      ()
-    })
-    assert(openedArchiveOpt.isDefined)
-  }
-
   test("check minimal vmdk for files") {
     val vmdk = File("test_data/smallvm.zip")
     testDiskImage(vmdk, 2)

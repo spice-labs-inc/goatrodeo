@@ -41,7 +41,7 @@ object CarvedCertAugmenter {
   val CarvedMime = "application/x-goatrodeo-carved-x509"
 
   /** Bytes read during the MIME-pass probe. */
-  val ProbeBytes: Int = 256 * 1024
+  val ProbeBytes: Int = MimeProbe.MaxBytes
 
   /** Bytes scanned during processing-time carving. */
   val MaxScanBytes: Int = 16 * 1024 * 1024
@@ -77,17 +77,16 @@ object CarvedCertAugmenter {
       0x01
     )
 
-  /** Applicability rule: block-list shaped — text/XML/JSON/class files can
-    * never carry carved DER certs; binaries and unknown fragments (ELF sections
-    * are octet-stream) stay probed.
+  /** Both sides come from [[MimeFamilies]], the same pair the consumer of this
+    * augmenter's MIME type uses, so a change to what this augmenter can handle
+    * changes its consumer at the same moment.
     */
-  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
-    ArtifactWrapper.noneOf(
-      "text/",
-      "application/xml",
-      "application/json",
-      "application/java-vm"
-    )(mimes)
+  private[goatrodeo] def mimeRule(
+      mimes: Set[String],
+      name: String = ""
+  ): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeCarvedCarrier) &&
+      MimeFamilies.couldBe(mimes, MimeFamilies.couldBeCarvedCarrier)
 
   /** Parse the DER length header at `headerIdx` (pointing at the `0x30`
     * SEQUENCE byte). Returns the total DER object size (header + content), or
@@ -226,19 +225,149 @@ object CarvedCertAugmenter {
     (out.result(), capExceeded)
   }
 
-  def mimeTypeAugmenter(
-      artifact: ArtifactWrapper,
-      currentMimes: Set[String]
-  ): Set[String] = {
-    val found = Try {
-      artifact.withStream { s =>
-        val buf = new Array[Byte](ProbeBytes)
-        val n = s.read(buf, 0, ProbeBytes)
-        val bytes =
-          if (n <= 0) Array.emptyByteArray else Arrays.copyOf(buf, n)
-        hasDerCandidate(bytes, ProbeBytes)
-      }
-    }.getOrElse(false)
-    if (found) currentMimes + CarvedMime else currentMimes
+  /** Evidence about a possible carved-certificate carrier.
+    *
+    * No MIME type is added: whether this artifact *contains* a certificate is
+    * not known from a bounded prefix, and a MIME type is only added when it is
+    * true. The record says what the carrier is, so the carving strategy can
+    * decide whether a deeper look is worth it — and only for artifacts nothing
+    * else claimed.
+    */
+  final case class Carrier(
+      isElf: Boolean,
+      isPe: Boolean,
+      derPrefixSeen: Boolean,
+      probedBytes: Int,
+      sectionTableOffset: Long = 0L,
+      sectionEntrySize: Int = 0,
+      sectionCount: Int = 0,
+      symbolTableOffset: Long = 0L,
+      symbolCount: Int = 0
+  ) extends AugmentationEvidence {
+    def augmenter: String = "CarvedCertAugmenter"
+
+    /** True when the carrier's link-time tables can be walked: without a
+      * section table there is no way to find `.symtab`, and without a symbol
+      * table there is no name to aim the carve at.
+      */
+    def tablesKnown: Boolean = sectionTableOffset > 0 && sectionCount > 0
   }
+
+  /** Reads the ELF header fields that point at the section table. Both the
+    * header and the program header table sit in the first block of every sane
+    * ELF, so this costs no extra I/O.
+    *
+    * `e_shoff` is at the *end* of the file in practice, and the section data
+    * precedes it; the strategy reaches both by opening fresh streams and
+    * skipping, which is an lseek and therefore free in bytes read.
+    */
+  private def elfTables(bytes: Array[Byte]): (Long, Int, Int) = {
+    if (bytes.length < 64) (0L, 0, 0)
+    else {
+      val is64 = bytes(4) == 2
+      if (is64) {
+        val eShoff = readLongLE(bytes, 40)
+        val eShentsize = readShortLE(bytes, 58)
+        val eShnum = readShortLE(bytes, 60)
+        // e_shnum == 0 means the real count lives in section 0's sh_size, which
+        // would need a second read; treat it as unknown rather than guessing.
+        if (eShnum == 0) (0L, 0, 0) else (eShoff, eShentsize, eShnum)
+      } else {
+        val eShoff = readIntLE(bytes, 32).toLong & 0xffffffffL
+        val eShentsize = readShortLE(bytes, 46)
+        val eShnum = readShortLE(bytes, 48)
+        if (eShnum == 0) (0L, 0, 0) else (eShoff, eShentsize, eShnum)
+      }
+    }
+  }
+
+  /** Reads the PE COFF header fields: where the section table is and where the
+    * COFF symbol table is. Both are in the first block for any PE.
+    */
+  private def peTables(bytes: Array[Byte]): (Long, Int, Int, Long, Int) = {
+    if (bytes.length < 64) (0L, 0, 0, 0L, 0)
+    else {
+      val eLfanew = readIntLE(bytes, 60)
+      if (eLfanew <= 0 || eLfanew + 24 > bytes.length) (0L, 0, 0, 0L, 0)
+      else {
+        val symbolPointer = readIntLE(bytes, eLfanew + 12).toLong & 0xffffffffL
+        val numberOfSymbols = readIntLE(bytes, eLfanew + 16)
+        val sizeOfOptionalHeader = readShortLE(bytes, eLfanew + 20)
+        val numberOfSections = readShortLE(bytes, eLfanew + 6)
+        val sectionTable = eLfanew + 24 + sizeOfOptionalHeader
+        (
+          sectionTable.toLong,
+          40,
+          numberOfSections,
+          symbolPointer,
+          numberOfSymbols
+        )
+      }
+    }
+  }
+
+  private def readShortLE(b: Array[Byte], at: Int): Int =
+    (b(at) & 0xff) | ((b(at + 1) & 0xff) << 8)
+
+  private def readIntLE(b: Array[Byte], at: Int): Int =
+    (b(at) & 0xff) | ((b(at + 1) & 0xff) << 8) |
+      ((b(at + 2) & 0xff) << 16) | ((b(at + 3) & 0xff) << 24)
+
+  private def readLongLE(b: Array[Byte], at: Int): Long = {
+    var v = 0L
+    var i = 7
+    while (i >= 0) { v = (v << 8) | (b(at + i) & 0xffL); i -= 1 }
+    v
+  }
+
+  val augmenter: MimeAugmenter = MimeAugmenter(
+    id = "CarvedCertAugmenter",
+    rule = mimeRule(_, _),
+    budget = ProbeBudget(),
+    fn = (artifact, currentMimes, evidence, probe) => {
+      val bytes = probe.bytes
+      val isElf = bytes.length >= 4 && bytes(0) == 0x7f.toByte &&
+        bytes(1) == 'E'.toByte && bytes(2) == 'L'.toByte && bytes(
+          3
+        ) == 'F'.toByte
+      val isPe = bytes.length >= 2 && bytes(0) == 'M'.toByte &&
+        bytes(1) == 'Z'.toByte
+      val elf = if (isElf) elfTables(bytes) else (0L, 0, 0)
+      val pe = if (isPe) peTables(bytes) else (0L, 0, 0, 0L, 0)
+      val record = Carrier(
+        isElf = isElf,
+        isPe = isPe,
+        derPrefixSeen = hasDerCandidate(bytes, bytes.length),
+        probedBytes = bytes.length,
+        sectionTableOffset = if (isElf) elf._1 else pe._1,
+        sectionEntrySize = if (isElf) elf._2 else pe._2,
+        sectionCount = if (isElf) elf._3 else pe._3,
+        symbolTableOffset = pe._4,
+        symbolCount = pe._5
+      )
+      // A DER object carrying an SPKI needle in the first block *is* carved
+      // certificate material — a known fact, not a possibility — so the MIME is
+      // asserted here and the strategy claims it without probing again.
+      // The ELF magic in the first four bytes is proof, so the ELF container type
+      // is claimed here rather than left to Saffron's probe: that probe needs the
+      // whole file to classify an ELF, and a binary larger than the probe prefix
+      // therefore came back unclassified. A known type belongs in the MIME set
+      // before the probes that would otherwise guess at it.
+      val afterElf =
+        if (record.isElf && !currentMimes.contains(SaffronDetector.ElfMime))
+          currentMimes + SaffronDetector.ElfMime
+        else currentMimes
+      val mimes =
+        if (record.derPrefixSeen && !afterElf.contains(CarvedMime))
+          afterElf + CarvedMime
+        else afterElf
+      (
+        mimes,
+        evidence.updated(
+          CarvedMime,
+          evidence.getOrElse(CarvedMime, Vector.empty) :+ record
+        )
+      )
+    }
+  )
 }

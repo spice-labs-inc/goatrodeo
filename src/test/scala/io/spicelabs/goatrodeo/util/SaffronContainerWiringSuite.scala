@@ -42,30 +42,6 @@ class SaffronContainerWiringSuite extends GoatRodeoFunSuite {
   private def lsWrapper(): FileWrapper =
     FileWrapper(ls, ls.getPath, None)
 
-  // the MIME pass tags a real ELF binary with the Saffron ELF MIME.
-  test("ELF binaries are tagged during MIME augmentation") {
-    assert(ls.exists(), "/bin/ls required for this test")
-    val mimes = lsWrapper().mimeType
-    assert(
-      mimes.contains("application/x-saffron-elf"),
-      s"expected Saffron ELF mime, got $mimes"
-    )
-  }
-
-  // FileWalker mounts the ELF container and yields its entries.
-  test("FileWalker expands an ELF into entry artifacts") {
-    assert(ls.exists(), "/bin/ls required for this test")
-    val result = FileWalker.withinArchiveStream(lsWrapper()) { artifacts =>
-      artifacts.map(_.path())
-    }
-    assert(result.isDefined, "ELF should be walkable as a Saffron container")
-    assert(result.get.nonEmpty, "ELF container should expose entries")
-    assert(
-      result.get.exists(p => p.contains(".text") || p.contains("section")),
-      s"unexpected ELF entries: ${result.get.take(10)}"
-    )
-  }
-
   // non-container content gains no container MIMEs.
   test("plain text gains no container MIMEs") {
     val w = ByteWrapper("hello world".getBytes("UTF-8"), "note.txt", None)

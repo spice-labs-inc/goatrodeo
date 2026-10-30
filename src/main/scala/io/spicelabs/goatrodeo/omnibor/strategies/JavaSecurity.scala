@@ -21,6 +21,7 @@ import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.JavaSecurityData
 import io.spicelabs.goatrodeo.util.JavaSecurityDetector
 import io.spicelabs.goatrodeo.util.JavaSecurityParser
+import io.spicelabs.goatrodeo.util.MimeFamilies
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
@@ -225,12 +226,23 @@ object JavaSecurityToProcess {
     * named `java.security` inside a known security directory layout. Parsing,
     * `include` resolution, and dependency ordering happen inside the strategy.
     */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextConfig)
+
   def computeJavaSecurityFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val mimeClaimed = byName.values.flatten
-      .filter(_.mimeType.contains(JavaSecurityMimeType))
+      .filter(a =>
+        notAContainer(a.mimeType) && a.mimeType.contains(JavaSecurityMimeType)
+      )
       .toVector
 
     val pathClaimed = byName.values.flatten.filter { artifact =>

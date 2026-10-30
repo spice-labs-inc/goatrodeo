@@ -94,7 +94,9 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
     // Detection-signature table footnote: contrasting
     // SaffronDetector, the Crypto augmenter is purely additive.
     val input = Set("text/plain", "text/html")
-    val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input)
+    val out = ArtifactWrapper
+      .runAugmenter(CryptoDetector.augmenter, syntheticArtifact(), input)
+      .mimes
     val stripped = input.filterNot(out.contains)
     assert(
       stripped.isEmpty,
@@ -115,7 +117,9 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
       Set("text/plain", "application/x-x509-ca-cert")
     )
     for (input <- cases) {
-      val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input)
+      val out = ArtifactWrapper
+        .runAugmenter(CryptoDetector.augmenter, syntheticArtifact(), input)
+        .mimes
       assert(
         input.subsetOf(out),
         s"output $out must be a superset of input $input " +
@@ -144,7 +148,9 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
   test(
     "CryptoDetector.mimeTypeAugmenter returns currentMimes unchanged for empty set"
   ) {
-    val out = CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), Set.empty)
+    val out = ArtifactWrapper
+      .runAugmenter(CryptoDetector.augmenter, syntheticArtifact(), Set.empty)
+      .mimes
     assertEquals(out, Set.empty[String])
   }
 
@@ -158,7 +164,9 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
       "text/plain"
     )
     assertEquals(
-      CryptoDetector.mimeTypeAugmenter(syntheticArtifact(), input),
+      ArtifactWrapper
+        .runAugmenter(CryptoDetector.augmenter, syntheticArtifact(), input)
+        .mimes,
       input
     )
   }

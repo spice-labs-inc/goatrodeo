@@ -48,42 +48,71 @@ Verified by `MimeHintSuite.T5.1–T5.8` (hint default/union/spill/
 never-sniffed/authoritative/monotonic property) and
 `CertificatesPkcs7Suite.T6.x` (claim semantics).
 
-### Terminal MIME types and the extension-misreading exceptions
+### Per-augmenter short-circuits (there is no global MIME gate)
 
-`ArtifactWrapper.augmentationCannotApply` short-circuits the augmenter chain when
-Tika produced a MIME no augmenter could match: media types, plus
-`terminalBinaryMimeTypes` (JVM class mimes, `application/java-archive`,
-`application/vnd.android.package-archive`). Pure performance; safe only while "no
-augmenter could match" holds.
+There is no "terminal" MIME type, and no `augmentationCannotApply`. A MIME type is
+an additive claim about what an artifact is (a JAR is also a ZIP, also a walked
+container, and may also hold stored certificate bytes), so nothing may decide on
+everyone's behalf that no further claim is possible.
 
-Excluded from the short-circuit, because Tika assigns them **by extension alone**
-and the bytes contradict them:
-
-| Tika | Pipeline |
-|---|---|
-| `text/x-vhdl` for `.vhd` | text stays probed; `SaffronDetector.mimeTypeAugmenter` drops `text/*` once `readFormat` recognises a disk |
-| `image/x-raw-panasonic` for `.raw` | `image/x-raw-*` is not terminal; the same augmenter drops `image/x-raw-*` once a disk is recognised |
-
-The `image/` case is the dangerous one: `image/` is also terminal for
-`FileWalker.notArchive`, so without the exception the file never reaches Saffron
-and a `.raw` cloud image is surveyed as one opaque file **while the run still
-succeeds**. Nothing else reports it.
-
-Exact predicates:
+Dispatch, in `ArtifactWrapper.augmentMimeTypes`:
 
 ```scala
-// ArtifactWrapper.augmentationCannotApply
-(m.startsWith("image/") && !m.startsWith("image/x-raw-")) ||
-  m.startsWith("audio/") || m.startsWith("video/") ||
-  terminalBinaryMimeTypes.contains(m)
-
-// SaffronDetector.mimeTypeAugmenter, when readFormat is non-empty
-currentMimes.filterNot(m => m.startsWith("text/") || m.startsWith("image/x-raw-")) ++ myMimes
+mimeTypeAugmenters.get().foldLeft((mimes, Map.empty[...])) { case ((curMimes, curEv), augmenter) =>
+  if (!augmenter.rule(curMimes)) (curMimes, curEv)   // this augmenter only
+  else augmenter.fn(artifact, curMimes, curEv, new RetainedProbe(artifact, augmenter.budget))
+}
 ```
 
-Tests: `SaffronImageItemSuite.S-4` (`.raw` with no filesystem: recognised, carries
-`application/x-saffron-raw-disk`, no error, no file items) and `S-5` (`.raw` with a
-filesystem: walked, files become items, no `image/` MIME survives).
+The rules, each local, each block-shaped via `ArtifactWrapper.noneOf`. Its contract:
+a blocked name ending in a slash plus an asterisk is a family wildcard and matches
+as a prefix (`"text/*"` blocks `text/plain`); anything else matches exactly:
+
+```scala
+  def noneOf(blocked: String*)(mimes: Set[String]): Boolean = {
+    !blocked.exists{
+      b => 
+        if (b.endsWith("/*")) {
+          val realB = b.substring(0, b.length() - 1)
+          mimes.exists(m => m.startsWith(realB))
+        } else mimes.contains(b)
+    }
+  }
+```
+
+
+| Augmenter | Blocked families | Why it cannot use them |
+|---|---|---|
+| `DotnetDetector` | `text/*`, `application/xml`, `application/java-vm` | a PE image is binary; XML and class files carry no COFF header |
+| `SaffronDetector` | `application/java-vm` | only class files are provably impossible; `.vhd`/`.raw` are mislabelled `text/*`/`image/*` by extension, so those stay probed |
+| `CryptoDetector` | `application/java-vm` | a class file's constant pool is not a DER/PEM artefact |
+| `OpenSSLConfigDetector` | `image/*`, `audio/*`, `video/*`, `application/java-vm`, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` | a config file is text |
+| `JavaSecurityDetector` | same list as OpenSSL | same reason |
+| `JavaArchiveDetector` | `text/*`, `application/xml`, `application/java-vm` | a ZIP is binary and holds no XML header |
+| `CryptoContentDetector` | `application/java-vm` | class constant pools carry no PEM text |
+| `CarvedCertAugmenter` | `text/*`, `application/xml`, `application/json`, `application/java-vm` | a DER certificate is binary; base64 in text is `CryptoContentDetector`'s job |
+
+Consequences that are tested rather than assumed:
+
+- A family blocked by one augmenter is still probed by the others: a JAR is
+  refused by `JavaSecurityDetector` and still probed by `CryptoContentDetector`.
+- Class files are the only family every augmenter refuses — eight local
+  decisions, visible as such, not a shared gate.
+- Claims are additive: one artifact can carry several augmenters' MIME types at
+  once, and none suppresses another.
+- `SaffronDetector` never removes a MIME; it *adds*
+  `application/x-saffron-raw-disk`, which `FileWalker.saffronMimeTypes` uses to
+  offer the disk to Saffron, so an `image/x-raw-*` or `text/x-vhdl` misreading
+  from Tika cannot hide a cloud disk image.
+
+Tests: `AugmenterLocalShortCircuitSuite.LR-1` (no family blocked by every
+augmenter except class files; every augmenter refuses class files in its own
+rule), `LR-2` (JAR: blocked for `JavaSecurityDetector`, probed by
+`CryptoContentDetector`), `LR-3` (same payload in text fires both), `LR-4`
+(additive claims), `MimeAugmenterRuleSuite.R-1` (per-rule block lists, including
+`text/*` and `image/*` prefix matching), `MimeAugmenterRuleSuite.R-2` (a real class
+file is augmented by nothing), and `SaffronImageItemSuite.S-5` (a `.raw` disk is
+walked).
 
 ## CryptoDetector augmentation (Certificates strategy)
 
@@ -94,12 +123,12 @@ augmenter (registered after Saffron in
 `ArtifactWrapper.augmenters`) inspects the first 4 KB of each
 artifact and ADDS specific MIME types based on content signatures.
 
-**Pure-addition design:** unlike `SaffronDetector`, which strips
-`text/*` MIMEs when it finds a binary signature, `CryptoDetector` is
-purely additive — it never removes a Tika-detected MIME, only adds
-its own. Rationale: PEM-encoded artifacts legitimately are BOTH
-`text/plain` (Tika) AND `application/x-pem-file` (CryptoDetector);
-downstream filtering chooses what to act on.
+**Pure-addition design:** every augmenter is purely additive, `SaffronDetector`
+included. None removes a Tika-detected MIME. `SaffronDetector` adds
+`application/x-saffron-raw-disk`; it does not delete the `text/x-vhdl` or
+`image/x-raw-*` misreading. Rationale: PEM-encoded artifacts legitimately are BOTH
+`text/plain` (Tika) AND `application/x-pem-file` (`CryptoDetector`); downstream
+filtering chooses what to act on.
 
 **Verified by:**
 [`CertificatesStubTests::[INVARIANT] CryptoDetector.mimeTypeAugmenter never strips MIME types beginning with text/`](../src/test/scala/strategies/CertificatesStubTests.scala)
@@ -108,9 +137,9 @@ downstream filtering chooses what to act on.
 
 ### Per-augmenter applicability rules
 
-Every registered augmenter carries its own block-shaped MIME rule
-(`addMimeTypeAugmenter(rule)(fn)` in `ArtifactWrapper`; `noneOf` helper), so a
-new augmenter is added without touching any global skip logic. Rules only
+Every registered augmenter is a `MimeAugmenter(id, rule, budget, fn)` registered
+with `ArtifactWrapper.addMimeTypeAugmenter`; its `rule` is the only statement about
+which MIME sets it will look at, and it affects no other augmenter. Rules only
 block MIMEs that provably cannot match — unknown or degenerate MIMEs (inner
 package fragments, future ecosystems) are always probed, so a wrong rule can
 only cost performance, never a false negative.
@@ -119,7 +148,7 @@ only cost performance, never a false negative.
 |-----------|---------------|
 | `CryptoDetector` | `application/java-vm` |
 | `CryptoContentDetector` | `application/java-vm` |
-| `OpenSSLConfigDetector` | media (`image/`·`audio/`·`video/`), class mimes, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` |
+| `OpenSSLConfigDetector` | media (`image/*`·`audio/*`·`video/*`), class mimes, `application/java-archive`, `application/vnd.android.package-archive`, `application/xml` |
 | `JavaSecurityDetector` | same as OpenSSLConfigDetector |
 | `JavaArchiveDetector` | `text/*`, `application/xml`, `application/java-vm` |
 | `DotnetDetector` | `text/*`, `application/xml`, `application/java-vm` |

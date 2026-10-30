@@ -182,32 +182,45 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
     } finally run.cleanup()
   }
 
-  // S-2 — a disk image contributes at least as many file items as it has files.
-  // THEORY: this is the completeness check for image expansion. `FileWalker`
-  // returns None when no filesystem mounted, so a run that loses a whole
-  // filesystem still produces a well-formed ADG; only a count catches it. The
-  // floor was measured on 2026-10-14: the squashfs run yields 58 items with a
-  // file name (the image's own files, plus the ELF sections and segments of the
-  // binaries inside it, which are themselves containers). It is set well below
-  // the measurement so ordinary variation does not cause churn, while a change
-  // that halves the expansion still fails.
+  // S-2 — the squashfs image contributes its own files as items, by name.
+  //
+  // WHAT: a run over `alpine-minimal.squashfs` produces items for `bin/busybox`,
+  // `etc/os-release`, `etc/busybox-paths.d/busybox` and `lib/ld-musl-x86_64.so.1`,
+  // and at least five named items in total (the image itself plus those four).
+  //
+  // WHY: `FileWalker` returns None when nothing mounts, so a run that loses a whole
+  // filesystem still produces a well-formed ADG — only a name check catches it.
+  // Named assertions, because the previous count-based floor was measuring
+  // something else: it was 40 against a measurement of 58, and 53 of those 58 were
+  // the ELF sections and segments of the two binaries inside the image, which were
+  // items only while the walker mounted every ELF. With ELF mounting removed (it
+  // cost 435 s in `DockerSuite` alone and lost the embedded-binary case anyway) the
+  // real files are exactly the five measured below.
+  //
+  // THEORY: the count is evidence of expansion, the names are evidence of the right
+  // expansion. When a change moves the count, the names say whether anything real
+  // was lost.
   test("S-2 squashfs contributes its files as items") {
     val run = build("alpine-minimal.squashfs")
     try {
       val named = namedItems(run)
       val names = named.map(_._1).toSet
 
+      Seq(
+        "bin/busybox",
+        "etc/os-release",
+        "etc/busybox-paths.d/busybox",
+        "lib/ld-musl-x86_64.so.1"
+      ).foreach { expected =>
+        assert(
+          names.contains(expected),
+          s"expected an item for $expected, got ${names.toVector.sorted}"
+        )
+      }
       assert(
-        names.contains("bin/busybox"),
-        s"expected an item for bin/busybox, got ${names.toVector.sorted.take(20)}"
-      )
-      assert(
-        names.contains("etc/os-release"),
-        s"expected an item for etc/os-release, got ${names.toVector.sorted.take(20)}"
-      )
-      assert(
-        named.length >= 40,
-        s"expected at least 40 items with a file name (58 measured on 2026-10-14), found ${named.length}"
+        named.length >= 5,
+        s"expected at least 5 items with a file name, found ${named.length}: " +
+          names.toVector.sorted.mkString(", ")
       )
     } finally run.cleanup()
   }
@@ -333,15 +346,13 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
   }
   // S-5 — a raw disk named `.raw` is recognised and walked.
   // THEORY: Tika types a `.raw` file as a Panasonic camera RAW photo
-  // (`image/x-raw-panasonic`), by extension alone. An `image/` type is terminal
-  // for MIME augmentation and `FileWalker.notArchive` rejects anything under
-  // `image/`, so the disk is never even offered to Saffron: a Debian cloud image
-  // shipped as `.raw` is surveyed as one opaque file. The extension must not
-  // decide the format — the bytes must — so the detector has to be allowed to
-  // re-check a camera RAW type and, when Saffron recognises the file, to drop
-  // it. `S-4` covers the recognised-but-unmountable case; this covers the case
-  // where there is a filesystem to walk, and is the one whose loss would be
-  // silent, because the run would still succeed.
+  // (`image/x-raw-panasonic`), by extension alone. A claim of `image/` must not,
+  // by itself, decide that the bytes cannot hold a filesystem: a Debian cloud
+  // image shipped as `.raw` would then be surveyed as one opaque file. The bytes
+  // must decide the format, not the extension. This test asserts that the disk is
+  // recognised and that the filesystem inside it is walked. It says nothing
+  // about which MIME types are present, because MIME augmentation only ever adds
+  // — the camera-RAW type Tika supplied legitimately remains in the set.
   //
   // The fixture is `raw.img` renamed to `disk.raw`, so the bytes are identical
   // to `S-1`'s and the only variable is the extension.
@@ -358,11 +369,7 @@ class SaffronImageItemSuite extends GoatRodeoFunSuite {
       )
       assert(
         diskItem.head._3.contains("application/x-saffron-raw-disk"),
-        s"the .raw disk must carry the Saffron raw-disk MIME, got ${diskItem.head._3.toVector.sorted}"
-      )
-      assert(
-        !diskItem.head._3.exists(_.startsWith("image/")),
-        s"the camera-RAW misreading must be dropped, got ${diskItem.head._3.toVector.sorted}"
+        s"the .raw disk must be recognised as a Saffron raw disk, got ${diskItem.head._3.toVector.sorted}"
       )
 
       // and the filesystem inside it was walked, not skipped

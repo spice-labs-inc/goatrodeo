@@ -35,6 +35,11 @@ import java.io.InputStream
   */
 object JavaArchiveDetector {
 
+  /** The plain zip claim, which `.ipa` and `.nupkg` carry (they are zips with a
+    * foreign name, not JARs).
+    */
+  val ZipMime: String = "application/zip"
+
   private val JavaArchiveMime: String = "application/java-archive"
 
   val javaArchiveExtensions = Set(
@@ -55,6 +60,13 @@ object JavaArchiveDetector {
     ".nar",
     ".zar"
   )
+
+  /** ZIP local-file header, from an already-read prefix. */
+  private def isZipBytes(bytes: Array[Byte]): Boolean =
+    bytes.length >= 4 && (bytes(0) & 0xff) == 0x50 && (bytes(
+      1
+    ) & 0xff) == 0x4b &&
+      (bytes(2) & 0xff) == 0x03 && (bytes(3) & 0xff) == 0x04
 
   private def isZip(input: InputStream): Boolean = {
     input.mark(4)
@@ -77,31 +89,53 @@ object JavaArchiveDetector {
     "application/x-zip-compressed"
   )
 
-  /** Applicability rule: a JAR is a zip; text/XML/class files can never be one.
-    * Binaries with unknown mimes stay probed (the zip check is cheap).
+  /** Both sides come from [[MimeFamilies]], the same pair the consumer of this
+    * augmenter's MIME type uses, so a change to what this augmenter can handle
+    * changes its consumer at the same moment.
     */
-  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
-    ArtifactWrapper.noneOf(
-      "text/",
-      "application/xml",
-      "application/java-vm"
-    )(mimes)
+  private[goatrodeo] def mimeRule(
+      mimes: Set[String],
+      name: String = ""
+  ): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeZipArchive) &&
+      MimeFamilies.couldBe(mimes, MimeFamilies.couldBeZipArchive)
 
-  def mimeTypeAugmenter(
-      artifact: ArtifactWrapper,
-      currentMimes: Set[String]
-  ): Set[String] = {
-    val filename = artifact.filenameWithNoPath.toLowerCase()
-    val hasJavaExt = javaArchiveExtensions.exists(ext => filename.endsWith(ext))
-    if (!hasJavaExt) currentMimes
-    else {
-      val alreadyZip = (currentMimes & zipFamilyMimes).nonEmpty
-      if (alreadyZip) currentMimes + JavaArchiveMime
-      else {
-        val looksLikeZip = artifact.withStream(s => isZip(s))
-        if (looksLikeZip) currentMimes + JavaArchiveMime
-        else currentMimes
+  val augmenter: MimeAugmenter = MimeAugmenter(
+    id = "JavaArchiveDetector",
+    rule = mimeRule(_, _),
+    budget = ProbeBudget(),
+    fn = (artifact, currentMimes, evidence, probe) => {
+      val filename = artifact.filenameWithNoPath.toLowerCase()
+      // `.ipa` and `.nupkg` are zip archives whose names Tika resolves to
+      // `application/x-itunes-ipa` and `application/x-tika-ooxml`. Both must carry
+      // a zip claim so the FileWalker's archive branch expands them, which is how
+      // an iOS `Payload/<App>.app` bundle and a package's `lib/` contents are
+      // reached at all. They are name-gated, exactly as the JAR extensions are, so
+      // plain ZIPs and Android packages are unaffected.
+      val containerName: Option[String] =
+        javaArchiveExtensions
+          .find(e => filename.endsWith(e))
+          .orElse(if (filename.endsWith(".ipa")) Some(".ipa") else None)
+          .orElse(if (filename.endsWith(".nupkg")) Some(".nupkg") else None)
+      containerName match {
+        case None => (currentMimes, evidence)
+        case Some(ext) =>
+          val alreadyZip = (currentMimes & zipFamilyMimes).nonEmpty
+          val zipMagic =
+            alreadyZip || (probe.length >= 4 && isZipBytes(probe.bytes))
+          // `.ipa` and `.nupkg` are zips with a foreign name, not JARs: they get
+          // the plain zip claim, which is what the FileWalker archive branch and
+          // the IPA/NuGet strategies key on. Everything else here is a JAR name.
+          val claimed =
+            if (ext == ".ipa" || ext == ".nupkg") ZipMime else JavaArchiveMime
+          val mimes =
+            if (zipMagic && !currentMimes.contains(claimed))
+              currentMimes + claimed
+            else currentMimes
+          // The zip-magic check settled the question; nothing indeterminate
+          // remains for a downstream evaluator to continue from.
+          (mimes, evidence)
       }
     }
-  }
+  )
 }

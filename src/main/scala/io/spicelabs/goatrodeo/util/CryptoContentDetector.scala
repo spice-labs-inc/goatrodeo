@@ -44,16 +44,18 @@ import scala.util.Try
   *   - GradleLockfile (name-gated)
   *   - JvmDistribution (name-gated: `release`)
   *
-  * The read is skipped entirely for MIME sets the artifact pipeline already
-  * short-circuits (image/audio/video/terminal binaries — see
-  * `ArtifactWrapper.augmentationCannotApply`).
+  * The read is skipped only when this detector's own `mimeRule` finds the MIME
+  * set impossible for it (class files, whose constant pool carries no PEM
+  * text). No other augmenter's decision can skip this one, and this one's
+  * decision skips nothing but itself: a MIME type is an additive claim, not a
+  * verdict that nothing further can be found.
   */
 object CryptoContentDetector {
 
   /** Bytes read per artifact for content probing. Matches the detectors'
     * existing `DetectReadBytes` budgets.
     */
-  val ReadBytes: Int = 256 * 1024
+  val ReadBytes: Int = MimeProbe.MaxBytes
 
   val CryptoTokensMime = "application/x-goatrodeo-crypto-token"
   val UsignKeyMime = "application/x-goatrodeo-usign-key"
@@ -83,57 +85,63 @@ object CryptoContentDetector {
     }.getOrElse("")
   }
 
-  /** Applicability rule: class files can never match any content detector, but
-    * binaries (footprint/embedded PEM) and unknown fragments stay probed.
+  /** Both sides come from [[MimeFamilies]], the same pair the consumer of this
+    * augmenter's MIME type uses, so a change to what this augmenter can handle
+    * changes its consumer at the same moment.
     */
-  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
-    ArtifactWrapper.noneOf("application/java-vm")(mimes)
+  private[goatrodeo] def mimeRule(
+      mimes: Set[String],
+      name: String = ""
+  ): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextContent) &&
+      MimeFamilies.couldBe(mimes, MimeFamilies.couldBeTextContent)
 
-  def mimeTypeAugmenter(
-      artifact: ArtifactWrapper,
-      currentMimes: Set[String]
-  ): Set[String] = {
-    val path = artifact.path()
-    val name = artifact.filenameWithNoPath
-    val isBinary =
-      currentMimes.exists(CryptoFootprintStrategy.BinaryMimes.contains)
+  val augmenter: MimeAugmenter = MimeAugmenter(
+    id = "CryptoContentDetector",
+    rule = mimeRule(_, _),
+    budget = ProbeBudget(),
+    fn = (artifact, currentMimes, evidence, probe) => {
+      val path = artifact.path()
+      val name = artifact.filenameWithNoPath
+      val text =
+        new String(probe.bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+      if (text.isEmpty) (currentMimes, evidence)
+      else {
+        val isBinary =
+          currentMimes.exists(CryptoFootprintStrategy.BinaryMimes.contains)
+        val shadowPath = ShadowPaths.exists(path.endsWith)
+        val tlsPath = ServiceTlsConfigStrategy.isTlsConfigPath(path)
+        val gradleName =
+          GradleNames.contains(name) ||
+            (name.endsWith(".lockfile") && path.contains("dependency-locks"))
+        val jvmName = name == "release"
+        val cloudKeyName = CloudKeyStrategy.cloudKeyName(name)
 
-    val shadowPath = ShadowPaths.exists(path.endsWith)
-    val tlsPath = ServiceTlsConfigStrategy.isTlsConfigPath(path)
-    val gradleName =
-      GradleNames.contains(name) ||
-        (name.endsWith(".lockfile") && path.contains("dependency-locks"))
-    val jvmName = name == "release"
-    val cloudKeyName = CloudKeyStrategy.cloudKeyName(name)
+        var out = Set[String]()
+        if (CryptoTokenStrategy.detects(text)) out += CryptoTokensMime
+        if (UsignKeysStrategy.detects(text)) out += UsignKeyMime
+        if (isBinary && CryptoFootprintStrategy.detects(text))
+          out += CryptoFootprintMime
+        if (!isBinary && EmbeddedPemStrategy.detects(text))
+          out += EmbeddedPemMime
+        if (shadowPath && ShadowPasswordStrategy.containsHash(text))
+          out += ShadowPasswordMime
+        if (tlsPath && ServiceTlsConfigStrategy.containsTlsConfiguration(text))
+          out += TlsConfigMime
+        if (gradleName) out += GradleLockfileMime
+        if (
+          jvmName &&
+          (text.contains("JAVA_VERSION") || text
+            .contains("JAVA_RUNTIME_VERSION"))
+        ) out += JvmReleaseMime
+        if (cloudKeyName && CloudKeyStrategy.detects(text)) out += CloudKeyMime
+        if (!isBinary && ServiceCryptoStrategy.detectsSqlcipher(text))
+          out += DbEncryptionMime
 
-    val text = probe(artifact)
-    if (text.isEmpty) {
-      return currentMimes
+        // Every MIME this detector could assert is asserted here or not at all;
+        // nothing is left indeterminate, so no evidence is recorded.
+        (currentMimes ++ out, evidence)
+      }
     }
-
-    var out = currentMimes
-    if (CryptoTokenStrategy.detects(text)) out += CryptoTokensMime
-    if (UsignKeysStrategy.detects(text)) out += UsignKeyMime
-    if (isBinary && CryptoFootprintStrategy.detects(text))
-      out += CryptoFootprintMime
-    if (!isBinary && EmbeddedPemStrategy.detects(text)) out += EmbeddedPemMime
-    if (shadowPath && ShadowPasswordStrategy.containsHash(text))
-      out += ShadowPasswordMime
-    if (tlsPath && ServiceTlsConfigStrategy.containsTlsConfiguration(text))
-      out += TlsConfigMime
-    if (gradleName) out += GradleLockfileMime
-    if (
-      jvmName &&
-      (text.contains("JAVA_VERSION") || text.contains("JAVA_RUNTIME_VERSION"))
-    ) out += JvmReleaseMime
-    // Cloud-managed key references: config/IaC files only, gated on the file
-    // extension and then on provider-specific signatures.
-    if (cloudKeyName && CloudKeyStrategy.detects(text)) out += CloudKeyMime
-    // SQLCipher and other content-only DB-encryption markers (PRAGMA key in
-    // code/config). Non-binary, and a cheap substring pre-guard avoids running
-    // the regexes over every text file.
-    if (!isBinary && ServiceCryptoStrategy.detectsSqlcipher(text))
-      out += DbEncryptionMime
-    out
-  }
+  )
 }

@@ -127,13 +127,40 @@ class RunOutputContractPropertySuite extends GoatRodeoScalaCheckSuite {
           RunOutputs.filesWithSuffix(dir, ".grc").nonEmpty,
           s"maxRecords=$maxRecords: ${dir.getName} is a batch without a .grc"
         )
-        assert(
-          RunOutputs.filesWithSuffix(dir, ".grd").nonEmpty,
-          s"maxRecords=$maxRecords: ${dir.getName} has a .grc but no .grd"
+        // An empty batch is legitimate: a batch that gathered no records writes a
+        // cluster with an empty data/index list. What must never happen is the
+        // cluster naming a .grd/.gri that is not there, or the directory holding
+        // a .grd/.gri the cluster does not name — either way a consumer that
+        // trusts the cluster and one that lists the directory would disagree
+        // about what the batch contains.
+        val envelope = RunOutputs.readClusterEnvelope(
+          RunOutputs.filesWithSuffix(dir, ".grc").head
         )
-        assert(
-          RunOutputs.filesWithSuffix(dir, ".gri").nonEmpty,
-          s"maxRecords=$maxRecords: ${dir.getName} has a .grc but no .gri"
+        val namedData = envelope.dataFiles.map(h => f"$h%016x.grd").toSet
+        val namedIndex = envelope.indexFiles.map(h => f"$h%016x.gri").toSet
+        val presentData =
+          RunOutputs.filesWithSuffix(dir, ".grd").map(_.getName).toSet
+        val presentIndex =
+          RunOutputs.filesWithSuffix(dir, ".gri").map(_.getName).toSet
+        assertEquals(
+          namedData.diff(presentData),
+          Set.empty[String],
+          s"maxRecords=$maxRecords: ${dir.getName} names .grd files that are missing"
+        )
+        assertEquals(
+          presentData.diff(namedData),
+          Set.empty[String],
+          s"maxRecords=$maxRecords: ${dir.getName} holds .grd files the cluster does not name"
+        )
+        assertEquals(
+          namedIndex.diff(presentIndex),
+          Set.empty[String],
+          s"maxRecords=$maxRecords: ${dir.getName} names .gri files that are missing"
+        )
+        assertEquals(
+          presentIndex.diff(namedIndex),
+          Set.empty[String],
+          s"maxRecords=$maxRecords: ${dir.getName} holds .gri files the cluster does not name"
         )
         assert(
           new File(dir, "purls.txt").isFile,

@@ -2,6 +2,7 @@ package io.spicelabs.goatrodeo.omnibor.strategies
 
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.baharat.Package
+import io.spicelabs.baharat.PackageFormat
 import io.spicelabs.baharat.PackageReader
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.MetadataKeyConstants as MKC
@@ -54,11 +55,20 @@ object BaharatStrategy {
       // for every type that has a mime type that is supported
       (_, wrapper) <- byUUID
       if wrapper.mimeType.intersect(supportedMimeTypes).nonEmpty
-      // if we can create a pkg, then it's a thing we will handle
-      pkg <- Try(wrapper.withFile(f => PackageReader.read(f.toPath()))).toOption
-    } yield (wrapper, pkg)
+      // Selection only asks "is this a package format I handle". That is a magic
+      // read of a few bytes on a stream, not a parse: a full parse here would run
+      // on the single-threaded selector and would hold the parsed package, with
+      // its entry tables, in memory from selection until the item phase. The parse
+      // happens once, later, on a worker thread.
+      format <- Try(
+        wrapper.withStream(s =>
+          PackageFormat.detect(s, wrapper.filenameWithNoPath)
+        )
+      ).toOption
+      if format.isPresent
+    } yield wrapper
 
-    val uuids: Set[String] = mine.map(_._1.uuid).toSet
+    val uuids: Set[String] = mine.map(_.uuid).toSet
 
     val revisedByUUID = byUUID.filter { case (name, _) =>
       !uuids.contains(name)
@@ -68,7 +78,7 @@ object BaharatStrategy {
     }
 
     (
-      mine.map { case (artifact, pkg) => Baharat(artifact, pkg) }.toVector,
+      mine.map(artifact => Baharat(artifact)).toVector,
       revisedByUUID,
       revisedByName,
       "Baharat"
@@ -78,7 +88,17 @@ object BaharatStrategy {
 
 }
 
-class Baharat(artifact: ArtifactWrapper, pkg: Package) extends ToProcess {
+class Baharat(artifact: ArtifactWrapper) extends ToProcess {
+
+  /** The parse, done once, on the worker thread that first needs it.
+    *
+    * Lazy rather than eager: a claimed artifact may be asked for its elements
+    * more than once, and the selector deliberately did not parse, so holding a
+    * parsed package from selection for the whole run is exactly what we are
+    * avoiding.
+    */
+  private lazy val parsed: Option[Package] =
+    Try(artifact.withFile(f => PackageReader.read(f.toPath()))).toOption
   def markSuccessfulCompletion(): Unit = {
     artifact.finished()
   }
@@ -92,12 +112,12 @@ class Baharat(artifact: ArtifactWrapper, pkg: Package) extends ToProcess {
   type MarkerType = SingleMarker
   type StateType = BaharatState
   def getElementsToProcess(): (Seq[(ArtifactWrapper, MarkerType)], StateType) =
-    Vector(artifact -> SingleMarker()) -> BaharatState(artifact, pkg)
+    Vector(artifact -> SingleMarker()) -> BaharatState(artifact, parsed)
 }
 
 /** State maintained during Baharat package processing.
   */
-class BaharatState(artifact: ArtifactWrapper, pkg: Package)
+class BaharatState(artifact: ArtifactWrapper, pkgOpt: Option[Package])
     extends ProcessingState[SingleMarker, BaharatState] {
 
   /** Call the state object at the beginning of processing an ArtfactWrapper
@@ -128,9 +148,8 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
     // baharat returns a com.github.packageurl.PackageURL; convert to
     // io.spicelabs.coordinates.Purl via string round-trip.
     // Wrap in Try — a malformed pURL should not abort processing.
-    Try {
-      pkg.metadata().purl()
-    }.toOption
+    pkgOpt
+      .flatMap(pkg => Try(pkg.metadata().purl()).toOption)
       .map(p => PurlSet.single(p))
       .getOrElse(PurlSet.empty) -> this
   }
@@ -146,96 +165,100 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
       item: Item,
       marker: SingleMarker
   ): (TreeMap[String, TreeSet[StringOrPair]], BaharatState) = {
-    val metadata = pkg.metadata()
+    pkgOpt match {
+      case None => TreeMap[String, TreeSet[StringOrPair]]() -> this
+      case Some(pkg) =>
+        val metadata = pkg.metadata()
 
-    // compute dependencies
-    val dependencies: JArray = JArray(
-      metadata
-        .dependencies()
-        .asScala
-        .toList
-        .map(d => JString(d.toVersionedString()))
-    )
+        // compute dependencies
+        val dependencies: JArray = JArray(
+          metadata
+            .dependencies()
+            .asScala
+            .toList
+            .map(d => JString(d.toVersionedString()))
+        )
 
-    // and provides
-    val provides: JArray = JArray(
-      metadata
-        .provides()
-        .asScala
-        .toList
-        .map(p => JString(p.toVersionedString()))
-    )
+        // and provides
+        val provides: JArray = JArray(
+          metadata
+            .provides()
+            .asScala
+            .toList
+            .map(p => JString(p.toVersionedString()))
+        )
 
-    // adHoc generates a prefix onto the key
-    val adHoc = MKC.adHoc("Baharat")
+        // adHoc generates a prefix onto the key
+        val adHoc = MKC.adHoc("Baharat")
 
-    val tm: TreeMap[String, TreeSet[StringOrPair]] =
-      TreeMap[String, TreeSet[StringOrPair]]()
-        +? maybeStringOrPair(
-          adHoc("Arch"),
-          metadata.arch()
-        )
-        +? maybeStringOrPair(
-          MKC.PUBLICATION_DATE,
-          metadata.buildTime().map(_.toString()).toScala
-        )
-        +? maybeStringOrPair(
-          MKC.DESCRIPTION,
-          metadata.description().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Epoch"),
-          metadata.epoch().map(_.toString()).toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Group"),
-          metadata.group().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Installed_size"),
-          metadata.installedSize().toString()
-        )
-        +? maybeStringOrPair(
-          MKC.LICENSE,
-          metadata.license().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Maintainer"),
-          metadata.maintainer().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.NAME,
-          metadata.name()
-        )
-        +? maybeStringOrPair(
-          adHoc("Release"),
-          metadata.release().toScala
-        )
-        +? maybeStringOrPair(
-          adHoc("Summary"),
-          metadata.summary().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.URL,
-          metadata.url().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.PUBLISHER,
-          metadata.vendor().toScala
-        )
-        +? maybeStringOrPair(
-          MKC.VERSION,
-          metadata.version()
-        )
-        +? maybeStringOrPair(
-          MKC.DEPENDENCIES,
-          "application/json" -> compact(render(dependencies))
-        )
-        +? maybeStringOrPair(
-          adHoc("Provides"),
-          "application/json" -> compact(render(provides))
-        )
-    tm -> this
+        val tm: TreeMap[String, TreeSet[StringOrPair]] =
+          TreeMap[String, TreeSet[StringOrPair]]()
+            +? maybeStringOrPair(
+              adHoc("Arch"),
+              metadata.arch()
+            )
+            +? maybeStringOrPair(
+              MKC.PUBLICATION_DATE,
+              metadata.buildTime().map(_.toString()).toScala
+            )
+            +? maybeStringOrPair(
+              MKC.DESCRIPTION,
+              metadata.description().toScala
+            )
+            +? maybeStringOrPair(
+              adHoc("Epoch"),
+              metadata.epoch().map(_.toString()).toScala
+            )
+            +? maybeStringOrPair(
+              adHoc("Group"),
+              metadata.group().toScala
+            )
+            +? maybeStringOrPair(
+              adHoc("Installed_size"),
+              metadata.installedSize().toString()
+            )
+            +? maybeStringOrPair(
+              MKC.LICENSE,
+              metadata.license().toScala
+            )
+            +? maybeStringOrPair(
+              adHoc("Maintainer"),
+              metadata.maintainer().toScala
+            )
+            +? maybeStringOrPair(
+              MKC.NAME,
+              metadata.name()
+            )
+            +? maybeStringOrPair(
+              adHoc("Release"),
+              metadata.release().toScala
+            )
+            +? maybeStringOrPair(
+              adHoc("Summary"),
+              metadata.summary().toScala
+            )
+            +? maybeStringOrPair(
+              MKC.URL,
+              metadata.url().toScala
+            )
+            +? maybeStringOrPair(
+              MKC.PUBLISHER,
+              metadata.vendor().toScala
+            )
+            +? maybeStringOrPair(
+              MKC.VERSION,
+              metadata.version()
+            )
+            +? maybeStringOrPair(
+              MKC.DEPENDENCIES,
+              "application/json" -> compact(render(dependencies))
+            )
+            +? maybeStringOrPair(
+              adHoc("Provides"),
+              "application/json" -> compact(render(provides))
+            )
+        tm -> this
+    }
   }
 
   override def finalAugmentation(
@@ -254,22 +277,18 @@ class BaharatState(artifact: ArtifactWrapper, pkg: Package)
 
   /** Generate per-package tag info for Baharat packages.
     */
-  override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] = {
-    val metadata = pkg.metadata()
-    val buildTime = metadata.buildTime()
-
-    val date: Option[Date] = buildTime.toScala.map { instant =>
-      new Date(instant.toEpochMilli())
-    }
-
-    Some(
+  override def maybePackageTag(marker: SingleMarker): Option[PackageTagInfo] =
+    pkgOpt.map { pkg =>
+      val metadata = pkg.metadata()
+      val date: Option[Date] = metadata.buildTime().toScala.map { instant =>
+        new Date(instant.toEpochMilli())
+      }
       PackageTagInfo(
         name = metadata.name(),
         version = Some(metadata.version()),
         date = date
       )
-    )
-  }
+    }
 
   // Converts any of String, Option[String], (String, String) to Option[(String, TreeSet[StringOrPair])].
   // These three cases are the most common output from metadata and the output of thisfunction

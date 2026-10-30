@@ -29,6 +29,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.MimeFamilies
 
 import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeMap
@@ -97,6 +98,15 @@ object EmbeddedCertificatesStrategy {
     * except libraries named for known crypto stacks (mbedtls, libssl, …), whose
     * embedded-certificate metadata is richer than a footprint hit.
     */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeCryptoMaterial)
+
   def computeEmbeddedCertificateFiles(
       byUUID: ByUUID,
       byName: ByName
@@ -105,7 +115,7 @@ object EmbeddedCertificatesStrategy {
       val namedCryptoLib = CryptoLibraryNamePatterns.exists(
         artifact.path().contains
       )
-      isBinaryArtifact(artifact) &&
+      notAContainer(artifact.mimeType) && isBinaryArtifact(artifact) &&
       (namedCryptoLib ||
         !artifact.mimeType.contains(CryptoContentDetector.CryptoFootprintMime))
     }.toVector

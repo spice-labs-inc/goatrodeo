@@ -299,6 +299,28 @@ object ParentScope {
 
 /** A file or set of files to process
   */
+/** A strategy: the same discipline as an augmenter, with a larger budget.
+  *
+  *   1. '''Fast reject'''. Before any I/O, ask whether this artifact can
+  *      possibly be one of mine, using the MIME set and the name/suffix. The
+  *      MIME augmentation pass has finished by now, so the claims in the set
+  *      are the settled shape of the artifact — but the fast reject is still
+  *      the first thing that happens, for every artifact, and it is still made
+  *      of set membership and name tests rather than probing. The families and
+  *      the matching come from [[io.spicelabs.goatrodeo.util.MimeFamilies]],
+  *      shared with the augmenters and the file walker so all three agree. 2.
+  *      '''Cheap probe'''. A low-cost "could this be the thing" read, bounded
+  *      and surgical — the same shape as an augmenter's probe, with more room
+  *      because it runs per claimed artifact rather than per artifact. 3.
+  *      '''Determination'''. Only then the work that decides it. Anything that
+  *      needs more bytes than the budget allows is either dropped or handled
+  *      with an explicitly documented, bounded read; it is never an unbounded
+  *      read of the artifact.
+  *
+  * Evidence produced by an augmenter that could not decide is a starting point
+  * for step 2: read it instead of probing from scratch. It is not a substitute
+  * for the fast reject.
+  */
 trait ToProcess {
   type MarkerType <: ProcessingMarker
   type StateType <: ProcessingState[MarkerType, StateType]
@@ -895,6 +917,13 @@ object ToProcess {
 
     if (infoMsgs_? && largeCnt_?)
       logger.debug("Finished setting files up")
+
+    // Every strategy has now had its chance at every artifact in this batch, so
+    // the evidence the augmenters left behind has served its only purpose: it was
+    // a starting point for a strategy selector. Releasing it here keeps the
+    // retained set to one selection pass instead of the whole run, which matters
+    // because a wrapper lives until the run ends.
+    artifacts.foreach(_.wipeEvidence())
 
     processSet
 

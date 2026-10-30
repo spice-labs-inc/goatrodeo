@@ -68,7 +68,13 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
       currentMimes: Set[String],
       name: String = "test.bin"
   ): Set[String] =
-    CryptoDetector.mimeTypeAugmenter(wrapBytes(bytes, name), currentMimes)
+    ArtifactWrapper
+      .runAugmenter(
+        CryptoDetector.augmenter,
+        wrapBytes(bytes, name),
+        currentMimes
+      )
+      .mimes
 
   // ===================================================================
   // SECTION A — Phase-INVARIANT contracts
@@ -878,7 +884,7 @@ class CryptoDetectorSuite extends GoatRodeoFunSuite {
       .getBytes("UTF-8")
     val art = ByteWrapper(pem, "chain-probe.pem", None)
     val baseMimes = Set("text/plain")
-    val chainOut = ArtifactWrapper.augmentMimeTypes(art, baseMimes)
+    val (chainOut, _) = ArtifactWrapper.augmentMimeTypes(art, baseMimes)
     assert(
       chainOut.contains("text/plain"),
       s"text/plain must survive the Dotnet → Saffron → Crypto chain; " +

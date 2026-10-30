@@ -20,6 +20,7 @@ import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.FileWrapper
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.MimeFamilies
 import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
@@ -164,6 +165,15 @@ object JvmDistribution {
     * `release` selected by MIME (detected during the MIME augmentation pass);
     * the release file is parsed lazily during processing, not here.
     */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextContent)
+
   def computeJvmFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
@@ -171,6 +181,7 @@ object JvmDistribution {
 
     val candidates = byUUID.values.filter { wrapper =>
       wrapper.filenameWithNoPath == "release" &&
+      notAContainer(wrapper.mimeType) &&
       wrapper.mimeType.contains(CryptoContentDetector.JvmReleaseMime)
     }.toVector
 

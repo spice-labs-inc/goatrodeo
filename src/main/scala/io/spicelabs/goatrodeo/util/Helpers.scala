@@ -76,11 +76,49 @@ type GitOID = String
 object Helpers {
   private val logger: Logger = Logger(getClass())
 
+  /** Silence the JDK's own manifest warnings.
+    *
+    * `java.util.jar.Attributes.read` logs `Duplicate name in Manifest: <name>`
+    * through the platform logger named `java.util.jar`, once per duplicated
+    * attribute per manifest. Duplicate attributes are common in real jars —
+    * `Manifest-Version`, `Created-By`, `Automatic-Module-Name`,
+    * `Build-Jdk-Spec` — and every consumer we know of tolerates them by taking
+    * the last value, which is exactly what `Manifest` itself does. A single
+    * Maven-shaped run produced tens of thousands of those lines, and at that
+    * volume they are the largest source of log noise in the run.
+    *
+    * The level is set once, for that one logger. Nothing else is muted, and the
+    * parsing behaviour is unchanged: the attributes still arrive, duplicates
+    * included, resolved by the same last-value-wins rule.
+    */
+  /** A strong reference to the JDK's `java.util.jar` logger, and the reason it
+    * is held: `LogManager` keeps loggers in a weakly-referenced map, so a level
+    * set on an instance that nobody else references is lost when that instance
+    * is collected — a later `getLogger` hands back a fresh one with a null
+    * level and the warnings come back. Holding the reference for the life of
+    * the object keeps the level where it was set.
+    */
+  private val jdkJarLogger: java.util.logging.Logger =
+    java.util.logging.Logger.getLogger("java.util.jar")
+
+  private def silenceJdkManifestWarnings(): Unit =
+    Try(jdkJarLogger.setLevel(java.util.logging.Level.OFF)).toOption
+
+  /** Re-apply the level if anything reset it. A field read and a comparison
+    * when the level is already OFF, which is the normal case.
+    */
+  private def ensureManifestWarningsSilenced(): Unit =
+    if (jdkJarLogger.getLevel != java.util.logging.Level.OFF)
+      silenceJdkManifestWarnings()
+
+  silenceJdkManifestWarnings()
+
   /** Take a JAR manifest and turn it into metadata stuff
     */
   def treeInfoFromManifest(
       manifestString: String
   ): TreeMap[String, TreeSet[StringOrPair]] = {
+    ensureManifestWarningsSilenced()
     val bis = ByteArrayInputStream(manifestString.getBytes("UTF-8"))
     val manifestVec = Try {
       Manifest.apply(bis)
@@ -728,6 +766,72 @@ object Helpers {
       ret.write(buffer, 0, len)
       ret.toByteArray()
     }
+  }
+
+  /** Slurp the contents of an InputStream, refusing to buffer more than
+    * `maxBytes`.
+    *
+    * `slurpInput` buffers until EOF with no upper bound, so any caller that
+    * parses "the whole blob" can be handed an arbitrarily large artifact. Every
+    * such caller treats the bytes as one complete structure, so a *truncated*
+    * buffer is worse than no buffer at all: a truncated certificate, key ring
+    * or POM does not fail cleanly, it either fails deep inside a parser or
+    * parses as a different object.
+    *
+    * This reads at most `maxBytes + 1` bytes. The extra byte is what proves the
+    * stream is longer than the budget; when it arrives the answer is `None` and
+    * nothing further is read or buffered.
+    *
+    * The stream is closed, matching [[slurpInput]].
+    *
+    * @param what
+    *   the stream to read
+    * @param maxBytes
+    *   the largest number of bytes that may be buffered
+    * @return
+    *   the bytes, or `None` when the stream holds more than `maxBytes`
+    */
+  def slurpInputUpTo(
+      what: InputStream,
+      maxBytes: Long
+  ): Option[Array[Byte]] = {
+    val cap = math.max(0L, maxBytes)
+    val ret = new ByteArrayOutputStream()
+    val buffer = new Array[Byte](4096)
+    var total = 0L
+    var overflow = false
+    var done = false
+    try {
+      while (!done) {
+        // Ask for the remaining budget plus one byte: that byte distinguishes
+        // "exactly at the budget" from "longer than the budget" without
+        // buffering whatever follows it. The arithmetic is written so it cannot
+        // overflow: `remaining + 1` is only evaluated below the buffer size, and
+        // the length comparison uses `remaining` rather than `total + len`.
+        val remaining = cap - total
+        val want =
+          (if (remaining >= buffer.length.toLong) buffer.length.toLong
+           else remaining + 1L).toInt
+        if (want <= 0) {
+          overflow = true
+          done = true
+        } else {
+          val len = what.read(buffer, 0, want)
+          if (len < 0) done = true
+          else if (len == 0) done = true
+          else if (len.toLong > remaining) {
+            overflow = true
+            done = true
+          } else {
+            ret.write(buffer, 0, len)
+            total += len
+          }
+        }
+      }
+    } finally {
+      what.close()
+    }
+    if (overflow) None else Some(ret.toByteArray())
   }
 
   /** Slurp the contents of an InputStream
