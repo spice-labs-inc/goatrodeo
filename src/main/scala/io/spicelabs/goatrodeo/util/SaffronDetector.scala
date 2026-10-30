@@ -24,25 +24,30 @@ import scala.util.Try
   */
 object SaffronDetector {
 
-  /** Bytes read from the front of an artifact before probing.
-    *
-    * `SaffronProbe` documents that its prefix "may be shorter than
-    * `SaffronProbe.MIN_PREFIX`"; Saffron's 128 KiB budget exists only to reach
-    * the btrfs superblock at offset 65536. Every signature the probe consults
-    * before that check — the disk head magics, the container head magics, the
-    * squashfs superblock, the partition-table probe at offset 512, and the
-    * non-btrfs filesystem superblocks, all of which live in the first 2 KiB —
-    * fits in 4 KiB. A btrfs image with no partition table and no recognised
-    * extension is therefore not classified from this read; every other format
-    * is.
+  /** Bytes read from the tail of an artifact before probing: one block. The
+    * suffix exists for the VHD (`conectix`) and DMG (`koly`) footers, which are
+    * far smaller than a block, so a block is generous and keeps the read
+    * symmetric with the head.
     */
-  val probePrefixBytes: Int = 4096
+  val probeSuffixBytes: Int = MimeProbe.MaxBytes
 
-  /** Bytes read from the tail of an artifact before probing. The suffix exists
-    * for the VHD (`conectix`) and DMG (`koly`) footers, which is exactly
-    * `SaffronProbe.MIN_SUFFIX`.
+  /** Bytes read from the front of an artifact before probing: one block.
+    *
+    * Every signature this augmenter is responsible for decided lives in the
+    * first 2 KiB -- the disk head magics, the container head magics, the
+    * squashfs superblock, the partition-table probe at offset 512 and the
+    * non-btrfs filesystem superblocks. The ELF container type is not decided
+    * here at all any more: the carve augmenter claims it from the four magic
+    * bytes it reads, which is why this prefix no longer has to reach the end of
+    * a large binary.
     */
-  val probeSuffixBytes: Int = SaffronProbe.MIN_SUFFIX
+  val probePrefixBytes: Int = MimeProbe.MaxBytes
+
+  /** The container MIME for an ELF binary. Named once: the carve augmenter
+    * claims it from the ELF magic in the first block, and the Saffron kind map
+    * uses the same value.
+    */
+  val ElfMime: String = "application/x-saffron-elf"
 
   /** MIME name for a raw disk or bare filesystem image. Saffron mounts both
     * directly, and `FileWalker` treats this name as a disk to offer to
@@ -68,7 +73,7 @@ object SaffronDetector {
     SaffronProbe.Kind.CONTAINER_LINUX_KERNEL -> "application/x-saffron-linux-kernel",
     SaffronProbe.Kind.CONTAINER_FIT_IMAGE -> "application/x-saffron-fit-image",
     SaffronProbe.Kind.CONTAINER_DTB -> "application/x-saffron-dtb",
-    SaffronProbe.Kind.CONTAINER_ELF -> "application/x-saffron-elf",
+    SaffronProbe.Kind.CONTAINER_ELF -> ElfMime,
     SaffronProbe.Kind.CONTAINER_RPI_FIRMWARE -> "application/x-saffron-rpi-firmware",
     SaffronProbe.Kind.CONTAINER_ANDROID_BOOT -> "application/x-saffron-android-boot",
     SaffronProbe.Kind.CONTAINER_COMPRESSED_SINGLE -> "application/x-saffron-compressed-single",
@@ -112,6 +117,18 @@ object SaffronDetector {
 
   /** Every container MIME this detector can emit. */
   val containerMimeTypes: Set[String] = containerKinds.flatMap(KindMimes.get)
+
+  /** The container MIMEs the file walker will mount.
+    *
+    * ELF is deliberately absent. An ELF is a container in Saffron's taxonomy,
+    * but mounting one is expensive and, in a container image, it happens
+    * thousands of times: every `.so` and every binary in every layer. The
+    * certificate material inside an ELF is reached by reading its section and
+    * symbol tables, not by mounting it, so mounting is left out of the default
+    * path.
+    */
+  val mountableContainerMimeTypes: Set[String] =
+    containerMimeTypes - ElfMime
 
   /** Read up to `n` bytes from the front of the artifact through a fresh
     * stream. Never throws; the result may be shorter than `n`.
@@ -175,39 +192,59 @@ object SaffronDetector {
     } else KindMimes.get(kind)
   }
 
-  /** Probe the artifact's own bytes and return the MIME names for the formats
-    * Saffron says it can traverse into. Nothing is written to disk and no path
-    * is required.
+  /** Ask Saffron whether it can traverse this artifact, from the retained
+    * prefix plus a bounded tail read (the VHD and DMG footers live at the end).
+    *
+    * The head comes from the probe; the tail is a separate 512-byte read so the
+    * total inspected stays one block.
     */
-  private def readFormat(artifact: ArtifactWrapper): Set[String] =
-    Try {
-      val prefix = readPrefix(artifact, probePrefixBytes)
-      // A short artifact already contains its own tail in the prefix; a second
-      // read would only re-read bytes the probe already has.
-      val suffix =
-        if (artifact.size() > probePrefixBytes.toLong)
-          readSuffix(artifact, probeSuffixBytes)
-        else Array.emptyByteArray
-      SaffronProbe
-        .detect(prefix, suffix, artifact.path())
-        .toScala
-        .flatMap(result => mimeFor(result.kind(), artifact.filenameWithNoPath))
-    }.toOption.flatten.toSet
-
-  /** Applicability rule: only class files are provably impossible. Text
-    * families stay probed deliberately — Tika mislabels real disk images as
-    * text (e.g. a `.vhd` as `text/x-vhdl`) and this augmenter exists to
-    * re-check exactly those.
-    */
-  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
-    ArtifactWrapper.noneOf("application/java-vm")(mimes)
-
-  def mimeTypeAugmenter(
+  private def readFormat(
       artifact: ArtifactWrapper,
-      currentMimes: Set[String]
-  ): Set[String] = {
-    // MIME augmentation is additive: this augmenter adds the Saffron MIME for
-    // the format it detects and never removes a MIME another detector produced.
-    currentMimes ++ readFormat(artifact)
+      probe: AugmentProbe
+  ): Option[(String, SaffronProbe.Kind)] = {
+    val head =
+      if (probe.length <= probePrefixBytes) probe.bytes
+      else java.util.Arrays.copyOf(probe.bytes, probePrefixBytes)
+    val suffix =
+      if (artifact.size() > probePrefixBytes.toLong)
+        readSuffix(artifact, probeSuffixBytes)
+      else Array.emptyByteArray
+    Try(
+      SaffronProbe
+        .detect(head, suffix, artifact.path())
+        .toScala
+        .flatMap(result =>
+          mimeFor(result.kind(), artifact.filenameWithNoPath)
+            .map(_ -> result.kind())
+        )
+    ).toOption.flatten
   }
+
+  /** Both sides come from [[MimeFamilies]], shared with the file walker so that
+    * a change to what counts as a container changes the augmenter and the
+    * walker at the same moment. A text artifact is refused as prose unless
+    * Tika's extension misreading says otherwise (`text/x-vhdl`,
+    * `image/x-raw-*`), which is the only reason text was ever probed here.
+    */
+  /** Both sides: refuse a contradiction, refuse when nothing could be ours. */
+  private[goatrodeo] def mimeRule(
+      mimes: Set[String],
+      name: String = ""
+  ): Boolean =
+    !MimeFamilies.contradictsDiskOrGuest(mimes, name) &&
+      MimeFamilies.couldBeDiskOrGuest(mimes, name)
+
+  val augmenter: MimeAugmenter = MimeAugmenter(
+    id = "SaffronDetector",
+    rule = mimeRule(_, _),
+    budget = ProbeBudget(),
+    fn = (artifact, currentMimes, evidence, probe) =>
+      readFormat(artifact, probe) match {
+        case None            => (currentMimes, evidence)
+        case Some((mime, _)) =>
+          // The format probe identified the container, so the MIME is asserted
+          // and nothing is left indeterminate; no evidence is recorded.
+          (currentMimes + mime, evidence)
+      }
+  )
 }

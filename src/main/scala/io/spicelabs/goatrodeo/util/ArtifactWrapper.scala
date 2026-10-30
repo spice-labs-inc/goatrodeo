@@ -80,7 +80,8 @@ sealed trait ArtifactWrapper {
     */
   def size(): Long
 
-  private lazy val _mimeType: Set[String] = {
+  private lazy val _mimeType
+      : (Set[String], AtomicReference[MimeAugmenter.Evidence]) = {
     val base = Try {
       ExtensionMimeDetector.detect(this) match {
         case Some(mime) => Set(mime)
@@ -93,16 +94,37 @@ sealed trait ArtifactWrapper {
     val base2 = mimeHint ++ base
     // The hint is authoritative (never re-checked against content), so an
     // augmenter failure must not drop it: fall back to base2 (hint ++
-    // detected), not to the detected set alone.
+    // detected) with no evidence, not to the detected set alone.
     Try { ArtifactWrapper.augmentMimeTypes(this, base2) }.toOption
-      .getOrElse(base2)
+      .getOrElse(
+        (
+          base2,
+          AtomicReference(Map.empty[String, Vector[AugmentationEvidence]])
+        )
+      )
   }
 
   /** The effective MIME set: the detected/augmented set UNIONED with the
     * producer-stamped hint . The hint is authoritative (never re-checked
     * against content) and never produced by sniffing.
     */
-  def mimeType: Set[String] = _mimeType
+  def mimeType: Set[String] = _mimeType._1
+
+  /** What the augmenters established about this artifact, keyed by the MIME
+    * type each record speaks about.
+    *
+    * A key may name a MIME type that is not in [[mimeType]]: that is how a
+    * negative or inconclusive probe is recorded. The MIME set states what is
+    * true; this map states what was probed and learned, so a later consumer can
+    * continue from it instead of probing again.
+    */
+  def mimeTypeEvidence: MimeAugmenter.Evidence = _mimeType._2.get
+
+  /** Cleans up evidence *AFTER* the strategies have been selected
+    */
+  def wipeEvidence(): Unit = {
+    _mimeType._2.set(Map())
+  }
 
   /** Optional authoritative MIME hint stamped by the producer that created this
     * wrapper. None when no producer stamped one. Non-producers never set it;
@@ -183,6 +205,95 @@ sealed trait ArtifactWrapper {
 object ArtifactWrapper {
   private val logger = Logger(getClass())
 
+  // ---------- MIME-augmentation probe --------------------------------------
+
+  /** The one-block probe every augmenter gets unless it declares more. Defined
+    * in [[MimeProbe]] so augmenters can read it during their own initialization
+    * without closing a class-initialization cycle with this companion.
+    */
+  val MaxMimeProbeBytes: Int = MimeProbe.MaxBytes
+
+  /** Thrown when an augmenter calls `withFile` during augmentation. */
+  final class WithFileDuringMimeProbe(what: String)
+      extends RuntimeException(
+        s"withFile is forbidden during MIME augmentation ($what): it may spill an " +
+          "in-memory artifact to a temporary file. Augmentation reads a bounded " +
+          "prefix through the probe and nothing else."
+      )
+
+  private val augmentScope: ThreadLocal[Boolean] =
+    ThreadLocal.withInitial[Boolean](() => false)
+
+  /** Run `f` in the augmentation scope: `withFile` throws, and nothing else is
+    * restricted (the probe bounds the bytes).
+    */
+  private[goatrodeo] def inAugmentScope[T](f: => T): T = {
+    val previous = augmentScope.get()
+    augmentScope.set(true)
+    try f
+    finally augmentScope.set(previous)
+  }
+
+  private[goatrodeo] def forbidWithFileDuringMimeProbe(): Unit =
+    if (augmentScope.get())
+      throw new WithFileDuringMimeProbe("during MIME augmentation")
+
+  /** Read up to `n` bytes from the front of the artifact; the result may be
+    * shorter when the artifact is smaller or the stream ends early.
+    */
+  private def readPrefix(artifact: ArtifactWrapper, n: Int): Array[Byte] =
+    artifact.withStream { stream =>
+      val want = math.min(n.toLong, artifact.size()).toInt
+      val buffer = new Array[Byte](want)
+      var total = 0
+      var done = false
+      while (total < want && !done) {
+        val read = stream.read(buffer, total, want - total)
+        if (read <= 0) done = true else total += read
+      }
+      if (total == want) buffer else java.util.Arrays.copyOf(buffer, total)
+    }
+
+  /** The probe handed to one augmenter for one artifact.
+    *
+    * The retained prefix only ever grows through [[extend]], and only within
+    * the augmenter's declared [[ProbeBudget]]. Re-reading from the front makes
+    * the retained bytes contiguous; the total I/O is at most twice the final
+    * prefix, and only for the one augmenter that declares an extension.
+    */
+  private final class RetainedProbe(
+      artifact: ArtifactWrapper,
+      budget: ProbeBudget
+  ) extends AugmentProbe {
+    private var target: Int =
+      math.min(budget.startBytes.toLong, artifact.size()).toInt
+    private var doublings: Int = 0
+    private var data: Array[Byte] = readPrefix(artifact, target)
+
+    private def nextTarget: Int =
+      math
+        .min(
+          math.min(target.toLong * 2L, artifact.size()),
+          budget.maxBytes.toLong
+        )
+        .toInt
+
+    def bytes: Array[Byte] = data
+    def length: Int = data.length
+
+    def canExtend(): Boolean =
+      doublings < budget.maxDoublings && nextTarget > data.length
+
+    def extend(): Boolean =
+      if (!canExtend()) false
+      else {
+        doublings += 1
+        target = nextTarget
+        data = readPrefix(artifact, target)
+        true
+      }
+  }
+
   /** Maximum size for in-memory artifact storage (32MB). */
   val maxInMemorySize: Long = 32L * 1024 * 1024;
 
@@ -215,7 +326,10 @@ object ArtifactWrapper {
       metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, fileName)
       val detected = Try { tika.getDetector.detect(data, metadata) }.toOption
         .getOrElse(MediaType.OCTET_STREAM)
-      massageMimeType(fileName, rawData, detected)
+      // Whatever Tika says is the base type. The types Tika cannot name (JSON,
+      // LuaRocks rockspecs) are claimed by MIME augmenters, which are additive
+      // and bounded to one block; the artifact's MIME set is not overwritten here.
+      detected.toString()
     } catch {
       // NonFatal rather than Exception: this runs on the builder's worker
       // threads, which are interrupted on shutdown, and catching Exception
@@ -232,224 +346,144 @@ object ArtifactWrapper {
     }
   }
 
-  private val mimeTypeAugmenters: AtomicReference[
-    Vector[
-      (Set[String] => Boolean, (ArtifactWrapper, Set[String]) => Set[String])
-    ]
-  ] =
+  private val mimeTypeAugmenters: AtomicReference[Vector[MimeAugmenter]] =
     AtomicReference(Vector())
 
-  /** MIME gate helper for per-augmenter applicability rules: true when the MIME
-    * set contains none of the blocked names. A name ending in `/` matches as a
-    * prefix (e.g. `"text/"`); any other name matches exactly.
+  /** Per-augmenter block predicate: true when the MIME set contains none of the
+    * blocked names. A blocked name that ends in a slash plus an asterisk -- the
+    * family wildcard, written as &#34;text/&#42;&#34; for the text family --
+    * matches as a prefix, so it blocks `text/plain` and `text/x-vhdl`; any
+    * other name matches exactly.
+    *
+    * This helper carries no policy of its own. The blocked list is supplied by
+    * one augmenter and consulted only by that augmenter's own rule: a MIME type
+    * is an additive claim about what an artifact is, never a verdict that
+    * nothing further can be found, so no aggregate list may silence the chain
+    * on everyone's behalf.
     *
     * Rules are deliberately block-shaped: blocking only MIMEs that provably
-    * cannot match the augmenter keeps every unknown/degenerate MIME (inner
-    * package fragments, future ecosystems) probed, so a wrong rule can only
-    * cost performance, never a false negative.
+    * cannot match keeps every unknown/degenerate MIME probed, so a wrong rule
+    * can only cost performance, never a false negative.
     */
+  /** Admission predicate for per-augmenter applicability rules: true when at
+    * least one MIME in the set could be this augmenter's target.
+    *
+    * Structurally the mirror of `noneOf`, and for the same reason: the
+    * candidate list is iterated ONCE and every exact entry is answered by a
+    * hash lookup in the MIME set (O(1) per entry). Only a suffix entry -- the
+    * text family wildcard, `image/x-raw-*`, or a bare `"text/"` -- falls back
+    * to scanning the MIME set, and `mimes` holds a handful of entries.
+    * Iterating the MIME set on the outside and the candidate list on the inside
+    * -- the shape this replaces -- pays for every candidate once per MIME,
+    * which is the quadratic behaviour `noneOf` was rewritten to avoid.
+    *
+    * `exists` short-circuits on the first hit, and the caller passes a `Seq` it
+    * holds as a `val` (`Admissible*`), so no allocation happens per call.
+    */
+  def anyOf(candidates: String*)(mimes: Set[String]): Boolean =
+    candidates.exists { c =>
+      if (c.endsWith("*")) {
+        val realC = c.substring(0, c.length() - 1)
+        mimes.exists(m => m.startsWith(realC))
+      } else if (c.endsWith("/")) {
+        mimes.exists(m => m.startsWith(c))
+      } else mimes.contains(c)
+    }
+
   def noneOf(blocked: String*)(mimes: Set[String]): Boolean = {
-    !mimes.exists(m =>
-      blocked.exists(b => if (b.endsWith("/")) m.startsWith(b) else m == b)
-    )
+    !blocked.exists { b =>
+      if (b.endsWith("*")) {
+        val realB = b.substring(0, b.length() - 1)
+        mimes.exists(m => m.startsWith(realB))
+      } else if (b.endsWith("/")) {
+        mimes.exists(m => m.startsWith(b))
+      } else mimes.contains(b)
+    }
   }
 
-  /** MIME types that are confidently terminal for the purpose of augmentation:
-    * none of the registered augmenters (.NET PE, VM disk image, crypto
-    * material) can ever apply to them. When Tika has already produced one of
-    * these we skip the whole augmenter chain, which avoids per-artifact stream
-    * reads and — crucially — SaffronDetector spilling in-memory artifacts to a
-    * temp file just to rule them out.
+  /** Run the augmenter chain.
     *
-    * Deliberately excludes text-prefixed and `application/octet-stream` types:
-    * SaffronDetector intentionally re-checks those (e.g. a `.vhd` that Tika
-    * misdetects as `text/x-vhdl`). Camera RAW types (`image/x-raw-*`) are
-    * excluded too: Tika assigns them by extension alone, and a raw disk image
-    * named `.raw` comes back as `image/x-raw-panasonic`. Treating that as
-    * terminal meant the disk was never offered to Saffron, so a Debian cloud
-    * image shipped as `.raw` was surveyed as one opaque file.
-    */
-  private lazy val terminalBinaryMimeTypes: Set[String] =
-    Helpers.javaClassMimeTypes ++ Set(
-      "application/java-archive",
-      "application/vnd.android.package-archive"
-    )
-
-  private def augmentationCannotApply(mimes: Set[String]): Boolean =
-    mimes.exists(m =>
-      (m.startsWith("image/") && !m.startsWith("image/x-raw-")) ||
-        m.startsWith("audio/") || m.startsWith("video/") ||
-        terminalBinaryMimeTypes.contains(m)
-    )
-
-  /** Augment the mime type with other mime types. Each registered augmenter
-    * carries its own applicability rule (see [[addMimeTypeAugmenter]]) so a new
-    * augmenter can be added without understanding any global skip logic.
+    * Each augmenter receives the MIME set so far, the evidence accumulated by
+    * the augmenters before it, and its own bounded probe. It returns the new
+    * MIME set and the evidence map. A single augmenter that throws is skipped
+    * (its evidence and MIMEs are dropped, the rest keep running), so one bug
+    * cannot silently disable every detector for an artifact.
     */
   def augmentMimeTypes(
       artifact: ArtifactWrapper,
       mimes: Set[String]
-  ): Set[String] = {
-    if (augmentationCannotApply(mimes)) mimes
-    else
-      mimeTypeAugmenters.get().foldLeft(mimes) { case (cur, (rule, theFn)) =>
-        if (rule(cur)) theFn(artifact, cur) else cur
+  ): (Set[String], AtomicReference[MimeAugmenter.Evidence]) = {
+    val (mimesOut: Set[String], evidence: MimeAugmenter.Evidence) =
+      inAugmentScope {
+        mimeTypeAugmenters
+          .get()
+          .foldLeft(
+            (mimes, Map.empty[String, Vector[AugmentationEvidence]])
+          ) { case ((curMimes, curEvidence), augmenter) =>
+            if (!augmenter.rule(curMimes, artifact.filenameWithNoPath))
+              (curMimes, curEvidence)
+            else {
+              val probe = new RetainedProbe(artifact, augmenter.budget)
+              Try(augmenter.fn(artifact, curMimes, curEvidence, probe)) match {
+                case Success(result) => result
+                case Failure(e) if e.isInstanceOf[WithFileDuringMimeProbe] =>
+                  logger.error(
+                    s"MIME augmenter ${augmenter.id} violated the rules for ${artifact
+                        .path()}: ${e.getMessage}"
+                  )
+                  (curMimes, curEvidence)
+                case Failure(_) => (curMimes, curEvidence)
+              }
+            }
+          }
       }
+
+    (mimesOut, AtomicReference(evidence))
   }
 
-  /** Register a MIME augmenter with its own applicability rule: the augmenter
-    * only runs when `rule(currentMimes)` is true.
+  /** The result of running one augmenter: the new MIME set, the evidence it
+    * produced, and how much of the artifact it inspected.
     */
-  def addMimeTypeAugmenter(
-      rule: Set[String] => Boolean
-  )(theFn: (ArtifactWrapper, Set[String]) => Set[String]): Unit = {
-    mimeTypeAugmenters.getAndUpdate(v => v :+ (rule -> theFn))
+  final case class AugmentOutcome(
+      mimes: Set[String],
+      evidence: MimeAugmenter.Evidence,
+      inspectedBytes: Int
+  )
+
+  /** Run one augmenter exactly as the chain would.
+    *
+    * Used by the chain itself and by tests that pin an individual augmenter's
+    * behaviour — including how much of the artifact it inspected, which is the
+    * rule the probe exists to enforce.
+    */
+  def runAugmenter(
+      augmenter: MimeAugmenter,
+      artifact: ArtifactWrapper,
+      mimes: Set[String],
+      evidence: MimeAugmenter.Evidence = Map.empty
+  ): AugmentOutcome =
+    inAugmentScope {
+      val probe = new RetainedProbe(artifact, augmenter.budget)
+      val (outMimes, outEvidence) =
+        augmenter.fn(artifact, mimes, evidence, probe)
+      AugmentOutcome(outMimes, outEvidence, probe.length)
+    }
+
+  /** Register a MIME augmenter. */
+  def addMimeTypeAugmenter(augmenter: MimeAugmenter): Unit = {
+    mimeTypeAugmenters.getAndUpdate(v => v :+ augmenter)
   }
 
   // constructor
-  addMimeTypeAugmenter(DotnetDetector.mimeRule)(
-    DotnetDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(SaffronDetector.mimeRule)(
-    SaffronDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(CryptoDetector.mimeRule)(
-    CryptoDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(OpenSSLConfigDetector.mimeRule)(
-    OpenSSLConfigDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(JavaSecurityDetector.mimeRule)(
-    JavaSecurityDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(JavaArchiveDetector.mimeRule)(
-    JavaArchiveDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(CryptoContentDetector.mimeRule)(
-    CryptoContentDetector.mimeTypeAugmenter
-  )
-  addMimeTypeAugmenter(CarvedCertAugmenter.mimeRule)(
-    CarvedCertAugmenter.mimeTypeAugmenter
-  )
-
-  private def massageMimeType(
-      fileName: String,
-      rawData: TikaInputStream,
-      detected: MediaType
-  ): String = {
-    // if you add more changes to this, add to the mime_types.md documentation
-    Try {
-      if (
-        detected == MediaType.TEXT_PLAIN && rawData.getLength() < 1000000 &&
-        rawData.getLength() > 0
-      ) {
-        import org.json4s._
-        import org.json4s.native.JsonMethods._
-
-        if (rawData.getPosition() > 0) {
-          rawData.skip(-rawData.getPosition())
-        }
-        val bytes = new String(Helpers.slurpInputNoClose(rawData), "UTF-8")
-        parseOpt(bytes).isDefined
-      } else false
-    }.toOption match {
-      case Some(true) => "application/json"
-      // Tika has no glob for LuaRocks rockspecs, so they arrive as text/plain;
-      // Annatto only accepts them as text/x-lua
-      case _ if isRockspec(fileName, detected) => "text/x-lua"
-      case _ if isNupkg(fileName, detected.toString(), rawData) == Some(true) =>
-        "application/zip"
-      case _ if isIpa(fileName, rawData) == Some(true) =>
-        "application/zip"
-      case _ => detected.toString()
-    }
-  }
-
-  /** Is the file a LuaRocks `.rockspec` that Tika detected as plain text?
-    *
-    * @param fileName
-    *   the logical file name
-    * @param detected
-    *   the MIME type Tika detected
-    */
-  private def isRockspec(fileName: String, detected: MediaType): Boolean =
-    detected == MediaType.TEXT_PLAIN &&
-      fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".rockspec")
-
-  /** Does the file look like an iOS `.ipa`? An `.ipa` is a ZIP archive whose
-    * name ends in `.ipa` (Tika reports it as `application/x-itunes-ipa`); the
-    * massage normalizes it to `application/zip` so the FileWalker ZIP branch
-    * walks the container and its `Payload/<App>.app/` bundle.
-    *
-    * The sniff is exactly the nupkg pattern: extension plus the 4-byte ZIP
-    * magic — a local-file header (`PK\x03\x04`) or an empty-archive EOCD record
-    * (`PK\x05\x06`). It keys on magic, never on Tika's outcome, so Android APKs
-    * and plain ZIPs are unaffected (they share the magic but not the extension,
-    * and the extension gate keeps this branch off them).
-    *
-    * @param fileName
-    *   the logical file name
-    * @param rawData
-    *   the Tika input stream (rewound before the sniff)
-    * @return
-    *   Some(true) when the file is an .ipa ZIP, Some(false) otherwise, None
-    *   when the sniff itself fails
-    */
-  private def isIpa(
-      fileName: String,
-      rawData: TikaInputStream
-  ): Option[Boolean] = {
-    Try {
-      if (fileName.toLowerCase.endsWith(".ipa") && rawData.getLength() > 4) {
-        // rewind
-        if (rawData.getPosition() > 0) {
-          rawData.skip(-rawData.getPosition())
-        }
-        val bytes = rawData.readNBytes(4)
-        Some(
-          bytes(0) == 0x50 && bytes(1) == 0x4b &&
-            (bytes(2) == 0x03 || bytes(2) == 0x05) && bytes(3) == 0x04
-        )
-      } else Some(false)
-    } match {
-      case Success(v) => v
-      case Failure(e) =>
-        logger.error(f"Ipa detect failure ${e.getMessage()}")
-        None
-    }
-  }
-
-  private def isNupkg(
-      fileName: String,
-      detectedMime: String,
-      rawData: TikaInputStream
-  ): Option[Boolean] = {
-    Try {
-      if (
-        fileName.endsWith(
-          ".nupkg"
-        ) && detectedMime == "application/x-tika-ooxml" && rawData
-          .getLength() > 4
-      ) {
-        // rewind
-        if (rawData.getPosition() > 0) {
-          rawData.skip(-rawData.getPosition())
-        }
-        val bytes = rawData.readNBytes(4)
-        // does it match nupkg header?
-        Some(
-          bytes(0) == 0x50 && bytes(1) == 0x4b && bytes(2) == 0x03 && bytes(
-            3
-          ) == 0x04
-        )
-      } else Some(false)
-    } match {
-      case Success(v) => v
-      case Failure(e) =>
-        logger.error(f"Nupkg detect failure ${e.getMessage()}")
-        None
-    }
-  }
+  addMimeTypeAugmenter(DotnetDetector.augmenter)
+  addMimeTypeAugmenter(JsonLikeDetector.augmenter)
+  addMimeTypeAugmenter(CarvedCertAugmenter.augmenter)
+  addMimeTypeAugmenter(SaffronDetector.augmenter)
+  addMimeTypeAugmenter(CryptoDetector.augmenter)
+  addMimeTypeAugmenter(OpenSSLConfigDetector.augmenter)
+  addMimeTypeAugmenter(JavaSecurityDetector.augmenter)
+  addMimeTypeAugmenter(JavaArchiveDetector.augmenter)
+  addMimeTypeAugmenter(CryptoContentDetector.augmenter)
 
   protected def fixPath(p: String): String = {
     if (p.startsWith("./")) fixPath(p.substring(2))
@@ -633,6 +667,7 @@ final case class FileWrapper(
     * of the reference.
     */
   def withFile[T](func: File => T): T = {
+    ArtifactWrapper.forbidWithFileDuringMimeProbe()
     func(wrappedFile)
   }
 
@@ -697,6 +732,7 @@ final case class ByteWrapper(
     * of the reference.
     */
   def withFile[T](func: File => T): T = {
+    ArtifactWrapper.forbidWithFileDuringMimeProbe()
     FileWalker.withinTempDir { path =>
       // Preserve the original extension so MIME-type augmenters and disk-format
       // detectors (e.g. Saffron for .img / .img.gz) can fall back to the filename.

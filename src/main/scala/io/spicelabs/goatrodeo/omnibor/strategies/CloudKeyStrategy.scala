@@ -29,6 +29,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.MimeFamilies
 
 import java.nio.charset.StandardCharsets
 import java.util.Arrays
@@ -187,12 +188,24 @@ object CloudKeyStrategy {
   }
 
   /** Compute cloud-key config files to process at a layer. */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextContent)
+
   def computeCloudKeyFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val mine = byUUID.values
-      .filter(a => a.mimeType.contains(CryptoContentDetector.CloudKeyMime))
+      .filter(a =>
+        notAContainer(a.mimeType) && a.mimeType
+          .contains(CryptoContentDetector.CloudKeyMime)
+      )
       .toVector
 
     val uuids = mine.map(_.uuid).toSet

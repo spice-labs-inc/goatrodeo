@@ -26,9 +26,10 @@ import scala.jdk.CollectionConverters.*
   * block-shaped predicate over the artifact's Tika MIME set, so a new augmenter
   * can be added without understanding any global skip logic.
   *
-  * WHY: the augmenter chain costs ~700–1,350µs per non-terminal artifact
-  * (measured), which on 50M-artifact builds halves throughput. The rules remove
-  * provably-impossible work (class files, XML, media) per augmenter.
+  * WHY: the augmenter chain costs ~700–1,350µs per artifact that reaches it
+  * (measured), which on 50M-artifact builds halves throughput. Each rule
+  * removes the work that augmenter provably cannot use (class files, XML,
+  * media), and only that augmenter's work.
   *
   * THEORY: rules are BLOCK-shaped by design — they only skip MIMEs that
   * provably cannot match, so every unknown/degenerate MIME (inner package
@@ -65,6 +66,8 @@ class MimeAugmenterRuleSuite extends GoatRodeoFunSuite {
 
     assert(!CryptoContentDetector.mimeRule(Set("application/java-vm")))
     assert(CryptoContentDetector.mimeRule(Set("application/octet-stream")))
+    // A JAR is expanded into children; the stored file carries the claim.
+    assert(!CryptoContentDetector.mimeRule(Set("application/java-archive")))
 
     assert(!DotnetDetector.mimeRule(Set("application/xml")))
     assert(!DotnetDetector.mimeRule(Set("text/plain")))
@@ -75,8 +78,11 @@ class MimeAugmenterRuleSuite extends GoatRodeoFunSuite {
     assert(DotnetDetector.mimeRule(Set("application/octet-stream")))
 
     assert(!SaffronDetector.mimeRule(Set("application/java-vm")))
-    // text stays probed on purpose (Tika mislabels .vhd as text/x-vhdl)
-    assert(SaffronDetector.mimeRule(Set("text/plain")))
+    // Text is refused unless it is the documented misreading: `.vhd` arrives as
+    // `text/x-vhdl`, and that type is admitted by name. Leaving the whole text
+    // family admissible cost 512 wasted 128 KiB probes out of 543 admissions.
+    assert(!SaffronDetector.mimeRule(Set("text/plain")))
+    assert(SaffronDetector.mimeRule(Set("text/x-vhdl")))
 
     assert(!OpenSSLConfigDetector.mimeRule(Set("application/java-vm")))
     assert(!OpenSSLConfigDetector.mimeRule(Set("image/png")))

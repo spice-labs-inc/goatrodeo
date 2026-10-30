@@ -61,7 +61,9 @@ class DotnetStreamingSuite extends GoatRodeoFunSuite {
   private def mimesForFile(name: String): Set[String] = {
     val wrapper = fileWrapper(name)
     wrapper.mimeType ++
-      DotnetDetector.mimeTypeAugmenter(wrapper, wrapper.mimeType)
+      ArtifactWrapper
+        .runAugmenter(DotnetDetector.augmenter, wrapper, wrapper.mimeType)
+        .mimes
   }
 
   test("GRW-1b probe: non-PE bytes are not dotnet, no exception") {

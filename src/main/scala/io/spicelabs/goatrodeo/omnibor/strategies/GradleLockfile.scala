@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CryptoContentDetector
 import io.spicelabs.goatrodeo.util.GitOID
 import io.spicelabs.goatrodeo.util.Helpers
+import io.spicelabs.goatrodeo.util.MimeFamilies
 import io.spicelabs.goatrodeo.util.PURLComponentSanitizer
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
@@ -123,6 +124,15 @@ object GradleLockfile {
     * `dependency-locks` ending with `.lockfile` — selected by MIME (detected
     * during the MIME augmentation pass), no file reads here.
     */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextContent)
+
   def computeGradleLockfiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
@@ -136,6 +146,7 @@ object GradleLockfile {
           name == "buildscript-gradle.lockfile" ||
           (name.endsWith(".lockfile") && path.contains("dependency-locks"))
       nameMatches &&
+      notAContainer(wrapper.mimeType) &&
       wrapper.mimeType.contains(CryptoContentDetector.GradleLockfileMime)
     }.toVector
 

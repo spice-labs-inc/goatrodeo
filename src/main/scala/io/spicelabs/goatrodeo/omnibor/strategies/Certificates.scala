@@ -27,6 +27,7 @@ import io.spicelabs.goatrodeo.omnibor.strategies.CertificatesOidMaps.*
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.Helpers
 import io.spicelabs.goatrodeo.util.Helpers.sha256Hex
+import io.spicelabs.goatrodeo.util.MimeFamilies
 import io.spicelabs.goatrodeo.util.PURLHelpers
 import io.spicelabs.goatrodeo.util.SshWireReader
 import io.spicelabs.goatrodeo.util.TreeMapExtensions.+?
@@ -296,13 +297,24 @@ object Certificates {
     isSingleCertCandidate(mimes)
   }
 
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeCryptoMaterial)
+
   def computeCertificateFiles(
       byUUID: ToProcess.ByUUID,
       byName: ToProcess.ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val claimed: Iterable[ArtifactWrapper] = for {
       (_, wrapper) <- byUUID
-      if isCertificateCandidate(wrapper.mimeType)
+      if notAContainer(wrapper.mimeType) && isCertificateCandidate(
+        wrapper.mimeType
+      )
     } yield wrapper
 
     val claimedUuids: Set[String] = claimed.map(_.uuid).toSet

@@ -36,7 +36,9 @@ class JavaSecurityDetectorSuite extends GoatRodeoScalaCheckSuite {
   private def augment(text: String, current: Set[String]): Set[String] = {
     val wrapper =
       ByteWrapper(text.getBytes("ISO-8859-1"), "extra.security", None)
-    JavaSecurityDetector.mimeTypeAugmenter(wrapper, current)
+    ArtifactWrapper
+      .runAugmenter(JavaSecurityDetector.augmenter, wrapper, current)
+      .mimes
   }
 
   test("detects java.security with disabledAlgorithms") {

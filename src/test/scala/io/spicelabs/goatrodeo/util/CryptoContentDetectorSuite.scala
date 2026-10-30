@@ -53,10 +53,13 @@ class CryptoContentDetectorSuite extends GoatRodeoFunSuite {
       name: String,
       mimes: Set[String] = Set("text/plain")
   ): Set[String] =
-    CryptoContentDetector.mimeTypeAugmenter(
-      wrapper(content, name, mimes),
-      mimes
-    )
+    ArtifactWrapper
+      .runAugmenter(
+        CryptoContentDetector.augmenter,
+        wrapper(content, name, mimes),
+        mimes
+      )
+      .mimes
 
   test("JWT content emits the crypto-token MIME") {
     val jwt = "header.eyJhbGciOiJIUzI1NiJ9.payload.signature"

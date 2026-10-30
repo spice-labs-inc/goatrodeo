@@ -18,6 +18,7 @@ import io.spicelabs.goatrodeo.omnibor.ItemMetaData
 import io.spicelabs.goatrodeo.omnibor.SingleMarker
 import io.spicelabs.goatrodeo.omnibor.StringOf
 import io.spicelabs.goatrodeo.omnibor.StringOrPair
+import io.spicelabs.goatrodeo.omnibor.ToProcess
 import io.spicelabs.goatrodeo.testing.GoatRodeoScalaCheckSuite
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CarvedCertAugmenter
@@ -81,6 +82,36 @@ class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
       key: String
   ): Option[String] =
     md.get(key).flatMap(_.headOption).collect { case StringOf(s) => s }
+
+  /** The carrier record the augmenter produced, read before the strategy wipes
+    * it.
+    */
+  private def carrierOf(
+      w: ArtifactWrapper
+  ): Option[CarvedCertAugmenter.Carrier] = {
+    w.mimeType
+    w.mimeTypeEvidence
+      .getOrElse(CarvedCertAugmenter.CarvedMime, Vector.empty)
+      .collectFirst { case c: CarvedCertAugmenter.Carrier => c }
+  }
+
+  /** The spans the carrier's own tables point at. */
+  private def spansOf(
+      w: ArtifactWrapper
+  ): Vector[CarvedCertificatesStrategy.CarvedSpan] =
+    carrierOf(w)
+      .map(c => CarvedCertificatesStrategy.carrierSpans(w, c))
+      .getOrElse(Vector.empty)
+
+  /** Run the strategy's selection over a single artifact. */
+  private def claimAll(w: ArtifactWrapper): Vector[ToProcess] = {
+    val (claimed, _, _, _) = CarvedCertificatesStrategy
+      .computeCarvedCertificateFiles(
+        Map(w.uuid -> w),
+        Map(w.path() -> Vector(w))
+      )
+    claimed
+  }
 
   // C-1 — the carve scanner parses only real certs, dedupes, and honours caps.
   test("C-1 carveCertificates parses, dedupes, and caps") {
@@ -161,12 +192,30 @@ class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
     assertEquals(sizes, Set("1024", "2048"))
   }
 
-  // C-5 — the deep-cert fixture is not detected by the probe and therefore
-  // yields no carved metadata through the normal (MIME-gated) path.
-  test("C-5 deep cert beyond the probe window is not detected") {
-    val f = fixture("elf-deep-cert")
-    val wrapper = FileWrapper(f, "elf-deep-cert", None)
-    assert(!wrapper.mimeType.contains(CarvedCertAugmenter.CarvedMime))
+  // C-5 — the deep certificate IS found. Inverted 2026-10-28 with David's
+  // explicit approval.
+  //
+  // WHAT: `elf-deep-cert` places its certificate at offset 319,520, far beyond
+  // any streaming window the old probe could afford. The carrier's symbol table
+  // names it (`cert2048_der`, size 791), so the strategy reaches it by skipping
+  // to the symbol's span instead of scanning toward it.
+  //
+  // WHY: this is the whole reason the strategy walks tables rather than bytes. A
+  // certificate embedded deep in a firmware image is not rare, and a window-based
+  // probe misses it while reporting success.
+  //
+  // THEORY: the claim now comes from the carrier's own tables, not from a byte
+  // window, so the distance from the front of the file is irrelevant; only the
+  // span's existence and size matter.
+  test("C-5 deep cert beyond any streaming window is found by its symbol") {
+    val wrapper = FileWrapper(fixture("elf-deep-cert"), "elf-deep-cert", None)
+    val spans = spansOf(wrapper)
+    assert(
+      spans.exists(s => s.offset == 319520L && s.length == 791L),
+      s"the cert2048_der symbol must yield its span, got $spans"
+    )
+    val claimed = claimAll(wrapper)
+    assertEquals(claimed.length, 1, "the deep carrier must be claimed")
   }
 
   // C-6 — the strategy claims by MIME only, with no reads during selection.

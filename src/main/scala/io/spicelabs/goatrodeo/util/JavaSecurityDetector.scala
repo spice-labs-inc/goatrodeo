@@ -65,43 +65,56 @@ object JavaSecurityDetector {
     *   `Set.empty`
     */
   def detect(artifact: ArtifactWrapper): Set[String] = {
-    if (looksBinary(artifact)) {
-      Set.empty
-    } else {
-      readPrefix(artifact) match {
-        case None => Set.empty
-        case Some(text) =>
+    // One read of the prefix, reused for both the binary check and the scan.
+    // Reading it twice doubled this probe's cost for every artifact in the
+    // corpus (see MaxMimeProbeBytes).
+    readPrefix(artifact) match {
+      case None => Set.empty
+      case Some(text) =>
+        if (isBinaryText(text)) {
+          Set.empty
+        } else {
           val lower = text.toLowerCase
           if (hasSecurityKey(lower)) {
             Set(JavaSecurityMimeType)
           } else {
             Set.empty
           }
-      }
+        }
     }
   }
 
-  /** Augmenter entry point used by `ArtifactWrapper`. Purely additive. */
-  /** Applicability rule: `java.security` properties are text-ish files; media,
-    * class files, archives, and XML can never be one. Unknown mimes stay
-    * probed.
+  /** Both sides come from [[MimeFamilies]], the same pair the consumer of this
+    * augmenter's MIME type uses, so a change to what this augmenter can handle
+    * changes its consumer at the same moment.
     */
-  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
-    ArtifactWrapper.noneOf(
-      "image/",
-      "audio/",
-      "video/",
-      "application/java-vm",
-      "application/java-archive",
-      "application/vnd.android.package-archive",
-      "application/xml"
-    )(mimes)
+  private[goatrodeo] def mimeRule(
+      mimes: Set[String],
+      name: String = ""
+  ): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextConfig) &&
+      MimeFamilies.couldBe(mimes, MimeFamilies.couldBeTextConfig)
 
-  def mimeTypeAugmenter(
-      artifact: ArtifactWrapper,
-      currentMimes: Set[String]
-  ): Set[String] = {
-    currentMimes ++ detect(artifact)
+  val augmenter: MimeAugmenter = MimeAugmenter(
+    id = "JavaSecurityDetector",
+    rule = mimeRule(_, _),
+    budget = ProbeBudget(),
+    fn = (artifact, currentMimes, evidence, probe) => {
+      val text = new String(probe.bytes, StandardCharsets.ISO_8859_1)
+      val found = detectBytes(probe.bytes)
+      // The prefix was read and the decision made; no evidence.
+      (currentMimes ++ found, evidence)
+    }
+  )
+
+  /** Detect from an already-read prefix. */
+  def detectBytes(bytes: Array[Byte]): Set[String] = {
+    val text = new String(bytes, StandardCharsets.ISO_8859_1)
+    if (isBinaryText(text)) Set.empty
+    else {
+      val lower = text.toLowerCase
+      if (hasSecurityKey(lower)) Set(JavaSecurityMimeType) else Set.empty
+    }
   }
 
   /** Read up to `MaxReadBytes` from the artifact as an ISO-8859-1 string.
@@ -117,25 +130,16 @@ object JavaSecurityDetector {
     }.toOption
   }
 
-  /** Check whether the prefix looks like binary data. Binary prefixes are not
-    * scanned for security markers to avoid wasted work and false positives.
+  /** True when the prefix looks like binary rather than text. Binary prefixes
+    * are not scanned for security markers: it avoids false positives and avoids
+    * scanning bytes that cannot contain the markers.
     */
-  private def looksBinary(artifact: ArtifactWrapper): Boolean = {
-    if (artifact.size() == 0) {
+  private def isBinaryText(text: String): Boolean = {
+    if (text.isEmpty) {
       false
     } else {
-      readPrefix(artifact) match {
-        case None => true
-        case Some(text) =>
-          if (text.isEmpty) {
-            false
-          } else {
-            val controlCount = text.count { c =>
-              c < 0x20 && !c.isWhitespace
-            }
-            controlCount.toDouble / text.length > 0.1
-          }
-      }
+      val controlCount = text.count { c => c < 0x20 && !c.isWhitespace }
+      controlCount.toDouble / text.length > 0.1
     }
   }
 

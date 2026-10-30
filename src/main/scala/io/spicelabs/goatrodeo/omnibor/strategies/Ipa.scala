@@ -5,6 +5,7 @@ import io.spicelabs.goatrodeo.omnibor.*
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByName
 import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.*
+import io.spicelabs.goatrodeo.util.MimeFamilies
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cms.CMSSignedData
 import org.json4s.*
@@ -73,6 +74,15 @@ object IpaStrategy {
     * claimed only when they appear inside a `Payload/**/*.app/` path and are
     * NOT inside a claimed .ipa (containers take precedence).
     */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeZipArchive)
+
   def computeIpaFiles(
       byUUID: ByUUID,
       byName: ByName
@@ -80,7 +90,7 @@ object IpaStrategy {
     // 1. Claim .ipa containers.
     val ipaContainers: Vector[ArtifactWrapper] = byUUID.values.filter { a =>
       a.path().toLowerCase.endsWith(".ipa") &&
-      a.mimeType.contains(zipMime)
+      notAContainer(a.mimeType) && a.mimeType.contains(zipMime)
     }.toVector
 
     val claimedUuids = ipaContainers.map(_.uuid).toSet

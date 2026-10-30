@@ -213,9 +213,9 @@ class ExtensionMimeDetectorSuite extends GoatRodeoFunSuite {
       *
       * Why: This verifies the wiring of `ExtensionMimeDetector` into the
       * `_mimeType` lazy val. The MIME type should be determined without
-      * invoking Tika, and the augmenter chain should still run (but
-      * `augmentationCannotApply` returns true for `application/java-vm`, so
-      * augmenters are skipped — same as the Tika path).
+      * invoking Tika, and the augmenter chain should still run — each augmenter
+      * deciding for itself. Every registered augmenter's own rule finds a class
+      * file impossible for its own reasons, so none of them claims anything.
       */
     val bytes = Array[Byte](
       0xca.toByte,
@@ -245,9 +245,9 @@ class ExtensionMimeDetectorSuite extends GoatRodeoFunSuite {
       * Why: This verifies the wiring of `ExtensionMimeDetector` into the
       * `_mimeType` lazy val for Java archives. The MIME type should be
       * determined without invoking Tika, and the augmenter chain should still
-      * run (but `augmentationCannotApply` returns true for
-      * `application/java-archive`, so augmenters are skipped — same as the Tika
-      * path).
+      * run — each augmenter deciding for itself. The augmenters whose rules
+      * refuse archives skip this artifact; the ones that accept archives still
+      * probe it, so the archive MIME silences nothing globally.
       */
     val bytes = Array[Byte](0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00)
     val wrapper = ByteWrapper(bytes, "lib.jar", None)

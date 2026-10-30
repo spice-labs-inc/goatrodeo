@@ -54,6 +54,25 @@ import FileSystemEntry.RegularFile
   *   - Other: ISO9660, DEB (Debian packages)
   */
 object FileWalker {
+
+  /** The walker: fast reject, then a cheap probe, then the work.
+    *
+    * Expanding a container is I/O plus a parser, so the decision to attempt it
+    * is made in the same order every other consumer uses:
+    *
+    *   1. '''Fast reject'''. [[notArchive]] and [[notCompressed]] test the MIME
+    *      set and the name/suffix only -- no reads. They are composed from
+    *      [[MimeFamilies]], the same families the augmenters and the strategies
+    *      use, so a change to what counts as a container changes all three at
+    *      once. 2. '''Cheap probe'''. A bounded read of the head, plus a footer
+    *      where a format keeps its signature at the end, to confirm the magic
+    *      before anything is handed to a parser. 3. '''The work'''. Mount or
+    *      expand, always through a bounded stream.
+    *
+    * Evidence matters only to step 2, and only when an augmenter left a record
+    * because it could not decide within its own budget.
+    */
+
   val logger: Logger = Logger(getClass())
 
   private lazy val zipMimeTypes: Set[String] =
@@ -283,7 +302,7 @@ object FileWalker {
   private def isSaffronSupported(mime: Set[String], path: Path) = {
     // if we get some recognized mimes, succeed fast, otherwise check DiskReader
     mime.intersect(saffronMimeTypes).nonEmpty ||
-    mime.intersect(SaffronDetector.containerMimeTypes).nonEmpty ||
+    mime.intersect(SaffronDetector.mountableContainerMimeTypes).nonEmpty ||
     Try { DiskReader.isSupported(path) }.toOption.getOrElse(false)
   }
 
@@ -437,7 +456,7 @@ object FileWalker {
     val mimes = in.mimeType
     val diskMime = mimes.intersect(saffronMimeTypes).nonEmpty
     val containerMime =
-      mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty
+      mimes.intersect(SaffronDetector.mountableContainerMimeTypes).nonEmpty
     val maskMime = mimes.intersect(saffronMaskMimes).nonEmpty
     // Gate the expensive `withFile` (which spills in-memory artifacts to a
     // temp file) behind a MIME check plus, for disk-format MIMEs, a cheap
@@ -476,7 +495,9 @@ object FileWalker {
               } else (Vector(), None)
             val containerSystems: Vector[FileSystem] =
               if (
-                mimes.intersect(SaffronDetector.containerMimeTypes).nonEmpty
+                mimes
+                  .intersect(SaffronDetector.mountableContainerMimeTypes)
+                  .nonEmpty
               ) {
                 Try {
                   BinaryContainerMount.mount(path).toScala.toVector
@@ -739,6 +760,11 @@ object FileWalker {
     // "application/x-gtar"
   )
 
+  /** The walker's decisions use [[MimeFamilies]], the same object the Saffron
+    * augmenter and the container strategies use, so the three can never
+    * disagree about what a container is.
+    */
+
   /** Check if an artifact is definitely not an archive based on MIME type.
     *
     * @param in
@@ -751,6 +777,11 @@ object FileWalker {
 
   /** Check if a file is definitely not an archive based on MIME type and path.
     *
+    * Two-sided, in this order: a claim that the artifact cannot be a container
+    * refuses expansion outright, and otherwise expansion happens only when some
+    * MIME says it could be one. An unknown type therefore costs nothing:
+    * nothing admits it, so nothing is attempted.
+    *
     * @param path
     *   the file path
     * @param mimeType
@@ -759,13 +790,21 @@ object FileWalker {
     *   true if this is definitely not an archive
     */
   def notArchive(path: String, mimeType: Set[String]): Boolean = {
-    mimeType.exists(_.startsWith("text/")) ||
-    mimeType.exists(_.startsWith("image/")) ||
-    mimeType.forall(definitelyNotArchive.contains(_)) /*||
-    (mimeType.contains("application/zip") && path.endsWith(".xpi"))*/
+    // The name is part of the fast reject: a `.vhd` or `.raw` names a disk even
+    // when Tika's answer puts it in a refused family, and a name that says disk is
+    // never contradicted by a text or image claim.
+    val nameSaysDisk = MimeFamilies.nameSuggestsDisk(path)
+    (!nameSaysDisk &&
+      MimeFamilies.contradicts(mimeType, MimeFamilies.cannotBeContainer)) ||
+    !(nameSaysDisk ||
+      MimeFamilies.couldBe(mimeType, MimeFamilies.couldBeArchive))
   }
 
   /** Check if a file is definitely not compressed based on MIME type and path.
+    *
+    * The same pair as [[notArchive]]: a text, media, font or class claim
+    * refuses, and otherwise something in the set has to say the bytes could be
+    * a compressed stream.
     *
     * @param path
     *   the file path
@@ -774,13 +813,32 @@ object FileWalker {
     * @return
     *   true if this is definitely not a compressed file
     */
-  def notCompressed(path: String, mimeType: Set[String]): Boolean = {
+  def notCompressed(path: String, mimeType: Set[String]): Boolean =
+    (!MimeFamilies.nameSuggestsDisk(path) &&
+      MimeFamilies.contradicts(mimeType, MimeFamilies.cannotBeContainer)) ||
+      !MimeFamilies.couldBe(mimeType, MimeFamilies.couldBeCompressed)
 
-    mimeType.exists(_.startsWith("text/")) ||
-    mimeType.exists(_.startsWith("image/")) ||
-    notCompressedSet.intersect(mimeType).nonEmpty
-
-  }
+  /** Compressed-stream families an uncompress attempt can open. */
+  private val CouldBeCompressed: Seq[String] = Seq(
+    "application/gzip",
+    "application/zstd",
+    "application/x-xz",
+    "application/x-bzip2",
+    "application/x-compress",
+    // A ZIP, a JAR and an APK are containers for the archive path, not compressed
+    // streams for the uncompress path; `FileWalkerTestSuite` pins that an APK is
+    // not offered to the uncompress attempt.
+    "application/x-debian-package",
+    "application/x-rpm",
+    "application/x-gtar",
+    "application/x-tar",
+    "application/x-archive",
+    "application/x-7z-compressed",
+    "application/octet-stream",
+    "multipart/appledouble",
+    "text/x-vhdl",
+    "image/x-raw-*"
+  )
 
   /** Try a series of strategies (except for uncompressing a file) for creating
     * an archive stream

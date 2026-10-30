@@ -19,6 +19,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.CipherSuiteResolver
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.MimeFamilies
 import io.spicelabs.goatrodeo.util.OpenSSLConfigData
 import io.spicelabs.goatrodeo.util.OpenSSLConfigDetector
 import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
@@ -248,12 +249,23 @@ object OpenSSLConfigToProcess {
     * `.include` resolution, and dependency ordering happen inside the strategy
     * during processing.
     */
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextConfig)
+
   def computeOpenSSLConfigFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val claimed = byName.values.flatten
-      .filter(_.mimeType.contains(OpenSSLConfigMimeType))
+      .filter(a =>
+        notAContainer(a.mimeType) && a.mimeType.contains(OpenSSLConfigMimeType)
+      )
       .toVector
 
     if (claimed.isEmpty) {

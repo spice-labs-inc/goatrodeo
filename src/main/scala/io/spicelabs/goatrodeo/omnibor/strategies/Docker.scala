@@ -780,6 +780,11 @@ object DockerToProcess {
     val maybeManifest = byName.get("manifest.json")
 
     val configInfo =
+      // Every JSON read in this arm goes through `readJsonCapped` with the same
+      // `MaxOciJsonBytes` ceiling the OCI arm uses. A docker-save manifest is a
+      // few KB and a registry will not accept a manifest above 4 MiB, so the cap
+      // never fires on a real image; it bounds the parse for anything that merely
+      // happens to be named manifest.json inside some other container.
       for {
         manifestVec <- maybeManifest if manifestVec.length == 1 &&
           manifestVec(0).mimeType.exists(_.startsWith(jsonMimeType))
@@ -787,9 +792,7 @@ object DockerToProcess {
         manifest = manifestVec(0)
 
         // parse the manifest
-        manifestJson <- Try(
-          manifest.withStream(stream => parseOpt(stream))
-        ).toOption.flatten
+        manifestJson <- readJsonCapped(manifest, MaxOciJsonBytes)
 
         // get the elements of the manifest array
         manifestElements <- manifestJson match {
@@ -808,9 +811,7 @@ object DockerToProcess {
               _.startsWith(jsonMimeType)
             )
             if name.startsWith("blobs/sha256/")
-            json <- Try(
-              artifacts(0).withStream(stream => parseOpt(stream))
-            ).toOption.flatten.toList
+            json <- readJsonCapped(artifacts(0), MaxOciJsonBytes).toList
             if DockerMetadataExtractor.isOciManifestBlob(json)
           } yield json
 
@@ -843,9 +844,7 @@ object DockerToProcess {
               List(a(0))
             case _ => Nil
           }
-          configJson <- Try(
-            configFile.withStream(stream => parseOpt(stream))
-          ).toOption.flatten
+          configJson <- readJsonCapped(configFile, MaxOciJsonBytes)
           // get the layers
 
         } yield {
@@ -969,7 +968,7 @@ object DockerToProcess {
   /** Read an OCI metadata blob as JSON, bounded: more than `maxBytes` bytes is
     * refused (the blob is skipped, never partially trusted).
     */
-  private def readJsonCapped(
+  private[strategies] def readJsonCapped(
       artifact: ArtifactWrapper,
       maxBytes: Int
   ): Option[JValue] = {

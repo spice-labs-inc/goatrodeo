@@ -43,7 +43,9 @@ class OpenSSLConfigDetectorSuite extends GoatRodeoScalaCheckSuite {
 
   private def augment(text: String, current: Set[String]): Set[String] = {
     val wrapper = ByteWrapper(bytes(text), "test.cnf", None)
-    OpenSSLConfigDetector.mimeTypeAugmenter(wrapper, current)
+    ArtifactWrapper
+      .runAugmenter(OpenSSLConfigDetector.augmenter, wrapper, current)
+      .mimes
   }
 
   test("detects OpenSSL config with CipherString") {

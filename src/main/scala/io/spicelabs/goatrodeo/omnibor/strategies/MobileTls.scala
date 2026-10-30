@@ -29,6 +29,7 @@ import io.spicelabs.goatrodeo.omnibor.ToProcess.ByUUID
 import io.spicelabs.goatrodeo.util.ArtifactWrapper
 import io.spicelabs.goatrodeo.util.BinaryPlistParser
 import io.spicelabs.goatrodeo.util.GitOID
+import io.spicelabs.goatrodeo.util.MimeFamilies
 import org.json4s.JBool
 import org.json4s.JObject
 import org.json4s.JValue
@@ -70,12 +71,23 @@ object MobileTlsStrategy {
     else None
   }
 
+  /** The contradiction half of the two-sided applicability test, shared with
+    * every other container consumer through [[MimeFamilies]]: an artifact
+    * claimed to be an archive, a disk, a media type or a class file is expanded
+    * into children, and a child carries the content claim. Claiming the
+    * container itself would attribute a stored file's content to the archive.
+    */
+  private[strategies] def notAContainer(mimes: Set[String]): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeTextContent)
+
   def computeMobileTlsFiles(
       byUUID: ByUUID,
       byName: ByName
   ): (Vector[ToProcess], ByUUID, ByName, String) = {
     val mine = byUUID.values
-      .filter(a => detectTlsPolicyArtifact(a.path()).isDefined)
+      .filter(a =>
+        notAContainer(a.mimeType) && detectTlsPolicyArtifact(a.path()).isDefined
+      )
       .toVector
 
     val uuids = mine.map(_.uuid).toSet

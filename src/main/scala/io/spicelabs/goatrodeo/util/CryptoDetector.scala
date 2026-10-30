@@ -31,8 +31,14 @@ object CryptoDetector {
   /** Maximum bytes read from any artifact during detection. */
   val MAX_READ_BYTES: Int = 4096
 
-  /** Extended read budget for DER X.509/CRL parser probe. */
-  val MAX_DER_PROBE_BYTES: Int = 1024 * 1024
+  /** A DER object's total length is declared in its first four bytes, so the
+    * prefix is all a *structural* check needs. A post-quantum certificate can
+    * be 50 KB, but all of that is key and signature material at the end: its
+    * shape and its signature-algorithm OID sit in the first ~300 bytes. The
+    * full parse happens in the certificate strategy's item phase, which has a
+    * megabyte.
+    */
+  val MAX_DER_PROBE_BYTES: Int = MimeProbe.MaxBytes
 
   // Register the BC provider once. Idempotent — Security.addProvider
   // is a no-op if BC is already registered.
@@ -65,20 +71,41 @@ object CryptoDetector {
     "ecdsa-sha2-nistp521-cert-v01@openssh.com"
   )
 
-  /** Augments the MIME type set for the given artifact. Purely additive. */
-  /** Applicability rule: class files can never carry PEM/SSH/PGP/DER material,
-    * but everything else — including binaries with embedded PEM blocks — is
-    * probed.
+  /** Both sides come from [[MimeFamilies]], the same pair the consumer of this
+    * augmenter's MIME type uses, so a change to what this augmenter can handle
+    * changes its consumer at the same moment.
     */
-  private[goatrodeo] def mimeRule(mimes: Set[String]): Boolean =
-    ArtifactWrapper.noneOf("application/java-vm")(mimes)
+  private[goatrodeo] def mimeRule(
+      mimes: Set[String],
+      name: String = ""
+  ): Boolean =
+    !MimeFamilies.contradicts(mimes, MimeFamilies.cannotBeCryptoMaterial) &&
+      MimeFamilies.couldBe(mimes, MimeFamilies.couldBeCryptoMaterial)
 
-  def mimeTypeAugmenter(
-      artifact: ArtifactWrapper,
-      currentMimes: Set[String]
-  ): Set[String] = {
-    currentMimes ++ detect(artifact)
-  }
+  /** The only augmenter permitted to extend its probe.
+    *
+    * A DER object declares its total length in its first four bytes. One block
+    * covers the headers, the signature-algorithm OID and small objects; a
+    * second block covers the bodies that do not fit. Beyond that, the full
+    * parse belongs to the Certificates strategy's item phase.
+    */
+  val augmenter: MimeAugmenter = MimeAugmenter(
+    id = "CryptoDetector",
+    rule = mimeRule(_, _),
+    budget = ProbeBudget(startBytes = 4096, maxBytes = 8192, maxDoublings = 1),
+    fn = (artifact, currentMimes, evidence, probe) => {
+      val isDerPrefix =
+        probe.length >= 2 && (probe.bytes(0) & 0xff) == 0x30 &&
+          (probe.bytes(1) & 0xff) == 0x82
+      if (isDerPrefix && probe.canExtend()) { probe.extend(); () }
+      val bytes = probe.bytes
+      val found = detectFromBytes(bytes, artifact.path(), Some(bytes))
+      // The augmenter answered the question itself -- it either found a DER
+      // object worth claiming or it did not -- so nothing is left indeterminate
+      // and no evidence is recorded.
+      (currentMimes ++ found, evidence)
+    }
+  )
 
   /** Inspect the artifact and return every matching MIME type. */
   def detect(artifact: ArtifactWrapper): Set[String] = {
@@ -283,11 +310,97 @@ object CryptoDetector {
         else if (tryParseCRL(fullDer)) builder += "application/pkix-crl"
       }
     } else {
-      if (tryParseX509(fullDer)) {
+      // Exact parse when the whole object fits in the probe; structural shape
+      // check when it does not. A 50 KB post-quantum certificate is too large to
+      // parse inside a one-block probe, but its shape and signature algorithm
+      // are in the prefix.
+      val fits = derTotalLength(prefix).exists(_ <= fullDer.length.toLong)
+      if (fits) {
+        if (tryParseX509(fullDer)) {
+          builder += "application/pkix-cert"
+        } else if (tryParseCRL(fullDer)) {
+          builder += "application/pkix-crl"
+        }
+      } else if (looksLikeX509Certificate(prefix)) {
         builder += "application/pkix-cert"
-      } else if (tryParseCRL(fullDer)) {
-        builder += "application/pkix-crl"
       }
+    }
+  }
+
+  /** Total length a DER object declares, header included. */
+  private def derTotalLength(bytes: Array[Byte]): Option[Long] =
+    derTlv(bytes, 0).map { case (_, hdr, len) => hdr.toLong + len.toLong }
+
+  /** One DER TLV header: tag, header length and content length. */
+  private def derTlv(
+      bytes: Array[Byte],
+      off: Int
+  ): Option[(Int, Int, Int)] = {
+    if (off + 2 > bytes.length) None
+    else {
+      val tag = bytes(off) & 0xff
+      val first = bytes(off + 1) & 0xff
+      if (first < 0x80) Some((tag, 2, first))
+      else {
+        val n = first & 0x7f
+        if (n == 0 || n > 4 || off + 2 + n > bytes.length) None
+        else {
+          var len = 0
+          var i = 0
+          while (i < n) {
+            len = (len << 8) | (bytes(off + 2 + i) & 0xff)
+            i += 1
+          }
+          Some((tag, 2 + n, len))
+        }
+      }
+    }
+  }
+
+  /** Does this prefix open like an X.509 Certificate?
+    *
+    * Certificate ::= SEQUENCE { tbsCertificate SEQUENCE, signatureAlgorithm
+    * SEQUENCE, signatureValue BIT STRING }
+    *
+    * The check reads only the tags and lengths at the front: outer SEQUENCE,
+    * then a SEQUENCE for the TBS, then version or serial, then a SEQUENCE whose
+    * first element is an OID (the signature algorithm). It is deliberately a
+    * shape test, not a validation: a false positive costs one failed parse in
+    * the item phase, which is cheaper than reading 50 KB per artifact to
+    * decide.
+    */
+  private def looksLikeX509Certificate(prefix: Array[Byte]): Boolean = {
+    def tlv(off: Int) = derTlv(prefix, off)
+
+    tlv(0) match {
+      case Some((0x30, outerHdr, _)) =>
+        // tbsCertificate
+        tlv(outerHdr) match {
+          case Some((0x30, tbsHdr, _)) =>
+            val tbsContent = outerHdr + tbsHdr
+            // version is [0] EXPLICIT when present; serialNumber always follows
+            val afterVersion = tlv(tbsContent) match {
+              case Some((0xa0, hdr, len)) => Some(tbsContent + hdr + len)
+              case Some((0x02, _, _))     => Some(tbsContent)
+              case _                      => None
+            }
+            afterVersion.exists { serialOff =>
+              tlv(serialOff) match {
+                case Some((0x02, serialHdr, serialLen)) =>
+                  val sigAlgOff = serialOff + serialHdr + serialLen
+                  tlv(sigAlgOff) match {
+                    case Some((0x30, sigHdr, _)) =>
+                      // AlgorithmIdentifier starts with an OID
+                      (sigAlgOff + sigHdr < prefix.length) &&
+                      ((prefix(sigAlgOff + sigHdr) & 0xff) == 0x06)
+                    case _ => false
+                  }
+                case _ => false
+              }
+            }
+          case _ => false
+        }
+      case _ => false
     }
   }
 
