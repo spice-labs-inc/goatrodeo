@@ -14,6 +14,8 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+import scala.collection.immutable.TreeMap
+
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Dom
 import io.bullet.borer.Json
@@ -343,7 +345,7 @@ object Builder {
           "tags",
           item =>
             Some(
-              Item("tags", TreeSet(EdgeType.tagTo -> tag.gitoid), None, None)
+              Item("tags", TreeMap(EdgeType.tagTo -> TreeSet(tag.gitoid)), None, None)
             ),
           item => "set up tags"
         )
@@ -353,7 +355,7 @@ object Builder {
             Some(
               Item(
                 tag.gitoid,
-                TreeSet(EdgeType.tagFrom -> "tags"),
+                TreeMap(EdgeType.tagFrom -> TreeSet("tags")),
                 Some(ItemTagData.mimeType),
                 Some(ItemTagData(tag.json))
               )
@@ -367,7 +369,7 @@ object Builder {
               Some(
                 Item(
                   gi.gitoid,
-                  TreeSet(EdgeType.tagFrom -> tag.gitoid),
+                  TreeMap(EdgeType.tagFrom -> TreeSet(tag.gitoid)),
                   Some(ItemTagData.mimeType),
                   Some(ItemTagData(gi.json))
                 )

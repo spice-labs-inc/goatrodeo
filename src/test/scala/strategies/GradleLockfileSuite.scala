@@ -10,7 +10,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
 import java.nio.file.Files
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 /** Gradle Lockfile Parsing Strategy test suite.
   *
@@ -20,7 +20,7 @@ import scala.collection.immutable.TreeSet
 class GradleLockfileSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty, None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   private def loadLockfile(name: String): String = {
     val path = s"test_data/gradle/$name"

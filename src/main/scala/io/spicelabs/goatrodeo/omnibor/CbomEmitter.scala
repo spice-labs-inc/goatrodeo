@@ -14,6 +14,8 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+import scala.collection.immutable.TreeSet
+
 import com.typesafe.scalalogging.Logger
 import io.spicelabs.goatrodeo.util.TamperEvidentLog
 import org.json4s.*
@@ -398,10 +400,10 @@ object CbomEmitter {
   private def swhidFor(item: Item): Option[String] = {
     val prefix = "gitoid:blob:sha1:"
     val hex = item.connections
-      .collect {
-        case (EdgeType.aliasFrom, value) if value.startsWith(prefix) =>
-          value.stripPrefix(prefix)
-      }
+      .getOrElse(EdgeType.aliasFrom, TreeSet.empty[String])
+      .iterator
+      .filter(_.startsWith(prefix))
+      .map(_.stripPrefix(prefix))
       .find(h =>
         h.length == 40 && h.forall(c =>
           (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')

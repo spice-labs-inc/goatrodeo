@@ -49,7 +49,7 @@ class PrivateKeyLogCaptureTests extends GoatRodeoFunSuite {
 
   private def stubItem(): Item = Item(
     identifier = "gitoid:blob:sha256:phase7-log-capture-stub",
-    connections = TreeSet.empty,
+    connections = TreeMap.empty[String, TreeSet[String]],
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(
       ItemMetaData(

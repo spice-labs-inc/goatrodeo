@@ -15,7 +15,7 @@ class StorageTestSuite extends GoatRodeoFunSuite {
   def createTestItem(id: String, fileNames: Set[String] = Set()): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -394,7 +394,7 @@ class StorageTestSuite extends GoatRodeoFunSuite {
       // Create a root item (no aliasTo or containedBy edges)
       val rootItem = Item(
         "gitoid:blob:sha256:root123",
-        TreeSet(),
+        TreeMap(),
         Some(ItemMetaData.mimeType),
         Some(ItemMetaData(TreeSet(), TreeSet(), 100, TreeMap()))
       )

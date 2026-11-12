@@ -70,7 +70,7 @@ final case class ConnectionAugmentation(
 ) extends Augmentation {
   def augment(item: Item, store: Storage): Item = {
     store.addPurl(pURL)
-    item.copy(connections = item.connections + connection)
+    item.withConnection(connection._1, connection._2)
   }
 }
 

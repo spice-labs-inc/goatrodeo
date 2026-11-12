@@ -43,7 +43,7 @@ class MavenTestSuite extends GoatRodeoFunSuite {
   def createTestItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -259,7 +259,7 @@ class MavenTestSuite extends GoatRodeoFunSuite {
     val storage = MemStorage(None)
     val sourceItem = Item(
       "gitoid:blob:sha256:source123",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("Source.java"), TreeSet(), 100, TreeMap()))
     )

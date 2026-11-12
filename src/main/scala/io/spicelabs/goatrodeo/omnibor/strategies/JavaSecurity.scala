@@ -125,8 +125,8 @@ case class JavaSecurityState(
       item -> updatedState
     } else {
       val containerGitOID = item.connections
-        .find(_._1 == EdgeType.containedBy)
-        .map(_._2)
+        .getOrElse(EdgeType.containedBy, scala.collection.immutable.TreeSet.empty[String])
+        .headOption
         .getOrElse("")
 
       val associated = referencedPaths.flatMap { refPath =>

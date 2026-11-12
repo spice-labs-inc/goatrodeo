@@ -89,7 +89,7 @@ class MultiplePurlSuite extends GoatRodeoFunSuite {
         val itemOpt = store.read(gitoid)
         val goatRodeoPurls: Set[String] = itemOpt match {
           case Some(item) =>
-            item.connections
+            item.edges
               .filter(_._1 == EdgeType.aliasFrom)
               .map(_._2)
               .filter(_.startsWith("pkg:"))

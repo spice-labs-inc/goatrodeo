@@ -56,7 +56,7 @@ class CertificatesPipelineRunnerTests extends GoatRodeoFunSuite {
 
   private def primaryItem(id: String): Item = Item(
     identifier = id,
-    connections = TreeSet.empty,
+    connections = TreeMap.empty[String, TreeSet[String]],
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(
       ItemMetaData(
@@ -70,14 +70,14 @@ class CertificatesPipelineRunnerTests extends GoatRodeoFunSuite {
 
   private def aliasStubItem(id: String): Item = Item(
     identifier = id,
-    connections = TreeSet.empty,
+    connections = TreeMap.empty[String, TreeSet[String]],
     bodyMimeType = None,
     body = None
   )
 
   private def tagItem(id: String): Item = Item(
     identifier = id,
-    connections = TreeSet.empty,
+    connections = TreeMap.empty[String, TreeSet[String]],
     bodyMimeType = Some(ItemTagData.mimeType),
     body = Some(ItemTagData(Dom.NullElem))
   )

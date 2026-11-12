@@ -1020,6 +1020,19 @@ object Helpers {
     readCBOR(fc, len)
   }
 
+  /** Read a two-byte big-endian length followed by that many CBOR bytes.
+    *
+    * The on-disk envelopes use a `u16` length after the four-byte magic — the
+    * reader must match the writer and BigTent, both of which write a short. Reading
+    * a four-byte length misparses every file by two bytes.
+    */
+  def readShortAndCBOR[A](
+      fc: FileChannel
+  )(implicit decoder: Decoder[A]): Try[A] = {
+    val len = Helpers.readShort(fc)
+    readCBOR(fc, len)
+  }
+
   def readCBOR[A](fc: FileChannel, len: Int)(implicit
       decoder: Decoder[A]
   ): Try[A] = {
@@ -1030,6 +1043,10 @@ object Helpers {
             Exception(f"Trying to read ${len} bytes but only got ${bytesRead}")
           )
         } else {
+          // `read` fills the buffer, so the data is behind the position: without the
+          // flip the decoder is handed an empty buffer and every envelope read
+          // fails with "End of Input".
+          dest.flip()
           Try(Cbor.decode(dest).to[A].value)
         }
       }

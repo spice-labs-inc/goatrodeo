@@ -115,7 +115,7 @@ case class DataFileEnvelope(
 }
 
 object DataFileEnvelope {
-  val DataFileEnvelopeVersion = 1
+  val DataFileEnvelopeVersion = 2
   def build(
       version: Int = DataFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.DataFileMagicNumber,
@@ -142,7 +142,7 @@ case class IndexFileEnvelope(
     version: Int,
     magic: Int,
     size: Int,
-    @key("data_files") dataFiles: Vector[Long],
+    @key("data_files") dataFiles: TreeSet[Long],
     encoding: String,
     info: TreeMap[String, String]
 ) derives Codec {
@@ -150,13 +150,13 @@ case class IndexFileEnvelope(
 }
 
 object IndexFileEnvelope {
-  val IndexFileEnvelopeVersion = 2
+  val IndexFileEnvelopeVersion = 1
   def build(
       version: Int = IndexFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.IndexFileMagicNumber,
       size: Int,
-      dataFiles: Vector[Long],
-      encoding: String = "MD5/Long/Long",
+      dataFiles: TreeSet[Long],
+      encoding: String = Blake3IndexKey.encoding,
       info: TreeMap[String, String] = TreeMap()
   ): IndexFileEnvelope = IndexFileEnvelope(
     version = version,
@@ -176,53 +176,54 @@ case class ClusterFileEnvelope(
     magic: Int,
     @key("data_files") dataFiles: Vector[Long],
     @key("index_files") indexFiles: Vector[Long],
-    info: TreeMap[String, String]
-) {
+    info: TreeMap[String, String],
+    // `encoding` is the index key algorithm declaration. BigTent writes it last in
+    // the CBOR map and always present for version 4, so it is a plain string here:
+    // an `Option` would add a shape the format does not have. See
+    // `test_data/bigtent_v4/cluster_0/*.grc`.
+    encoding: String
+) derives Codec {
   def encode(): Array[Byte] = Cbor.encode(this).toByteArray
 
 }
 
 object ClusterFileEnvelope {
-  val ClusterFileEnvelopeVersion = 3
+  val ClusterFileEnvelopeVersion = 4
 
   def build(
       version: Int = ClusterFileEnvelopeVersion,
       magic: Int = GraphManager.Consts.ClusterFileMagicNumber,
       dataFiles: Vector[Long],
       indexFiles: Vector[Long],
-      info: TreeMap[String, String] = TreeMap()
+      info: TreeMap[String, String] = TreeMap(),
+      encoding: String = Blake3IndexKey.encoding
   ): ClusterFileEnvelope = ClusterFileEnvelope(
     version = version,
     magic = magic,
     dataFiles = dataFiles,
     indexFiles = indexFiles,
-    info = info
+    info = info,
+    encoding = encoding
   )
 
-  given forOption[T: Encoder]: Encoder.DefaultValueAware[Option[T]] =
-    new Encoder.DefaultValueAware[Option[T]] {
-
-      def write(w: Writer, value: Option[T]): Writer =
-        value match {
-          case Some(x) => w.write(x)
-          case None    => w.writeNull()
-        }
-
-      def withDefaultValue(defaultValue: Option[T]): Encoder[Option[T]] =
-        if (defaultValue eq None)
-          new Encoder.PossiblyWithoutOutput[Option[T]] {
-            def producesOutputFor(value: Option[T]): Boolean = value ne None
-            def write(w: Writer, value: Option[T]): Writer =
-              value match {
-                case Some(x) => w.write(x)
-                case None    => w
-              }
-          }
-        else this
+  /** Refuse an envelope this reader cannot honour.
+    *
+    * Version 4 only: a version 3 cluster is MD5-keyed and carries pair-shaped items,
+    * which this reader would misread rather than reject. And the declared `encoding`
+    * is the contract — readers use the algorithm the files name, so an unknown
+    * declaration fails the load.
+    */
+  def validateForRead(env: ClusterFileEnvelope, fileName: String): Unit = {
+    if (env.version != ClusterFileEnvelopeVersion) {
+      throw new Exception(
+        f"Cluster ${fileName} is version ${env.version}; this reader requires version ${ClusterFileEnvelopeVersion}"
+      )
     }
-
-  given Codec[ClusterFileEnvelope] = {
-    import io.bullet.borer.derivation.MapBasedCodecs.*
-    deriveCodec[ClusterFileEnvelope]
+    if (env.encoding != Blake3IndexKey.encoding) {
+      throw new Exception(
+        f"Cluster ${fileName} declares index key encoding '${env.encoding}'; this reader understands only '${Blake3IndexKey.encoding}'"
+      )
+    }
   }
+
 }

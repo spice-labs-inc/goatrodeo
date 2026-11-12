@@ -16,7 +16,7 @@ import io.spicelabs.goatrodeo.util.OpenSSLConfigParser
 
 import java.io.ByteArrayOutputStream
 import java.io.File
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 /** Tests for the OpenSSL config capture strategy.
   *
@@ -486,7 +486,7 @@ object ItemTestHelper {
   def testItem(id: String): Item = {
     Item(
       id,
-      TreeSet.empty,
+      TreeMap.empty[String, TreeSet[String]],
       None,
       None
     )

@@ -44,7 +44,7 @@ class CertificatesLeakSuite extends GoatRodeoFunSuite {
 
   private def stubItem(): Item = Item(
     identifier = "gitoid:blob:sha256:phase8-leak-suite-stub",
-    connections = TreeSet.empty,
+    connections = TreeMap.empty[String, TreeSet[String]],
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(
       ItemMetaData(
@@ -380,7 +380,7 @@ class CertificatesLeakSuite extends GoatRodeoFunSuite {
     val state = new CertificatesState(aw, Some(emptyKs))
     val item = Item(
       identifier = "gitoid:test",
-      connections = TreeSet.empty,
+      connections = TreeMap.empty[String, TreeSet[String]],
       bodyMimeType = None,
       body = None
     )

@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 package strategies
+
+import io.spicelabs.goatrodeo.omnibor.TestEdges
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -52,7 +54,7 @@ class CertificatesAssertionsTests extends GoatRodeoFunSuite {
         TreeSet.from(vs.map(v => StringOrPair(v)))
       })
     val connections =
-      TreeSet.from(purls.map(p => EdgeType.aliasFrom -> p))
+      TestEdges.edgesOf(purls.map(p => EdgeType.aliasFrom -> p))
     Item(
       identifier = "gitoid:blob:sha256:test",
       connections = connections,
@@ -165,7 +167,7 @@ class CertificatesAssertionsTests extends GoatRodeoFunSuite {
     // alias:from edges may legitimately carry gitoid: hashes too.
     val item = Item(
       identifier = "gitoid:blob:sha256:test",
-      connections = TreeSet(
+      connections = TestEdges.edges(
         EdgeType.aliasFrom -> "gitoid:blob:sha1:hashA",
         EdgeType.aliasFrom -> "pkg:generic/x509/spki-sha256@abc"
       ),

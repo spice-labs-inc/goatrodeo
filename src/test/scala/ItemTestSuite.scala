@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.omnibor.TestEdges
 import io.bullet.borer.Cbor
 import io.bullet.borer.Dom
 import io.bullet.borer.Dom.ArrayElem
@@ -19,7 +20,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   def createBasicItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -34,7 +35,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
 
   def createItemWithConnections(
       id: String,
-      connections: TreeSet[(String, String)]
+      connections: TreeMap[String, TreeSet[String]]
   ): Item = {
     Item(
       id,
@@ -110,7 +111,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("Item - round-trip CBOR preserves connections") {
-    val connections = TreeSet(
+    val connections = TestEdges.edges(
       EdgeType.aliasFrom -> "sha256:abc123",
       EdgeType.containedBy -> "gitoid:blob:sha256:parent"
     )
@@ -142,8 +143,8 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     val item = Item.itemFrom(wrapper, None)
 
     assert(item.identifier.startsWith("gitoid:blob:sha256:"))
-    assert(item.connections.nonEmpty)
-    assert(item.connections.exists(_._1 == EdgeType.aliasFrom))
+    assert(item.edges.nonEmpty)
+    assert(item.edges.exists(_._1 == EdgeType.aliasFrom))
   }
 
   test("Item.itemFrom - includes container if provided") {
@@ -153,7 +154,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     val item = Item.itemFrom(wrapper, container)
 
     assert(
-      item.connections.exists(e =>
+      item.edges.exists( e =>
         e._1 == EdgeType.containedBy && e._2 == container.get
       )
     )
@@ -164,7 +165,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     val wrapper = ByteWrapper(data, "test.txt", None)
     val item = Item.itemFrom(wrapper, None)
 
-    val aliases = item.connections.filter(_._1 == EdgeType.aliasFrom).map(_._2)
+    val aliases = item.edges.filter(_._1 == EdgeType.aliasFrom).map(_._2)
     assert(aliases.exists(_.startsWith("gitoid:blob:sha1:")))
     assert(aliases.exists(_.startsWith("sha1:")))
     assert(aliases.exists(_.startsWith("sha256:")))
@@ -178,16 +179,16 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     val item = createBasicItem("test-id")
     val updated = item.withConnection(EdgeType.aliasFrom, "sha256:newhash")
 
-    assert(updated.connections.contains(EdgeType.aliasFrom -> "sha256:newhash"))
+    assert(updated.targetsOf(EdgeType.aliasFrom).contains("sha256:newhash"))
   }
 
   test("Item.withConnection - preserves existing connections") {
-    val connections = TreeSet(EdgeType.aliasFrom -> "existing")
+    val connections = TreeMap(EdgeType.aliasFrom -> TreeSet("existing"))
     val item = createItemWithConnections("test-id", connections)
     val updated = item.withConnection(EdgeType.containedBy, "parent")
 
-    assert(updated.connections.contains(EdgeType.aliasFrom -> "existing"))
-    assert(updated.connections.contains(EdgeType.containedBy -> "parent"))
+    assert(updated.targetsOf(EdgeType.aliasFrom).contains("existing"))
+    assert(updated.targetsOf(EdgeType.containedBy).contains("parent"))
   }
 
   // ==================== isRoot Tests ====================
@@ -198,14 +199,14 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("Item.isRoot - returns false for item with aliasTo") {
-    val connections = TreeSet(EdgeType.aliasTo -> "gitoid:blob:sha256:target")
+    val connections = TreeMap(EdgeType.aliasTo -> TreeSet("gitoid:blob:sha256:target"))
     val item = createItemWithConnections("sha256:abc123", connections)
     assert(!item.isRoot())
   }
 
   test("Item.isRoot - returns false for item with containedBy") {
     val connections =
-      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
+      TreeMap(EdgeType.containedBy -> TreeSet("gitoid:blob:sha256:parent"))
     val item =
       createItemWithConnections("gitoid:blob:sha256:abc123", connections)
     assert(!item.isRoot())
@@ -214,7 +215,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   test("Item.isRoot - returns false for tags identifier") {
     val item = Item(
       "tags",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet(), TreeSet(), 0, TreeMap()))
     )
@@ -222,14 +223,14 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("Item.isRoot - returns false for non-metadata body type") {
-    val item = Item("test-id", TreeSet(), None, None)
+    val item = Item("test-id", TreeMap(), None, None)
     assert(!item.isRoot())
   }
 
   // ==================== buildListOfReferencesForAliasFromBuiltFromContainedBy Tests ====================
 
   test("buildListOfReferences - returns aliasTo for aliasFrom") {
-    val connections = TreeSet(EdgeType.aliasFrom -> "sha256:abc123")
+    val connections = TreeMap(EdgeType.aliasFrom -> TreeSet("sha256:abc123"))
     val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
@@ -237,7 +238,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("buildListOfReferences - returns buildsTo for builtFrom") {
-    val connections = TreeSet(EdgeType.builtFrom -> "gitoid:blob:sha256:source")
+    val connections = TreeMap(EdgeType.builtFrom -> TreeSet("gitoid:blob:sha256:source"))
     val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
@@ -246,7 +247,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
 
   test("buildListOfReferences - returns contains for containedBy") {
     val connections =
-      TreeSet(EdgeType.containedBy -> "gitoid:blob:sha256:parent")
+      TreeMap(EdgeType.containedBy -> TreeSet("gitoid:blob:sha256:parent"))
     val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
@@ -254,7 +255,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("buildListOfReferences - returns tagTo for tagFrom") {
-    val connections = TreeSet(EdgeType.tagFrom -> "gitoid:blob:sha256:tag")
+    val connections = TreeMap(EdgeType.tagFrom -> TreeSet("gitoid:blob:sha256:tag"))
     val item = createItemWithConnections("gitoid:blob:sha256:main", connections)
 
     val refs = item.buildListOfReferencesForAliasFromBuiltFromContainedBy()
@@ -262,7 +263,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("buildListOfReferences - handles multiple connections") {
-    val connections = TreeSet(
+    val connections = TestEdges.edges(
       EdgeType.aliasFrom -> "sha256:abc",
       EdgeType.aliasFrom -> "sha1:def",
       EdgeType.containedBy -> "parent"
@@ -277,25 +278,25 @@ class ItemTestSuite extends GoatRodeoFunSuite {
 
   test("Item.merge - merges connections") {
     val item1 =
-      createItemWithConnections("id", TreeSet(EdgeType.aliasFrom -> "a"))
+      createItemWithConnections("id", TreeMap(EdgeType.aliasFrom -> TreeSet("a")))
     val item2 =
-      createItemWithConnections("id", TreeSet(EdgeType.aliasFrom -> "b"))
+      createItemWithConnections("id", TreeMap(EdgeType.aliasFrom -> TreeSet("b")))
 
     val merged = item1.merge(item2)
-    assert(merged.connections.contains(EdgeType.aliasFrom -> "a"))
-    assert(merged.connections.contains(EdgeType.aliasFrom -> "b"))
+    assert(merged.targetsOf(EdgeType.aliasFrom).contains("a"))
+    assert(merged.targetsOf(EdgeType.aliasFrom).contains("b"))
   }
 
   test("Item.merge - merges metadata bodies") {
     val item1 = Item(
       "id",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1"), TreeSet("mime1"), 100, TreeMap()))
     )
     val item2 = Item(
       "id",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2"), TreeSet("mime2"), 100, TreeMap()))
     )
@@ -316,7 +317,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
 
   test("Item.merge - handles None body") {
     val item1 = createBasicItem("id")
-    val item2 = Item("id", TreeSet(), None, None)
+    val item2 = Item("id", TreeMap(), None, None)
 
     val merged = item1.merge(item2)
     assert(merged.bodyAsItemMetaData.isDefined)
@@ -328,13 +329,13 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     // ItemMetaData.merge requires non-empty fileNames
     val item1 = Item(
       "id",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, extra1))
     )
     val item2 = Item(
       "id",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file.txt"), TreeSet(), 100, extra2))
     )
@@ -357,7 +358,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     )
 
     val enhanced = item.enhanceItemWithPurls(Seq(purl.toCanonical()))
-    val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
+    val purlConnections = enhanced.edges.filter(_._2.startsWith("pkg:"))
     assert(purlConnections.nonEmpty)
   }
 
@@ -399,12 +400,12 @@ class ItemTestSuite extends GoatRodeoFunSuite {
       item.enhanceItemWithPurls(
         Seq(purl1.toCanonical(), purl2.toCanonical())
       )
-    val purlConnections = enhanced.connections.filter(_._2.startsWith("pkg:"))
+    val purlConnections = enhanced.edges.filter(_._2.startsWith("pkg:"))
     assertEquals(purlConnections.size, 2)
   }
 
   test("enhanceItemWithPurls - creates body if none exists") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item("id", TreeMap(), None, None)
     val purl = PURLHelpers.purl(
       `type` = "deb",
       name = "artifact",
@@ -441,7 +442,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("enhanceWithMetadata - creates body if none exists") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item("id", TreeMap(), None, None)
 
     val enhanced = item.enhanceWithMetadata(filenames = Seq("file.txt"))
     assert(enhanced.bodyAsItemMetaData.isDefined)
@@ -451,7 +452,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   test("enhanceWithMetadata - includes parent gitoid for duplicate filenames") {
     val item = Item(
       "id",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("existing.txt"), TreeSet(), 100, TreeMap()))
     )
@@ -471,13 +472,13 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   test("itemsToFilenameGitOIDMap - creates filename to gitoid map") {
     val item1 = Item(
       "gitoid:blob:sha256:abc123",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file1.txt"), TreeSet(), 100, TreeMap()))
     )
     val item2 = Item(
       "gitoid:blob:sha256:def456",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(ItemMetaData(TreeSet("file2.txt"), TreeSet(), 100, TreeMap()))
     )
@@ -490,14 +491,14 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   test("itemsToFilenameGitOIDMap - applies name filter") {
     val item = Item(
       "gitoid:blob:sha256:abc123",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
-          TreeSet("include.java", "exclude.txt"),
-          TreeSet(),
+          TreeSet[String]("include.java", "exclude.txt"),
+          TreeSet[String]("text/plain"),
           100,
-          TreeMap()
+          TreeMap[String, TreeSet[StringOrPair]]()
         )
       )
     )
@@ -510,7 +511,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   test("itemsToFilenameGitOIDMap - applies mime filter") {
     val item1 = Item(
       "gitoid:blob:sha256:abc123",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -523,7 +524,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
     )
     val item2 = Item(
       "gitoid:blob:sha256:def456",
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(TreeSet("file.txt"), TreeSet("text/plain"), 100, TreeMap())
@@ -539,7 +540,7 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("itemsToFilenameGitOIDMap - handles items without body") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item("id", TreeMap(), None, None)
     val map = Item.itemsToFilenameGitOIDMap(Seq(item))
     assert(map.isEmpty)
   }
@@ -552,26 +553,30 @@ class ItemTestSuite extends GoatRodeoFunSuite {
   }
 
   test("Item.bodyAsItemMetaData - returns None for no body") {
-    val item = Item("id", TreeSet(), None, None)
+    val item = Item("id", TreeMap(), None, None)
     assertEquals(item.bodyAsItemMetaData, None)
   }
 
-  test("Item.identifierMD5 - returns MD5 of identifier") {
+  test("Item index key - is 16 bytes and stable for an identifier") {
     val item = createBasicItem("test-identifier")
-    val md5 = item.identifierMD5()
-    assertEquals(md5.length, 16)
+    val key = io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.key(item.identifier)
+    assertEquals(key.length, 16)
+    assertEquals(
+      key.toVector,
+      io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.key("test-identifier").toVector
+    )
   }
 
-  test("Item.cmpMd5 - compares items by MD5") {
+  test("Item.cmpKey - orders items by their index key") {
     val item1 = createBasicItem("aaa")
     val item2 = createBasicItem("zzz")
 
-    // One should be less than the other
-    assert(item1.cmpMd5(item2) != item2.cmpMd5(item1))
+    // Exactly one of the two orders holds
+    assert(item1.cmpKey(item2) != item2.cmpKey(item1))
   }
 
   test("Item.listContains - returns contained items") {
-    val connections = TreeSet(
+    val connections = TestEdges.edges(
       EdgeType.contains -> "child1",
       EdgeType.contains -> "child2",
       EdgeType.aliasFrom -> "alias1"

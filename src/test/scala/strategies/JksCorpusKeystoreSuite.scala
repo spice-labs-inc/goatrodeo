@@ -82,7 +82,7 @@ class JksCorpusKeystoreSuite extends GoatRodeoFunSuite {
   private def testItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(

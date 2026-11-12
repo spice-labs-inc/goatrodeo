@@ -138,7 +138,7 @@ class CertificatesKeystoreKeyEntrySuite extends GoatRodeoFunSuite {
   private def createTestItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(

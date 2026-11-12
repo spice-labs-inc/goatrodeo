@@ -1,5 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 
+import io.spicelabs.goatrodeo.envelopes.Blake3IndexKey
+
 import com.typesafe.scalalogging.Logger
 import io.bullet.borer.Cbor
 import io.bullet.borer.Decoder
@@ -40,10 +42,40 @@ import scala.util.Try
 case class Item(
     identifier: String,
     // reference: LocationReference,
-    connections: TreeSet[Edge],
+    // The version 4 shape: edge type to target set, both ordered. The type carries
+    // the format's guarantee rather than leaving it to the writer, and a target is
+    // stored once per edge type instead of once per pair.
+    connections: TreeMap[String, TreeSet[String]],
     @key("body_mime_type") bodyMimeType: Option[String],
     body: Option[ItemMetaData | ItemTagData]
 ) {
+
+  /** Every edge as an `(edge type, target)` pair, ordered by type then target.
+    *
+    * Read-only views of the map for the consumers that think in pairs. Building the
+    * pairs on demand keeps the model canonical and costs nothing at rest.
+    */
+  def edges: Vector[Edge] =
+    connections.iterator.flatMap { case (edgeType, targets) =>
+      targets.iterator.map(t => (edgeType, t))
+    }.toVector
+
+  /** This item's connections with one edge added, for callers that build a
+    * `copy(connections = ...)`.
+    */
+  def connectionsPlus(
+      edgeType: String,
+      id: String
+  ): TreeMap[String, TreeSet[String]] =
+    connections.updated(
+      edgeType,
+      connections.getOrElse(edgeType, TreeSet.empty[String]) + id
+    )
+
+  /** The targets connected by this edge type. */
+  def targetsOf(edgeType: String): TreeSet[String] =
+    connections.getOrElse(edgeType, TreeSet.empty)
+
 
   /** Encode this Item to CBOR format.
     *
@@ -72,32 +104,48 @@ case class Item(
     *   the revised Item
     */
   def withConnection(edgeType: String, id: String): Item =
-    this.copy(connections = this.connections + (edgeType -> id))
-
-  private lazy val md5 =
-    Helpers.computeMD5(Helpers.stringToInputStream(identifier))
+    this.copy(
+      connections = connections.updated(
+        edgeType,
+        connections.getOrElse(edgeType, TreeSet.empty[String]) + id
+      )
+    )
 
   /** Lazily cached CBOR-encoded representation of this Item. */
   lazy val cachedCBOR: Array[Byte] = Cbor.encode(this).toByteArray
 
-  /** Get the MD5 hash of this Item's identifier.
+  /** The identifier's index key, computed at most once per item.
     *
-    * @return
-    *   the 16-byte MD5 hash
+    * Lazy, and that is the point: an item that is never ordered by key never pays
+    * for it, and one that is pays once instead of once per comparison — the
+    * difference between O(n) digests and O(n log n) inside a sort.
     */
-  def identifierMD5(): Array[Byte] = md5
+  private lazy val indexKey: Array[Byte] = Blake3IndexKey.key(identifier)
 
-  /** Compare this Item's MD5 hash with another Item's for ordering.
+  /** Compare this Item's key with another Item's, for ordering.
+    *
+    * The order is the version 4 index key order: BLAKE3[0..16] of the identifier,
+    * as bytes. Compute it here rather than storing it — the identifier is already
+    * resident and the digest of a short string is cheap, while a stored copy is 16
+    * bytes plus a header on every item in the run.
     *
     * @param that
     *   the other Item to compare
     * @return
-    *   true if this Item's hash is lexicographically less than the other's
+    *   true if this Item's key sorts before the other's
     */
-  def cmpMd5(that: Item): Boolean = {
-    val myHash = Helpers.md5hashHex(identifier)
-    val thatHash = Helpers.md5hashHex(that.identifier)
-    myHash < thatHash
+  def cmpKey(that: Item): Boolean = {
+    val mine = indexKey
+    val theirs = that.indexKey
+    var i = 0
+    var result: Option[Boolean] = None
+    while (i < mine.length && result.isEmpty) {
+      val a = mine(i) & 0xff
+      val b = theirs(i) & 0xff
+      if (a != b) result = Some(a < b)
+      i += 1
+    }
+    result.getOrElse(false)
   }
 
   /** Is the item a root item
@@ -110,9 +158,10 @@ case class Item(
     } else if (this.identifier == "tags") {
       false
     } else if (
-      this.connections
-        .find(e => EdgeType.isAliasTo(e._1) || EdgeType.isContainedByUp(e._1))
-        .isDefined
+      // A map is for looking up by key: two exact key probes, each O(log n),
+      // instead of walking every edge type.
+      this.connections.contains(EdgeType.aliasTo) ||
+      this.connections.contains(EdgeType.containedBy)
     ) { false }
     else {
 
@@ -128,36 +177,15 @@ case class Item(
     */
   def buildListOfReferencesForAliasFromBuiltFromContainedBy()
       : Vector[(String, String)] = {
-    for {
-      edge <- this.connections.toVector
-      toUpdate <- edge match {
-        case Edge(EdgeType.aliasFrom, connection) => {
-          Vector(
-            (EdgeType.aliasTo -> connection)
-          )
+    // Four exact edge types, so four key probes rather than a walk of every edge in
+    // the item.
+    def targets(edgeType: String): Vector[String] =
+      connections.getOrElse(edgeType, TreeSet.empty[String]).toVector
 
-        }
-
-        case Edge(EdgeType.builtFrom, connection) => {
-
-          Vector(EdgeType.buildsTo -> connection)
-
-        }
-        case Edge(EdgeType.containedBy, connection) => {
-
-          Vector(
-            EdgeType.contains -> connection
-          )
-        }
-        case Edge(EdgeType.tagFrom, connection) => {
-          Vector(EdgeType.tagTo -> connection)
-        }
-        case _ => Vector.empty
-      }
-
-    } yield {
-      toUpdate
-    }
+    targets(EdgeType.aliasFrom).map(EdgeType.aliasTo -> _) ++
+      targets(EdgeType.builtFrom).map(EdgeType.buildsTo -> _) ++
+      targets(EdgeType.containedBy).map(EdgeType.contains -> _) ++
+      targets(EdgeType.tagFrom).map(EdgeType.tagTo -> _)
   }
 
   def updateBackReferences(store: Storage, parentScope: ParentScope): Item = {
@@ -168,17 +196,12 @@ case class Item(
           itemNeedingAlias,
           {
             case Some(item) =>
-              Some(
-                item.copy(connections =
-                  item.connections + (aliasType -> this.identifier)
-                )
-              )
+              Some(item.withConnection(aliasType, this.identifier))
             case None =>
               Some(
                 Item(
                   itemNeedingAlias,
-                  // noopLocationReference,
-                  TreeSet(aliasType -> this.identifier),
+                  TreeMap(aliasType -> TreeSet(this.identifier)),
                   None,
                   None
                 )
@@ -203,9 +226,8 @@ case class Item(
     * @return
     *   a Vector of GitOIDs from "contains" edges
     */
-  def listContains(): Vector[String] = {
-    this.connections.toVector.filter(v => EdgeType.isContains(v._1)).map(_._2)
-  }
+  def listContains(): Vector[String] =
+    this.connections.getOrElse(EdgeType.contains, TreeSet.empty[String]).toVector
 
   /** Merge this `Item` with another `Item`
     *
@@ -235,7 +257,17 @@ case class Item(
 
     Item(
       identifier = this.identifier,
-      connections = this.connections ++ other.connections,
+      // Union per edge type. `TreeMap.++` *replaces* on a key collision, which for
+      // this type would drop one side's target set whenever both items carry the
+      // same edge type -- the common case for `alias:from` on a merged item.
+      connections = (this.connections.keySet ++ other.connections.keySet)
+        .foldLeft(TreeMap.empty[String, TreeSet[String]]) { (acc, edgeType) =>
+          acc.updated(
+            edgeType,
+            this.connections.getOrElse(edgeType, TreeSet.empty[String]) ++
+              other.connections.getOrElse(edgeType, TreeSet.empty[String])
+          )
+        },
       bodyMimeType = mime,
       body = body
     )
@@ -258,9 +290,12 @@ case class Item(
 
       val textPurls = purls
       val ret = this.copy(
-        connections = this.connections ++ TreeSet(
-          textPurls.map(purl => EdgeType.aliasFrom -> purl)*
-        ),
+        connections = textPurls.foldLeft(this.connections) { (acc, purl) =>
+          acc.updated(
+            EdgeType.aliasFrom,
+            acc.getOrElse(EdgeType.aliasFrom, TreeSet.empty[String]) + purl
+          )
+        },
         body = this.body match {
           case None =>
             Some(
@@ -339,7 +374,6 @@ case class Item(
     )
   }
 
-  def getMd5(): Array[Byte] = this.md5
   def getIdentifier(): String = identifier
   def isRootWorkItem(): Boolean = isRoot()
 }
@@ -370,9 +404,9 @@ object Item {
     Item(
       id,
       // Item.noopLocationReference,
-      TreeSet(
-        hashes.map(hash => EdgeType.aliasFrom -> hash)*
-      ) ++ container.toSeq.map(c => EdgeType.containedBy -> c),
+      TreeMap(
+        EdgeType.aliasFrom -> TreeSet.from(hashes)
+      ) ++ container.toSeq.map(c => (EdgeType.containedBy, TreeSet(c))),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -486,7 +520,8 @@ object Item {
       val bodyMimeType: Option[String] = if (r.hasNull) { r.readNull(); None }
       else Some(r.readString())
       r.readString() // "connections"
-      val connections: TreeSet[Edge] = r.read[TreeSet[Edge]]()
+      val connections: TreeMap[String, TreeSet[String]] =
+        r.read[TreeMap[String, TreeSet[String]]]()
       r.readString() // "identifier"
       val identifier = r.readString()
 

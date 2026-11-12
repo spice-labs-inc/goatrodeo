@@ -46,7 +46,7 @@ class GraphManagerReadNextSuite extends GoatRodeoFunSuite {
   private def createTestItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -277,7 +277,7 @@ class GrdEofSuite extends GoatRodeoFunSuite {
     try {
       val item = new Item(
         "gitoid:blob:sha256:abcdef0000000000000000000000000000000000000000000000000000000000",
-        TreeSet(),
+        TreeMap(),
         Some(ItemMetaData.mimeType),
         Some(
           ItemMetaData(
@@ -338,7 +338,7 @@ class GrdEofSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:abcdef0000000000000000000000000000000000000000000000000000000000"
       val item = new Item(
         id,
-        TreeSet(),
+        TreeMap(),
         Some(ItemMetaData.mimeType),
         Some(
           ItemMetaData(

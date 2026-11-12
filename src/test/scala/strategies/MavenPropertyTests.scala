@@ -1175,7 +1175,7 @@ class MavenPropertyTests extends GoatRodeoScalaCheckSuite {
   } yield (g, a, v)
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty, None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   private def writeJarEntries(
       jarFile: File,

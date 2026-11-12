@@ -58,7 +58,7 @@ class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
     storage.read("tags") match {
       case Some(tagsItem) =>
         val items = for {
-          (edgeType, target) <- tagsItem.connections.toVector
+          (edgeType, target) <- tagsItem.edges
           if edgeType == EdgeType.tagTo
           item <- storage.read(target)
           content <- extractTagContent(item)
@@ -183,7 +183,7 @@ class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
 
     // Each tag should have tag:from -> tags and tag:to -> some artifact
     packageTags.foreach { tagItem =>
-      val edges = tagItem.connections
+      val edges = tagItem.edges
 
       val hasTagFromTags = edges.exists { case (edgeType, target) =>
         edgeType == EdgeType.tagFrom && target == "tags"
@@ -412,7 +412,7 @@ class PackageTagIntegrationSuite extends GoatRodeoFunSuite {
     assert(tagsItem.isDefined, "Should create tags index")
 
     // Should have tag:to edges to package tags
-    val tagEdges = tagsItem.get.connections.filter(_._1 == EdgeType.tagTo)
+    val tagEdges = tagsItem.get.edges.filter(_._1 == EdgeType.tagTo)
     assert(
       tagEdges.nonEmpty,
       "Tags index should have tag:to edges to package tags"

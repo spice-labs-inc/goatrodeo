@@ -63,7 +63,7 @@ class TamperEvidentSuite extends GoatRodeoFunSuite {
   ): Item = {
     Item(
       identifier = id,
-      connections = TreeSet(),
+      connections = TreeMap(),
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(
         ItemMetaData(

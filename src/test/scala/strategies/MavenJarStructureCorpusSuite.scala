@@ -10,12 +10,12 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 class MavenJarStructureCorpusSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty, None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   private def processJarAccumulation(wrapper: FileWrapper): MavenState = {
     val item = createTestItem("jar-test")

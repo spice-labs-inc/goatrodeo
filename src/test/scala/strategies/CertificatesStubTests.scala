@@ -69,7 +69,7 @@ class CertificatesStubTests extends GoatRodeoFunSuite {
 
   private def syntheticItem(): Item = Item(
     identifier = "gitoid:blob:sha256:phase1-stub",
-    connections = TreeSet.empty,
+    connections = TreeMap.empty[String, TreeSet[String]],
     bodyMimeType = Some(ItemMetaData.mimeType),
     body = Some(
       ItemMetaData(

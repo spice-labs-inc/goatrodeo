@@ -11,7 +11,7 @@ import io.spicelabs.goatrodeo.util.Helpers
 
 import java.io.File
 import java.nio.file.Files
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 /** JVM Distribution Strategy test suite.
   *
@@ -21,7 +21,7 @@ import scala.collection.immutable.TreeSet
 class JvmDistributionSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty, None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   private def loadRelease(dir: String): String = {
     val path = s"test_data/jvm/$dir/release"

@@ -1587,10 +1587,7 @@ case class MavenState(
                   item.identifier,
                   {
                     case Some(existing) =>
-                      val withAlias = existing.copy(
-                        connections =
-                          existing.connections + (EdgeType.aliasFrom -> purl)
-                      )
+                      val withAlias = existing.withConnection(EdgeType.aliasFrom, purl)
                       val withMeta =
                         if (metaWithCanonical.nonEmpty)
                           withAlias.enhanceWithMetadata(
@@ -1601,10 +1598,7 @@ case class MavenState(
                         else withAlias
                       Some(withMeta)
                     case None =>
-                      val base = item.copy(
-                        connections =
-                          item.connections + (EdgeType.aliasFrom -> purl)
-                      )
+                      val base = item.withConnection(EdgeType.aliasFrom, purl)
                       val withMeta =
                         if (metaWithCanonical.nonEmpty)
                           base.enhanceWithMetadata(
@@ -1629,17 +1623,14 @@ case class MavenState(
                       // pURL item already exists — add another aliasTo pointing
                       // to this JAR item
                       Some(
-                        existingPurlItem.copy(
-                          connections =
-                            existingPurlItem.connections + (EdgeType.aliasTo -> item.identifier)
-                        )
+                        existingPurlItem.withConnection(EdgeType.aliasTo, item.identifier)
                       )
                     case None =>
                       // First time we've seen this pURL — create the item
                       Some(
                         Item(
                           purl,
-                          TreeSet(EdgeType.aliasTo -> item.identifier),
+                          TreeMap(EdgeType.aliasTo -> TreeSet(item.identifier)),
                           Some(ItemMetaData.mimeType),
                           Some(
                             ItemMetaData(

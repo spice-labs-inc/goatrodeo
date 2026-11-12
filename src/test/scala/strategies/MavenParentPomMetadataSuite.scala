@@ -13,12 +13,12 @@ import io.spicelabs.goatrodeo.util.FileWalker
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 class MavenParentPomMetadataSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty, None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   // ==================== 4.1: Parent POM Metadata ====================
 

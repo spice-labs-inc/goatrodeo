@@ -114,7 +114,7 @@ class CanonicalSecondaryPurlPropertySuite extends GoatRodeoScalaCheckSuite {
     val (gitoid, _) = GitOIDUtils.computeAllHashes(artifact)
     store.read(gitoid) match {
       case Some(item) =>
-        item.connections
+        item.edges
           .filter(_._1 == EdgeType.aliasFrom)
           .map(_._2)
           .filter(_.startsWith("pkg:"))

@@ -49,7 +49,7 @@ class ExtendedCaptureCbomSuite extends GoatRodeoFunSuite {
 
   private def makeItem(
       id: String,
-      connections: TreeSet[Edge] = TreeSet(),
+      connections: TreeMap[String, TreeSet[String]] = TreeMap(),
       extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap(),
       fileNames: TreeSet[String] = TreeSet(),
       mimeTypes: TreeSet[String] = TreeSet()
@@ -95,13 +95,13 @@ class ExtendedCaptureCbomSuite extends GoatRodeoFunSuite {
     items.foreach { it =>
       storeItem(
         storage,
-        it.copy(connections = TreeSet(EdgeType.containedBy -> rootId))
+        it.copy(connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)))
       )
     }
     val root = makeItem(
       rootId,
       connections =
-        TreeSet.from(items.map(it => EdgeType.contains -> it.identifier))
+        TestEdges.edgesOf(items.map(it => EdgeType.contains -> it.identifier))
     )
     storeItem(storage, root)
     val files = CbomEmitter.emitForStorage(storage, "1.6", dir).get

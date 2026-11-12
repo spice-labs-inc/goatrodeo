@@ -30,7 +30,7 @@ class DockerSuite extends GoatRodeoFunSuite {
   def createTestItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -99,7 +99,7 @@ class DockerSuite extends GoatRodeoFunSuite {
     assert(historyOpt.isDefined, "docker:History should be present")
     assert(historyOpt.get.nonEmpty, "docker:History should not be empty")
 
-    val connectedLayers = item2.connections.collect {
+    val connectedLayers = item2.edges.collect {
       case (EdgeType.contains, v) => v
     }
     assert(
@@ -110,8 +110,8 @@ class DockerSuite extends GoatRodeoFunSuite {
     for (layerGitoid <- connectedLayers) {
       val layerItem = store1.read(layerGitoid).get
       assert(
-        layerItem.connections.size > 3,
-        f"Layer ${layerGitoid} must have more than 3 files, found ${layerItem.connections.size}"
+        layerItem.edges.size > 3,
+        f"Layer ${layerGitoid} must have more than 3 files, found ${layerItem.edges.size}"
       )
       assert(
         layerItem.body.get
@@ -139,7 +139,7 @@ class DockerSuite extends GoatRodeoFunSuite {
     assertEquals(result, TreeSet("pkg:docker/bigtent@2025_03_22"))
 
     val item = store1.read("pkg:docker/bigtent@2025_03_22").get
-    val aliasTo = item.connections
+    val aliasTo = item.edges
       .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
       .headOption
       .get
@@ -309,7 +309,7 @@ class DockerSuite extends GoatRodeoFunSuite {
 
     for (purl <- expectedpurls) {
       val item = store1.read(purl).get
-      val aliasTo = item.connections
+      val aliasTo = item.edges
         .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
         .headOption
         .get
@@ -319,7 +319,7 @@ class DockerSuite extends GoatRodeoFunSuite {
     // -- grinder OCI label metadata (from "grinder image has correct OCI label metadata") --
     val grinderPurl = "pkg:docker/spicelabs%2Fgrinder@0.1.0"
     val grinderItem = store1.read(grinderPurl).get
-    val grinderAliasTo = grinderItem.connections
+    val grinderAliasTo = grinderItem.edges
       .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
       .headOption
       .get
@@ -390,7 +390,7 @@ class DockerSuite extends GoatRodeoFunSuite {
       ("pkg:docker/postgres@9.6.12", "14", 237365248L)
     ).foreach { case (purl, expectedLayers, expectedSize) =>
       val pgItem = store1.read(purl).get
-      val pgAliasTo = pgItem.connections
+      val pgAliasTo = pgItem.edges
         .collect { case (t, v) if EdgeType.isAliasTo(t) => v }
         .headOption
         .get

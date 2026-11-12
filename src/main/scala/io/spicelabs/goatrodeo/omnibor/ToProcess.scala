@@ -412,9 +412,9 @@ trait ToProcess {
             if (blockList.contains(itemRaw.identifier)) {
               orgState -> alreadyDone
             } else {
-              val aliases = itemRaw.connections.toVector
-                .filter(_._1 == EdgeType.aliasFrom)
-                .map(_._2)
+              val aliases = itemRaw.connections
+                .getOrElse(EdgeType.aliasFrom, TreeSet.empty[String])
+                .toVector
               val augmentations = parentScope.itemAugmentationByHashes(aliases)
               val item = augmentations.foldLeft(itemRaw) { case (item, aug) =>
                 aug.augment(item, store)
@@ -479,9 +479,7 @@ trait ToProcess {
               val itemScope3 = tag match {
                 case None => itemScopePre3
                 case Some(tag) =>
-                  itemScopePre3.copy(connections =
-                    itemScopePre3.connections + (EdgeType.tagFrom -> tag.gitoid)
-                  )
+                  itemScopePre3.withConnection(EdgeType.tagFrom, tag.gitoid)
               }
 
               // update per-package tags
@@ -531,7 +529,7 @@ trait ToProcess {
                         Some(
                           Item(
                             tagGitoid,
-                            TreeSet(EdgeType.tagFrom -> "tags"),
+                            TreeMap(EdgeType.tagFrom -> TreeSet("tags")),
                             Some(ItemTagData.mimeType),
                             Some(ItemTagData(tagJson))
                           )
@@ -546,15 +544,13 @@ trait ToProcess {
                         itemOpt match {
                           case Some(item) =>
                             Some(
-                              item.copy(connections =
-                                item.connections + (EdgeType.tagTo -> tagGitoid)
-                              )
+                              item.withConnection(EdgeType.tagTo, tagGitoid)
                             )
                           case None =>
                             Some(
                               Item(
                                 "tags",
-                                TreeSet(EdgeType.tagTo -> tagGitoid),
+                                TreeMap(EdgeType.tagTo -> TreeSet(tagGitoid)),
                                 None,
                                 None
                               )
@@ -564,9 +560,7 @@ trait ToProcess {
                     )
 
                     // Add tagFrom to main artifact
-                    itemScope3.copy(connections =
-                      itemScope3.connections + (EdgeType.tagFrom -> tagGitoid)
-                    )
+                    itemScope3.withConnection(EdgeType.tagFrom, tagGitoid)
                   case None => itemScope3
                 }
               } else itemScope3
@@ -601,16 +595,14 @@ trait ToProcess {
                     {
                       case Some(item) =>
                         Some(
-                          item.copy(connections =
-                            item.connections + (aliasType -> itemScope4.identifier)
-                          )
+                          item.withConnection(aliasType, itemScope4.identifier)
                         )
                       case None =>
                         Some(
                           Item(
                             itemNeedingAlias,
                             // noopLocationReference,
-                            TreeSet(aliasType -> itemScope4.identifier),
+                            TreeMap(aliasType -> TreeSet(itemScope4.identifier)),
                             None,
                             None
                           )
@@ -640,7 +632,7 @@ trait ToProcess {
                     f"Writing ${itemScope4.identifier}, ${item.body match {
                         case None => ""
                         case Some(body) =>
-                          f"gitoid:sha1 ${item.connections.map(_._2).filter(_.startsWith("gitoid:blob:sha1"))}"
+                          f"gitoid:sha1 ${item.edges.map(_._2).filter(_.startsWith("gitoid:blob:sha1"))}"
                       }} parent scope ${parentScope.parentScopeInformation()}"
                 )
                 .get // we know we just wrote an item

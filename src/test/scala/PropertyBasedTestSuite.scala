@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.omnibor.TestEdges
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.Item
 import io.spicelabs.goatrodeo.omnibor.ItemMetaData
@@ -118,7 +119,7 @@ class PropertyBasedTestSuite extends GoatRodeoScalaCheckSuite {
   /** Generate Item */
   val genItem: Gen[Item] = for {
     identifier <- genGitOID
-    connections <- Gen.listOf(genEdge).map(l => TreeSet(l.take(5)*))
+    connections <- Gen.listOf(genEdge).map(l => TestEdges.edgesOf(l.take(5)))
     hasMetadata <- Gen.oneOf(true, false)
     metadata <-
       if (hasMetadata) genItemMetaData.map(Some(_)) else Gen.const(None)
@@ -167,7 +168,7 @@ class PropertyBasedTestSuite extends GoatRodeoScalaCheckSuite {
       val encoded = metadata.encodeCBOR()
       val item = Item(
         identifier = "gitoid:blob:sha256:" + "a" * 64,
-        connections = TreeSet(),
+        connections = TreeMap(),
         bodyMimeType = Some(ItemMetaData.mimeType),
         body = Some(metadata)
       )
@@ -378,17 +379,17 @@ class PropertyBasedTestSuite extends GoatRodeoScalaCheckSuite {
       val extraConnection =
         (EdgeType.aliasFrom, "gitoid:blob:sha256:" + "b" * 64)
       val itemWithExtra =
-        item.copy(connections = item.connections + extraConnection)
+        item.withConnection(extraConnection._1, extraConnection._2)
       val merged = item.merge(itemWithExtra)
 
-      merged.connections.contains(extraConnection)
+      merged.edges.contains(extraConnection)
     }
   }
 
   property("Item withConnection adds connection") {
     forAll(genItem, genEdgeType, genGitOID) { (item, edgeType, target) =>
       val updated = item.withConnection(edgeType, target)
-      updated.connections.contains((edgeType, target))
+      updated.edges.contains((edgeType, target))
     }
   }
 
@@ -440,11 +441,11 @@ class PropertyBasedTestSuite extends GoatRodeoScalaCheckSuite {
 
   // ==================== MD5 Identifier Tests ====================
 
-  property("Item.identifierMD5 is deterministic") {
+  property("the index key is deterministic") {
     forAll(genItem) { item =>
-      val md5_1 = item.identifierMD5()
-      val md5_2 = item.identifierMD5()
-      md5_1.sameElements(md5_2)
+      val k1 = io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.key(item.identifier)
+      val k2 = io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.key(item.identifier)
+      k1.sameElements(k2) && k1.length == 16
     }
   }
 
@@ -452,7 +453,11 @@ class PropertyBasedTestSuite extends GoatRodeoScalaCheckSuite {
     forAll(genItem, genGitOID) { (item, newId) =>
       if (item.identifier != newId) {
         val item2 = item.copy(identifier = newId)
-        !item.identifierMD5().sameElements(item2.identifierMD5())
+        !io.spicelabs.goatrodeo.envelopes.Blake3IndexKey
+          .key(item.identifier)
+          .sameElements(
+            io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.key(item2.identifier)
+          )
       } else {
         true
       }

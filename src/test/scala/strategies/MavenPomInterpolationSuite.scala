@@ -20,13 +20,13 @@ import io.spicelabs.goatrodeo.util.PomParser
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 class MavenPomInterpolationSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item = Item(
     id,
-    TreeSet.empty[Edge],
+    TreeMap.empty[String, TreeSet[String]],
     None,
     None
   )

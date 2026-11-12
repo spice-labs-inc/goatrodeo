@@ -651,9 +651,7 @@ case class DockerState(
           layerToGitoidMapping.get(layer) match {
             case None => item
             case Some(gitoid) =>
-              item.copy(connections =
-                item.connections + (EdgeType.contains -> gitoid)
-              )
+              item.withConnection(EdgeType.contains, gitoid)
           }
       }
 

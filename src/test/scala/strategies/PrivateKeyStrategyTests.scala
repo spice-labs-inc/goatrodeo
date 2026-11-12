@@ -651,7 +651,7 @@ class PrivateKeyStrategyTests extends GoatRodeoFunSuite {
     import scala.collection.immutable.{TreeMap, TreeSet}
     Item(
       identifier = "gitoid:blob:sha256:phase7-test-stub",
-      connections = TreeSet.empty,
+      connections = TreeMap.empty[String, TreeSet[String]],
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(
         ItemMetaData(

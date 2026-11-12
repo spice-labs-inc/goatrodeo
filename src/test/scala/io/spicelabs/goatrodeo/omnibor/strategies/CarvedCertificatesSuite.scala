@@ -56,7 +56,7 @@ class CarvedCertificatesSuite extends GoatRodeoScalaCheckSuite {
 
   private def testItem(id: String): Item = Item(
     id,
-    TreeSet(),
+    TreeMap(),
     Some(ItemMetaData.mimeType),
     Some(
       ItemMetaData(

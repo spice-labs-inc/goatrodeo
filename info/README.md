@@ -292,3 +292,5 @@ How Goat Rodeo manages system resources:
 - [Contributing](../CONTRIBUTING.md) - How to contribute
 - [Release Process](../RELEASE_PROCESS.md) - How releases are made
 - [Code of Conduct](../code_of_conduct.md) - Community guidelines
+
+* [BigTent version 4 clusters and BLAKE3 index keys](bigtent_v4_format.md)

@@ -25,7 +25,7 @@ import scala.collection.immutable.TreeSet
 class MavenDependencyLicenseSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty[Edge], None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   // ==================== 3.1: Dependency parsing ====================
 

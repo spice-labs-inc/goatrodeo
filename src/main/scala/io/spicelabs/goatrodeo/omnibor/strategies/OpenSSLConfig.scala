@@ -123,9 +123,11 @@ case class OpenSSLConfigState(
     if (referencedPaths.isEmpty) {
       item -> updatedState
     } else {
+      // `edges` is the flattened view; `targetsOf` would hand back a set and the
+      // metadata value below is a single GitOID.
       val containerGitOID = item.connections
-        .find(_._1 == EdgeType.containedBy)
-        .map(_._2)
+        .getOrElse(EdgeType.containedBy, scala.collection.immutable.TreeSet.empty[String])
+        .headOption
         .getOrElse("")
 
       val associated = referencedPaths.flatMap { refPath =>

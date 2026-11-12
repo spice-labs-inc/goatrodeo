@@ -490,7 +490,7 @@ final case class IpaState(
           )
         val certItem = Item(
           id,
-          TreeSet(EdgeType.contains -> item.identifier),
+          TreeMap(EdgeType.contains -> TreeSet(item.identifier)),
           Some(ItemMetaData.mimeType),
           Some(
             ItemMetaData(

@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 /** Detection depth: keystore name fallback, binary PGP keyrings, keybox
   * detection, PKCS#8 DER envelopes, certificate extension depth, and the
@@ -132,7 +132,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
     val (els, state) = certs.getElementsToProcess()
     val item = Item(
       "x",
-      TreeSet.empty,
+      scala.collection.immutable.TreeMap.empty[String, TreeSet[String]],
       None,
       None
     )
@@ -207,7 +207,7 @@ class CryptoDepthSuite extends GoatRodeoFunSuite {
       .getOrElse(fail(s"$pemPath must be claimed by Certificates"))
     val (els, state) = certs.getElementsToProcess()
     val item =
-      Item("x", TreeSet.empty, None, None)
+      Item("x", TreeMap.empty[String, TreeSet[String]], None, None)
     val (m, _) = state.getMetadata(els.head._1, item, new SingleMarker())
     m.toMap
   }

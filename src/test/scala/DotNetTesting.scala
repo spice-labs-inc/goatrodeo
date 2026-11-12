@@ -27,7 +27,7 @@ class DotNetTesting extends GoatRodeoFunSuite {
   def createTestItem(id: String): Item = {
     Item(
       id,
-      TreeSet(),
+      TreeMap(),
       Some(ItemMetaData.mimeType),
       Some(
         ItemMetaData(
@@ -85,7 +85,7 @@ class DotNetTesting extends GoatRodeoFunSuite {
           .iterator
           .flatMap(k => store1.read(k))
           .find(item =>
-            item.connections.exists(_._2 == smokeSha1) ||
+            item.edges.exists(_._2 == smokeSha1) ||
               item.identifier == smokeSha1
           )
       }

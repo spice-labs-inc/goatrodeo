@@ -231,8 +231,10 @@ class MemStorage(val targetDir: Option[File])
   }
 
   override def pathsSortedWithMD5(): Vector[(String, String)] = {
+    // BLAKE3[0..16], the same digest the index uses, so the tree has one
+    // identifier hash. The order is arbitrary either way; the name is historical.
     keys().toVector.par
-      .map(k => (Helpers.md5hashHex(k), k))
+      .map(k => (io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.keyHex(k), k))
       .toArray
       .sorted
       .toVector

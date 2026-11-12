@@ -691,7 +691,7 @@ class CertificatesPropertySuite extends GoatRodeoScalaCheckSuite {
     import io.spicelabs.goatrodeo.omnibor.{Item, ItemMetaData}
     Item(
       identifier = "gitoid:blob:sha256:phase8-property-stub",
-      connections = TreeSet.empty,
+      connections = TreeMap.empty[String, TreeSet[String]],
       bodyMimeType = Some(ItemMetaData.mimeType),
       body = Some(
         ItemMetaData(

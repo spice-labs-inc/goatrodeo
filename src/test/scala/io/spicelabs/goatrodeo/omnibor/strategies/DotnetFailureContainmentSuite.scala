@@ -17,7 +17,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.jdk.CollectionConverters.*
 
 /** Failure containment for the .NET strategy.
@@ -52,7 +52,7 @@ class DotnetFailureContainmentSuite extends GoatRodeoFunSuite {
     val artifact = FileWrapper(blob, blob.getPath, None)
     val item = Item(
       "sha256:" + "ab" * 32,
-      TreeSet.empty[Edge],
+      TreeMap.empty[String, TreeSet[String]],
       Some("application/octet-stream"),
       None
     )

@@ -1,3 +1,4 @@
+import io.spicelabs.goatrodeo.omnibor.TestEdges
 import io.spicelabs.goatrodeo.omnibor.EdgeType
 import io.spicelabs.goatrodeo.omnibor.GRDWalker
 import io.spicelabs.goatrodeo.omnibor.GraphManager
@@ -16,7 +17,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
 
   def createTestItem(
       id: String,
-      connections: TreeSet[(String, String)] = TreeSet()
+      connections: TreeMap[String, TreeSet[String]] = TreeMap()
   ): Item = {
     Item(
       id,
@@ -162,7 +163,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
   test("writeEntries - handles items with connections") {
     val tempDir = Files.createTempDirectory("connections").toFile()
     try {
-      val connections = TreeSet(
+      val connections = TestEdges.edges(
         EdgeType.aliasFrom -> "sha256:alias1",
         EdgeType.containedBy -> "gitoid:blob:sha256:parent"
       )
@@ -242,7 +243,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       // Use simple items without metadata for reliable serialization
       val item = Item(
         "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
-        TreeSet(),
+        TreeMap(),
         None,
         None
       )
@@ -262,7 +263,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       // Use simple items without metadata for reliable serialization
       val item = Item(
         "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
-        TreeSet(),
+        TreeMap(),
         None,
         None
       )
@@ -284,7 +285,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
       // Simple test with minimal items - complex items have encoding issues
       val item = Item(
         "gitoid:blob:sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111",
-        TreeSet(),
+        TreeMap(),
         None,
         None
       )
@@ -301,7 +302,7 @@ class GraphManagerTestSuite extends GoatRodeoFunSuite {
   test("writeEntries and GRDWalker - round-trip preserves connections") {
     val tempDir = Files.createTempDirectory("roundtrip2").toFile()
     try {
-      val connections = TreeSet(
+      val connections = TestEdges.edges(
         EdgeType.aliasFrom -> "sha256:hash1",
         EdgeType.containedBy -> "gitoid:blob:sha256:parent123"
       )

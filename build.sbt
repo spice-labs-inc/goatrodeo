@@ -371,7 +371,7 @@ Test / testOptions += Tests.Setup(() => {
             "30",
             "-o",
             part.getPath,
-            f"https://public-test-data.spice-labs.dev/${item}"
+            f"https://test-data.goatrodeo.org/${item}"
           ) ! log
 
           if (cmdResult == 0) {
@@ -407,7 +407,7 @@ Test / testOptions += Tests.Setup(() => {
     // The iOS .ipa corpus (owner decision 2026-09-25: real corpus first,
     // size-gated at 6 MB; this item is 4.11 MB). Fetched from the upstream
     // GitHub release (allsafe-ios v1.0) because it is not hosted on
-    // public-test-data; digest-pinned by the IpaCorpus helper so drift is
+    // test-data.goatrodeo.org; digest-pinned by the IpaCorpus helper so drift is
     // caught at test time, cached once present, and skipped when the
     // network is unavailable (the corpus tests assume the fixture).
     val ipaCorpus = file("./test_data/download/ipa_tests/allsafe-ios.ipa")
@@ -449,7 +449,7 @@ Test / testOptions += Tests.Setup(() => {
   // ===== pinned OCI parity fixtures =====
   // Fetched from public registries (the source of truth for the pinned
   // digests) only when the cache entry is missing. Nothing for these fixtures
-  // is hosted on public-test-data: a digest-pinned artifact is immutable, so
+  // is hosted on test-data.goatrodeo.org: a digest-pinned artifact is immutable, so
   // the registry is the canonical location.
   //
   // Two artifacts per image, both pinned to the same digest:

@@ -12,7 +12,7 @@ import io.spicelabs.goatrodeo.util.Configuration
 import io.spicelabs.goatrodeo.util.FileWrapper
 
 import java.io.File
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 /** Regression: a nested assembly's `cilantro/type` children belong to the
   * nested assembly only. The outer assembly must not report them as its own
@@ -30,7 +30,7 @@ class DotnetTypeScopeIsolationSuite extends GoatRodeoFunSuite {
     MetadataKeyConstants.adHoc("cilantro")("TypeJson")
 
   private def item(id: String): Item =
-    Item(id, TreeSet.empty[Edge], Some("application/octet-stream"), None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], Some("application/octet-stream"), None)
 
   test("a nested assembly's types are not accumulated on the outer assembly") {
     val store = MemStorage(None)

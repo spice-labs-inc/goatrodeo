@@ -135,7 +135,7 @@ class ADGTests extends GoatRodeoFunSuite {
                 store
                   .read("sha1:ea95ab1f5b392d690443c7087168bd96568366ad")
                   .get
-                  .connections
+                  .edges
                   .head
                   ._2
               )
@@ -154,12 +154,12 @@ class ADGTests extends GoatRodeoFunSuite {
             case Some(tags) => {
 
               val theTag =
-                tags.connections.filter(e => e._1 == EdgeType.tagTo).head._2
+                tags.edges.filter(e => e._1 == EdgeType.tagTo).head._2
 
               tagCount = store
                 .read(theTag)
                 .get
-                .connections
+                .edges
                 .filter(_._1 == EdgeType.tagTo)
                 .size
 

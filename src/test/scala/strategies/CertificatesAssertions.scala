@@ -56,7 +56,7 @@ object CertificatesAssertions {
     * `PackageURL.toCanonical()`.
     */
   def purlsOf(item: Item): Set[String] = {
-    item.connections
+    item.edges
       .collect {
         case (edgeType, target) if edgeType == EdgeType.aliasFrom =>
           target

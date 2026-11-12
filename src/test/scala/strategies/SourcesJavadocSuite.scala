@@ -16,7 +16,7 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import scala.collection.immutable.TreeSet
+import scala.collection.immutable.{TreeMap, TreeSet}
 
 // Tests that Sources and JavaDocs JAR markers get the same metadata
 // accumulation and groupId/artifactId/version resolution as the JAR marker.
@@ -43,7 +43,7 @@ import scala.collection.immutable.TreeSet
 class SourcesJavadocSuite extends GoatRodeoFunSuite {
 
   private def createTestItem(id: String): Item =
-    Item(id, TreeSet.empty, None, None)
+    Item(id, TreeMap.empty[String, TreeSet[String]], None, None)
 
   private def writeJarEntries(
       jarFile: File,

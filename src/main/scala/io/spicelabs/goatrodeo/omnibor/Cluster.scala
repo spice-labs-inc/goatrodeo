@@ -37,7 +37,20 @@ object IndexFile {
         )
       }
 
-      val indexEnv: IndexFileEnvelope = Helpers.readLenAndCBOR(ipf).get
+      val indexEnv: IndexFileEnvelope = Helpers.readShortAndCBOR(ipf).get
+      if (indexEnv.version != IndexFileEnvelope.IndexFileEnvelopeVersion) {
+        throw Exception(
+          f"Index ${file.getName()} is envelope version ${indexEnv.version}; this reader " +
+            f"requires version ${IndexFileEnvelope.IndexFileEnvelopeVersion}"
+        )
+      }
+      if (indexEnv.encoding != io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.encoding) {
+        throw Exception(
+          f"Index ${file.getName()} declares key encoding '${indexEnv.encoding}'; this " +
+            f"reader understands only " +
+            f"'${io.spicelabs.goatrodeo.envelopes.Blake3IndexKey.encoding}'"
+        )
+      }
       val indexPos = ipf.position()
       IndexFile(indexEnv, file, indexPos)
     }
@@ -79,7 +92,15 @@ object DataFile {
         )
       }
 
-      val dataEnv: DataFileEnvelope = Helpers.readLenAndCBOR(ipf).get
+      val dataEnv: DataFileEnvelope = Helpers.readShortAndCBOR(ipf).get
+      // Version 4 data files declare envelope version 2 and hold map-shaped items;
+      // a version 1 file carries the pair shape, so it is refused by name.
+      if (dataEnv.version != DataFileEnvelope.DataFileEnvelopeVersion) {
+        throw Exception(
+          f"Data file ${file.getName()} is envelope version ${dataEnv.version}; this " +
+            f"reader requires version ${DataFileEnvelope.DataFileEnvelopeVersion}"
+        )
+      }
       val indexPos = ipf.position()
       DataFile(dataEnv, FileInputStream(file).getChannel(), indexPos)
     }
@@ -125,13 +146,15 @@ object GoatRodeoCluster {
         )
       }
 
-      val env: ClusterFileEnvelope = Helpers.readLenAndCBOR(dfp).get
+      val env: ClusterFileEnvelope = Helpers.readShortAndCBOR(dfp).get
 
       if (env.magic != GraphManager.Consts.ClusterFileMagicNumber) {
         throw Exception(
           f"Loaded a cluster with an invalid magic number: ${env}"
         );
       }
+
+      ClusterFileEnvelope.validateForRead(env, fileName)
 
       val indexFiles = Map((for { indexFile <- env.indexFiles } yield {
 

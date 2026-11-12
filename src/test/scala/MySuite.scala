@@ -172,13 +172,13 @@ class MySuite extends GoatRodeoFunSuite {
                 "sha256:46dccecac556623d8e2ce8648496824a82951d139062a4e61148aff1a25ed18d"
               )
               .get
-              .connections
+              .edges
               .head
               ._2
           )
           .get
 
-        val purls = item.connections.toVector.filter(_._2.startsWith("pkg:"))
+        val purls = item.edges.filter(_._2.startsWith("pkg:"))
 
         assert(purls.length == 1, s"should be a purl ${purls} on log4j")
 
@@ -201,7 +201,7 @@ class MySuite extends GoatRodeoFunSuite {
                 "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
               )
               .get
-              .connections
+              .edges
               .head
               ._2
           )
@@ -245,10 +245,10 @@ class MySuite extends GoatRodeoFunSuite {
     val log4jItemOpt = for {
       firstItem <- store.read(log4jSha256)
       // Follow the first "contains" edge to the nested JAR child
-      childGitoid <- firstItem.connections
+      childGitoid <- firstItem.edges
         .find(_._1 == EdgeType.contains)
         .map(_._2)
-        .orElse(firstItem.connections.headOption.map(_._2))
+        .orElse(firstItem.edges.headOption.map(_._2))
       childItem <- store.read(childGitoid)
     } yield childItem
 
@@ -258,7 +258,7 @@ class MySuite extends GoatRodeoFunSuite {
     )
 
     val log4jPurls =
-      log4jItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
+      log4jItemOpt.get.edges.filter(_._2.startsWith("pkg:"))
     assert(
       log4jPurls.nonEmpty,
       s"log4j JAR should have at least one pURL connection, got ${log4jPurls}"
@@ -269,10 +269,10 @@ class MySuite extends GoatRodeoFunSuite {
       "sha256:a51c97150f29aae8d0b3bbc40e880352fbdb381020364a19fb73fc7612f8ba17"
     val tkItemOpt = for {
       firstItem <- store.read(tkSha256)
-      childGitoid <- firstItem.connections
+      childGitoid <- firstItem.edges
         .find(_._1 == EdgeType.contains)
         .map(_._2)
-        .orElse(firstItem.connections.headOption.map(_._2))
+        .orElse(firstItem.edges.headOption.map(_._2))
       childItem <- store.read(childGitoid)
     } yield childItem
 
@@ -282,7 +282,7 @@ class MySuite extends GoatRodeoFunSuite {
     )
 
     val tkPurls =
-      tkItemOpt.get.connections.toVector.filter(_._2.startsWith("pkg:"))
+      tkItemOpt.get.edges.filter(_._2.startsWith("pkg:"))
     assert(
       tkPurls.nonEmpty,
       s"tk package should have at least one pURL connection, got ${tkPurls}"
@@ -368,11 +368,11 @@ class MySuite extends GoatRodeoFunSuite {
         "sha256:82ceabe5192a5c3803f8b73536e83cd59e219fb560d8ed9e0c165728b199c0d7"
       )
       .get
-    val gitoid = topAlias.connections.head._2
+    val gitoid = topAlias.edges.head._2
     assert(gitoid.startsWith("gitoid:"))
     val top = store1.read(gitoid).get
     store1.read("gitoid:blob:sha1:2e79b179ad18431600e9a074735f40cd54dde7f6").get
-    for { edge <- top.connections if edge._1 == EdgeType.contains } {
+    for { edge <- top.edges if edge._1 == EdgeType.contains } {
       val contained = store1.read(edge._2).get
     }
 
@@ -382,7 +382,7 @@ class MySuite extends GoatRodeoFunSuite {
       )
       .get
     assert(
-      log4j.connections.filter(_._1 == EdgeType.contains).size > 1200
+      log4j.edges.filter(_._1 == EdgeType.contains).size > 1200
     )
   }
 
@@ -409,10 +409,10 @@ class MySuite extends GoatRodeoFunSuite {
     assert(items.length == keys.size)
 
     val sourceRef = items.filter(i =>
-      i.connections.filter(e => EdgeType.isBuiltFrom(e._1)).size > 0
+      i.edges.filter(e => EdgeType.isBuiltFrom(e._1)).size > 0
     )
     val fromSource = for {
-      i <- items; c <- i.connections if c._1 == EdgeType.buildsTo
+      i <- items; c <- i.edges if c._1 == EdgeType.buildsTo
     } yield c
     assert(sourceRef.length > 100, "Expected to find source files")
 
@@ -420,7 +420,7 @@ class MySuite extends GoatRodeoFunSuite {
 
     // the package URL is picked up
     val withPurl =
-      items.filter(i => i.connections.filter(_._2.startsWith("pkg:")).size > 0)
+      items.filter(i => i.edges.filter(_._2.startsWith("pkg:")).size > 0)
 
     assert(
       withPurl.length == 6,
@@ -428,12 +428,12 @@ class MySuite extends GoatRodeoFunSuite {
     )
 
     val withPurlSources = withPurl.filter(i =>
-      i.connections.filter(_._2.endsWith("?packaging=sources")).size > 0
+      i.edges.filter(_._2.endsWith("?packaging=sources")).size > 0
     )
     assert(withPurlSources.length == 2)
 
     val jars =
-      withPurl.filter(i => i.connections.filter(_._2.contains("?")).size == 0)
+      withPurl.filter(i => i.edges.filter(_._2.contains("?")).size == 0)
 
     assert(jars.length == 2, f"Expecting two JARs, but got ${jars.length}")
 

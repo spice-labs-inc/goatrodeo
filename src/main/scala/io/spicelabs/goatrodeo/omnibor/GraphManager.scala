@@ -1,6 +1,7 @@
 package io.spicelabs.goatrodeo.omnibor
 
 import com.typesafe.scalalogging.Logger
+import io.spicelabs.goatrodeo.envelopes.Blake3IndexKey
 import io.spicelabs.goatrodeo.envelopes.ClusterFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.DataFileEnvelope
 import io.spicelabs.goatrodeo.envelopes.IndexFileEnvelope
@@ -24,6 +25,7 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import scala.collection.immutable.TreeMap
+import scala.collection.immutable.TreeSet
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -107,10 +109,12 @@ object GraphManager {
       val orgEntry = items.next()
       val currentPosition = writer.position()
       val entry = orgEntry
-      val md5 = entry.identifierMD5()
+      // The version 4 index key: BLAKE3[0..16] over the identifier, computed here
+      // because this is the only place an index entry is written.
+      val key = Blake3IndexKey.key(entry.identifier)
       val entryBytes = entry.encodeCBOR()
 
-      pairs = pairs.appended((Helpers.toHex(md5), md5, currentPosition))
+      pairs = pairs.appended((Helpers.toHex(key), key, currentPosition))
 
       val toAlloc = 256 + (entryBytes.length)
       val bb = ByteBuffer.allocate(toAlloc)
@@ -170,7 +174,7 @@ object GraphManager {
     Helpers.writeInt(indexWriter, Consts.IndexFileMagicNumber)
     val indexEnv = IndexFileEnvelope.build(
       size = pairs.length,
-      dataFiles = Vector(sha256Long)
+      dataFiles = TreeSet(sha256Long)
     )
     val indexEnvBytes = indexEnv.encode()
     Helpers.writeShort(indexWriter, indexEnvBytes.length)
@@ -178,6 +182,10 @@ object GraphManager {
     indexWriter.write(ByteBuffer.wrap(indexEnvBytes))
     val indexBB = ByteBuffer.allocate(pairs.length * 32)
 
+    // The entries arrive in ascending key order: `Builder` sorts the items with
+    // `Storage.pathsSortedWithMD5`, which uses the same digest the index key uses.
+    // The writer preserves that order rather than re-sorting, so the file is
+    // ascending without a second O(n log n) pass over the whole index.
     for { v <- pairs } {
       indexBB.put(v._2)
       indexBB.putLong(sha256Long)
@@ -240,7 +248,9 @@ object GraphManager {
 
     def updateBiggest(item: Item): Unit = {
       val containedBy =
-        item.connections.filter(_._1 == EdgeType.containedBy).size
+        item.connections
+          .getOrElse(EdgeType.containedBy, TreeSet.empty[String])
+          .size
       if (biggest.length <= 50) {
         biggest = (biggest :+ (item -> containedBy)).sortBy(_._2).reverse
       } else if (biggest.last._2 < containedBy) {

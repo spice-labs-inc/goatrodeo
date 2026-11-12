@@ -14,6 +14,8 @@ limitations under the License. */
 
 package io.spicelabs.goatrodeo.omnibor
 
+import io.spicelabs.goatrodeo.omnibor.TestEdges
+
 import _root_.strategies.CertificatesPipelineRunner
 import io.spicelabs.goatrodeo.testing.GoatRodeoFunSuite
 import io.spicelabs.goatrodeo.util.Configuration
@@ -116,7 +118,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
   private def makeItem(
       id: String,
-      connections: TreeSet[Edge] = TreeSet(),
+      connections: TreeMap[String, TreeSet[String]] = TreeMap(),
       extra: TreeMap[String, TreeSet[StringOrPair]] = TreeMap(),
       fileNames: TreeSet[String] = TreeSet(),
       mimeTypes: TreeSet[String] = TreeSet()
@@ -280,7 +282,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("test-cert.pem"),
         mimeTypes = TreeSet("application/x-pem-file"),
         extra = TreeMap(
@@ -301,7 +303,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> certId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(certId)),
         fileNames = TreeSet("root.jar"),
         mimeTypes = TreeSet("application/java-archive")
       )
@@ -400,7 +402,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val config = makeItem(
         id = configId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("openssl.cnf"),
         mimeTypes = TreeSet("application/x-openssl-config"),
         extra = TreeMap(
@@ -415,7 +417,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> configId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(configId)),
         fileNames = TreeSet("root.tar"),
         mimeTypes = TreeSet("application/x-tar")
       )
@@ -466,7 +468,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val sec = makeItem(
         id = secId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("java.security"),
         mimeTypes = TreeSet("application/x-java-security-properties"),
         extra = TreeMap(
@@ -481,7 +483,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> secId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(secId)),
         fileNames = TreeSet("root.zip"),
         mimeTypes = TreeSet("application/zip")
       )
@@ -518,7 +520,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("cert.pem"),
         mimeTypes = TreeSet("application/x-pem-file"),
         extra = TreeMap(
@@ -529,7 +531,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> certId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(certId)),
         fileNames = TreeSet("root"),
         mimeTypes = TreeSet("application/octet-stream")
       )
@@ -563,24 +565,24 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> zipId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(zipId)),
         fileNames = TreeSet("outer.zip")
       )
       val zip = makeItem(
         id = zipId,
         connections =
-          TreeSet(EdgeType.containedBy -> rootId, EdgeType.contains -> tarId),
+          TestEdges.edges(EdgeType.containedBy -> rootId, EdgeType.contains -> tarId),
         fileNames = TreeSet("inner.tar")
       )
       val tar = makeItem(
         id = tarId,
         connections =
-          TreeSet(EdgeType.containedBy -> zipId, EdgeType.contains -> certId),
+          TestEdges.edges(EdgeType.containedBy -> zipId, EdgeType.contains -> certId),
         fileNames = TreeSet("cert.pem")
       )
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(EdgeType.containedBy -> tarId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(tarId)),
         fileNames = TreeSet("cert.pem"),
         extra = TreeMap(
           "Name" -> TreeSet(StringOrPair("nested-cert")),
@@ -697,7 +699,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val itemA = makeItem(
         id = a,
-        connections = TreeSet(EdgeType.contains -> b),
+        connections = TreeMap(EdgeType.contains -> TreeSet(b)),
         fileNames = TreeSet("A"),
         extra = TreeMap(
           "Name" -> TreeSet(StringOrPair("A")),
@@ -707,13 +709,13 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val itemB = makeItem(
         id = b,
         connections =
-          TreeSet(EdgeType.containedBy -> a, EdgeType.contains -> c),
+          TestEdges.edges(EdgeType.containedBy -> a, EdgeType.contains -> c),
         fileNames = TreeSet("B")
       )
       val itemC = makeItem(
         id = c,
         connections =
-          TreeSet(EdgeType.containedBy -> b, EdgeType.contains -> a),
+          TestEdges.edges(EdgeType.containedBy -> b, EdgeType.contains -> a),
         fileNames = TreeSet("C")
       )
       storeItem(storage, itemA)
@@ -748,24 +750,24 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val root = makeItem(
         id = rootId,
         connections =
-          TreeSet(EdgeType.contains -> viaA, EdgeType.contains -> viaB),
+          TestEdges.edges(EdgeType.contains -> viaA, EdgeType.contains -> viaB),
         fileNames = TreeSet("root")
       )
       val a = makeItem(
         id = viaA,
         connections =
-          TreeSet(EdgeType.containedBy -> rootId, EdgeType.contains -> certId),
+          TestEdges.edges(EdgeType.containedBy -> rootId, EdgeType.contains -> certId),
         fileNames = TreeSet("A")
       )
       val b = makeItem(
         id = viaB,
         connections =
-          TreeSet(EdgeType.containedBy -> rootId, EdgeType.contains -> certId),
+          TestEdges.edges(EdgeType.containedBy -> rootId, EdgeType.contains -> certId),
         fileNames = TreeSet("B")
       )
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(EdgeType.containedBy -> viaA),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(viaA)),
         fileNames = TreeSet("cert.pem"),
         extra = TreeMap(
           "Name" -> TreeSet(StringOrPair("shared-cert")),
@@ -896,7 +898,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("cert.pem"),
         extra = TreeMap(
           "Name" -> TreeSet(StringOrPair("cert")),
@@ -905,7 +907,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val key = makeItem(
         id = keyId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("key.pem"),
         extra = TreeMap(
           "Name" -> TreeSet(StringOrPair("key.pem")),
@@ -918,7 +920,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val root = makeItem(
         id = rootId,
         connections =
-          TreeSet(EdgeType.contains -> certId, EdgeType.contains -> keyId),
+          TestEdges.edges(EdgeType.contains -> certId, EdgeType.contains -> keyId),
         fileNames = TreeSet("root")
       )
       storeItem(storage, cert)
@@ -963,7 +965,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(),
+        connections = TreeMap(),
         fileNames = TreeSet("root")
       )
       storeItem(storage, root)
@@ -973,7 +975,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
           f"gitoid:blob:sha256:111111111111111111111111111111111111111111111111111111111111${idx}%05d"
         val item = makeItem(
           id = id,
-          connections = TreeSet(EdgeType.containedBy -> rootId),
+          connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
           fileNames = TreeSet(s"cert$idx.pem"),
           extra = TreeMap(
             "Name" -> TreeSet(StringOrPair(s"cert$idx")),
@@ -984,7 +986,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         id
       }
       val rootWithChildren =
-        root.copy(connections = TreeSet(ids.map(EdgeType.contains -> _)*))
+        root.copy(connections = TestEdges.edges(ids.map(EdgeType.contains -> _)*))
       storeItem(storage, rootWithChildren)
 
       val json = writeAndRead(storage, rootWithChildren, dir)
@@ -1103,7 +1105,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val key = makeItem(
         id = keyId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("test-key.pub"),
         mimeTypes = TreeSet("application/x-openssh-public-key"),
         extra = TreeMap(
@@ -1114,7 +1116,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> keyId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(keyId)),
         fileNames = TreeSet("root.tar"),
         mimeTypes = TreeSet("application/x-tar")
       )
@@ -1191,7 +1193,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val crl = makeItem(
         id = crlId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("test.crl"),
         mimeTypes = TreeSet("application/pkix-crl"),
         extra = TreeMap(
@@ -1203,7 +1205,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> crlId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(crlId)),
         fileNames = TreeSet("root.zip"),
         mimeTypes = TreeSet("application/zip")
       )
@@ -1252,7 +1254,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("ec-cert.pem"),
         mimeTypes = TreeSet("application/x-pem-file"),
         extra = TreeMap(
@@ -1267,7 +1269,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> certId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(certId)),
         fileNames = TreeSet("root.jar"),
         mimeTypes = TreeSet("application/java-archive")
       )
@@ -1312,7 +1314,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val hashFile = makeItem(
         id = hashId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("shadow"),
         mimeTypes = TreeSet("text/plain"),
         extra = TreeMap(
@@ -1322,7 +1324,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> hashId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(hashId)),
         fileNames = TreeSet("root.tar"),
         mimeTypes = TreeSet("application/x-tar")
       )
@@ -1380,7 +1382,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val key = makeItem(
         id = keyId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("1035ac73cc4e59e3"),
         mimeTypes = TreeSet("text/plain"),
         extra = TreeMap(
@@ -1391,7 +1393,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> keyId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(keyId)),
         fileNames = TreeSet("root.tar"),
         mimeTypes = TreeSet("application/x-tar")
       )
@@ -1467,7 +1469,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
 
       val hashFile = makeItem(
         id = hashId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("shadow"),
         mimeTypes = TreeSet("text/plain"),
         extra = TreeMap(
@@ -1478,7 +1480,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> hashId),
+        connections = TreeMap(EdgeType.contains -> TreeSet(hashId)),
         fileNames = TreeSet("root.tar"),
         mimeTypes = TreeSet("application/x-tar")
       )
@@ -1570,7 +1572,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
   private def algoItem(id: String, algs: String*): Item =
     makeItem(
       id = id,
-      connections = TreeSet(
+      connections = TestEdges.edges(
         EdgeType.containedBy ->
           "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
       ),
@@ -1598,7 +1600,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> item.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(item.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, item)
@@ -1640,7 +1642,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> item.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(item.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, item)
@@ -1699,7 +1701,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val shadow = makeItem(
         id =
           "gitoid:blob:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("etc/shadow"),
         mimeTypes = TreeSet("text/plain"),
         extra = TreeMap(
@@ -1717,7 +1719,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> shadow.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(shadow.identifier)),
         fileNames = TreeSet("root.tar")
       )
       storeItem(storage, shadow)
@@ -1753,7 +1755,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val svc = makeItem(
         id =
           "gitoid:blob:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("etc/ipsec.conf"),
         mimeTypes = TreeSet("text/plain"),
         extra = TreeMap(
@@ -1767,7 +1769,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> svc.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(svc.identifier)),
         fileNames = TreeSet("root.tar")
       )
       storeItem(storage, svc)
@@ -1825,7 +1827,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
   ): Item =
     makeItem(
       id = id,
-      connections = TreeSet(EdgeType.containedBy -> GoldenRootId),
+      connections = TreeMap(EdgeType.containedBy -> TreeSet(GoldenRootId)),
       fileNames = TreeSet(name),
       mimeTypes = TreeSet("application/octet-stream"),
       extra = TreeMap.from(
@@ -1844,7 +1846,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
     val storage = MemStorage(None)
     val root = makeItem(
       id = GoldenRootId,
-      connections = TreeSet(
+      connections = TestEdges.edges(
         EdgeType.contains ->
           "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000001"
       ),
@@ -2024,7 +2026,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val jwt = makeItem(
         id =
           "gitoid:blob:sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("token.txt"),
         mimeTypes = TreeSet("text/plain"),
         extra = TreeMap(
@@ -2035,7 +2037,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> jwt.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(jwt.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, jwt)
@@ -2082,7 +2084,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
     )
     makeItem(
       id = certId,
-      connections = TreeSet(
+      connections = TestEdges.edges(
         (EdgeType.containedBy -> SwhidRootId) +: aliasEdges*
       ),
       fileNames = TreeSet("cert.pem"),
@@ -2112,7 +2114,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val cert = swhidCert(certId, Some(s"gitoid:blob:sha1:${sha1hex}"))
       val root = makeItem(
         id = SwhidRootId,
-        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(cert.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, cert)
@@ -2153,7 +2155,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val cert = swhidCert(certId, Some(s"gitoid:blob:sha1:${sha1hex}"))
       val root = makeItem(
         id = SwhidRootId,
-        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(cert.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, cert)
@@ -2191,7 +2193,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val cert = swhidCert(certId, None)
       val root = makeItem(
         id = SwhidRootId,
-        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(cert.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, cert)
@@ -2226,7 +2228,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val cert = makeItem(
         id = certId,
-        connections = TreeSet(
+        connections = TestEdges.edges(
           (EdgeType.containedBy -> SwhidRootId) +:
             badAliases.map(EdgeType.aliasFrom -> _)*
         ),
@@ -2239,7 +2241,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = SwhidRootId,
-        connections = TreeSet(EdgeType.contains -> cert.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(cert.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, cert)
@@ -2273,7 +2275,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       val ks = makeItem(
         id = ksId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("store.jks"),
         mimeTypes = TreeSet("application/x-java-keystore"),
         extra = TreeMap(
@@ -2292,7 +2294,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> ks.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(ks.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, ks)
@@ -2354,7 +2356,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       val ks = makeItem(
         id = ksId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("trust.jks"),
         mimeTypes = TreeSet("application/x-java-keystore"),
         extra = TreeMap(
@@ -2370,7 +2372,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> ks.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(ks.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, ks)
@@ -2419,16 +2421,13 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
       // the pipeline item is top-level (no containedBy), so wrap it under a
       // synthetic root or the emitter would treat it as a second root
-      val ksItem = items.head
-        .copy(connections =
-          items.head.connections + (EdgeType.containedBy -> rootId)
-        )
+      val ksItem = items.head.withConnection(EdgeType.containedBy, rootId)
 
       val storage = MemStorage(None)
       storeItem(storage, ksItem)
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> ksItem.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(ksItem.identifier)),
         fileNames = TreeSet("root")
       )
 
@@ -2524,12 +2523,12 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       items.foreach(i =>
         storeItem(
           storage,
-          i.copy(connections = i.connections + (EdgeType.containedBy -> rootId))
+          i.withConnection(EdgeType.containedBy, rootId)
         )
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(
+        connections = TestEdges.edges(
           items.map(i => EdgeType.contains -> i.identifier)*
         ),
         fileNames = TreeSet("root")
@@ -2588,7 +2587,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       val leafId = "gitoid:blob:sha256:" + ("2" * 64)
       val container = makeItem(
         id = containerId,
-        connections = TreeSet(
+        connections = TestEdges.edges(
           EdgeType.containedBy -> rootId,
           EdgeType.contains -> leafId,
           EdgeType.aliasFrom -> s"gitoid:blob:sha1:$sha1Container"
@@ -2601,7 +2600,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val leaf = makeItem(
         id = leafId,
-        connections = TreeSet(
+        connections = TestEdges.edges(
           EdgeType.containedBy -> containerId,
           EdgeType.aliasFrom -> s"gitoid:blob:sha1:$sha1Leaf"
         ),
@@ -2617,7 +2616,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(
+        connections = TestEdges.edges(
           EdgeType.contains -> container.identifier,
           EdgeType.aliasFrom -> s"gitoid:blob:sha1:$sha1Root"
         ),
@@ -2678,12 +2677,12 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       items.foreach(i =>
         storeItem(
           storage,
-          i.copy(connections = i.connections + (EdgeType.containedBy -> rootId))
+          i.withConnection(EdgeType.containedBy, rootId)
         )
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(
+        connections = TestEdges.edges(
           items.map(i => EdgeType.contains -> i.identifier)*
         ),
         fileNames = TreeSet("root")
@@ -2730,7 +2729,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       val ks = makeItem(
         id = ksId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("store.jks"),
         mimeTypes = TreeSet("application/x-java-keystore"),
         extra = TreeMap(
@@ -2749,7 +2748,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> ks.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(ks.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, ks)
@@ -2811,7 +2810,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       val ks = makeItem(
         id = ksId,
-        connections = TreeSet(EdgeType.containedBy -> rootId),
+        connections = TreeMap(EdgeType.containedBy -> TreeSet(rootId)),
         fileNames = TreeSet("trust.jks"),
         mimeTypes = TreeSet("application/x-java-keystore"),
         extra = TreeMap(
@@ -2827,7 +2826,7 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
       )
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> ks.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(ks.identifier)),
         fileNames = TreeSet("root")
       )
       storeItem(storage, ks)
@@ -2876,16 +2875,13 @@ class CbomEmitterSuite extends GoatRodeoFunSuite {
         "gitoid:blob:sha256:0000000000000000000000000000000000000000000000000000000000000000"
       // the pipeline item is top-level (no containedBy), so wrap it under a
       // synthetic root or the emitter would treat it as a second root
-      val ksItem = items.head
-        .copy(connections =
-          items.head.connections + (EdgeType.containedBy -> rootId)
-        )
+      val ksItem = items.head.withConnection(EdgeType.containedBy, rootId)
 
       val storage = MemStorage(None)
       storeItem(storage, ksItem)
       val root = makeItem(
         id = rootId,
-        connections = TreeSet(EdgeType.contains -> ksItem.identifier),
+        connections = TreeMap(EdgeType.contains -> TreeSet(ksItem.identifier)),
         fileNames = TreeSet("root")
       )
 

@@ -82,7 +82,7 @@ object PurlAliasWriter {
       {
         case Some(existing) =>
           val withAlias = existing.copy(
-            connections = existing.connections + (EdgeType.aliasFrom -> purl)
+            connections = existing.connectionsPlus(EdgeType.aliasFrom, purl)
           )
           val withMeta =
             if (extra.nonEmpty)
@@ -96,7 +96,7 @@ object PurlAliasWriter {
         case None =>
           val base = Item(
             itemIdentifier,
-            TreeSet(EdgeType.aliasFrom -> purl),
+            TreeMap(EdgeType.aliasFrom -> TreeSet(purl)),
             None,
             None
           )
@@ -124,17 +124,14 @@ object PurlAliasWriter {
           // pURL item already exists — add another aliasTo pointing to this
           // JAR item
           Some(
-            existingPurlItem.copy(
-              connections =
-                existingPurlItem.connections + (EdgeType.aliasTo -> itemIdentifier)
-            )
+            existingPurlItem.withConnection(EdgeType.aliasTo, itemIdentifier)
           )
         case None =>
           // First time we've seen this pURL — create the item
           Some(
             Item(
               purl,
-              TreeSet(EdgeType.aliasTo -> itemIdentifier),
+              TreeMap(EdgeType.aliasTo -> TreeSet(itemIdentifier)),
               Some(ItemMetaData.mimeType),
               Some(
                 ItemMetaData(

@@ -232,13 +232,13 @@ class StructTestSuite extends GoatRodeoFunSuite {
     // Must have non-empty fileNames for merge to work
     val a = ItemMetaData(
       TreeSet("file.txt"),
-      TreeSet(),
+      TreeSet[String]("text/plain"),
       100,
       TreeMap("key1" -> TreeSet(StringOrPair("val1")))
     )
     val b = ItemMetaData(
       TreeSet("file.txt"),
-      TreeSet(),
+      TreeSet[String]("text/plain"),
       100,
       TreeMap("key2" -> TreeSet(StringOrPair("val2")))
     )

@@ -339,7 +339,7 @@ class OciDockerParitySuite extends GoatRodeoFunSuite {
         val layers =
           byMime.getOrElse("application/vnd.oci.image.layer.v1.tar", Vector())
         val config = configItem(storage)
-        val contains = config.connections.count(_._1 == EdgeType.contains)
+        val contains = config.edges.count(_._1 == EdgeType.contains)
         (layers.length, contains)
       }
       val (dockerLayers, dockerContains) = layerStats(docker)
